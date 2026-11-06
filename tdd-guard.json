@@ -1,0 +1,12 @@
+{
+  "docsDir": "docs",
+  "projectDir": "",
+  "team": true,
+  "autoRun": "class",
+  "verifyOnTurnEnd": true,
+  "autoFix": true,
+  "maxAutoFix": 2,
+  "strict": false,
+  "testCommand": "",
+  "commitBranch": "feature/{domain}"
+}
