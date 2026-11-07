@@ -1,10 +1,10 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-07 20:02 KST · tdd-guard
+- 생성: 2026-11-07 23:03 KST · tdd-guard
 - 설계서: C:/pickup/docs
 - 프로젝트: gradle · C:/pickup
-- 테스트: ● GREEN · 483 passed · 전체 · 36s
-- 진행: 공유모듈 57/57 · 사용자 71/71 · 인증 21/100 · 일정 0/55 · 장소 0/43 · 픽업 0/203 · 알림 0/44 · 남은 항목 424/573
+- 테스트: ● GREEN · 725 passed · 전체 · 1.5s
+- 진행: 공유모듈 57/57 · 사용자 71/71 · 인증 120/120 · 일정 0/55 · 장소 0/43 · 픽업 0/203 · 알림 0/44 · 남은 항목 345/593
 - 현재 도메인: 인증 (05_인증-auth.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
@@ -16,92 +16,8 @@
 ### 완료 기준
 - [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
 
-## 3. 인증 (auth) · 05_인증-auth.md · 진행 중 · 항목 21/100 · 완료 기준 0/4
-### 테스트 케이스
-- [ ] #16 [persistence] Device를 refreshTokenHash로 찾는다
-- [ ] #17 [persistence] loadLiveDevices는 revokedAt이 빈 기기만 돌려준다
-- [ ] #18 [persistence] loadLinkCodeByCode는 8자 code로 연결 코드를 찾는다
-- [ ] #19 [persistence] loadIssuedCodes는 그 차량의 ISSUED 코드만 돌려준다
-- [ ] #20 [persistence] MemberInvite를 token으로 찾고 같은 token 두 개는 유니크 위반이 난다
-- [ ] #21 [persistence] loadLatestInvite는 그 멤버의 가장 최근 초대를 돌려준다
-- [ ] #22 [서비스] 토큰 발급은 refresh 원문을 돌려주고 Device에는 그 SHA-256 해시만 저장한다
-- [ ] #23 [서비스] 발급한 access 토큰에는 주체 · familyId · role이 들어 있다
-- [ ] #24 [서비스] 토큰 갱신은 새 refresh 토큰을 주고 이전 refresh 토큰으로 다시 갱신하면 REFRESH_TOKEN_INVALID로 거절한다
-- [ ] #25 [서비스] 폐기된 기기의 refresh 토큰으로 갱신하면 REFRESH_TOKEN_INVALID로 거절한다
-- [ ] #26 [서비스] 차량 기기 등록은 연결된 VIN이면 VEHICLE_ALREADY_LINKED로 거절한다
-- [ ] #27 [서비스] 차량 기기 등록은 같은 VIN의 연결 대기 행이 있으면 새 Vehicle을 만들지 않고 그 vehicleId를 쓴다
-- [ ] #28 [서비스] 차량 기기 등록은 ownerType VEHICLE · platform VEHICLE인 Device를 만든다
-- [ ] #29 [서비스] 연결 전 기기 토큰으로는 LINK-01 · LINK-02 외의 API를 부를 수 없다
-- [ ] #30 [서비스] 푸시 토큰 갱신은 지금 기기의 pushToken과 pushUpdatedAt을 바꾼다
-- [ ] #31 [서비스] 차량 로그아웃은 진행 중 픽업이 있으면 ACTIVE_PICKUP_EXISTS로 거절한다
-- [ ] #32 [서비스] 차량 로그아웃이 성공하면 그 기기의 revokedAt이 채워진다
-- [ ] #33 [서비스] 연결 코드 발급은 그 차량의 이전 ISSUED 코드를 EXPIRED로 바꾼다
-- [ ] #34 [서비스] 연결 코드 발급은 첫 발급 때 reissuesLeft 4를 돌려준다
-- [ ] #35 [서비스] 연결 코드를 연속 6번째로 발급하면 LINK_CODE_REISSUE_LIMIT으로 거절한다
-- [ ] #36 [서비스] 연결 상태 조회는 다른 차량이 발급한 코드면 NOT_CODE_OWNER로 거절한다
-- [ ] #37 [서비스] 연결 상태 조회는 승인 전 코드에 WAITING과 pollAfterSeconds 2를 돌려준다
-- [ ] #38 [서비스] 연결 상태 조회는 만료된 코드에 EXPIRED를 돌려준다
-- [ ] #39 [서비스] 연결 상태 조회는 NEW로 승인된 코드에 LINKED와 vehicleId · familyId · 차량 토큰을 돌려준다
-- [ ] #40 [서비스] 연결 상태 조회는 RELINK로 승인된 코드에 RELINKED를 돌려준다
-- [ ] #41 [서비스] 차량 토큰을 내려준 코드를 다시 조회하면 LINK_CODE_INVALID로 거절한다
-- [ ] #42 [서비스] 연결 코드 확인은 가족에 연결된 차량의 코드면 RELINK, 아니면 NEW를 돌려준다
-- [ ] #43 [서비스] 연결 코드 확인은 사용된 코드면 LINK_CODE_EXPIRED로 거절한다
-- [ ] #44 [서비스] 연결 코드 확인이 같은 기기에서 5번 실패하면 1분 동안 LINK_CODE_ATTEMPT_LIMIT으로 거절한다
-- [ ] #45 [서비스] 연결 승인은 mode가 코드의 실제 상태와 다르면 LINK_MODE_MISMATCH로 거절한다
-- [ ] #46 [서비스] 연결 승인은 TERMS나 PRIVACY 동의가 없으면 CONSENT_REQUIRED로 거절한다
-- [ ] #47 [서비스] 연결 승인 NEW는 CreateGuardianUseCase를 불러 가족과 GUARDIAN을 만든다
-- [ ] #48 [서비스] 연결 승인 RELINK는 기존 GUARDIAN에게 토큰을 주고 그 GUARDIAN의 이전 기기를 폐기한다
-- [ ] #49 [서비스] 연결 승인 RELINK는 이전 기기 알림 이벤트를 발행한다
-- [ ] #50 [서비스] 연결 승인은 요청의 pushToken으로 Device를 만든다
-- [ ] #51 [서비스] 연결 승인이 성공하면 코드가 USED가 되고 같은 코드로 다시 승인하면 LINK_CODE_EXPIRED로 거절한다
-- [ ] #52 [서비스] 초대 발급은 기기가 연결된 멤버에 replaceDevice false면 DEVICE_ALREADY_CONNECTED로 거절한다
-- [ ] #53 [서비스] 초대를 다시 발급하면 이전 초대 토큰으로는 확인 · 수락할 수 없다
-- [ ] #54 [서비스] 초대 발급은 다른 가족의 멤버면 NOT_FOUND로 거절한다
-- [ ] #55 [서비스] 초대 확인은 role CHILD 멤버에 requiredConsents TERMS · PRIVACY · LOCATION · PUSH를 돌려준다
-- [ ] #56 [서비스] 초대 수락은 requiredConsents 중 하나라도 agreed가 아니면 CONSENT_REQUIRED로 거절한다
-- [ ] #57 [서비스] 초대 수락은 Device를 만들고 pushToken을 저장하고 usedAt을 채운다
-- [ ] #58 [서비스] 사용된 초대를 다시 수락하면 INVITE_ALREADY_USED로 거절한다
-- [ ] #59 [서비스] 만료된 초대를 수락하면 INVITE_EXPIRED로 거절한다
-- [ ] #60 [서비스] revokeDevicesOf는 그 멤버의 살아 있는 기기를 모두 폐기한다
-- [ ] #61 [서비스] findPushTargets는 폐기됐거나 pushToken이 빈 기기를 빼고 돌려준다
-- [ ] #62 [web] POST /v1/auth/refresh는 인증 헤더 없이 200과 accessToken · refreshToken · accessTokenExpiresAt을 돌려준다
-- [ ] #63 [web] POST /v1/auth/refresh에 폐기된 토큰을 보내면 401 REFRESH_TOKEN_INVALID를 돌려준다
-- [ ] #64 [web] POST /v1/vehicle-devices는 인증 헤더 없이 201과 deviceId · vehicleId · deviceToken을 돌려준다
-- [ ] #65 [web] POST /v1/vehicle-devices에 16자 vin을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #66 [web] POST /v1/vehicle-devices가 연결된 VIN이면 409 VEHICLE_ALREADY_LINKED를 돌려준다
-- [ ] #67 [web] PUT /v1/devices/me/push-token은 204를 돌려준다
-- [ ] #68 [web] PUT /v1/devices/me/push-token에 256자 pushToken을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #69 [web] DELETE /v1/vehicle-devices/me/session은 204를 돌려준다
-- [ ] #70 [web] DELETE /v1/vehicle-devices/me/session이 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS를 돌려준다
-- [ ] #71 [web] POST /v1/vehicle-link-codes는 201과 codeId · code · qrPayload · expiresAt · reissuesLeft를 돌려준다
-- [ ] #72 [web] POST /v1/vehicle-link-codes가 한도를 넘으면 429 LINK_CODE_REISSUE_LIMIT을 돌려준다
-- [ ] #73 [web] GET /v1/vehicle-link-codes/{codeId}/status는 200과 status를 돌려준다
-- [ ] #74 [web] GET /v1/vehicle-link-codes/{codeId}/status를 다른 차량 토큰으로 부르면 403 NOT_CODE_OWNER를 돌려준다
-- [ ] #75 [web] GET /v1/vehicle-link-codes/{codeId}/status를 1초 안에 다시 부르면 429 TOO_MANY_REQUESTS를 돌려준다
-- [ ] #76 [web] GET /v1/vehicle-link-codes/by-code/{code}는 인증 헤더 없이 200과 status · vehicleModel · plateNumberMasked · expiresAt을 돌려준다
-- [ ] #77 [web] GET /v1/vehicle-link-codes/by-code/{code}가 없는 코드면 404 LINK_CODE_INVALID를 돌려준다
-- [ ] #78 [web] GET /v1/vehicle-link-codes/by-code/{code}가 만료된 코드면 410 LINK_CODE_EXPIRED를 돌려준다
-- [ ] #79 [web] POST /v1/vehicle-links는 인증 헤더 없이 201과 vehicleId · familyId · userId · accessToken · refreshToken을 돌려준다
-- [ ] #80 [web] POST /v1/vehicle-links가 mode 불일치면 409 LINK_MODE_MISMATCH를 돌려준다
-- [ ] #81 [web] POST /v1/vehicle-links가 필수 동의 누락이면 422 CONSENT_REQUIRED를 돌려준다
-- [ ] #82 [web] POST /v1/families/me/members/{userId}/invites는 201과 inviteUrl · expiresAt을 돌려준다
-- [ ] #83 [web] POST /v1/families/me/members/{userId}/invites가 기기 연결 멤버에 replaceDevice false면 409 DEVICE_ALREADY_CONNECTED를 돌려준다
-- [ ] #84 [web] POST /v1/families/me/members/{userId}/invites를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] #85 [web] GET /v1/invites/{token}은 인증 헤더 없이 200과 inviterName · memberName · role · requiredConsents · expiresAt을 돌려준다
-- [ ] #86 [web] GET /v1/invites/{token}이 사용된 초대면 409 INVITE_ALREADY_USED를 돌려준다
-- [ ] #87 [web] GET /v1/invites/{token}이 만료된 초대면 410 INVITE_EXPIRED를 돌려준다
-- [ ] #88 [web] POST /v1/invites/{token}/acceptance는 인증 헤더 없이 201과 userId · familyId · role · accessToken · refreshToken을 돌려준다
-- [ ] #89 [web] POST /v1/invites/{token}/acceptance가 필수 동의 누락이면 422 CONSENT_REQUIRED를 돌려준다
-- [ ] #90 [web] Idempotency-Key는 POST /v1/vehicle-devices · POST /v1/vehicle-links · POST /v1/families/me/members/{userId}/invites · POST /v1/invites/{token}/acceptance에만 요구된다
-- [ ] #93 [서비스] 연결 승인 NEW는 요청의 name으로 GUARDIAN을 만든다
-- [ ] #94 [web] POST /v1/vehicle-links에 mode NEW로 name 없이 보내면 422 VALIDATION_FAILED와 fields의 name을 돌려준다
-- [ ] #99 [통합] user의 AuthMemberDeviceAdapter는 auth GetMemberDeviceStatusUseCase 결과를 user DeviceStatus로 바꿔 돌려준다
-- [ ] #100 [통합] user의 RevokeMemberDevicesPort 구현은 auth RevokeMemberDevicesUseCase를 부른다
-### 완료 기준
-- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
-- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+## 3. 인증 (auth) · 05_인증-auth.md · 완료 · 항목 120/120 · 완료 기준 4/4 · 리뷰 11-07 23:03 통과 (상 1 · 중 0 · 하 5)
+- 남은 할 일 없음
 
 ## 4. 일정 (schedule) · 06_일정-schedule.md · 대기 · 항목 0/55 · 완료 기준 0/4 · 리뷰 10-28 21:19 조건부 통과 (상 0 · 중 0 · 하 6) · 재리뷰 필요
 ### 테스트 케이스

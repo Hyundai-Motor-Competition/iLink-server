@@ -5,7 +5,7 @@
 | 항목 | 내용 |
 |---|---|
 | 범위 | 엔티티 Family · User · Vehicle. API FAM-01~03 · FAM-07(가족 멤버), LINK-05(차량 연결 해제), SET-06(합류 안내 방식). 다른 모듈용 in 포트(보호자 · 가족 생성, 차량 등록 · 조회, 멤버 · 가족 조회) |
-| 의존 | 03_공유모듈-shared. auth의 in 포트(멤버 기기 상태 조회, 멤버 해제 때 기기 · 토큰 폐기), pickup의 in 포트(진행 중 픽업 여부). 둘 다 user out 포트로 두고 구현 전에는 테스트 대역으로 검증 |
+| 의존 | 03_공유모듈-shared. auth의 in 포트(멤버 기기 상태 조회, 멤버 해제 때 기기 · 토큰 폐기, LINK-05 차량 기기 폐기), pickup의 in 포트(진행 중 픽업 여부). 둘 다 user out 포트로 두고 구현 전에는 테스트 대역으로 검증 |
 | 진행 | 계층 병렬 |
 
 ## 구조
@@ -51,6 +51,7 @@ user
 | model | VARCHAR(50) | | |
 | plateNumber | VARCHAR(20) | | |
 | unlinkedAt | TIMESTAMPTZ | NULL | 연결 해제 시각 |
+| version | BIGINT | NOT NULL, 기본값 0 | 낙관적 잠금(@Version). 같은 대기 차량에 NEW 승인이 동시에 오면 하나만 성공 |
 
 - VIN 유니크는 연결 중인 행끼리만 건다. schema.sql: `CREATE UNIQUE INDEX IF NOT EXISTS … ON vehicle (vin) WHERE unlinked_at IS NULL`.
 - 연결을 해제해도 행은 지우지 않고 unlinkedAt만 채운다. 같은 차를 다시 연결하면 새 행(새 vehicleId)이 생겨 가족별 픽업 기록이 섞이지 않는다.
@@ -89,7 +90,7 @@ user
 ### 차량
 - AUTH-02(auth)가 차량 기기를 등록할 때 Vehicle 행을 familyId 없이 만든다(RegisterVehicleUseCase).
 - LINK-04 NEW(auth)가 승인되면 Family와 User(GUARDIAN)를 만들고 Vehicle.familyId를 채운다(CreateGuardianUseCase).
-- LINK-05: GUARDIAN만, 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS, 성공하면 unlinkedAt만 채운다. 해제 뒤 같은 VIN은 AUTH-02에서 새 행으로 등록된다.
+- LINK-05: GUARDIAN만, 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS, 성공하면 unlinkedAt을 채우고 그 차량의 살아 있는 기기를 모두 폐기한다(RevokeVehicleDevicesPort → auth RevokeVehicleDevicesUseCase, 사람 결정 2026-11-07). 해제 뒤 같은 VIN은 AUTH-02에서 새 행으로 등록된다.
 - 번호판 마스킹: 뒷자리를 가린다(예: 「12가 ****」).
 
 ### 합류 안내 방식
@@ -126,6 +127,7 @@ long countNonChildMembers(long familyId);                                       
 Optional<Vehicle> loadVehicle(long vehicleId);  Optional<Vehicle> loadLinkedVehicleByVin(String vin);  Optional<Vehicle> loadLinkedVehicleOfFamily(long familyId);  Vehicle saveVehicle(Vehicle vehicle);   // LoadVehiclePort · SaveVehiclePort
 Map<Long, DeviceStatus> loadDeviceStatuses(List<Long> userIds);   // LoadMemberDeviceStatusPort → auth
 void revokeDevicesOf(long userId);                                 // RevokeMemberDevicesPort → auth
+void revokeDevicesOfVehicle(long vehicleId);                       // RevokeVehicleDevicesPort → auth RevokeVehicleDevicesUseCase (LINK-05, 구현 adapter/out/auth/AuthVehicleDeviceAdapter)
 boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);   // CheckActivePickupPort → pickup
 ```
 
@@ -212,11 +214,11 @@ boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);
 | 멤버 해제 때 User 행 처리 | 소스에 없음. SessionChild · PickupSchedule이 User를 FK로 가리켜 지난 기록이 있는 멤버는 행을 지울 수 없음. 삭제 대신 표시만 하는 방식이 필요한지 정해야 함 |
 | 멤버 해제 때 그 자녀의 일정 · 장소 처리 | 소스에 없음. 그대로 둔다고 가정 |
 | LINK-05를 차량 앱이 부를 수 있는지 | 4.3 표의 사용 화면에 「차량 설정 요약 화면」이 있으나 4.14 호출은 GUARDIAN뿐. 4.14대로 USER 주체 GUARDIAN만 허용 |
-| LINK-05 때 차량 기기 토큰 폐기 | 소스에 없음. 폐기하지 않는다고 가정 |
+| LINK-05 때 차량 기기 토큰 폐기 | 결정됨(사람 결정 2026-11-07). 해제하면 그 차량의 살아 있는 기기를 모두 폐기한다. 해제된 차량 앱은 AUTH-02로 다시 등록한다. 포트도 결정됨: RevokeVehicleDevicesPort → auth RevokeVehicleDevicesUseCase |
 | settingsVersion을 올리는 변경의 범위 | SET-06만 명시됨. 일정(SET-02 · 03) · 장소(SPOT-02 · 03) · 멤버 변경도 올리는지 정해야 함(SET-08 충돌 판단에 영향) |
 | 번호판 마스킹 규칙 | 예시 「12가 ****」뿐. 마지막 숫자 4자리를 *로 바꾼다고 가정 |
 | user ↔ auth 서로 부름 | auth는 User 생성을 user에 요청하고, user는 기기 상태 · 폐기를 auth에 요청. user 쪽은 out 포트로 두고 auth 구현 전에는 테스트 대역으로 검증 |
 | 진행 중 픽업 확인(FAM-07 · LINK-05)을 pickup in 포트로 부르는 것 | pickup이 user보다 뒤에 구현되므로 out 포트 + 테스트 대역으로 먼저 검증 |
 | 포트 · 유스케이스 이름 | 소스 2.2 예시(StartPickupUseCase, LoadSessionPort)의 이름 규칙을 따른 제안 |
-| LINK-04 NEW로 만드는 GUARDIAN의 name | LINK-04 요청에 이름이 없음(05_인증-auth.md에도 기록). 이름을 받을 곳을 정해야 함 |
+| LINK-04 NEW로 만드는 GUARDIAN의 name · phone | name은 결정됨(사람 결정 2026-11-07). LINK-04 요청 name, mode NEW일 때 필수(05_인증-auth.md와 같음). phone은 미정. 요청에 없어 null로 만들고 있어 「자녀 외 phone 필수」 규칙과 어긋남. 보호자 전화번호를 받을 곳을 정해야 함 |
 | Role enum 위치 | 해소: 02에 「common 순수 타입(Role · PrincipalType · LatLng)은 domain에서 써도 된다」 예외를 둠. user/domain은 common.security.Role을 그대로 쓰고 Role enum을 따로 만들지 않음(사람 결정 2026-11-07, 03 확인 필요 사항) |
