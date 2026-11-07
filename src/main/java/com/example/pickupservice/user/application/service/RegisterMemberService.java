@@ -33,7 +33,7 @@ public class RegisterMemberService implements RegisterMemberUseCase {
 			throw UserErrors.memberLimitExceeded();
 		}
 		if (command.role() != Role.CHILD && !PhoneRule.isValid(command.phone())) {
-			throw BusinessException.of(ErrorCode.VALIDATION_FAILED);
+			throw BusinessException.invalidField("phone", "자녀 외 멤버는 국제 형식 전화번호가 필요합니다");
 		}
 		User saved = saveUserPort.saveUser(
 				User.create(command.familyId(), command.role(), command.name(), command.phone()));

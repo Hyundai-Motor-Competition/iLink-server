@@ -2,6 +2,7 @@ package com.example.pickupservice.user.application.service;
 
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.error.ErrorCode;
+import com.example.pickupservice.common.error.ErrorResponse.FieldError;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.user.application.port.in.MemberResult;
 import com.example.pickupservice.user.application.port.in.UpdateMemberCommand;
@@ -173,6 +174,111 @@ class UpdateMemberServiceTest {
 		assertThat(exception.code()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
 		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
 		verify(saveUserPort, never()).saveUser(any());
+	}
+
+	@Test
+	@DisplayName("자녀 외 멤버를 phone 없이 등록하거나 GUARDIAN이 자기 role을 바꾸려 할 때의 VALIDATION_FAILED는 fields에 phone · role을 담는다")
+	void putsRoleInFieldsWhenGuardianChangesOwnRole() {
+		lenient().when(loadUserPort.loadUser(GUARDIAN_ID)).thenReturn(Optional.of(
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678")));
+		lenient().when(saveUserPort.saveUser(any())).thenAnswer(returnsFirstArg());
+		lenient().when(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList())).thenReturn(Map.of());
+		UpdateMemberCommand command = new UpdateMemberCommand(
+				FAMILY_ID, GUARDIAN_ID, Role.GUARDIAN, GUARDIAN_ID, null, null, Role.CO_GUARDIAN);
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> updateMemberService.updateMember(command));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.code()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
+		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		assertThat(exception.fields()).isNotNull();
+		assertThat(exception.fields()).extracting(FieldError::field).containsExactly("role");
+		assertThat(exception.fields()).extracting(FieldError::reason).allSatisfy(
+				reason -> assertThat(reason).isNotBlank());
+		verify(saveUserPort, never()).saveUser(any());
+	}
+
+	@Test
+	@DisplayName("멤버 수정으로 phone 없는 CHILD를 자녀 외 role로 바꾸면 VALIDATION_FAILED로 거절하고 fields에 phone을 담는다")
+	void rejectsChangingChildWithoutPhoneToNonChildRole() {
+		given(loadUserPort.loadUser(CHILD_ID)).willReturn(Optional.of(
+				User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null)));
+		lenient().when(loadUserPort.countNonChildMembers(FAMILY_ID)).thenReturn(1L);
+		lenient().when(saveUserPort.saveUser(any())).thenAnswer(returnsFirstArg());
+		lenient().when(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList())).thenReturn(Map.of());
+		UpdateMemberCommand command = new UpdateMemberCommand(
+				FAMILY_ID, GUARDIAN_ID, Role.GUARDIAN, CHILD_ID, null, null, Role.TEACHER);
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> updateMemberService.updateMember(command));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.code()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
+		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		assertThat(exception.fields()).isNotNull();
+		assertThat(exception.fields()).extracting(FieldError::field).containsExactly("phone");
+		verify(saveUserPort, never()).saveUser(any());
+	}
+
+	@Test
+	@DisplayName("멤버 수정으로 phone 없는 CHILD를 자녀 외 role로 바꿀 때 phone을 함께 보내면 바꾼다")
+	void changesChildWithoutPhoneToNonChildRoleWhenPhoneIsSent() {
+		given(loadUserPort.loadUser(CHILD_ID)).willReturn(Optional.of(
+				User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null)));
+		lenient().when(loadUserPort.countNonChildMembers(FAMILY_ID)).thenReturn(1L);
+		given(saveUserPort.saveUser(any())).willAnswer(returnsFirstArg());
+		given(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList())).willReturn(Map.of());
+		UpdateMemberCommand command = new UpdateMemberCommand(
+				FAMILY_ID, GUARDIAN_ID, Role.GUARDIAN, CHILD_ID, null, "+821012345678", Role.TEACHER);
+
+		MemberResult result = updateMemberService.updateMember(command);
+
+		ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+		verify(saveUserPort).saveUser(savedUser.capture());
+		assertThat(savedUser.getValue().getRole()).isEqualTo(Role.TEACHER);
+		assertThat(savedUser.getValue().getPhone()).isEqualTo("+821012345678");
+		assertThat(result).isEqualTo(new MemberResult(
+				CHILD_ID, Role.TEACHER, "민준", "+821012345678", DeviceStatus.NONE));
+	}
+
+	@Test
+	@DisplayName("멤버 수정으로 CHILD를 자녀 외 role로 바꿀 때 자녀 외 멤버가 이미 5명이면 MEMBER_LIMIT_EXCEEDED로 거절한다")
+	void rejectsChangingChildToNonChildRoleWhenFiveNonChildMembersAlreadyExist() {
+		given(loadUserPort.loadUser(CHILD_ID)).willReturn(Optional.of(
+				User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null)));
+		lenient().when(loadUserPort.countNonChildMembers(FAMILY_ID)).thenReturn(5L);
+		lenient().when(saveUserPort.saveUser(any())).thenAnswer(returnsFirstArg());
+		lenient().when(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList())).thenReturn(Map.of());
+		UpdateMemberCommand command = new UpdateMemberCommand(
+				FAMILY_ID, GUARDIAN_ID, Role.GUARDIAN, CHILD_ID, null, "+821012345678", Role.DELEGATE);
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> updateMemberService.updateMember(command));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.code()).isEqualTo("MEMBER_LIMIT_EXCEEDED");
+		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		verify(saveUserPort, never()).saveUser(any());
+	}
+
+	@Test
+	@DisplayName("멤버 수정으로 자녀 외 멤버의 role을 다른 자녀 외 role로 바꿀 때는 자녀 외 멤버가 5명이어도 바꾼다")
+	void changesNonChildRoleToAnotherNonChildRoleEvenWhenFiveNonChildMembersExist() {
+		given(loadUserPort.loadUser(DELEGATE_ID)).willReturn(Optional.of(
+				User.restore(DELEGATE_ID, FAMILY_ID, Role.TEACHER, "이선생", "+821098765432")));
+		lenient().when(loadUserPort.countNonChildMembers(FAMILY_ID)).thenReturn(5L);
+		given(saveUserPort.saveUser(any())).willAnswer(returnsFirstArg());
+		given(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList())).willReturn(Map.of());
+		UpdateMemberCommand command = new UpdateMemberCommand(
+				FAMILY_ID, GUARDIAN_ID, Role.GUARDIAN, DELEGATE_ID, null, null, Role.DELEGATE);
+
+		MemberResult result = updateMemberService.updateMember(command);
+
+		ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+		verify(saveUserPort).saveUser(savedUser.capture());
+		assertThat(savedUser.getValue().getRole()).isEqualTo(Role.DELEGATE);
+		assertThat(result.role()).isEqualTo(Role.DELEGATE);
 	}
 
 	@Test

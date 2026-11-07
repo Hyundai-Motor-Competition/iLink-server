@@ -21,6 +21,8 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class UpdateMemberService implements UpdateMemberUseCase {
 
+	private static final long NON_CHILD_MEMBER_LIMIT = 5;
+
 	private final LoadUserPort loadUserPort;
 	private final SaveUserPort saveUserPort;
 	private final LoadMemberDeviceStatusPort loadMemberDeviceStatusPort;
@@ -32,6 +34,7 @@ public class UpdateMemberService implements UpdateMemberUseCase {
 				.filter(found -> Objects.equals(found.getFamilyId(), command.familyId()))
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
 		checkRoleChangeAllowed(command);
+		checkChildPromotionAllowed(user, command);
 		applyChanges(user, command);
 		User saved = saveUserPort.saveUser(user);
 		return MemberResults.withDeviceStatus(List.of(saved), loadMemberDeviceStatusPort).getFirst();
@@ -45,7 +48,20 @@ public class UpdateMemberService implements UpdateMemberUseCase {
 			throw BusinessException.of(ErrorCode.FORBIDDEN);
 		}
 		if (command.requesterRole() == Role.GUARDIAN && command.requesterId() == command.userId()) {
-			throw BusinessException.of(ErrorCode.VALIDATION_FAILED);
+			throw BusinessException.invalidField("role", "보호자 자신의 역할은 바꿀 수 없습니다");
+		}
+	}
+
+	private void checkChildPromotionAllowed(User user, UpdateMemberCommand command) {
+		if (user.getRole() != Role.CHILD || command.role() == null || command.role() == Role.CHILD) {
+			return;
+		}
+		String phone = command.phone() != null ? command.phone() : user.getPhone();
+		if (phone == null || phone.isBlank()) {
+			throw BusinessException.invalidField("phone", "자녀 외 멤버는 전화번호가 필요합니다");
+		}
+		if (loadUserPort.countNonChildMembers(command.familyId()) >= NON_CHILD_MEMBER_LIMIT) {
+			throw UserErrors.memberLimitExceeded();
 		}
 	}
 

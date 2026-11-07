@@ -2,6 +2,7 @@ package com.example.pickupservice.user.application.service;
 
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.error.ErrorCode;
+import com.example.pickupservice.common.error.ErrorResponse.FieldError;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.user.application.port.in.RegisterMemberCommand;
 import com.example.pickupservice.user.application.port.out.LoadUserPort;
@@ -164,6 +165,28 @@ class RegisterMemberServiceTest {
 		assertThat(exception).isNotNull();
 		assertThat(exception.code()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
 		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		verify(saveUserPort, never()).saveUser(any());
+	}
+
+	@ParameterizedTest
+	@MethodSource("nonChildRolesWithoutPhone")
+	@DisplayName("자녀 외 멤버를 phone 없이 등록하거나 GUARDIAN이 자기 role을 바꾸려 할 때의 VALIDATION_FAILED는 fields에 phone · role을 담는다")
+	void putsPhoneInFieldsWhenNonChildMemberIsRegisteredWithoutPhone(Role role, String phone) {
+		lenient().when(saveUserPort.saveUser(any())).thenReturn(
+				User.restore(172L, FAMILY_ID, role, "정멤버", phone));
+		RegisterMemberCommand command = new RegisterMemberCommand(
+				FAMILY_ID, Role.GUARDIAN, role, "정멤버", phone);
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> registerMemberService.registerMember(command));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.code()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
+		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		assertThat(exception.fields()).isNotNull();
+		assertThat(exception.fields()).extracting(FieldError::field).containsExactly("phone");
+		assertThat(exception.fields()).extracting(FieldError::reason).allSatisfy(
+				reason -> assertThat(reason).isNotBlank());
 		verify(saveUserPort, never()).saveUser(any());
 	}
 
