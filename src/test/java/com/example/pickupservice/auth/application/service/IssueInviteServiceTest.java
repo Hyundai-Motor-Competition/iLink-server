@@ -48,6 +48,8 @@ class IssueInviteServiceTest {
 	private static final long FAMILY_ID = 12L;
 	private static final long OTHER_FAMILY_ID = 99L;
 	private static final long CHILD_ID = 33L;
+	private static final long GUARDIAN_ID = 31L;
+	private static final long CO_GUARDIAN_ID = 32L;
 	private static final long PREVIOUS_INVITE_ID = 701L;
 	private static final String PREVIOUS_TOKEN = "inv-previous-token";
 	private static final String NEW_TOKEN = "inv-new-token-0123456789";
@@ -183,9 +185,59 @@ class IssueInviteServiceTest {
 		verify(saveInvitePort, never()).saveInvite(any());
 	}
 
+	@Test
+	@DisplayName("초대 발급은 대상 멤버의 role이 GUARDIAN이면 FORBIDDEN으로 거절한다")
+	void issueInviteRejectsGuardianMember() {
+		givenMember(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN);
+		lenient().when(loadDevicePort.loadLiveDevices(OwnerType.USER, GUARDIAN_ID)).thenReturn(List.of());
+		lenient().when(loadInvitePort.loadLatestInvite(GUARDIAN_ID)).thenReturn(Optional.of(MemberInvite.restore(
+				PREVIOUS_INVITE_ID, GUARDIAN_ID, PREVIOUS_TOKEN, NOW.plus(Duration.ofHours(20)), null)));
+
+		assertError(() -> issueInviteService.issueInvite(new IssueInviteCommand(FAMILY_ID, GUARDIAN_ID, false)),
+				HttpStatus.FORBIDDEN, "FORBIDDEN");
+
+		verify(saveInvitePort, never()).saveInvite(any());
+		verify(inviteTokenGenerator, never()).generate();
+	}
+
+	@Test
+	@DisplayName("초대 발급은 대상 멤버의 role이 GUARDIAN이면 replaceDevice true여도 FORBIDDEN으로 거절한다")
+	void issueInviteRejectsGuardianMemberEvenWhenReplaceDeviceIsTrue() {
+		givenMember(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN);
+		lenient().when(loadDevicePort.loadLiveDevices(OwnerType.USER, GUARDIAN_ID))
+				.thenReturn(List.of(liveDevice(GUARDIAN_ID)));
+		lenient().when(loadInvitePort.loadLatestInvite(GUARDIAN_ID)).thenReturn(Optional.empty());
+
+		assertError(() -> issueInviteService.issueInvite(new IssueInviteCommand(FAMILY_ID, GUARDIAN_ID, true)),
+				HttpStatus.FORBIDDEN, "FORBIDDEN");
+
+		verify(saveInvitePort, never()).saveInvite(any());
+		verify(inviteTokenGenerator, never()).generate();
+	}
+
+	@Test
+	@DisplayName("초대 발급은 대상 멤버의 role이 CO_GUARDIAN이면 초대를 만든다")
+	void issueInviteIssuesForCoGuardianMember() {
+		givenMember(CO_GUARDIAN_ID, FAMILY_ID, Role.CO_GUARDIAN);
+		lenient().when(loadDevicePort.loadLiveDevices(OwnerType.USER, CO_GUARDIAN_ID)).thenReturn(List.of());
+		lenient().when(loadInvitePort.loadLatestInvite(CO_GUARDIAN_ID)).thenReturn(Optional.empty());
+
+		InviteResult result = issueInviteService.issueInvite(new IssueInviteCommand(FAMILY_ID, CO_GUARDIAN_ID, false));
+
+		assertThat(result.inviteUrl()).isEqualTo(BASE_URL + NEW_TOKEN);
+		assertThat(savedInvites()).singleElement().satisfies(invite -> {
+			assertThat(invite.getUserId()).isEqualTo(CO_GUARDIAN_ID);
+			assertThat(invite.getToken()).isEqualTo(NEW_TOKEN);
+		});
+	}
+
 	private void givenMember(long userId, long familyId) {
+		givenMember(userId, familyId, Role.CHILD);
+	}
+
+	private void givenMember(long userId, long familyId, Role role) {
 		when(loadMemberUseCase.findMember(userId))
-				.thenReturn(Optional.of(new MemberInfo(userId, familyId, Role.CHILD, "민준", null)));
+				.thenReturn(Optional.of(new MemberInfo(userId, familyId, role, "민준", null)));
 	}
 
 	private List<MemberInvite> savedInvites() {

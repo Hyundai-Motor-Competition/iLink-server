@@ -18,7 +18,7 @@ public interface InviteApiDoc {
 	@Operation(summary = "초대 발급 (FAM-04)", description = "GUARDIAN · CO_GUARDIAN. Idempotency-Key 필요. 24시간 · 1회용 초대 링크를 만들고 다시 발급하면 이전 링크는 폐기한다. 본문은 생략할 수 있고 replaceDevice 기본값은 false")
 	@ApiResponse(responseCode = "201", description = "inviteUrl · expiresAt")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
-	@ApiResponse(responseCode = "403", description = "FORBIDDEN (GUARDIAN · CO_GUARDIAN이 아님)")
+	@ApiResponse(responseCode = "403", description = "FORBIDDEN (GUARDIAN · CO_GUARDIAN이 아님, 대상 멤버가 GUARDIAN)")
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (없거나 다른 가족의 멤버)")
 	@ApiResponse(responseCode = "409", description = "DEVICE_ALREADY_CONNECTED (기기가 연결된 멤버에 replaceDevice false)")
 	InviteResponse issueInvite(@Parameter(hidden = true) AuthPrincipal principal, long userId, IssueInviteRequest request);

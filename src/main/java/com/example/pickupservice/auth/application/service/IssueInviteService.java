@@ -10,7 +10,9 @@ import com.example.pickupservice.auth.domain.MemberInvite;
 import com.example.pickupservice.auth.domain.OwnerType;
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.error.ErrorCode;
+import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.user.application.port.in.LoadMemberUseCase;
+import com.example.pickupservice.user.application.port.in.MemberInfo;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,9 +58,12 @@ public class IssueInviteService implements IssueInviteUseCase {
 	}
 
 	private void verifyFamilyMember(long familyId, long userId) {
-		loadMemberUseCase.findMember(userId)
-				.filter(member -> member.familyId() == familyId)
+		MemberInfo member = loadMemberUseCase.findMember(userId)
+				.filter(found -> found.familyId() == familyId)
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
+		if (member.role() == Role.GUARDIAN) {
+			throw BusinessException.of(ErrorCode.FORBIDDEN);
+		}
 	}
 
 	private boolean hasLiveDevice(long userId) {

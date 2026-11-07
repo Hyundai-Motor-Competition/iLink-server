@@ -1,5 +1,6 @@
 package com.example.pickupservice.auth.adapter.in.web;
 
+import com.example.pickupservice.auth.adapter.in.web.doc.InviteApiDoc;
 import com.example.pickupservice.auth.application.port.in.AcceptInviteCommand;
 import com.example.pickupservice.auth.application.port.in.AcceptInviteResult;
 import com.example.pickupservice.auth.application.port.in.ConsentAgreement;
@@ -9,8 +10,11 @@ import com.example.pickupservice.auth.application.port.in.IssueInviteCommand;
 import com.example.pickupservice.auth.domain.ConsentType;
 import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
+import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.Role;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,12 +24,14 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 import static com.example.pickupservice.common.fixture.AccessTokenFixture.bearer;
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonError;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -157,6 +163,34 @@ class InviteControllerTest extends AuthWebTestSupport {
 				.andExpect(commonError(HttpStatus.FORBIDDEN, "FORBIDDEN"));
 
 		then(issueInviteUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/families/me/members/{userId}/invites의 대상 멤버가 GUARDIAN이면 403 FORBIDDEN을 돌려준다")
+	void issueInviteForGuardianTargetReturns403() throws Exception {
+		given(issueInviteUseCase.issueInvite(any())).willThrow(BusinessException.of(ErrorCode.FORBIDDEN));
+		String coGuardianToken = accessTokenFixture.user(CO_GUARDIAN_USER_ID, FAMILY_ID, Role.CO_GUARDIAN);
+
+		mockMvc.perform(issueRequest(GUARDIAN_USER_ID, coGuardianToken, "{\"replaceDevice\": true}"))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
+				.andExpect(commonError(HttpStatus.FORBIDDEN, "FORBIDDEN"));
+
+		then(issueInviteUseCase).should().issueInvite(new IssueInviteCommand(FAMILY_ID, GUARDIAN_USER_ID, true));
+	}
+
+	@Test
+	@DisplayName("POST /v1/families/me/members/{userId}/invites의 API 문서는 403 응답에 대상 멤버가 GUARDIAN인 경우를 적는다")
+	void issueInviteApiDocDescribes403ForGuardianTarget() throws Exception {
+		Method issueInvite = InviteApiDoc.class.getMethod(
+				"issueInvite", AuthPrincipal.class, long.class, IssueInviteRequest.class);
+
+		assertThat(issueInvite.getAnnotationsByType(ApiResponse.class))
+				.filteredOn(response -> response.responseCode().equals("403"))
+				.singleElement()
+				.satisfies(response -> assertThat(response.description())
+						.contains("FORBIDDEN")
+						.contains("대상 멤버가 GUARDIAN"));
 	}
 
 	@Test
