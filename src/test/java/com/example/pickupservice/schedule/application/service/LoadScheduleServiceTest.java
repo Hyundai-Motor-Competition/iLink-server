@@ -55,7 +55,7 @@ class LoadScheduleServiceTest {
 	@Test
 	@DisplayName("findSchedules는 scheduleId의 일정 값과 학원 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려준다")
 	void findSchedulesReturnsScheduleWithAcademyInfo() {
-		Academy academy = Academy.restore(ACADEMY_ID, "해솔영어학원", "서울 강남구 테헤란로 1", LOCATION, ENTRANCE,
+		Academy academy = Academy.restore(ACADEMY_ID, "kakao:12345", "해솔영어학원", "서울 강남구 테헤란로 1", LOCATION, ENTRANCE,
 				"02-555-1234");
 		given(loadSchedulePort.loadSchedule(SCHEDULE_ID)).willReturn(Optional.of(PickupSchedule.restore(SCHEDULE_ID,
 				MINJUN_ID, academy, Set.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY), LocalTime.of(18, 0), 5,
@@ -83,7 +83,7 @@ class LoadScheduleServiceTest {
 	@Test
 	@DisplayName("findSchedules는 학원 출입구가 없는 DRAFT 일정도 entrance null로 돌려준다")
 	void findSchedulesReturnsDraftScheduleWithNullEntrance() {
-		Academy academy = Academy.restore(ACADEMY_ID, "해솔영어학원", "서울 강남구 테헤란로 1", LOCATION, null,
+		Academy academy = Academy.restore(ACADEMY_ID, "kakao:12345", "해솔영어학원", "서울 강남구 테헤란로 1", LOCATION, null,
 				"02-555-1234");
 		given(loadSchedulePort.loadSchedule(SCHEDULE_ID)).willReturn(Optional.of(PickupSchedule.restore(SCHEDULE_ID,
 				MINJUN_ID, academy, Set.of(DayOfWeek.FRIDAY), LocalTime.of(17, 30), 0, ScheduleStatus.DRAFT)));
@@ -117,7 +117,7 @@ class LoadScheduleServiceTest {
 	}
 
 	private void givenSchedule(long scheduleId, long childUserId, long academyId, String academyName) {
-		Academy academy = Academy.restore(academyId, academyName, "서울 강남구", OTHER_LOCATION, ENTRANCE, "02-000-0000");
+		Academy academy = Academy.restore(academyId, "kakao:" + academyId, academyName, "서울 강남구", OTHER_LOCATION, ENTRANCE, "02-000-0000");
 		given(loadSchedulePort.loadSchedule(scheduleId)).willReturn(Optional.of(PickupSchedule.restore(scheduleId,
 				childUserId, academy, Set.of(DayOfWeek.TUESDAY), LocalTime.of(16, 0), 10, ScheduleStatus.READY)));
 	}

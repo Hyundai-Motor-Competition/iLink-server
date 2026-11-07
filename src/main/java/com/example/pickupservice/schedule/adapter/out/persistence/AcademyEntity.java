@@ -22,6 +22,9 @@ public class AcademyEntity extends BaseTimeEntity {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long academyId;
 
+	@Column(nullable = false, length = 100, unique = true)
+	private String externalPlaceId;
+
 	@Column(nullable = false, length = 100)
 	private String name;
 
@@ -37,8 +40,10 @@ public class AcademyEntity extends BaseTimeEntity {
 	@Column(length = 20)
 	private String phone;
 
-	public AcademyEntity(Long academyId, String name, String address, Point location, Point entrance, String phone) {
+	public AcademyEntity(Long academyId, String externalPlaceId, String name, String address, Point location,
+			Point entrance, String phone) {
 		this.academyId = academyId;
+		this.externalPlaceId = externalPlaceId;
 		this.name = name;
 		this.address = address;
 		this.location = location;

@@ -16,6 +16,7 @@ import java.time.LocalTime;
 @RequiredArgsConstructor
 public class ScheduleSeed {
 
+	public static final String ACADEMY_EXTERNAL_PLACE_ID = "kakao:12345";
 	public static final String ACADEMY_NAME = "해솔영어학원";
 	public static final String ACADEMY_ADDRESS = "서울 강남구 테헤란로 152";
 	public static final double ACADEMY_LAT = 37.501234;
@@ -34,7 +35,7 @@ public class ScheduleSeed {
 	public Result seed() {
 		UserSeed.Result user = userSeed.seed();
 		return transactionTemplate.execute(status -> {
-			AcademyEntity academy = persist(new AcademyEntity(null, ACADEMY_NAME, ACADEMY_ADDRESS,
+			AcademyEntity academy = persist(new AcademyEntity(null, ACADEMY_EXTERNAL_PLACE_ID, ACADEMY_NAME, ACADEMY_ADDRESS,
 					GeoPoints.toPoint(ACADEMY_LAT, ACADEMY_LNG), GeoPoints.toPoint(ENTRANCE_LAT, ENTRANCE_LNG),
 					ACADEMY_PHONE));
 			PickupScheduleEntity schedule = persist(new PickupScheduleEntity(null, user.minjunId(),

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -30,8 +31,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 @RequiredArgsConstructor
@@ -83,11 +86,11 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 	@Test
 	@DisplayName("Academy를 저장하고 읽으면 location · entrance 좌표가 같다")
 	void savedAcademyIsLoadedWithSameLocationAndEntrance() {
-		Academy saved = saveAcademyPort.saveAcademy(Academy.create("해솔영어학원", "서울 강남구 테헤란로 152",
+		Academy saved = saveAcademyPort.saveAcademy(Academy.create(uniquePlaceId(), "해솔영어학원", "서울 강남구 테헤란로 152",
 				ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
 		assertThat(saved.getAcademyId()).as("저장된 academyId").isNotNull();
 		academyIds.add(saved.getAcademyId());
-		Academy savedWithoutEntrance = saveAcademyPort.saveAcademy(Academy.create("바른수학학원",
+		Academy savedWithoutEntrance = saveAcademyPort.saveAcademy(Academy.create(uniquePlaceId(), "바른수학학원",
 				"서울 강남구 역삼로 10", ACADEMY_LOCATION, null, null));
 		academyIds.add(savedWithoutEntrance.getAcademyId());
 		clearPersistenceContext();
@@ -111,6 +114,95 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 				.orElseThrow();
 		assertThat(loadedWithoutEntrance.getEntrance()).as("출입구 없이 저장한 학원의 entrance").isNull();
 		assertThat(loadedWithoutEntrance.getPhone()).as("대표번호 없이 저장한 학원의 phone").isNull();
+	}
+
+	@Test
+	@DisplayName("Academy를 저장하면 external_place_id 컬럼에 externalPlaceId가 들어가고 loadAcademy · loadAcademyByExternalPlaceId로 읽으면 같은 학원이 나온다")
+	void savedAcademyKeepsExternalPlaceIdAndIsFoundByIt() {
+		String placeId = uniquePlaceId();
+		Academy saved = saveAcademyPort.saveAcademy(Academy.create(placeId, "해솔영어학원", "서울 강남구 테헤란로 152",
+				ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
+		academyIds.add(saved.getAcademyId());
+		Academy other = saveAcademyPort.saveAcademy(Academy.create(uniquePlaceId(), "바른수학학원", "서울 강남구 역삼로 10",
+				ACADEMY_LOCATION, null, null));
+		academyIds.add(other.getAcademyId());
+		clearPersistenceContext();
+
+		String column = jdbcTemplate.queryForObject(
+				"select external_place_id from academy where academy_id = ?", String.class, saved.getAcademyId());
+		assertThat(column).as("external_place_id 컬럼 원문").isEqualTo(placeId);
+		assertThat(saved.getExternalPlaceId()).as("saveAcademy가 돌려준 학원의 externalPlaceId").isEqualTo(placeId);
+		assertThat(loadAcademyPort.loadAcademy(saved.getAcademyId()).orElseThrow().getExternalPlaceId())
+				.as("loadAcademy로 읽은 externalPlaceId")
+				.isEqualTo(placeId);
+
+		Academy found = loadAcademyPort.loadAcademyByExternalPlaceId(placeId).orElseThrow();
+		assertThat(found.getAcademyId()).as("externalPlaceId로 찾은 academyId").isEqualTo(saved.getAcademyId());
+		assertThat(found.getExternalPlaceId()).isEqualTo(placeId);
+		assertThat(found.getName()).isEqualTo("해솔영어학원");
+		assertThat(found.getAddress()).isEqualTo("서울 강남구 테헤란로 152");
+		assertThat(found.getPhone()).isEqualTo("02-555-1234");
+		assertThat(found.getLocation().lat()).isCloseTo(ACADEMY_LOCATION.lat(), within(COORDINATE_TOLERANCE));
+		assertThat(found.getLocation().lng()).isCloseTo(ACADEMY_LOCATION.lng(), within(COORDINATE_TOLERANCE));
+		assertThat(found.getEntrance()).as("entrance").isNotNull();
+		assertThat(found.getEntrance().lat()).isCloseTo(ACADEMY_ENTRANCE.lat(), within(COORDINATE_TOLERANCE));
+		assertThat(found.getEntrance().lng()).isCloseTo(ACADEMY_ENTRANCE.lng(), within(COORDINATE_TOLERANCE));
+	}
+
+	@Test
+	@DisplayName("loadAcademyByExternalPlaceId에 저장된 적 없는 값을 주면 빈 값을 돌려준다")
+	void loadAcademyByExternalPlaceIdReturnsEmptyForUnknownValue() {
+		newAcademy();
+		clearPersistenceContext();
+
+		assertThat(loadAcademyPort.loadAcademyByExternalPlaceId(uniquePlaceId())).as("없는 externalPlaceId").isEmpty();
+	}
+
+	@Test
+	@DisplayName("같은 externalPlaceId로 academyId 없는 학원을 한 번 더 저장하면 유니크 제약 위반으로 거절되고 행이 늘지 않는다")
+	void savingAnotherAcademyWithSameExternalPlaceIdViolatesUniqueConstraint() {
+		String placeId = uniquePlaceId();
+		Academy first = saveAcademyPort.saveAcademy(Academy.create(placeId, "해솔영어학원", "서울 강남구 테헤란로 152",
+				ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
+		academyIds.add(first.getAcademyId());
+		clearPersistenceContext();
+
+		assertThatThrownBy(() -> saveAcademyPort.saveAcademy(Academy.create(placeId, "해솔영어학원 2관",
+				"서울 강남구 테헤란로 200", ACADEMY_LOCATION, null, null)))
+				.isInstanceOf(DataIntegrityViolationException.class);
+
+		Integer rows = jdbcTemplate.queryForObject(
+				"select count(*) from academy where external_place_id = ?", Integer.class, placeId);
+		assertThat(rows).as("externalPlaceId %s인 academy 행 수", placeId).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("saveAcademy로 academyId가 있는 학원을 다시 저장하면 새 행을 만들지 않고 그 행의 이름 · 주소 · 위치 · 출입구 · 전화가 바뀌며 externalPlaceId는 그대로다")
+	void savingAcademyWithIdUpdatesSameRowInsteadOfInsertingNewOne() {
+		String placeId = uniquePlaceId();
+		Academy saved = saveAcademyPort.saveAcademy(Academy.create(placeId, "해솔영어학원", "서울 강남구 테헤란로 152",
+				ACADEMY_LOCATION, null, null));
+		academyIds.add(saved.getAcademyId());
+		clearPersistenceContext();
+		LatLng newLocation = new LatLng(37.497942, 127.027621);
+
+		Academy updated = saveAcademyPort.saveAcademy(Academy.restore(saved.getAcademyId(), placeId, "해솔영어학원 본관",
+				"서울 강남구 테헤란로 200", newLocation, ACADEMY_ENTRANCE, "02-555-9999"));
+		clearPersistenceContext();
+
+		assertThat(updated.getAcademyId()).as("다시 저장한 학원의 academyId").isEqualTo(saved.getAcademyId());
+		Integer rows = jdbcTemplate.queryForObject(
+				"select count(*) from academy where external_place_id = ?", Integer.class, placeId);
+		assertThat(rows).as("externalPlaceId %s인 academy 행 수", placeId).isEqualTo(1);
+		Academy loaded = loadAcademyPort.loadAcademy(saved.getAcademyId()).orElseThrow();
+		assertThat(loaded.getExternalPlaceId()).isEqualTo(placeId);
+		assertThat(loaded.getName()).isEqualTo("해솔영어학원 본관");
+		assertThat(loaded.getAddress()).isEqualTo("서울 강남구 테헤란로 200");
+		assertThat(loaded.getPhone()).isEqualTo("02-555-9999");
+		assertThat(loaded.getLocation().lat()).isCloseTo(newLocation.lat(), within(COORDINATE_TOLERANCE));
+		assertThat(loaded.getLocation().lng()).isCloseTo(newLocation.lng(), within(COORDINATE_TOLERANCE));
+		assertThat(loaded.getEntrance()).as("새로 생긴 entrance").isNotNull();
+		assertThat(loaded.getEntrance().lat()).isCloseTo(ACADEMY_ENTRANCE.lat(), within(COORDINATE_TOLERANCE));
 	}
 
 	@Test
@@ -141,7 +233,7 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 	void savingScheduleWithIdUpdatesSameRowInsteadOfInsertingNewOne() {
 		Academy academy = newAcademy();
 		PickupSchedule saved = newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
-		Academy academyWithoutEntrance = saveAcademyPort.saveAcademy(Academy.create("바른수학학원",
+		Academy academyWithoutEntrance = saveAcademyPort.saveAcademy(Academy.create(uniquePlaceId(), "바른수학학원",
 				"서울 강남구 역삼로 10", ACADEMY_LOCATION, null, null));
 		academyIds.add(academyWithoutEntrance.getAcademyId());
 		clearPersistenceContext();
@@ -278,10 +370,14 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 	}
 
 	private Academy newAcademy() {
-		Academy academy = saveAcademyPort.saveAcademy(Academy.create("해솔영어학원", "서울 강남구 테헤란로 152",
+		Academy academy = saveAcademyPort.saveAcademy(Academy.create(uniquePlaceId(), "해솔영어학원", "서울 강남구 테헤란로 152",
 				ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
 		academyIds.add(academy.getAcademyId());
 		return academy;
+	}
+
+	private static String uniquePlaceId() {
+		return "test:" + UUID.randomUUID();
 	}
 
 	private PickupSchedule newSchedule(long childUserId, Academy academy, DayOfWeek weekday) {

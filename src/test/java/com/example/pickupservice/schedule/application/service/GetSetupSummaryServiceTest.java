@@ -290,7 +290,7 @@ class GetSetupSummaryServiceTest {
 	}
 
 	private static Academy academy(long academyId, String name) {
-		return Academy.restore(academyId, name, "서울 강남구 테헤란로 152", LOCATION, ENTRANCE, "02-555-1234");
+		return Academy.restore(academyId, "kakao:" + academyId, name, "서울 강남구 테헤란로 152", LOCATION, ENTRANCE, "02-555-1234");
 	}
 
 	private static PickupSchedule schedule(long scheduleId, Academy academy, ScheduleStatus status) {

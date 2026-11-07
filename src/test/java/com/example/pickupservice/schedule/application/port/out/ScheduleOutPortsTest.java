@@ -50,7 +50,8 @@ class ScheduleOutPortsTest {
 
 	private void verifyPersistencePorts() {
 		assertPort(LoadAcademyPort.class,
-				method("loadAcademy", generic(Optional.class, Academy.class), params(long.class)));
+				method("loadAcademy", generic(Optional.class, Academy.class), params(long.class)),
+				method("loadAcademyByExternalPlaceId", generic(Optional.class, Academy.class), params(String.class)));
 		assertPort(SaveAcademyPort.class,
 				method("saveAcademy", Academy.class.getName(), params(Academy.class)));
 		assertPort(LoadSchedulePort.class,

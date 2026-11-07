@@ -1,15 +1,16 @@
 package com.example.pickupservice.schedule.domain;
 
-import com.example.pickupservice.common.error.BusinessException;
-import com.example.pickupservice.common.error.ErrorResponse.FieldError;
 import com.example.pickupservice.common.geo.LatLng;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.http.HttpStatus;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.Set;
@@ -25,6 +26,8 @@ class PickupScheduleTest {
 	private static final Set<DayOfWeek> MON_WED_FRI =
 			Set.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY);
 	private static final LocalTime SIX_PM = LocalTime.of(18, 0);
+	private static final Path SOURCE =
+			Path.of("src/main/java/com/example/pickupservice/schedule/domain/PickupSchedule.java");
 
 	@Test
 	@DisplayName("학원 출입구가 없으면 PickupSchedule은 DRAFT로 만들어진다")
@@ -59,11 +62,11 @@ class PickupScheduleTest {
 
 	@ParameterizedTest(name = "[{index}] targetPickup = {0}")
 	@ValueSource(ints = {-1, 61, Integer.MIN_VALUE, Integer.MAX_VALUE})
-	@DisplayName("일정 규칙은 targetPickup이 0~60을 벗어나면 422 VALIDATION_FAILED(field targetPickup)로 거절한다")
+	@DisplayName("일정 규칙은 targetPickup이 0~60을 벗어나면 도메인 예외 InvalidScheduleException(field targetPickup)으로 거절한다")
 	void rejectsTargetPickupOutOfRange(int targetPickup) {
-		assertValidationFailed(
+		assertInvalidSchedule(
 				() -> PickupSchedule.create(CHILD_USER_ID, academyWithEntrance(), MON_WED_FRI, SIX_PM, targetPickup),
-				"targetPickup");
+				"targetPickup", "0~60이어야 합니다");
 	}
 
 	@ParameterizedTest(name = "[{index}] targetPickup = {0}")
@@ -77,11 +80,19 @@ class PickupScheduleTest {
 	}
 
 	@Test
-	@DisplayName("일정 규칙은 weekdays가 비어 있으면 422 VALIDATION_FAILED(field weekdays)로 거절한다")
+	@DisplayName("일정 규칙은 weekdays가 비어 있으면 도메인 예외 InvalidScheduleException(field weekdays)으로 거절한다")
 	void rejectsEmptyWeekdays() {
-		assertValidationFailed(
+		assertInvalidSchedule(
 				() -> PickupSchedule.create(CHILD_USER_ID, academyWithEntrance(), Set.of(), SIX_PM, 5),
-				"weekdays");
+				"weekdays", "1개 이상이어야 합니다");
+	}
+
+	@Test
+	@DisplayName("PickupSchedule 소스는 Spring과 common.error를 import하지 않는다")
+	void sourceHasNoSpringOrCommonErrorImport() throws IOException {
+		String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+		assertThat(source).doesNotContain("org.springframework").doesNotContain("common.error");
 	}
 
 	@Test
@@ -119,18 +130,17 @@ class PickupScheduleTest {
 	}
 
 	private static Academy academyWithEntrance() {
-		return Academy.create("한빛수학학원", "서울 중구 세종대로 110", LOCATION, ENTRANCE, "+8221234567");
+		return Academy.create("kakao:12345", "한빛수학학원", "서울 중구 세종대로 110", LOCATION, ENTRANCE, "+8221234567");
 	}
 
 	private static Academy academyWithoutEntrance() {
-		return Academy.create("한빛수학학원", "서울 중구 세종대로 110", LOCATION, null, "+8221234567");
+		return Academy.create("kakao:12345", "한빛수학학원", "서울 중구 세종대로 110", LOCATION, null, "+8221234567");
 	}
 
-	private static void assertValidationFailed(ThrowingCallable call, String field) {
-		assertThatThrownBy(call).isInstanceOfSatisfying(BusinessException.class, e -> {
-			assertThat(e.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-			assertThat(e.code()).isEqualTo("VALIDATION_FAILED");
-			assertThat(e.fields()).extracting(FieldError::field).containsExactly(field);
+	private static void assertInvalidSchedule(ThrowingCallable call, String field, String reason) {
+		assertThatThrownBy(call).isInstanceOfSatisfying(InvalidScheduleException.class, e -> {
+			assertThat(e.field()).isEqualTo(field);
+			assertThat(e.reason()).isEqualTo(reason);
 		});
 	}
 }

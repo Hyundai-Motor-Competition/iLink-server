@@ -10,19 +10,25 @@ import lombok.Getter;
 public class Academy {
 
 	private final Long academyId;
+	private final String externalPlaceId;
 	private final String name;
 	private final String address;
 	private final LatLng location;
 	private final LatLng entrance;
 	private final String phone;
 
-	public static Academy create(String name, String address, LatLng location, LatLng entrance, String phone) {
-		return new Academy(null, name, address, location, entrance, phone);
+	public static Academy create(String externalPlaceId, String name, String address, LatLng location,
+			LatLng entrance, String phone) {
+		return new Academy(null, externalPlaceId, name, address, location, entrance, phone);
 	}
 
-	public static Academy restore(Long academyId, String name, String address, LatLng location, LatLng entrance,
-			String phone) {
-		return new Academy(academyId, name, address, location, entrance, phone);
+	public static Academy restore(Long academyId, String externalPlaceId, String name, String address,
+			LatLng location, LatLng entrance, String phone) {
+		return new Academy(academyId, externalPlaceId, name, address, location, entrance, phone);
+	}
+
+	public Academy updateInfo(String name, String address, LatLng location, LatLng entrance, String phone) {
+		return new Academy(academyId, externalPlaceId, name, address, location, entrance, phone);
 	}
 
 	public boolean hasEntrance() {

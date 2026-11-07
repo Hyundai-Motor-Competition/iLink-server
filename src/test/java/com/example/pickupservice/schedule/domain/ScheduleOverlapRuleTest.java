@@ -101,7 +101,7 @@ class ScheduleOverlapRuleTest {
 	}
 
 	private static Academy academy() {
-		return Academy.create("한빛수학학원", "서울 중구 세종대로 110", new LatLng(37.5665, 126.9780),
+		return Academy.create("kakao:12345", "한빛수학학원", "서울 중구 세종대로 110", new LatLng(37.5665, 126.9780),
 				new LatLng(37.5666, 126.9781), "+8221234567");
 	}
 }

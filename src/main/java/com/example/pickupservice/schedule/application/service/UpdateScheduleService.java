@@ -5,6 +5,7 @@ import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.schedule.application.port.in.ScheduleResult;
 import com.example.pickupservice.schedule.application.port.in.UpdateScheduleCommand;
 import com.example.pickupservice.schedule.application.port.in.UpdateScheduleUseCase;
+import com.example.pickupservice.schedule.application.port.out.LoadAcademyPort;
 import com.example.pickupservice.schedule.application.port.out.LoadSchedulePort;
 import com.example.pickupservice.schedule.application.port.out.SaveAcademyPort;
 import com.example.pickupservice.schedule.application.port.out.SaveSchedulePort;
@@ -24,6 +25,7 @@ public class UpdateScheduleService implements UpdateScheduleUseCase {
 
 	private final LoadMemberUseCase loadMemberUseCase;
 	private final LoadSchedulePort loadSchedulePort;
+	private final LoadAcademyPort loadAcademyPort;
 	private final SaveAcademyPort saveAcademyPort;
 	private final SaveSchedulePort saveSchedulePort;
 
@@ -34,8 +36,8 @@ public class UpdateScheduleService implements UpdateScheduleUseCase {
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
 		FamilyChildGuard.requireChildOfFamily(loadMemberUseCase, command.familyId(), existing.getChildUserId());
 
-		Academy academy = ScheduleWriteRules.newAcademy(command.academy());
-		PickupSchedule candidate = PickupSchedule.create(existing.getChildUserId(), academy, command.weekdays(),
+		Academy academy = ScheduleWriteRules.academyOf(loadAcademyPort, command.academy());
+		PickupSchedule candidate = ScheduleWriteRules.newSchedule(existing.getChildUserId(), academy, command.weekdays(),
 				command.classEndTime(), command.targetPickup());
 		ScheduleWriteRules.rejectConflicts(candidate, othersOf(existing));
 

@@ -2,11 +2,13 @@ package com.example.pickupservice.schedule.application.service;
 
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.error.ErrorCode;
+import com.example.pickupservice.common.error.ErrorResponse.FieldError;
 import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.schedule.application.port.in.AcademyInput;
 import com.example.pickupservice.schedule.application.port.in.CreateScheduleCommand;
 import com.example.pickupservice.schedule.application.port.in.ScheduleResult;
+import com.example.pickupservice.schedule.application.port.out.LoadAcademyPort;
 import com.example.pickupservice.schedule.application.port.out.LoadSchedulePort;
 import com.example.pickupservice.schedule.application.port.out.SaveAcademyPort;
 import com.example.pickupservice.schedule.application.port.out.SaveSchedulePort;
@@ -45,10 +47,13 @@ class CreateScheduleServiceTest {
 	private static final long OTHER_FAMILY_ID = 20L;
 	private static final long CHILD_ID = 101L;
 	private static final long SAVED_ACADEMY_ID = 301L;
+	private static final long EXISTING_ACADEMY_ID = 401L;
+	private static final String EXTERNAL_PLACE_ID = "kakao:12345";
 	private static final long SAVED_SCHEDULE_ID = 501L;
 
 	private static final LatLng LOCATION = new LatLng(37.501234, 127.039876);
 	private static final LatLng ENTRANCE = new LatLng(37.501150, 127.039790);
+	private static final LatLng OLD_LOCATION = new LatLng(37.500000, 127.030000);
 	private static final Set<DayOfWeek> WEEKDAYS = Set.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY);
 	private static final LocalTime CLASS_END_TIME = LocalTime.of(18, 0);
 	private static final int TARGET_PICKUP = 5;
@@ -60,6 +65,9 @@ class CreateScheduleServiceTest {
 	private LoadSchedulePort loadSchedulePort;
 
 	@Mock
+	private LoadAcademyPort loadAcademyPort;
+
+	@Mock
 	private SaveAcademyPort saveAcademyPort;
 
 	@Mock
@@ -69,8 +77,8 @@ class CreateScheduleServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		createScheduleService = new CreateScheduleService(loadMemberUseCase, loadSchedulePort, saveAcademyPort,
-				saveSchedulePort);
+		createScheduleService = new CreateScheduleService(loadMemberUseCase, loadSchedulePort, loadAcademyPort,
+				saveAcademyPort, saveSchedulePort);
 	}
 
 	@Test
@@ -118,6 +126,61 @@ class CreateScheduleServiceTest {
 		verify(saveSchedulePort).saveSchedule(scheduleCaptor.capture());
 		assertThat(scheduleCaptor.getValue().getStatus()).isEqualTo(ScheduleStatus.DRAFT);
 		assertThat(scheduleCaptor.getValue().getAcademy().getEntrance()).isNull();
+	}
+
+	@Test
+	@DisplayName("일정 등록은 같은 externalPlaceId의 학원이 있으면 새로 만들지 않고 그 academyId로 저장하며 학원 정보는 요청 값으로 갱신하고 그 academyId를 돌려준다")
+	void createScheduleReusesExistingAcademyWithSameExternalPlaceIdAndUpdatesItsInfo() {
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+		Academy existingAcademy = Academy.restore(EXISTING_ACADEMY_ID, EXTERNAL_PLACE_ID, "해솔영어", "서울 강남구 옛 주소 1",
+				OLD_LOCATION, null, null);
+		given(loadAcademyPort.loadAcademyByExternalPlaceId(EXTERNAL_PLACE_ID)).willReturn(Optional.of(existingAcademy));
+		givenSavePortsAssignIds();
+
+		ScheduleResult result = createScheduleService.createSchedule(command(ENTRANCE));
+
+		assertThat(result).as("등록 결과")
+				.isEqualTo(new ScheduleResult(SAVED_SCHEDULE_ID, EXISTING_ACADEMY_ID, ScheduleStatus.READY));
+
+		ArgumentCaptor<Academy> academyCaptor = ArgumentCaptor.forClass(Academy.class);
+		verify(saveAcademyPort).saveAcademy(academyCaptor.capture());
+		Academy savedAcademy = academyCaptor.getValue();
+		assertThat(savedAcademy.getAcademyId()).as("saveAcademy에 넘긴 학원의 academyId").isEqualTo(EXISTING_ACADEMY_ID);
+		assertThat(savedAcademy.getExternalPlaceId()).isEqualTo(EXTERNAL_PLACE_ID);
+		assertThat(savedAcademy.getName()).as("요청 값으로 갱신한 name").isEqualTo("해솔영어학원");
+		assertThat(savedAcademy.getAddress()).as("요청 값으로 갱신한 address").isEqualTo("서울 강남구 테헤란로 152");
+		assertThat(savedAcademy.getLocation()).as("요청 값으로 갱신한 location").isEqualTo(LOCATION);
+		assertThat(savedAcademy.getEntrance()).as("요청 값으로 갱신한 entrance").isEqualTo(ENTRANCE);
+		assertThat(savedAcademy.getPhone()).as("요청 값으로 갱신한 phone").isEqualTo("02-555-1234");
+
+		ArgumentCaptor<PickupSchedule> scheduleCaptor = ArgumentCaptor.forClass(PickupSchedule.class);
+		verify(saveSchedulePort).saveSchedule(scheduleCaptor.capture());
+		assertThat(scheduleCaptor.getValue().getAcademy().getAcademyId()).as("저장한 일정의 academyId")
+				.isEqualTo(EXISTING_ACADEMY_ID);
+		assertThat(scheduleCaptor.getValue().getStatus()).isEqualTo(ScheduleStatus.READY);
+	}
+
+	@Test
+	@DisplayName("일정 등록은 같은 externalPlaceId의 학원이 없으면 academyId 없는 새 학원을 externalPlaceId와 함께 저장한다")
+	void createScheduleCreatesNewAcademyWhenNoAcademyHasSameExternalPlaceId() {
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+		given(loadAcademyPort.loadAcademyByExternalPlaceId(EXTERNAL_PLACE_ID)).willReturn(Optional.empty());
+		givenSavePortsAssignIds();
+
+		ScheduleResult result = createScheduleService.createSchedule(command(ENTRANCE));
+
+		verify(loadAcademyPort).loadAcademyByExternalPlaceId(EXTERNAL_PLACE_ID);
+		assertThat(result).isEqualTo(new ScheduleResult(SAVED_SCHEDULE_ID, SAVED_ACADEMY_ID, ScheduleStatus.READY));
+		ArgumentCaptor<Academy> academyCaptor = ArgumentCaptor.forClass(Academy.class);
+		verify(saveAcademyPort).saveAcademy(academyCaptor.capture());
+		Academy newAcademy = academyCaptor.getValue();
+		assertThat(newAcademy.getAcademyId()).as("새 학원의 academyId").isNull();
+		assertThat(newAcademy.getExternalPlaceId()).isEqualTo(EXTERNAL_PLACE_ID);
+		assertThat(newAcademy.getName()).isEqualTo("해솔영어학원");
+		assertThat(newAcademy.getAddress()).isEqualTo("서울 강남구 테헤란로 152");
+		assertThat(newAcademy.getLocation()).isEqualTo(LOCATION);
+		assertThat(newAcademy.getEntrance()).isEqualTo(ENTRANCE);
+		assertThat(newAcademy.getPhone()).isEqualTo("02-555-1234");
 	}
 
 	@Test
@@ -212,8 +275,32 @@ class CreateScheduleServiceTest {
 		verifyNoInteractions(saveAcademyPort, saveSchedulePort);
 	}
 
+	@Test
+	@DisplayName("일정 등록은 targetPickup 61이면 도메인 예외를 422 VALIDATION_FAILED(fields[targetPickup])로 바꿔 거절한다")
+	void createScheduleRejectsWithValidationFailedWhenTargetPickupIsOutOfRange() {
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+
+		BusinessException thrown = catchThrowableOfType(BusinessException.class,
+				() -> createScheduleService.createSchedule(command(ENTRANCE, WEEKDAYS, 61)));
+
+		assertValidationFailedOn(thrown, new FieldError("targetPickup", "0~60이어야 합니다"));
+		verifyNoInteractions(saveAcademyPort, saveSchedulePort);
+	}
+
+	@Test
+	@DisplayName("일정 등록은 weekdays가 비어 있으면 도메인 예외를 422 VALIDATION_FAILED(fields[weekdays])로 바꿔 거절한다")
+	void createScheduleRejectsWithValidationFailedWhenWeekdaysIsEmpty() {
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+
+		BusinessException thrown = catchThrowableOfType(BusinessException.class,
+				() -> createScheduleService.createSchedule(command(ENTRANCE, Set.of(), TARGET_PICKUP)));
+
+		assertValidationFailedOn(thrown, new FieldError("weekdays", "1개 이상이어야 합니다"));
+		verifyNoInteractions(saveAcademyPort, saveSchedulePort);
+	}
+
 	private static PickupSchedule existingSchedule(long scheduleId, Set<DayOfWeek> weekdays, LocalTime classEndTime) {
-		Academy academy = Academy.restore(SAVED_ACADEMY_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE,
+		Academy academy = Academy.restore(SAVED_ACADEMY_ID, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE,
 				"02-555-1234");
 		return PickupSchedule.restore(scheduleId, CHILD_ID, academy, weekdays, classEndTime, TARGET_PICKUP,
 				ScheduleStatus.READY);
@@ -227,8 +314,11 @@ class CreateScheduleServiceTest {
 	private void givenSavePortsAssignIds() {
 		willAnswer(invocation -> {
 			Academy academy = invocation.getArgument(0);
-			return Academy.restore(SAVED_ACADEMY_ID, academy.getName(), academy.getAddress(), academy.getLocation(),
-					academy.getEntrance(), academy.getPhone());
+			if (academy.getAcademyId() != null) {
+				return academy;
+			}
+			return Academy.restore(SAVED_ACADEMY_ID, academy.getExternalPlaceId(), academy.getName(),
+					academy.getAddress(), academy.getLocation(), academy.getEntrance(), academy.getPhone());
 		}).given(saveAcademyPort).saveAcademy(any(Academy.class));
 		willAnswer(invocation -> {
 			PickupSchedule schedule = invocation.getArgument(0);
@@ -239,9 +329,20 @@ class CreateScheduleServiceTest {
 	}
 
 	private static CreateScheduleCommand command(LatLng entrance) {
-		AcademyInput academy = new AcademyInput("kakao:12345", "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, entrance,
+		return command(entrance, WEEKDAYS, TARGET_PICKUP);
+	}
+
+	private static CreateScheduleCommand command(LatLng entrance, Set<DayOfWeek> weekdays, int targetPickup) {
+		AcademyInput academy = new AcademyInput(EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, entrance,
 				"02-555-1234");
-		return new CreateScheduleCommand(FAMILY_ID, CHILD_ID, academy, WEEKDAYS, CLASS_END_TIME, TARGET_PICKUP);
+		return new CreateScheduleCommand(FAMILY_ID, CHILD_ID, academy, weekdays, CLASS_END_TIME, targetPickup);
+	}
+
+	private static void assertValidationFailedOn(BusinessException thrown, FieldError expected) {
+		assertThat(thrown).isNotNull();
+		assertThat(thrown.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		assertThat(thrown.code()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
+		assertThat(thrown.fields()).containsExactly(expected);
 	}
 
 	private static void assertNotFound(BusinessException thrown) {

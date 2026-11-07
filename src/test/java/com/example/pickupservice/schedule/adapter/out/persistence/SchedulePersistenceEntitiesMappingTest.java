@@ -58,6 +58,30 @@ class SchedulePersistenceEntitiesMappingTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	@DisplayName("academy.external_place_id는 VARCHAR(100) NOT NULL 컬럼이다")
+	void academyExternalPlaceIdIsNotNullVarchar100() {
+		assertThat(columnsOf("academy"))
+				.containsEntry("external_place_id", new ColumnType(VARCHAR, 100, NOT_NULL));
+	}
+
+	@Test
+	@DisplayName("academy.external_place_id에는 그 컬럼 하나만 묶은 유니크 인덱스가 1개 있다")
+	void academyExternalPlaceIdHasUniqueIndex() {
+		List<String> indexDefinitions = jdbcTemplate.queryForList("""
+				select indexdef
+				from pg_indexes
+				where schemaname = current_schema()
+				  and tablename = 'academy'
+				""", String.class);
+
+		assertThat(indexDefinitions)
+				.as("academy 테이블의 인덱스 정의")
+				.filteredOn(definition -> definition.startsWith("CREATE UNIQUE INDEX")
+						&& definition.endsWith("(external_place_id)"))
+				.hasSize(1);
+	}
+
+	@Test
 	@DisplayName("academy.location · academy.entrance는 타입 Point · SRID 4326인 geography 컬럼으로 만들어진다")
 	void academyLocationAndEntranceAreGeographyPoint4326() {
 		List<Map<String, Object>> columns = jdbcTemplate.queryForList("""

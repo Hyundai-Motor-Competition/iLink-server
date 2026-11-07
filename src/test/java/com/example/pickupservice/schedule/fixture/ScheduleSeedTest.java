@@ -34,7 +34,7 @@ class ScheduleSeedTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다")
+	@DisplayName("테스트 시드로 학원 1곳(해솔영어학원, externalPlaceId kakao:12345, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다")
 	void seedCreatesAcademyWithEntranceAndMinjunMondayWednesdaySchedule() {
 		seeded = scheduleSeed.seed();
 
@@ -59,7 +59,7 @@ class ScheduleSeedTest extends IntegrationTestSupport {
 		assertThat(childName).isEqualTo("민준");
 
 		List<Map<String, Object>> academies = jdbcTemplate.queryForList("""
-				select academy_id, name, address, phone,
+				select academy_id, external_place_id, name, address, phone,
 				       st_y(location::geometry) as location_lat, st_x(location::geometry) as location_lng,
 				       st_y(entrance::geometry) as entrance_lat, st_x(entrance::geometry) as entrance_lng
 				from academy
@@ -67,6 +67,8 @@ class ScheduleSeedTest extends IntegrationTestSupport {
 				""", seeded.user().minjunId(), seeded.user().seoyunId());
 		assertThat(academies).singleElement().satisfies(academy -> {
 			assertThat(((Number) academy.get("academy_id")).longValue()).isEqualTo(seeded.academyId());
+			assertThat(academy.get("external_place_id")).isEqualTo(ScheduleSeed.ACADEMY_EXTERNAL_PLACE_ID)
+					.isEqualTo("kakao:12345");
 			assertThat(academy.get("name")).isEqualTo("해솔영어학원");
 			assertThat((String) academy.get("address")).startsWith("서울 강남구");
 			assertThat(academy.get("phone")).isEqualTo(ScheduleSeed.ACADEMY_PHONE);

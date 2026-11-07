@@ -3,6 +3,7 @@ package com.example.pickupservice.schedule.application.service;
 import com.example.pickupservice.schedule.application.port.in.CreateScheduleCommand;
 import com.example.pickupservice.schedule.application.port.in.CreateScheduleUseCase;
 import com.example.pickupservice.schedule.application.port.in.ScheduleResult;
+import com.example.pickupservice.schedule.application.port.out.LoadAcademyPort;
 import com.example.pickupservice.schedule.application.port.out.LoadSchedulePort;
 import com.example.pickupservice.schedule.application.port.out.SaveAcademyPort;
 import com.example.pickupservice.schedule.application.port.out.SaveSchedulePort;
@@ -19,6 +20,7 @@ public class CreateScheduleService implements CreateScheduleUseCase {
 
 	private final LoadMemberUseCase loadMemberUseCase;
 	private final LoadSchedulePort loadSchedulePort;
+	private final LoadAcademyPort loadAcademyPort;
 	private final SaveAcademyPort saveAcademyPort;
 	private final SaveSchedulePort saveSchedulePort;
 
@@ -27,7 +29,7 @@ public class CreateScheduleService implements CreateScheduleUseCase {
 	public ScheduleResult createSchedule(CreateScheduleCommand command) {
 		FamilyChildGuard.requireChildOfFamily(loadMemberUseCase, command.familyId(), command.childId());
 
-		Academy academy = ScheduleWriteRules.newAcademy(command.academy());
+		Academy academy = ScheduleWriteRules.academyOf(loadAcademyPort, command.academy());
 		ScheduleWriteRules.rejectConflicts(scheduleOf(command, academy),
 				loadSchedulePort.loadSchedulesOfChild(command.childId()));
 
@@ -38,7 +40,7 @@ public class CreateScheduleService implements CreateScheduleUseCase {
 	}
 
 	private static PickupSchedule scheduleOf(CreateScheduleCommand command, Academy academy) {
-		return PickupSchedule.create(command.childId(), academy, command.weekdays(), command.classEndTime(),
+		return ScheduleWriteRules.newSchedule(command.childId(), academy, command.weekdays(), command.classEndTime(),
 				command.targetPickup());
 	}
 }

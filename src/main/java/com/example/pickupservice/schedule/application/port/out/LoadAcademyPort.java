@@ -7,4 +7,6 @@ import java.util.Optional;
 public interface LoadAcademyPort {
 
 	Optional<Academy> loadAcademy(long academyId);
+
+	Optional<Academy> loadAcademyByExternalPlaceId(String externalPlaceId);
 }

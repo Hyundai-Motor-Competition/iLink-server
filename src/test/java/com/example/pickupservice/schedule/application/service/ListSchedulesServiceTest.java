@@ -59,9 +59,9 @@ class ListSchedulesServiceTest {
 	@DisplayName("일정 목록은 자녀의 일정을 scheduleId · 학원 · weekdays · classEndTime · targetPickup · status로 돌려준다")
 	void listSchedulesReturnsScheduleViewsOfChild() {
 		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
-		Academy english = Academy.restore(301L, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE,
+		Academy english = Academy.restore(301L, "kakao:12345", "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE,
 				"02-555-1234");
-		Academy math = Academy.restore(302L, "바른수학교실", "서울 강남구 역삼로 10", LOCATION, null, "02-555-5678");
+		Academy math = Academy.restore(302L, "kakao:67890", "바른수학교실", "서울 강남구 역삼로 10", LOCATION, null, "02-555-5678");
 		given(loadSchedulePort.loadSchedulesOfChild(CHILD_ID)).willReturn(List.of(
 				PickupSchedule.restore(702L, CHILD_ID, math, Set.of(DayOfWeek.THURSDAY, DayOfWeek.TUESDAY),
 						LocalTime.of(17, 30), 10, ScheduleStatus.DRAFT),

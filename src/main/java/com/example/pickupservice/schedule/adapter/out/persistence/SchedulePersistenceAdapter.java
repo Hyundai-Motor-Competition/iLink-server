@@ -37,6 +37,11 @@ class SchedulePersistenceAdapter implements LoadAcademyPort, SaveAcademyPort, Lo
 	}
 
 	@Override
+	public Optional<Academy> loadAcademyByExternalPlaceId(String externalPlaceId) {
+		return academyJpaRepository.findByExternalPlaceId(externalPlaceId).map(SchedulePersistenceAdapter::toDomain);
+	}
+
+	@Override
 	public Academy saveAcademy(Academy academy) {
 		return toDomain(academyJpaRepository.save(toEntity(academy)));
 	}
@@ -96,12 +101,13 @@ class SchedulePersistenceAdapter implements LoadAcademyPort, SaveAcademyPort, Lo
 	}
 
 	private static Academy toDomain(AcademyEntity entity) {
-		return Academy.restore(entity.getAcademyId(), entity.getName(), entity.getAddress(),
-				toLatLng(entity.getLocation()), toLatLng(entity.getEntrance()), entity.getPhone());
+		return Academy.restore(entity.getAcademyId(), entity.getExternalPlaceId(), entity.getName(),
+				entity.getAddress(), toLatLng(entity.getLocation()), toLatLng(entity.getEntrance()), entity.getPhone());
 	}
 
 	private static AcademyEntity toEntity(Academy academy) {
-		return new AcademyEntity(academy.getAcademyId(), academy.getName(), academy.getAddress(),
+		return new AcademyEntity(academy.getAcademyId(), academy.getExternalPlaceId(), academy.getName(),
+				academy.getAddress(),
 				toPoint(academy.getLocation()), toPoint(academy.getEntrance()), academy.getPhone());
 	}
 
