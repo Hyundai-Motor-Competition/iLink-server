@@ -1,10 +1,12 @@
 package com.example.pickupservice.user.fixture;
 
+import com.example.pickupservice.auth.fixture.AuthSeed;
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
@@ -14,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 @RequiredArgsConstructor
+@Import({UserSeed.class, AuthSeed.class})
 class UserSeedTest extends IntegrationTestSupport {
 
 	private final UserSeed userSeed;

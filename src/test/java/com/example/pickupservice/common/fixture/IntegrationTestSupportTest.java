@@ -6,8 +6,10 @@ import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -80,6 +82,18 @@ class IntegrationTestSupportTest extends IntegrationTestSupport {
 		LatLng latLng = GeoPoints.toLatLng(found.getLocation());
 		assertThat(latLng.lat()).isEqualTo(LAT);
 		assertThat(latLng.lng()).isEqualTo(LNG);
+	}
+
+	@Test
+	@DisplayName("공통 IntegrationTestSupport는 도메인 시드를 Import하지 않고 시드가 필요한 테스트가 UserSeed · AuthSeed를 직접 Import한다")
+	void integrationTestSupportDoesNotImportDomainSeeds() {
+		Import imports = IntegrationTestSupport.class.getAnnotation(Import.class);
+
+		assertThat(imports).isNotNull();
+		assertThat(Arrays.stream(imports.value()).map(Class::getName))
+				.isNotEmpty()
+				.noneMatch(name -> name.startsWith("com.example.pickupservice.user."))
+				.noneMatch(name -> name.startsWith("com.example.pickupservice.auth."));
 	}
 
 }
