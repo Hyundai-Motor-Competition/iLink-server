@@ -5,6 +5,7 @@ import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.user.application.port.in.UnlinkVehicleCommand;
 import com.example.pickupservice.user.application.port.out.CheckActivePickupPort;
 import com.example.pickupservice.user.application.port.out.LoadVehiclePort;
+import com.example.pickupservice.user.application.port.out.RevokeVehicleDevicesPort;
 import com.example.pickupservice.user.application.port.out.SaveVehiclePort;
 import com.example.pickupservice.user.domain.Vehicle;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,13 +52,16 @@ class UnlinkVehicleServiceTest {
 	@Mock
 	private CheckActivePickupPort checkActivePickupPort;
 
+	@Mock
+	private RevokeVehicleDevicesPort revokeVehicleDevicesPort;
+
 	private UnlinkVehicleService unlinkVehicleService;
 
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 		unlinkVehicleService = new UnlinkVehicleService(loadVehiclePort, saveVehiclePort, checkActivePickupPort,
-				clock);
+				revokeVehicleDevicesPort, clock);
 	}
 
 	private static Vehicle linkedVehicleOf(long familyId) {
@@ -78,6 +82,21 @@ class UnlinkVehicleServiceTest {
 		assertThat(exception.code()).isEqualTo("ACTIVE_PICKUP_EXISTS");
 		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
 		verify(saveVehiclePort, never()).saveVehicle(any());
+		verify(revokeVehicleDevicesPort, never()).revokeDevicesOfVehicle(anyLong());
+	}
+
+	@Test
+	@DisplayName("LINK-05로 차량 연결을 해제하면 그 차량의 살아 있는 기기를 모두 폐기하도록 vehicleId로 요청한다")
+	void revokesLiveDevicesOfVehicleOnUnlink() {
+		given(loadVehiclePort.loadVehicle(VEHICLE_ID)).willReturn(Optional.of(linkedVehicleOf(FAMILY_ID)));
+		given(checkActivePickupPort.hasActivePickup(VEHICLE_ID)).willReturn(false);
+		lenient().when(saveVehiclePort.saveVehicle(any())).thenAnswer(invocation -> invocation.getArgument(0));
+		UnlinkVehicleCommand command = new UnlinkVehicleCommand(FAMILY_ID, VEHICLE_ID);
+
+		unlinkVehicleService.unlinkVehicle(command);
+
+		verify(revokeVehicleDevicesPort, times(1)).revokeDevicesOfVehicle(VEHICLE_ID);
+		verify(saveVehiclePort, times(1)).saveVehicle(any());
 	}
 
 	@Test
@@ -142,5 +161,6 @@ class UnlinkVehicleServiceTest {
 		assertThat(exception.code()).isEqualTo(ErrorCode.NOT_FOUND.name());
 		assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
 		verify(saveVehiclePort, never()).saveVehicle(any());
+		verify(revokeVehicleDevicesPort, never()).revokeDevicesOfVehicle(anyLong());
 	}
 }
