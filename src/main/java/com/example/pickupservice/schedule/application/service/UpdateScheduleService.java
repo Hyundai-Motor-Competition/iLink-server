@@ -54,8 +54,9 @@ public class UpdateScheduleService implements UpdateScheduleUseCase {
 	}
 
 	private static PickupSchedule replaced(PickupSchedule existing, PickupSchedule candidate, Academy savedAcademy) {
+		PickupSchedule judged = ScheduleWriteRules.newSchedule(existing.getChildUserId(), savedAcademy,
+				candidate.getWeekdays(), candidate.getClassEndTime(), candidate.getTargetPickup());
 		return PickupSchedule.restore(existing.getScheduleId(), existing.getChildUserId(), savedAcademy,
-				candidate.getWeekdays(), candidate.getClassEndTime(), candidate.getTargetPickup(),
-				candidate.getStatus());
+				judged.getWeekdays(), judged.getClassEndTime(), judged.getTargetPickup(), judged.getStatus());
 	}
 }

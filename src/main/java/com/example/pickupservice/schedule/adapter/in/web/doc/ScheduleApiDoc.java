@@ -22,7 +22,7 @@ public interface ScheduleApiDoc {
 	AcademySearchResponse searchAcademies(@Parameter(description = "검색어 (2~50자)", required = true) String query);
 
 	@Operation(summary = "일정 등록 (SET-02)", description = "GUARDIAN · CO_GUARDIAN. Idempotency-Key 필요. "
-			+ "academy.entrance가 없으면 status DRAFT, 있으면 READY")
+			+ "저장한 학원(요청 entrance가 비면 기존 값 유지)에 출입구가 없으면 status DRAFT, 있으면 READY")
 	@ApiResponse(responseCode = "201", description = "scheduleId · academyId · status")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN")
@@ -35,7 +35,7 @@ public interface ScheduleApiDoc {
 			ScheduleRequest request);
 
 	@Operation(summary = "일정 수정 (SET-03)", description = "GUARDIAN · CO_GUARDIAN. Idempotency-Key 불필요. "
-			+ "본문은 SET-02와 같다. 진행 중 세션에는 적용되지 않고 다음 세션부터 적용된다")
+			+ "본문 · status 판정은 SET-02와 같다. 진행 중 세션에는 적용되지 않고 다음 세션부터 적용된다")
 	@ApiResponse(responseCode = "200", description = "scheduleId · academyId · status")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN")

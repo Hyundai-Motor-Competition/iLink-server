@@ -219,6 +219,32 @@ class CreateScheduleServiceTest {
 	}
 
 	@Test
+	@DisplayName("일정 등록은 저장한 학원 기준으로 status를 판정한다 (다른 가족이 먼저 출입구와 함께 저장한 새 학원이면 요청 entrance가 없어도 READY)")
+	void createScheduleJudgesStatusBySavedAcademyKeepingEntranceSavedFirstByAnotherFamily() {
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+		given(loadAcademyPort.loadAcademyByExternalPlaceId(EXTERNAL_PLACE_ID)).willReturn(Optional.empty());
+		given(saveAcademyPort.saveAcademy(any(Academy.class))).willReturn(Academy.restore(EXISTING_ACADEMY_ID,
+				EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE, "02-555-1234"));
+		willAnswer(invocation -> {
+			PickupSchedule schedule = invocation.getArgument(0);
+			return PickupSchedule.restore(SAVED_SCHEDULE_ID, schedule.getChildUserId(), schedule.getAcademy(),
+					schedule.getWeekdays(), schedule.getClassEndTime(), schedule.getTargetPickup(),
+					schedule.getStatus());
+		}).given(saveSchedulePort).saveSchedule(any(PickupSchedule.class));
+
+		ScheduleResult result = createScheduleService.createSchedule(command(null));
+
+		assertThat(result).as("등록 결과 (upsert가 지킨 기존 출입구 기준이라 READY)")
+				.isEqualTo(new ScheduleResult(SAVED_SCHEDULE_ID, EXISTING_ACADEMY_ID, ScheduleStatus.READY));
+		ArgumentCaptor<PickupSchedule> scheduleCaptor = ArgumentCaptor.forClass(PickupSchedule.class);
+		verify(saveSchedulePort).saveSchedule(scheduleCaptor.capture());
+		assertThat(scheduleCaptor.getValue().getStatus()).as("saveSchedule에 넘긴 일정의 status")
+				.isEqualTo(ScheduleStatus.READY);
+		assertThat(scheduleCaptor.getValue().getAcademy().getEntrance()).as("saveSchedule에 넘긴 일정의 학원 entrance")
+				.isEqualTo(ENTRANCE);
+	}
+
+	@Test
 	@DisplayName("일정 등록은 childId가 CHILD가 아니면 NOT_FOUND로 거절한다")
 	void createScheduleRejectsWithNotFoundWhenMemberIsNotChild() {
 		givenMember(CHILD_ID, FAMILY_ID, Role.GUARDIAN);

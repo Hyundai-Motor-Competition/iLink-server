@@ -217,6 +217,34 @@ class UpdateScheduleServiceTest {
 	}
 
 	@Test
+	@DisplayName("일정 수정은 등록과 같이 저장한 학원(기존 출입구 반영) 기준으로 status를 판정한다 (다른 가족이 먼저 출입구와 함께 저장한 새 학원이면 요청 entrance가 없어도 READY)")
+	void updateScheduleJudgesStatusBySavedAcademyKeepingEntranceSavedFirstByAnotherFamily() {
+		PickupSchedule existing = savedSchedule(SCHEDULE_ID, OLD_WEEKDAYS, OLD_CLASS_END_TIME,
+				oldAcademyWithEntrance(), ScheduleStatus.READY);
+		given(loadSchedulePort.loadSchedule(SCHEDULE_ID)).willReturn(Optional.of(existing));
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+		given(loadSchedulePort.loadSchedulesOfChild(CHILD_ID)).willReturn(List.of(existing));
+		given(loadAcademyPort.loadAcademyByExternalPlaceId(NEW_EXTERNAL_PLACE_ID)).willReturn(Optional.empty());
+		given(saveAcademyPort.saveAcademy(any(Academy.class))).willReturn(Academy.restore(
+				EXISTING_NEW_PLACE_ACADEMY_ID, NEW_EXTERNAL_PLACE_ID, "새봄수학학원", "서울 서초구 서초대로 77", NEW_LOCATION,
+				NEW_ENTRANCE, "02-777-0000"));
+		willAnswer(invocation -> invocation.getArgument(0))
+				.given(saveSchedulePort).saveSchedule(any(PickupSchedule.class));
+
+		ScheduleResult result = updateScheduleService.updateSchedule(
+				command(OLD_WEEKDAYS, OLD_CLASS_END_TIME, OLD_TARGET_PICKUP, newAcademyInput(null)));
+
+		assertThat(result).as("수정 결과 (upsert가 지킨 기존 출입구 기준이라 READY)")
+				.isEqualTo(new ScheduleResult(SCHEDULE_ID, EXISTING_NEW_PLACE_ACADEMY_ID, ScheduleStatus.READY));
+		ArgumentCaptor<PickupSchedule> scheduleCaptor = ArgumentCaptor.forClass(PickupSchedule.class);
+		verify(saveSchedulePort).saveSchedule(scheduleCaptor.capture());
+		assertThat(scheduleCaptor.getValue().getStatus()).as("saveSchedule에 넘긴 일정의 status")
+				.isEqualTo(ScheduleStatus.READY);
+		assertThat(scheduleCaptor.getValue().getAcademy().getEntrance()).as("saveSchedule에 넘긴 일정의 학원 entrance")
+				.isEqualTo(NEW_ENTRANCE);
+	}
+
+	@Test
 	@DisplayName("일정 수정은 요일 · 시간 · 학원을 바꾸고 status를 다시 판정한다 (출입구 있는 학원 → 없는 학원이면 DRAFT)")
 	void updateScheduleChangesWeekdaysTimeAcademyAndRejudgesStatusToDraft() {
 		PickupSchedule existing = savedSchedule(SCHEDULE_ID, OLD_WEEKDAYS, OLD_CLASS_END_TIME,
