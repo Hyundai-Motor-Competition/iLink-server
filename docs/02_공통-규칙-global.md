@@ -8,7 +8,7 @@
 
 | 파일 | key · 패키지 | 책임 |
 |---|---|---|
-| 03_공유모듈-shared.md | shared (패키지 common) | 보안 설정, 오류 형식, Idempotency-Key, 요청 로깅 AOP, 비동기 설정, TimeUtils, BaseTimeEntity |
+| 03_공유모듈-shared.md | shared (패키지 common) | 보안 설정, 오류 형식, Idempotency-Key, 요청 로깅, 비동기 설정, TimeUtils, BaseTimeEntity |
 | 04_사용자-user.md | user | 가족 · 사용자 · 차량, 멤버 등록 · 수정 · 해제, 차량 연결 해제, 합류 안내 방식 |
 | 05_인증-auth.md | auth | QR 연결(가입 · 로그인 · RELINK), 멤버 초대 · 수락, 토큰 발급 · 갱신 · 폐기, 기기 · 푸시 토큰 |
 | 06_일정-schedule.md | schedule | 학원 · 일정, 설정 요약 · 완료, 차량용 주간 일정 · 설정 요약 |
@@ -64,10 +64,10 @@ com.{team}.pickupservice
 │  │  │  └─ out          Load...Port, Save...Port, Publish...Port
 │  │  └─ service         ...Service (in 포트 구현, 트랜잭션 경계)
 │  └─ domain             도메인 객체와 규칙
-└─ common                보안 설정, 오류 형식, Idempotency-Key 필터, 스웨거 공통 설정, 요청 로깅 AOP, 비동기 설정, TimeUtils, BaseTimeEntity
+└─ common                보안 설정, 오류 형식, Idempotency-Key 필터, 스웨거 공통 설정, 요청 로깅(인터셉터), 비동기 설정, TimeUtils, BaseTimeEntity
 ```
 
-- 의존 방향은 항상 안쪽이다. adapter → application → domain. domain은 어떤 패키지도 모른다.
+- 의존 방향은 항상 안쪽이다. adapter → application → domain. domain은 어떤 패키지도 모른다. 예외: 프레임워크에 기대지 않는 common의 순수 타입(enum · 값 객체: `common.security.Role` · `common.security.PrincipalType` · `common.geo.LatLng`)은 domain에서 써도 된다. 그래서 Role enum은 `common.security.Role` 하나만 둔다.
 - domain에는 Spring · JPA 어노테이션을 붙이지 않는다. JPA 엔티티는 adapter/out/persistence에 따로 두고 도메인 객체와 서로 변환한다.
 - 조회는 Spring Data JPA 메서드 이름 쿼리(findBy…)가 기본이다. 동적 쿼리는 Specification이나 간단한 JPQL(@Query)로 하고 QueryDSL은 쓰지 않는다. 예외: SPOT-01 지도 반경 조회는 PostGIS 함수가 필요해 네이티브 쿼리로 둔다.
 - 다른 모듈이 필요하면 그 모듈의 in 포트(유스케이스)만 부른다.
@@ -168,14 +168,18 @@ code 이름은 기획안 「4. 이벤트 · 상태」 탭의 ERR 이름을 그�
 
 | HTTP | code | 언제 |
 |---|---|---|
-| 400 | INVALID_REQUEST | JSON 형식이 틀림 |
+| 400 | INVALID_REQUEST | JSON 형식이 틀림, 필수 요청 파라미터 · 요청 헤더가 빠짐, 요청 파라미터 타입이 틀림 (Idempotency-Key 헤더가 빠지면 400이 아니라 422 VALIDATION_FAILED) |
 | 401 | UNAUTHORIZED | 토큰이 없거나 만료 · 폐기됨 |
 | 403 | FORBIDDEN | 토큰의 role로는 할 수 없는 동작 |
-| 404 | NOT_FOUND | 대상이 없거나 다른 가족의 것 |
+| 404 | NOT_FOUND | 대상이 없거나 다른 가족의 것, 매핑 없는 경로 |
+| 405 | METHOD_NOT_ALLOWED | 그 경로가 받지 않는 HTTP 메서드 |
+| 406 | NOT_ACCEPTABLE | 요청 Accept로는 줄 수 없는 응답 형식(응답 본문은 항상 JSON) |
+| 415 | UNSUPPORTED_MEDIA_TYPE | 받지 않는 Content-Type |
 | 409 | STATE_VERSION_CONFLICT | 보낸 stateVersion이 서버와 다름. 응답에 최신 세션 뷰가 함께 감 |
-| 409 | IDEMPOTENCY_KEY_REUSED | 같은 Idempotency-Key로 다른 내용을 보냄 |
+| 409 | IDEMPOTENCY_KEY_REUSED | 같은 Idempotency-Key로 다른 내용을 보냄, 또는 같은 키의 앞 요청이 아직 처리 중 |
 | 422 | VALIDATION_FAILED | 필드 검증 실패. fields에 어느 필드가 왜 틀렸는지 담음 |
 | 429 | TOO_MANY_REQUESTS | 횟수 제한. retryAfterSeconds에 다시 시도할 수 있는 초 |
+| 500 | INTERNAL_SERVER_ERROR | 처리하지 않은 예외. message는 고정 문구, 예외 내용은 서버 로그에만 |
 
 세션 뷰(SessionView)는 pickup 전용 공통 응답이라 08_픽업-pickup.md에 둔다.
 
@@ -186,12 +190,20 @@ code 이름은 기획안 「4. 이벤트 · 상태」 탭의 ERR 이름을 그�
 3. Kafka · RabbitMQ 같은 메시지 큐와 Outbox 테이블은 쓰지 않는다. 서버 1대, 같은 JVM 안의 이벤트로 충분하다.
 4. 메모리 이벤트라 서버가 발송 도중 꺼지면 사라질 수 있다. 알림은 재발송 스케줄러가 보완한다(09_알림-notification.md).
 
-## 요청 로깅
+## 로그
 
-- 대상은 adapter/in/web의 모든 컨트롤러 메서드(@RestController).
-- 한 줄에 requestId · 호출 주체(userId 또는 vehicleId) · HTTP 메서드 · 경로 · 응답 코드 · 걸린 시간을 남기고, 예외면 오류 코드도 남긴다.
-- 전화번호 · 위치 · 토큰 · 연결 코드는 남기지 않거나 가린다.
-- SSE 스트림(SES-08)은 연결 · 종료 때만, 2초마다 오는 LINK-02 폴링은 상태가 바뀔 때만 남긴다.
+공통
+- 전화번호 · 위치 · 토큰 · 연결 코드는 로그에 남기지 않거나 가린다.
+- 예외 메시지에 개인정보(전화번호 · 위치 · 토큰 · 연결 코드)를 넣지 않는다. 500 처리와 Idempotency 저장 실패 로그는 예외 내용을 서버 로그에 그대로 남기고 따로 가리지 않으므로, 예외를 만드는 쪽이 지킨다.
+
+요청 로그 (구현: 03_공유모듈-shared.md 「요청 로깅」)
+- 대상은 adapter/in/web의 모든 컨트롤러 메서드(@RestController). AOP가 아니라 HandlerInterceptor가 요청이 끝난 뒤 남긴다.
+- 형식: 요청 하나에 INFO 한 줄, key=value. 키는 requestId · principal · method · path · status · durationMs이고, 예외로 끝나면 errorCode를 더한다.
+- principal은 USER:{userId} · VEHICLE:{vehicleId}, 인증 없는 요청은 ANONYMOUS. status는 실제 응답 상태다.
+- requestId: X-Request-Id 헤더가 영숫자 · - · _ 64자 이하면 그대로 쓰고, 없거나 그 밖의 값이면 새 UUID를 만든다. MDC "requestId"에 넣어 같은 요청의 다른 로그(500 로그 등)에도 찍는다.
+- 요청 본문 · 쿼리 문자열 · 헤더는 남기지 않는다.
+- SSE 스트림(SES-08)은 연결(stream=open) · 종료(stream=closed) 두 줄만 남긴다. 두 줄은 같은 requestId이고 종료 줄의 durationMs는 연결 유지 시간이다.
+- 2초마다 오는 LINK-02 폴링은 상태가 바뀔 때만 남긴다. 컨트롤러 메서드에 @PollingLog(stateField = "status")를 달고, 4xx · 5xx는 늘 남긴다.
 
 ## 테스트 규칙
 

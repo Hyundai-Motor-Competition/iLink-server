@@ -1,12 +1,30 @@
 spring:
   application:
     name: pickup-service
+  datasource:
+    hikari:
+      connection-init-sql: SET TIME ZONE 'UTC'
+      data-source-properties:
+        logServerErrorDetail: false
   jpa:
     open-in-view: false
     defer-datasource-initialization: true
   sql:
     init:
       mode: always
+
+pickup:
+  async:
+    event:
+      core-pool-size: 2
+      max-pool-size: 4
+      queue-capacity: 100
+  idempotency:
+    cleanup-interval: PT1H
+
+logging:
+  pattern:
+    correlation: "[%X{requestId:-}] "
 
 management:
   endpoints:

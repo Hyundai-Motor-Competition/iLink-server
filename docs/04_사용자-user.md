@@ -18,7 +18,7 @@ user
 ├─ application/port/in     아래 「시그니처」
 ├─ application/port/out    아래 「시그니처」
 ├─ application/service     in 포트 구현
-└─ domain                  Family, User, Vehicle, Role, JoinCallMode, 이름 · 전화번호 규칙
+└─ domain                  Family, User, Vehicle, JoinCallMode, 이름 · 전화번호 규칙(Role은 common.security.Role을 씀)
 ```
 
 ## 테이블
@@ -207,3 +207,4 @@ boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);
 | 진행 중 픽업 확인(FAM-07 · LINK-05)을 pickup in 포트로 부르는 것 | pickup이 user보다 뒤에 구현되므로 out 포트 + 테스트 대역으로 먼저 검증 |
 | 포트 · 유스케이스 이름 | 소스 2.2 예시(StartPickupUseCase, LoadSessionPort)의 이름 규칙을 따른 제안 |
 | LINK-04 NEW로 만드는 GUARDIAN의 name | LINK-04 요청에 이름이 없음(05_인증-auth.md에도 기록). 이름을 받을 곳을 정해야 함 |
+| Role enum 위치 | 해소: 02에 「common 순수 타입(Role · PrincipalType · LatLng)은 domain에서 써도 된다」 예외를 둠. user/domain은 common.security.Role을 그대로 쓰고 Role enum을 따로 만들지 않음(사람 결정 2026-11-07, 03 확인 필요 사항) |

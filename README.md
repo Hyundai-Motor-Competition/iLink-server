@@ -33,8 +33,11 @@
 | `DB_URL` | 없으면 `jdbc:postgresql://localhost:5432/pickup` | 필수 |
 | `DB_USERNAME` | 없으면 `pickup` | 필수 |
 | `DB_PASSWORD` | 필수 | 필수 |
+| `JWT_SECRET` | 필수 | 필수 |
 
-JWT 키 · Firebase 키 · 전화번호 암호화 키는 해당 도메인을 만들 때 여기에 더한다.
+`JWT_SECRET`은 access 토큰 서명 키(HS256)다. 32바이트 이상 임의 값을 Base64로 인코딩해 넣는다. 예: `openssl rand -base64 32`. 테스트와 `bootTestRun`은 실행할 때 임의 키를 만들어 쓰므로 넣지 않아도 된다.
+
+Firebase 키 · 전화번호 암호화 키는 해당 도메인을 만들 때 여기에 더한다.
 
 ## dev DB 띄우기
 
@@ -44,19 +47,29 @@ docker run -d --name pickup-dev-db -p 5432:5432 \
   postgis/postgis:17-3.7
 ```
 
+dev는 `ddl-auto: update`라 컬럼 삭제 · NOT NULL 해제 같은 변경은 자동으로 반영되지 않는다. 그런 변경이 들어오면 dev DB 컨테이너를 지우고 다시 띄운다(`docker rm -f pickup-dev-db` 후 위 명령). 예: `idempotency_key.response_status`가 null 허용으로 바뀌었으므로 그 전에 만든 dev DB는 다시 띄우거나 `ALTER TABLE idempotency_key ALTER COLUMN response_status DROP NOT NULL;`을 실행한다.
+
 ## 실행
 
 ```bash
-SPRING_PROFILES_ACTIVE=dev DB_PASSWORD=<비밀번호> ./gradlew bootRun
+SPRING_PROFILES_ACTIVE=dev DB_PASSWORD=<비밀번호> JWT_SECRET=<Base64 키> ./gradlew bootRun
 ```
 
 PowerShell:
 
 ```powershell
-$env:SPRING_PROFILES_ACTIVE="dev"; $env:DB_PASSWORD="<비밀번호>"; .\gradlew.bat bootRun
+$env:SPRING_PROFILES_ACTIVE="dev"; $env:DB_PASSWORD="<비밀번호>"; $env:JWT_SECRET="<Base64 키>"; .\gradlew.bat bootRun
 ```
 
 DB를 따로 띄우지 않고 Testcontainers PostGIS로 실행: `./gradlew bootTestRun` (dev 프로필로 뜬다)
+
+## 운영(prod) 배포 순서
+
+prod는 `ddl-auto: validate`라 서버가 테이블을 만들지 않는다. 그런데 `spring.sql.init.mode: always`라 서버가 뜰 때 `src/main/resources/schema.sql`(유니크 인덱스 등)을 실행하므로, 그 대상 테이블이 먼저 있어야 한다.
+
+1. 새 테이블 · 컬럼 DDL을 DB에 직접 실행한다(예: `idempotency_key` 테이블). 컬럼 정의는 `docs/03_공유모듈-shared.md` 「테이블」 절과 각 도메인 설계서를 따른다.
+2. `schema.sql`의 인덱스는 `IF NOT EXISTS`라 서버가 뜰 때 자동으로 만들어진다. 미리 실행해도 된다.
+3. 환경 변수 `SPRING_PROFILES_ACTIVE=prod`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`을 넣고 서버를 띄운다.
 
 ## 테스트
 
@@ -64,7 +77,7 @@ DB를 따로 띄우지 않고 Testcontainers PostGIS로 실행: `./gradlew bootT
 ./gradlew test
 ```
 
-DB가 닿는 테스트는 `common.fixture.PostgisTestcontainersConfiguration`을 `@Import`해 `postgis/postgis:17-3.7` 컨테이너로 돌린다. 테스트는 `@ActiveProfiles("dev")`로 dev 설정을 쓴다.
+DB가 닿는 테스트는 공통 기반 클래스 `common.fixture.IntegrationTestSupport`를 상속한다. 이 클래스가 `@SpringBootTest` · `@ActiveProfiles("dev")` · `PostgisTestcontainersConfiguration`(`postgis/postgis:17-3.7` 컨테이너, 실행마다 임의 `pickup.jwt.secret`) · `AccessTokenFixture`(테스트용 access 토큰)를 묶는다.
 
 ## 상태 확인 · API 문서
 
