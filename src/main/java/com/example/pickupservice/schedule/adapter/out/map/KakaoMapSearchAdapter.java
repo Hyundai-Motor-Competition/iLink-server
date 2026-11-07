@@ -5,16 +5,18 @@ import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.schedule.application.port.in.AcademyCandidate;
 import com.example.pickupservice.schedule.application.port.out.SearchAcademyPort;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 
+@Slf4j
 @Component
 public class KakaoMapSearchAdapter implements SearchAcademyPort {
 
@@ -34,20 +36,31 @@ public class KakaoMapSearchAdapter implements SearchAcademyPort {
 
 	@Override
 	public List<AcademyCandidate> search(String query) {
-		KeywordSearchResponse response;
-		try {
-			response = restClient.get()
-					.uri(uriBuilder -> uriBuilder.path(KEYWORD_SEARCH_PATH).queryParam("query", "{query}").build(query))
-					.header(HttpHeaders.AUTHORIZATION, "KakaoAK " + apiKey)
-					.retrieve()
-					.body(KeywordSearchResponse.class);
-		} catch (RestClientResponseException | ResourceAccessException e) {
-			throw BusinessException.of(HttpStatus.BAD_GATEWAY, MAP_API_UNAVAILABLE, MAP_API_UNAVAILABLE_MESSAGE);
-		}
+		KeywordSearchResponse response = requestKeywordSearch(query);
 		if (response == null || response.documents() == null) {
 			return List.of();
 		}
 		return response.documents().stream().map(Document::toCandidate).toList();
+	}
+
+	private KeywordSearchResponse requestKeywordSearch(String query) {
+		try {
+			return restClient.get()
+					.uri(uriBuilder -> uriBuilder.path(KEYWORD_SEARCH_PATH).queryParam("query", "{query}").build(query))
+					.header(HttpHeaders.AUTHORIZATION, "KakaoAK " + apiKey)
+					.retrieve()
+					.body(KeywordSearchResponse.class);
+		} catch (RestClientResponseException e) {
+			log.warn("kakao map api failed status={}", e.getStatusCode().value());
+			throw mapApiUnavailable();
+		} catch (RestClientException e) {
+			log.warn("kakao map api failed exception={}", e.getClass().getSimpleName());
+			throw mapApiUnavailable();
+		}
+	}
+
+	private static BusinessException mapApiUnavailable() {
+		return BusinessException.of(HttpStatus.BAD_GATEWAY, MAP_API_UNAVAILABLE, MAP_API_UNAVAILABLE_MESSAGE);
 	}
 
 	private record KeywordSearchResponse(List<Document> documents) {
@@ -65,7 +78,20 @@ public class KakaoMapSearchAdapter implements SearchAcademyPort {
 		private AcademyCandidate toCandidate() {
 			String address = (roadAddressName == null || roadAddressName.isBlank()) ? addressName : roadAddressName;
 			return new AcademyCandidate("kakao:" + id, placeName, address,
-					new LatLng(Double.parseDouble(y), Double.parseDouble(x)));
+					new LatLng(parseCoordinate(y), parseCoordinate(x)));
+		}
+
+		private static double parseCoordinate(String value) {
+			if (value == null) {
+				log.warn("kakao map api failed reason=missing coordinate");
+				throw mapApiUnavailable();
+			}
+			try {
+				return Double.parseDouble(value);
+			} catch (NumberFormatException e) {
+				log.warn("kakao map api failed reason=coordinate not number");
+				throw mapApiUnavailable();
+			}
 		}
 	}
 }

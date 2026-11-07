@@ -144,6 +144,59 @@ class KakaoMapSearchAdapterTest {
 		assertMapApiUnavailable();
 	}
 
+	@Test
+	@DisplayName("카카오 API가 200이라도 본문이 JSON이 아니면 502 MAP_API_UNAVAILABLE로 거절한다")
+	void search_rejectsWithMapApiUnavailableWhenBodyIsNotJson() {
+		server.expect(requestTo(startsWith(KEYWORD_PATH)))
+				.andRespond(withSuccess("<html>점검 중입니다</html>", MediaType.APPLICATION_JSON));
+
+		assertMapApiUnavailable();
+	}
+
+	@Test
+	@DisplayName("카카오 API가 200이라도 documents 항목에 x · y 좌표가 없으면 502 MAP_API_UNAVAILABLE로 거절한다")
+	void search_rejectsWithMapApiUnavailableWhenDocumentHasNoCoordinates() {
+		server.expect(requestTo(startsWith(KEYWORD_PATH)))
+				.andRespond(withSuccess("""
+						{
+						  "documents": [
+						    {
+						      "id": "26338954",
+						      "place_name": "한빛수학학원",
+						      "address_name": "서울 강남구 대치동 900",
+						      "road_address_name": "서울 강남구 삼성로 212"
+						    }
+						  ],
+						  "meta": { "total_count": 1, "pageable_count": 1, "is_end": true }
+						}
+						""", MediaType.APPLICATION_JSON));
+
+		assertMapApiUnavailable();
+	}
+
+	@Test
+	@DisplayName("카카오 API가 200이라도 좌표 x가 숫자가 아니면 502 MAP_API_UNAVAILABLE로 거절한다")
+	void search_rejectsWithMapApiUnavailableWhenCoordinateIsNotNumber() {
+		server.expect(requestTo(startsWith(KEYWORD_PATH)))
+				.andRespond(withSuccess("""
+						{
+						  "documents": [
+						    {
+						      "id": "26338954",
+						      "place_name": "한빛수학학원",
+						      "address_name": "서울 강남구 대치동 900",
+						      "road_address_name": "서울 강남구 삼성로 212",
+						      "x": "abc",
+						      "y": "37.4991"
+						    }
+						  ],
+						  "meta": { "total_count": 1, "pageable_count": 1, "is_end": true }
+						}
+						""", MediaType.APPLICATION_JSON));
+
+		assertMapApiUnavailable();
+	}
+
 	private void assertMapApiUnavailable() {
 		assertThatThrownBy(() -> adapter.search("학원"))
 				.isInstanceOfSatisfying(BusinessException.class, e -> {
