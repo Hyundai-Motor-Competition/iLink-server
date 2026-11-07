@@ -287,6 +287,40 @@ class GetWeeklyPickupsServiceTest {
 		assertThat(weekly.readiness()).isEqualTo(new PickupReadiness(false, List.of()));
 	}
 
+	// #69
+
+	@Test
+	@DisplayName("주간 일정 readiness는 오늘 일정 중 DRAFT가 있으면 기기와 기본 장소가 다 있어도 startable false와 빈 missing을 돌려준다")
+	void readinessIsNotStartableWhenTodayHasDraftSchedule() {
+		givenFamilyMembers();
+		givenSchedules(
+				mondayScheduleOfMinjun(),
+				schedule(OTHER_SCHEDULE_ID, SEOYEON_ID, academyWithoutEntrance(OTHER_ACADEMY_ID, "한빛수학학원"),
+						Set.of(DayOfWeek.MONDAY), LocalTime.of(17, 0), 10, ScheduleStatus.DRAFT));
+		givenDeviceStatuses(Map.of(MINJUN_ID, DeviceStatus.CONNECTED, SEOYEON_ID, DeviceStatus.CONNECTED));
+		givenSpots(defaultSpot(SPOT_ID, ACADEMY_ID), defaultSpot(OTHER_SPOT_ID, OTHER_ACADEMY_ID));
+
+		WeeklyPickups weekly = service(KST_MONDAY_UTC_SUNDAY).getWeeklyPickups(FAMILY_ID, null);
+
+		assertThat(weekly.readiness()).isEqualTo(new PickupReadiness(false, List.of()));
+	}
+
+	@Test
+	@DisplayName("주간 일정 readiness는 DRAFT 일정이 오늘이 아닌 날에만 있으면 영향을 받지 않고 startable true를 돌려준다")
+	void readinessIgnoresDraftScheduleOnOtherDays() {
+		givenFamilyMembers();
+		givenSchedules(
+				mondayScheduleOfMinjun(),
+				schedule(OTHER_SCHEDULE_ID, SEOYEON_ID, academyWithoutEntrance(OTHER_ACADEMY_ID, "한빛수학학원"),
+						Set.of(DayOfWeek.TUESDAY), LocalTime.of(17, 0), 10, ScheduleStatus.DRAFT));
+		givenDeviceStatuses(Map.of(MINJUN_ID, DeviceStatus.CONNECTED, SEOYEON_ID, DeviceStatus.CONNECTED));
+		givenSpots(defaultSpot(SPOT_ID, ACADEMY_ID), defaultSpot(OTHER_SPOT_ID, OTHER_ACADEMY_ID));
+
+		WeeklyPickups weekly = service(KST_MONDAY_UTC_SUNDAY).getWeeklyPickups(FAMILY_ID, null);
+
+		assertThat(weekly.readiness()).isEqualTo(new PickupReadiness(true, List.of()));
+	}
+
 	private GetWeeklyPickupsService service(Instant now) {
 		return new GetWeeklyPickupsService(loadMemberUseCase, loadSchedulePort, loadMemberDeviceStatusPort,
 				loadPickupSpotPort, Clock.fixed(now, ZoneOffset.UTC));
@@ -321,11 +355,11 @@ class GetWeeklyPickupsServiceTest {
 	}
 
 	private static Academy academy(long academyId, String name) {
-		return Academy.restore(academyId, name, "서울 강남구 테헤란로 152", LOCATION, ENTRANCE, "02-555-1234");
+		return Academy.restore(academyId, "kakao:" + academyId, name, "서울 강남구 테헤란로 152", LOCATION, ENTRANCE, "02-555-1234");
 	}
 
 	private static Academy academyWithoutEntrance(long academyId, String name) {
-		return Academy.restore(academyId, name, "서울 강남구 테헤란로 152", LOCATION, null, "02-555-1234");
+		return Academy.restore(academyId, "kakao:" + academyId, name, "서울 강남구 테헤란로 152", LOCATION, null, "02-555-1234");
 	}
 
 	private static PickupSchedule schedule(long scheduleId, long childId, Academy academy, Set<DayOfWeek> weekdays,

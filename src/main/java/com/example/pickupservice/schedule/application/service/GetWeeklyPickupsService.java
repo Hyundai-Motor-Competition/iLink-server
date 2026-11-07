@@ -13,6 +13,7 @@ import com.example.pickupservice.schedule.application.port.out.LoadSchedulePort;
 import com.example.pickupservice.schedule.domain.DeviceStatus;
 import com.example.pickupservice.schedule.domain.MissingSetupItem;
 import com.example.pickupservice.schedule.domain.PickupSchedule;
+import com.example.pickupservice.schedule.domain.ScheduleStatus;
 import com.example.pickupservice.user.application.port.in.LoadMemberUseCase;
 import com.example.pickupservice.user.application.port.in.MemberInfo;
 import lombok.RequiredArgsConstructor;
@@ -93,7 +94,11 @@ public class GetWeeklyPickupsService implements GetWeeklyPickupsUseCase {
 		if (SetupChecks.lacksDefaultSpot(loadPickupSpotPort.loadSpots(familyId, academyIds), academyIds)) {
 			missing.add(MissingSetupItem.PICKUP_SPOT);
 		}
-		return new PickupReadiness(missing.isEmpty(), List.copyOf(missing));
+		return new PickupReadiness(missing.isEmpty() && allReady(todaySchedules), List.copyOf(missing));
+	}
+
+	private static boolean allReady(List<PickupSchedule> todaySchedules) {
+		return todaySchedules.stream().noneMatch(schedule -> schedule.getStatus() == ScheduleStatus.DRAFT);
 	}
 
 	private boolean allDevicesConnected(List<PickupSchedule> todaySchedules) {
