@@ -5,7 +5,7 @@
 | 항목 | 내용 |
 |---|---|
 | 범위 | 엔티티 Academy · PickupSchedule. API SET-01~04, SET-07~10. 다른 모듈용 in 포트(일정 조회 · 학원 조회) |
-| 의존 | 03_공유모듈-shared, 04_사용자-user(자녀 · 가족 · 합류 안내 방식 · settingsVersion · 보호자 이름), 05_인증-auth(자녀 기기 상태). place의 in 포트(장소 목록 · 기본 장소 유무)는 out 포트 + 테스트 대역 |
+| 의존 | 03_공유모듈-shared, 04_사용자-user(자녀 · 가족 · 합류 안내 방식 · settingsVersion · 보호자 이름. 서비스가 user in 포트 LoadMemberUseCase · LoadFamilyUseCase를 직접 부름), 05_인증-auth(자녀 기기 상태. out 포트 LoadMemberDeviceStatusPort → auth in 포트). place의 in 포트(장소 목록 · 기본 장소 유무)는 out 포트 LoadPickupSpotPort + 임시 어댑터(place 구현 전 빈 목록). schedule 코드는 user.domain 타입을 쓰지 않는다(JoinCallMode · DeviceStatus는 schedule 자체 enum) |
 | 진행 | 계층 병렬 |
 
 ## 구조
@@ -14,9 +14,11 @@
 schedule
 ├─ adapter/in/web          ScheduleController(SET-01~04), SetupController(SET-07 · 08), VehicleScheduleController(SET-09 · 10), doc 인터페이스
 ├─ adapter/out/persistence AcademyEntity · PickupScheduleEntity, 저장소
-├─ adapter/out/map         외부 지도 API 호출(RestClient)
+├─ adapter/out/map         KakaoMapSearchAdapter: 카카오 로컬 키워드 검색(RestClient), 키는 환경 변수 KAKAO_REST_API_KEY, 연결 2s · 읽기 3s
+├─ adapter/out/auth        LoadMemberDeviceStatusPort 구현 → auth in 포트
+├─ adapter/out/place       LoadPickupSpotPort 임시 어댑터(place 구현 전 빈 목록)
 ├─ application/port/in · out · service
-└─ domain                  Academy, PickupSchedule, ScheduleStatus, 겹침 · 하루 한도 규칙, 이름 마스킹
+└─ domain                  Academy, PickupSchedule, ScheduleStatus, JoinCallMode · DeviceStatus(schedule 자체 enum), InvalidScheduleException, 겹침 · 하루 한도 규칙, 이름 마스킹
 ```
 
 ## 테이블
@@ -26,6 +28,7 @@ schedule
 | 컬럼 | 타입 | 키 · 제약 | 설명 |
 |---|---|---|---|
 | academyId | BIGINT | PK | |
+| externalPlaceId | VARCHAR(100) | UNIQUE, NOT NULL | 외부 지도 장소 id(예: kakao:12345). 같은 학원을 가족 간 공유 |
 | name | VARCHAR(100) | | |
 | address | VARCHAR(255) | | |
 | location | geography(Point,4326) | GIST | 학원 위치 |
@@ -37,24 +40,26 @@ schedule
 | 컬럼 | 타입 | 키 · 제약 | 설명 |
 |---|---|---|---|
 | scheduleId | BIGINT | PK | |
-| childUserId | BIGINT | FK → User | role = CHILD |
-| academyId | BIGINT | FK → Academy | |
+| childUserId | BIGINT | | User의 userId, role = CHILD. DB FK 제약 없음 |
+| academyId | BIGINT | | Academy의 academyId. DB FK 제약 없음 |
 | weekdays | VARCHAR(30) | | 예: MON,WED,FRI |
 | classEndTime | TIME | | 한국 시간 |
 | targetPickup | SMALLINT | | 수업 종료 후 몇 분 뒤(0 = 종료 즉시, 5 = 5분 후, 직접 = 0~60) |
 | status | VARCHAR(10) | | READY · DRAFT |
+
+- childUserId · academyId는 DB FK 제약 없이 컬럼만 둔다(user · auth와 같은 관례).
 
 ## API 명세
 
 | ID | Method · 경로 | 호출 | Idempotency-Key | 요청 → 응답 | 오류 |
 |---|---|---|---|---|---|
 | SET-01 | GET /v1/places/academies | GUARDIAN · CO_GUARDIAN | 불필요 | query(2~50자, 필수) → 200 items[](externalPlaceId · name · address · location{lat, lng}) | 502 MAP_API_UNAVAILABLE |
-| SET-02 | POST /v1/children/{childId}/schedules | GUARDIAN · CO_GUARDIAN | 필요 | academy{externalPlaceId, name, address, location, entrance(선택), phone(선택)}, weekdays[](MON~SUN, 1개 이상), classEndTime(HH:MM), targetPickup(0~60) → 201 scheduleId, academyId, status | 409 SCHEDULE_OVERLAP(overlapScheduleIds 함께), 422 DAILY_SCHEDULE_LIMIT |
-| SET-03 | PUT /v1/schedules/{scheduleId} | GUARDIAN · CO_GUARDIAN | 불필요 | SET-02와 같음 → 200 scheduleId, academyId, status | 409 SCHEDULE_OVERLAP, 422 DAILY_SCHEDULE_LIMIT |
-| SET-04 | GET /v1/children/{childId}/schedules | GUARDIAN · CO_GUARDIAN | 불필요 | — → 200 items[](scheduleId · academy{academyId, name} · weekdays · classEndTime · targetPickup · status) | 공통 |
-| SET-07 | GET /v1/children/{childId}/setup-summary | GUARDIAN · CO_GUARDIAN | 불필요 | — → 200 child{userId, name, deviceStatus}, schedules[](scheduleId · academyName · status), pickupSpots[](spotId · name · isDefault), joinCallMode, missing[](CHILD_DEVICE · SCHEDULE · PICKUP_SPOT), settingsVersion | 공통 |
-| SET-08 | POST /v1/children/{childId}/setup-completion | GUARDIAN · CO_GUARDIAN | 필요 | settingsVersion → 200 syncedToVehicle | 409 SETTINGS_VERSION_CONFLICT, 422 SETUP_INCOMPLETE |
-| SET-09 | GET /v1/vehicles/me/weekly-pickups | 차량 앱 | 불필요 | weekStart(선택, 그 주 월요일) → 200 weekStart, days[](date · pickups[](scheduleId · childName · academyName · classEndTime · targetPickupTime)), readiness{startable, missing[](CHILD_DEVICE · PICKUP_SPOT)} | 공통 |
+| SET-02 | POST /v1/children/{childId}/schedules | GUARDIAN · CO_GUARDIAN | 필요 | academy{externalPlaceId(1~100자), name, address, location, entrance(선택), phone(선택)}, weekdays[](MON~SUN, 1개 이상), classEndTime(HH:MM), targetPickup(0~60) → 201 scheduleId, academyId, status | 404 NOT_FOUND(내 가족 CHILD 아님), 422 VALIDATION_FAILED, 409 SCHEDULE_OVERLAP(overlapScheduleIds 함께), 422 DAILY_SCHEDULE_LIMIT |
+| SET-03 | PUT /v1/schedules/{scheduleId} | GUARDIAN · CO_GUARDIAN | 불필요 | SET-02와 같음(externalPlaceId 1~100자) → 200 scheduleId, academyId, status | 404 NOT_FOUND(일정이 없거나 내 가족 자녀 일정 아님), 422 VALIDATION_FAILED, 409 SCHEDULE_OVERLAP, 422 DAILY_SCHEDULE_LIMIT |
+| SET-04 | GET /v1/children/{childId}/schedules | GUARDIAN · CO_GUARDIAN | 불필요 | — → 200 items[](scheduleId · academy{academyId, name} · weekdays · classEndTime · targetPickup · status) | 404 NOT_FOUND(내 가족 CHILD 아님) |
+| SET-07 | GET /v1/children/{childId}/setup-summary | GUARDIAN · CO_GUARDIAN | 불필요 | — → 200 child{userId, name, deviceStatus}, schedules[](scheduleId · academyName · status), pickupSpots[](spotId · name · isDefault), joinCallMode, missing[](CHILD_DEVICE · SCHEDULE · PICKUP_SPOT), settingsVersion | 404 NOT_FOUND(내 가족 CHILD 아님) |
+| SET-08 | POST /v1/children/{childId}/setup-completion | GUARDIAN · CO_GUARDIAN | 필요 | settingsVersion → 200 syncedToVehicle | 404 NOT_FOUND(내 가족 CHILD 아님), 409 SETTINGS_VERSION_CONFLICT, 422 SETUP_INCOMPLETE |
+| SET-09 | GET /v1/vehicles/me/weekly-pickups | 차량 앱 | 불필요 | weekStart(선택, 그 주 월요일) → 200 weekStart, days[](date · pickups[](scheduleId · childName · academyName · classEndTime · targetPickupTime)), readiness{startable, missing[](CHILD_DEVICE · PICKUP_SPOT)} | 400 INVALID_REQUEST(weekStart 형식 오류) |
 | SET-10 | GET /v1/vehicles/me/settings-summary | 차량 앱 | 불필요 | — → 200 guardianNameMasked, children[](userId · name), joinCallMode | 공통 |
 
 응답 예시
@@ -67,28 +72,67 @@ schedule
 ## 핵심 로직
 
 ### 학원 검색 (SET-01)
-- 외부 지도 API를 RestClient로 부르고 결과를 저장하지 않고 그대로 중계한다. 외부 API 오류는 502 MAP_API_UNAVAILABLE.
-- 학원(Academy)은 SET-02로 일정을 저장할 때 만들어진다.
+- 외부 지도 API를 RestClient로 부르고 결과를 저장하지 않고 그대로 중계한다. 결과가 없으면 빈 items.
+- 502 MAP_API_UNAVAILABLE: 외부 API 4xx · 5xx · 시간 초과, 200이어도 본문을 못 읽거나 좌표가 없거나 숫자가 아닐 때.
+- 학원(Academy)은 SET-02 · 03으로 일정을 저장할 때 만들거나 다시 쓴다(아래).
 
 ### 일정 등록 · 수정 (SET-02 · 03)
-- childId는 내 가족의 CHILD여야 한다(아니면 404 NOT_FOUND).
+- childId는 내 가족의 CHILD여야 한다(아니면 404 NOT_FOUND). SET-03은 scheduleId가 없거나 내 가족 자녀 일정이 아니면 404 NOT_FOUND.
 - academy.entrance가 없으면 status DRAFT(픽업 시작 불가), 있으면 READY.
-- weekdays는 MON~SUN 1개 이상, classEndTime은 한국 시간 HH:MM, targetPickup은 0~60.
-- 같은 아이의 겹치는 일정이 있으면 409 SCHEDULE_OVERLAP과 overlapScheduleIds. 겹침의 현재 가정: 같은 자녀 · 같은 요일 · 같은 classEndTime.
-- 하루 일정이 3개를 넘으면 422 DAILY_SCHEDULE_LIMIT. 현재 가정: 자녀 1명의 같은 요일 기준.
+- weekdays는 MON~SUN 1개 이상, classEndTime은 한국 시간 HH:MM, targetPickup은 0~60. weekdays 중복(["MON","MON"])은 하나로 합친다. classEndTime 형식 오류는 422.
+- 검증 순서와 오류
+
+| 순서 | 검사 | 오류 |
+|---|---|---|
+| 1 | 자녀 확인(SET-03은 일정 확인 포함) | 404 NOT_FOUND |
+| 2 | 값 검증 | 422 VALIDATION_FAILED(fields) |
+| 3 | 겹침 | 409 SCHEDULE_OVERLAP, overlapScheduleIds |
+| 4 | 하루 한도 | 422 DAILY_SCHEDULE_LIMIT |
+
+- 겹침과 한도가 둘 다면 겹침(409)이 먼저다.
+- 겹침의 현재 가정: 같은 자녀 · 같은 요일 · 같은 classEndTime.
+- 하루 한도의 현재 가정: 자녀 1명의 같은 요일 기준. 새 일정의 요일마다 세고 한 요일이라도 이미 3개 이상이면 초과.
+- 수정 때 겹침 · 한도는 자기 자신을 뺀 목록으로 판정한다(서비스가 뺀다).
+- 도메인 검증 실패는 도메인 전용 예외 InvalidScheduleException(field, reason)으로 던지고 서비스가 422 VALIDATION_FAILED(fields)로 바꾼다. 도메인은 Spring · common.error를 쓰지 않는다.
 - SET-03은 진행 중 세션에 적용되지 않고 다음 세션부터 적용된다(pickup이 세션 시작 때 스냅샷).
+
+학원 다시 쓰기(externalPlaceId 기준)
+
+| 경우 | 동작 |
+|---|---|
+| 같은 externalPlaceId 학원이 있음 | 그 academyId를 쓴다. name · address · location은 요청 값으로 갱신, entrance · phone은 요청 값이 비어 있으면(null) 기존 값 유지 |
+| 없음 | 새로 만든다 |
+| 같은 새 학원이 동시에 저장되어 유니크가 부딪힘 | 오류 없이 저장된 학원을 쓴다(INSERT … ON CONFLICT, 위와 같은 갱신 규칙) |
+
+### 일정 목록 (SET-04)
+- scheduleId 오름차순, weekdays는 월요일부터.
+- 내 가족 CHILD가 아니면 404 NOT_FOUND.
 
 ### 설정 요약 · 완료 (SET-07 · 08)
 - missing 판정(현재 가정): CHILD_DEVICE = 자녀 deviceStatus가 CONNECTED가 아님, SCHEDULE = READY 일정이 없음, PICKUP_SPOT = 일정의 학원 중 가족의 기본 장소가 없는 학원이 있음.
+- PICKUP_SPOT 판정은 모든 일정의 학원이 대상이다. 일정이 하나도 없으면 missing에는 SCHEDULE만 들어간다(PICKUP_SPOT 없음).
+- 기기 상태가 없으면 NONE으로 본다.
 - pickupSpots는 그 자녀 일정의 학원들에 저장된 가족 장소다(place in 포트).
-- SET-08: 보낸 settingsVersion이 Family.settingsVersion과 다르면 409 SETTINGS_VERSION_CONFLICT(SET-07을 다시 부름). missing이 남아 있으면 422 SETUP_INCOMPLETE. 성공하면 syncedToVehicle을 돌려준다.
+- SET-08: 검사 순서는 버전 비교 → missing.
+  - 보낸 settingsVersion이 Family.settingsVersion과 다르면 409 SETTINGS_VERSION_CONFLICT(SET-07을 다시 부름).
+  - missing이 남아 있으면 422 SETUP_INCOMPLETE.
+  - 성공하면 syncedToVehicle true를 돌려준다. 완료 기록은 아직 저장하지 않는다(후속 과제).
 
 ### 차량용 (SET-09 · 10)
 - 차량 토큰의 familyId 가족 자녀들의 일정을 보여 준다.
-- weekStart가 없으면 이번 주 월요일(한국 날짜). days는 7일, 하루 최대 3개.
+- weekStart가 없으면 이번 주 월요일(한국 날짜). weekStart 형식 오류는 400 INVALID_REQUEST.
+- days는 7일, 하루 최대 3개. 하루 안은 classEndTime 오름차순. DRAFT 일정도 days에 보여 준다.
 - targetPickupTime = classEndTime + targetPickup분(예: 18:00 + 5 = 18:05).
 - readiness: 오늘 픽업을 시작할 수 있는지와 빠진 항목(CHILD_DEVICE · PICKUP_SPOT). 보호자가 설정을 끝내기 전에는 차량에서 픽업을 시작할 수 없다.
-- SET-10 guardianNameMasked는 GUARDIAN 이름의 가운데 글자를 가린다(김보호 → 김*호).
+- readiness 판정 대상은 한국 날짜 오늘 일정이 있는 자녀 · 학원이다.
+
+| readiness 경우 | startable | missing |
+|---|---|---|
+| 오늘 일정이 없음 | false | 빈 목록 |
+| 오늘 일정 중 DRAFT가 있음 | false | DRAFT 때문에 바뀌지 않음(기기 · 장소 판정 값 그대로) |
+| 자녀 기기 · 기본 장소가 빠짐 | false | CHILD_DEVICE · PICKUP_SPOT |
+
+- SET-10 guardianNameMasked는 GUARDIAN 이름의 가운데 글자를 가린다(김보호 → 김*호). GUARDIAN이 없으면 null.
 
 ### 시그니처
 
@@ -104,15 +148,25 @@ WeeklyPickups getWeeklyPickups(long familyId, LocalDate weekStart);      // GetW
 VehicleSettingsSummary getVehicleSettingsSummary(long familyId);         // GetVehicleSettingsSummaryUseCase
 
 // in 포트 — 다른 모듈용
-List<ScheduleInfo> findSchedules(List<Long> scheduleIds);                // LoadScheduleUseCase (pickup SES-02)
+List<ScheduleInfo> findSchedules(List<Long> scheduleIds);                // LoadScheduleUseCase (pickup SES-02). loadSchedules를 1회 부름
 Optional<AcademyInfo> findAcademy(long academyId);                       // LoadAcademyUseCase (place 500m 검사, pickup 연락처)
 
 // out 포트
 List<AcademyCandidate> search(String query);                             // SearchAcademyPort (외부 지도 API)
-Optional<Academy> loadAcademy(long academyId); Academy saveAcademy(Academy a);                         // LoadAcademyPort · SaveAcademyPort
-Optional<PickupSchedule> loadSchedule(long scheduleId); List<PickupSchedule> loadSchedulesOfChild(long childUserId); List<PickupSchedule> loadSchedulesOfChildren(List<Long> childUserIds); PickupSchedule saveSchedule(PickupSchedule s);   // LoadSchedulePort · SaveSchedulePort
+Optional<Academy> loadAcademy(long academyId);                           // LoadAcademyPort
+Optional<Academy> loadAcademyByExternalPlaceId(String externalPlaceId);  // LoadAcademyPort
+Academy saveAcademy(Academy a);                                          // SaveAcademyPort
+Optional<PickupSchedule> loadSchedule(long scheduleId);                  // LoadSchedulePort
+List<PickupSchedule> loadSchedules(List<Long> scheduleIds);              // LoadSchedulePort (findSchedules가 1회 사용)
+List<PickupSchedule> loadSchedulesOfChild(long childUserId);             // LoadSchedulePort
+List<PickupSchedule> loadSchedulesOfChildren(List<Long> childUserIds);   // LoadSchedulePort
+PickupSchedule saveSchedule(PickupSchedule s);                           // SaveSchedulePort
 List<SpotSummary> loadSpots(long familyId, List<Long> academyIds);       // LoadPickupSpotPort → place
 Map<Long, DeviceStatus> loadDeviceStatuses(List<Long> userIds);          // LoadMemberDeviceStatusPort → auth
+
+// domain
+InvalidScheduleException(String field, String reason)                   // 도메인 검증 실패. Spring · common.error 안 씀, 서비스가 422 VALIDATION_FAILED(fields)로 바꿈
+// JoinCallMode · DeviceStatus: schedule 자체 enum(user.domain 타입을 import하지 않음)
 ```
 
 ## 테스트 케이스
@@ -185,21 +239,28 @@ Map<Long, DeviceStatus> loadDeviceStatuses(List<Long> userIds);          // Load
 - [x] Academy는 externalPlaceId를 가지며 academy.external_place_id는 유니크로 저장되고, 저장한 학원을 externalPlaceId로 찾을 수 있다
 - [x] 일정 등록 · 수정은 같은 externalPlaceId의 학원이 있으면 새로 만들지 않고 그 academyId를 쓰며 학원 정보는 요청 값으로 갱신한다
 - [x] 주간 일정 readiness는 오늘 일정 중 DRAFT가 있으면 startable false를 돌려준다
+- [x] 일정 등록 · 수정은 같은 학원을 다시 쓸 때 요청의 entrance · phone이 비어 있으면 기존 값을 유지한다
+- [x] 같은 externalPlaceId의 새 학원이 동시에 저장되어 유니크가 부딪히면 오류 없이 이미 저장된 그 학원을 다시 읽어 쓴다
+- [x] 일정 수정은 자기 자신을 뺀 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절한다
+- [x] loadSchedules는 여러 scheduleId의 일정을 학원과 함께 한 번에 읽어 돌려준다(일정 조회 1회 · 학원 조회 1회)
+- [x] findSchedules는 loadSchedules를 한 번만 불러 받은 순서대로 돌려주고 없는 id는 뺀다
+- [x] joinCallMode는 schedule 자체 enum으로 설정 요약 · 차량용 설정 요약 in 포트와 응답에 담고 user.domain 타입을 import하지 않는다
+- [x] POST /v1/children/{childId}/schedules · PUT /v1/schedules/{scheduleId}에 101자 externalPlaceId를 보내면 422 VALIDATION_FAILED를 돌려준다
 
 ## 확인 필요 사항
 
 | 항목 | 현재 가정 |
 |---|---|
-| Academy에 externalPlaceId 칸이 없음 | 요청에는 externalPlaceId가 있으나 테이블에 없음. 같은 학원을 다시 쓸지(가족 · 자녀 간 공유) 매번 새로 만들지 정해야 함. 지금은 일정 저장 때마다 새로 만든다고 가정 |
-| 일정 수정 때 학원 정보가 바뀐 경우 | 기존 Academy를 고칠지 새로 만들지 소스에 없음. 새로 만든다고 가정 |
+| Academy에 externalPlaceId 칸이 없음 | 해소: externalPlaceId 컬럼(UNIQUE)으로 같은 학원을 다시 씀(가족 간 공유). 핵심 로직 「학원 다시 쓰기」 |
+| 일정 수정 때 학원 정보가 바뀐 경우 | 해소: 같은 externalPlaceId면 그 행을 갱신, 다르면 그 학원을 찾거나 새로 만듦 |
 | 「겹침」의 정의 | 소스는 「같은 아이의 겹치는 일정」만 있음. 같은 자녀 · 같은 요일 · 같은 classEndTime으로 가정 |
 | 「하루 3개」의 기준 | 자녀별인지 가족 · 차량별인지 소스에 없음. 자녀별 같은 요일로 가정 |
 | 4.5 표의 「목표 < 종료 422」 | 4.14는 targetPickup을 종료 후 0~60분으로 정해 목표가 종료보다 앞설 수 없음. 0~60 범위 검사로 대신함 |
 | missing 판정 규칙 | 소스는 값 이름만 있음. 핵심 로직의 현재 가정으로 판정 |
-| SET-08 「차량 동기화」의 동작과 syncedToVehicle 값 | 차량에 무엇을 보내는지, 완료 여부를 어디에 저장하는지 소스에 없음(완료 기록 컬럼 없음). 추가 저장 없이 true를 돌려준다고 가정 |
-| DRAFT 일정을 SET-09에 보여 줄지 | 소스에 없음. 보여 주되 readiness에 반영한다고 가정 |
+| SET-08 「차량 동기화」의 동작과 syncedToVehicle 값 | 후속 과제로 둠. 지금은 추가 저장 없이 true를 돌려줌. 완료 기록 저장 · readiness 반영은 user · pickup 설계와 함께 정함 |
+| DRAFT 일정을 SET-09에 보여 줄지 | 해소: days에 보여 주고, 오늘 일정 중 DRAFT가 있으면 readiness startable false |
 | 이름 마스킹 규칙(2자 · 4자 이상) | 예시 「김*호」뿐. 첫 글자와 마지막 글자만 남기고 가운데를 *로 바꾼다고 가정(2자는 두 번째 글자를 가림) |
-| 외부 지도 API 공급자 · 키 | 예시 「kakao:12345」뿐. 카카오 로컬 검색으로 가정, 키는 환경 변수 |
+| 외부 지도 API 공급자 · 키 | 해소: 카카오 로컬 키워드 검색(KakaoMapSearchAdapter), 키는 환경 변수 KAKAO_REST_API_KEY, 연결 2s · 읽기 3s(구조 절) |
 | 일정 변경이 settingsVersion을 올리는지 | 04_사용자-user.md와 같은 질문. 올리지 않는다고 가정 |
 | SET-05 | API 번호가 SET-04 다음 SET-06으로 건너뜀. 빠진 API가 없는지 확인 필요 |
-| schedule ↔ place 서로 부름 | place는 Academy를 참조하고, SET-07 · 09는 place 장소를 읽음. schedule 쪽은 out 포트 + 테스트 대역으로 먼저 검증 |
+| schedule ↔ place 서로 부름 | place는 Academy를 참조하고, SET-07 · 09는 place 장소를 읽음. schedule 쪽은 out 포트 + 테스트 대역으로 먼저 검증하고, place 구현 전에는 임시 어댑터(adapter/out/place)가 빈 목록을 돌려줌 |
