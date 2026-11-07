@@ -1,10 +1,10 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-07 23:49 KST · tdd-guard
+- 생성: 2026-11-08 00:07 KST · tdd-guard
 - 설계서: C:/pickup/docs
 - 프로젝트: gradle · C:/pickup
-- 테스트: ● GREEN · 779 passed · 전체 · 81s
-- 진행: 공유모듈 57/57 · 사용자 71/71 · 인증 120/120 · 일정 11/55 · 장소 0/43 · 픽업 0/203 · 알림 0/44 · 남은 항목 334/593
+- 테스트: ● GREEN · 783 passed · 전체 · 91s
+- 진행: 공유모듈 57/57 · 사용자 71/71 · 인증 120/120 · 일정 12/61 · 장소 0/43 · 픽업 0/203 · 알림 0/44 · 남은 항목 339/599
 - 현재 도메인: 일정 (06_일정-schedule.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
@@ -19,7 +19,7 @@
 ## 3. 인증 (auth) · 05_인증-auth.md · 완료 · 항목 120/120 · 완료 기준 4/4 · 리뷰 11-07 23:03 통과 (상 1 · 중 0 · 하 5)
 - 남은 할 일 없음
 
-## 4. 일정 (schedule) · 06_일정-schedule.md · 진행 중 · 항목 11/55 · 완료 기준 0/4 · 리뷰 10-28 21:19 조건부 통과 (상 0 · 중 0 · 하 6) · 재리뷰 필요
+## 4. 일정 (schedule) · 06_일정-schedule.md · 진행 중 · 항목 12/61 · 완료 기준 0/4 · 리뷰 10-28 21:19 조건부 통과 (상 0 · 중 0 · 하 6) · 재리뷰 필요
 ### 테스트 케이스
 - [ ] #12 [persistence] Academy를 저장하고 읽으면 location · entrance 좌표가 같다
 - [ ] #13 [persistence] weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다
@@ -65,6 +65,11 @@
 - [ ] #53 [web] GET /v1/vehicles/me/weekly-pickups를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
 - [ ] #54 [web] GET /v1/vehicles/me/settings-summary는 차량 토큰으로 200과 guardianNameMasked · children · joinCallMode를 돌려준다
 - [ ] #55 [web] Idempotency-Key는 POST /v1/children/{childId}/schedules · POST /v1/children/{childId}/setup-completion에만 요구된다
+- [ ] #56 [persistence] 지도 API 어댑터는 카카오 로컬 검색 응답을 externalPlaceId(kakao:{id}) · name · address · location의 AcademyCandidate로 바꾼다
+- [ ] #57 [persistence] 지도 API 어댑터는 외부 API 오류 · 시간 초과면 502 MAP_API_UNAVAILABLE로 거절한다
+- [ ] #58 [persistence] place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다
+- [ ] #59 [persistence] LoadMemberDeviceStatusPort 어댑터는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다
+- [ ] #61 [서비스] findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려주고 없으면 빈 값을 돌려준다
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
