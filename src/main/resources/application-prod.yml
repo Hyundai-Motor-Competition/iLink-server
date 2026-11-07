@@ -10,6 +10,8 @@ spring:
 pickup:
   jwt:
     secret: ${JWT_SECRET}
+  crypto:
+    phone-key: ${PHONE_ENCRYPTION_KEY}
 
 logging:
   level:
