@@ -4,6 +4,7 @@ import com.example.pickupservice.auth.adapter.out.token.JwtTokenIssuer;
 import com.example.pickupservice.auth.application.port.in.AcceptInviteCommand;
 import com.example.pickupservice.auth.application.port.in.AcceptInviteResult;
 import com.example.pickupservice.auth.application.port.in.ConsentAgreement;
+import com.example.pickupservice.auth.application.port.out.LoadDevicePort;
 import com.example.pickupservice.auth.application.port.out.LoadInvitePort;
 import com.example.pickupservice.auth.application.port.out.SaveDevicePort;
 import com.example.pickupservice.auth.application.port.out.SaveInvitePort;
@@ -63,6 +64,9 @@ class AcceptInviteServiceTest {
 	private static final long TEACHER_ID = 34L;
 	private static final long INVITE_ID = 701L;
 	private static final long NEW_DEVICE_ID = 902L;
+	private static final long OLD_DEVICE_ID_1 = 401L;
+	private static final long OLD_DEVICE_ID_2 = 402L;
+	private static final String OLD_REFRESH_HASH = "0".repeat(64);
 	private static final String TOKEN = "inv-token-0123456789";
 	private static final String PUSH_TOKEN = "fcm-child-token";
 
@@ -74,6 +78,9 @@ class AcceptInviteServiceTest {
 
 	@Mock
 	private LoadMemberUseCase loadMemberUseCase;
+
+	@Mock
+	private LoadDevicePort loadDevicePort;
 
 	@Mock
 	private SaveDevicePort saveDevicePort;
@@ -238,6 +245,104 @@ class AcceptInviteServiceTest {
 				HttpStatus.NOT_FOUND, "NOT_FOUND");
 
 		assertNothingChanged();
+	}
+
+	@Test
+	@DisplayName("초대 수락은 그 멤버의 살아 있는 이전 기기를 모두 폐기한다")
+	void acceptInviteRevokesAllLivePreviousDevicesOfMember() {
+		givenInvite(liveInvite(CHILD_ID));
+		Device oldFirst = liveUserDevice(OLD_DEVICE_ID_1, CHILD_ID);
+		Device oldSecond = liveUserDevice(OLD_DEVICE_ID_2, CHILD_ID);
+		when(loadDevicePort.loadLiveDevices(OwnerType.USER, CHILD_ID)).thenReturn(List.of(oldFirst, oldSecond));
+
+		AcceptInviteResult result = acceptInviteService.acceptInvite(TOKEN, command(childConsents(), PUSH_TOKEN));
+
+		assertThat(oldFirst.getRevokedAt()).isEqualTo(NOW);
+		assertThat(oldSecond.getRevokedAt()).isEqualTo(NOW);
+
+		List<Device> saved = allSavedDevices();
+		assertThat(saved).filteredOn(d -> d.getDeviceId() != null && d.getDeviceId() == OLD_DEVICE_ID_1)
+				.as("이전 기기 1 폐기 저장")
+				.isNotEmpty()
+				.allSatisfy(d -> assertThat(d.getRevokedAt()).isEqualTo(NOW));
+		assertThat(saved).filteredOn(d -> d.getDeviceId() != null && d.getDeviceId() == OLD_DEVICE_ID_2)
+				.as("이전 기기 2 폐기 저장")
+				.isNotEmpty()
+				.allSatisfy(d -> assertThat(d.getRevokedAt()).isEqualTo(NOW));
+
+		int lastRevokeIndex = Math.max(lastIndexOfDevice(saved, OLD_DEVICE_ID_1), lastIndexOfDevice(saved, OLD_DEVICE_ID_2));
+		int newDeviceIndex = firstIndexOfNewDevice(saved);
+		assertThat(newDeviceIndex).as("새 Device 저장").isGreaterThanOrEqualTo(0);
+		assertThat(lastRevokeIndex).as("이전 기기 폐기는 새 Device 생성보다 먼저").isLessThan(newDeviceIndex);
+
+		Device newDevice = saved.get(newDeviceIndex);
+		assertThat(newDevice.getOwnerId()).isEqualTo(CHILD_ID);
+		assertThat(newDevice.getRevokedAt()).isNull();
+		assertThat(((Number) decode(result.accessToken()).getClaim("deviceId")).longValue()).isEqualTo(NEW_DEVICE_ID);
+	}
+
+	@Test
+	@DisplayName("초대 수락은 그 멤버에게 살아 있는 이전 기기가 없으면 아무 기기도 폐기하지 않고 새 Device만 만든다")
+	void acceptInviteRevokesNothingWhenMemberHasNoLiveDevice() {
+		givenInvite(liveInvite(CHILD_ID));
+		when(loadDevicePort.loadLiveDevices(OwnerType.USER, CHILD_ID)).thenReturn(List.of());
+
+		acceptInviteService.acceptInvite(TOKEN, command(childConsents(), PUSH_TOKEN));
+
+		verify(loadDevicePort).loadLiveDevices(OwnerType.USER, CHILD_ID);
+		List<Device> saved = allSavedDevices();
+		assertThat(saved).allSatisfy(d -> {
+			assertThat(d.getRevokedAt()).isNull();
+			assertThat(d.getOwnerId()).isEqualTo(CHILD_ID);
+			assertThat(d.getDeviceId() == null || d.getDeviceId() == NEW_DEVICE_ID)
+					.as("새 Device 외의 기기 저장 없음: %s", d.getDeviceId())
+					.isTrue();
+		});
+	}
+
+	@Test
+	@DisplayName("초대 수락은 필수 동의가 빠져 거절되면 이전 기기를 폐기하지 않는다")
+	void acceptInviteDoesNotRevokePreviousDevicesWhenConsentIsMissing() {
+		givenInvite(liveInvite(CHILD_ID));
+		Device oldDevice = liveUserDevice(OLD_DEVICE_ID_1, CHILD_ID);
+		lenient().when(loadDevicePort.loadLiveDevices(OwnerType.USER, CHILD_ID)).thenReturn(List.of(oldDevice));
+
+		assertError(() -> acceptInviteService.acceptInvite(TOKEN, command(List.of(
+						agreed(ConsentType.TERMS), agreed(ConsentType.PRIVACY)), PUSH_TOKEN)),
+				HttpStatus.UNPROCESSABLE_CONTENT, "CONSENT_REQUIRED");
+
+		assertThat(oldDevice.getRevokedAt()).isNull();
+		assertNothingChanged();
+	}
+
+	private List<Device> allSavedDevices() {
+		ArgumentCaptor<Device> captor = ArgumentCaptor.forClass(Device.class);
+		verify(saveDevicePort, atLeastOnce()).saveDevice(captor.capture());
+		return captor.getAllValues();
+	}
+
+	private static int lastIndexOfDevice(List<Device> devices, long deviceId) {
+		for (int i = devices.size() - 1; i >= 0; i--) {
+			Long id = devices.get(i).getDeviceId();
+			if (id != null && id == deviceId) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	private static int firstIndexOfNewDevice(List<Device> devices) {
+		for (int i = 0; i < devices.size(); i++) {
+			if (devices.get(i).getDeviceId() == null) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	private static Device liveUserDevice(long deviceId, long userId) {
+		return Device.restore(deviceId, OwnerType.USER, userId, Platform.ANDROID, "fcm-old-" + deviceId,
+				NOW.minusSeconds(3600), OLD_REFRESH_HASH, null);
 	}
 
 	private void givenInvite(MemberInvite invite) {
