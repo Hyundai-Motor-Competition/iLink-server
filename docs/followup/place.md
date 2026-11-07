@@ -1,8 +1,8 @@
 # FOLLOWUP · 장소 (place)
 
-- 생성: 2026-11-08 03:25 KST · tdd-guard
-- 상태: 진행 중 (체크 33/49 · 완료 기준 0/4)
-- 테스트: ● GREEN · 1075 passed · 전체 · 66s · ./gradlew.bat test --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321/08c37085-5b3e-4ca0-b4d3…
+- 생성: 2026-11-08 03:30 KST · tdd-guard
+- 상태: 진행 중 (체크 36/51 · 완료 기준 0/4)
+- 테스트: ● GREEN · 1079 passed · 전체 · 73s · cd C:/pickup; ./gradlew.bat test --console=plain 2>&1 | grep -E "FAILED|BUILD|tests completed" | tail -20; cd build/tes…
 - 설계서: C:/pickup/docs/07_장소-place.md
 
 ## 완료 항목
@@ -37,8 +37,11 @@
 - [x] #44 [persistence] pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다 ← PlaceModuleLinkAdaptersTest.pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다
 - [x] #45 [persistence] LoadAcademyPort 어댑터는 schedule의 LoadAcademyUseCase.findAcademy 결과를 place가 쓰는 학원 정보(academyId · name · location)로 바꿔 돌려주고 없으면 빈 값을 돌려준다 ← PlaceModuleLinkAdaptersTest.LoadAcademyPort 어댑터는 schedule의 LoadAcademyUseCase.findAcademy 결과를 place 학원 정보(academyId · name · location)로 바꿔 돌려준다
 - [x] #46 [서비스] findSpot은 spotId의 장소를 돌려주고 없으면 빈 값을, findSpots는 가족의 학원 목록에 속한 장소를 spotId · academyId · name · isDefault로 돌려준다 ← LoadPickupSpotServiceTest.findSpots는 가족의 학원 목록에 속한 장소만 spotId · academyId · name · isDefault로 돌려주고 장소 조회는 1회만 한다
+- [x] #47 schedule의 임시 LoadPickupSpotPort를 place findSpots 연동으로 바꿔 설정 요약 · 주간 일정의 PICKUP_SPOT 판정이 실제 장소를 본다 ← ScheduleModuleLinkAdaptersTest.설정 요약은 시드 가족 · 민준의 해솔영어학원에 기본 장소가 있으면 missing에 PICKUP_SPOT을 넣지 않고 그 장소를 보여준다
 - [x] #48 [서비스] 장소 수정은 기본 장소를 isDefault false로 바꾸려 하면 DEFAULT_SPOT_REQUIRED로 거절한다(다른 장소를 기본으로 지정해야 바뀜) ← UpdatePickupSpotServiceTest.장소 수정은 기본 장소를 isDefault false로 바꾸려 하면 DEFAULT_SPOT_REQUIRED로 거절한다
 - [x] #49 [persistence] deleteSpot은 그 장소 행만 지우고 같은 가족 · 학원의 다른 장소는 남긴다 ← PlacePersistenceAdapterTest.deleteSpot은 그 장소 행만 지우고 같은 가족 · 학원의 다른 장소는 남긴다
+- [x] #50 장소 삭제는 진행 중 세션이 쓰는 기본 장소면 같은 학원에 다른 장소가 남아 있어도 SPOT_IN_USE를 먼저 돌려준다 ← DeletePickupSpotServiceTest.장소 삭제는 진행 중 세션이 쓰는 기본 장소면 같은 학원에 다른 장소가 남아 있어도 SPOT_IN_USE를 먼저 돌려준다
+- [x] #51 장소 수정은 좌표를 바꿀 때 학원 정보가 없으면 NOT_FOUND로 거절하고 저장하지 않는다 ← UpdatePickupSpotServiceTest.장소 수정은 좌표를 바꿀 때 학원 정보가 없으면 NOT_FOUND로 거절하고 저장하지 않는다
 
 ## 미완료 항목
 - [ ] #29 [web] GET /v1/families/me/pickup-spots는 200과 academies[]를 돌려준다
@@ -56,7 +59,6 @@
 - [ ] #41 [web] DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다
 - [ ] #42 [web] DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다
 - [ ] #43 [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
-- [ ] #47 schedule의 임시 LoadPickupSpotPort를 place findSpots 연동으로 바꿔 설정 요약 · 주간 일정의 PICKUP_SPOT 판정이 실제 장소를 본다
 
 ## 완료 기준 (공통 규칙 문서)
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
@@ -65,7 +67,7 @@
 - [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 다시 리뷰 필요: 2026-11-08 03:25 KST 리뷰 뒤에 체크 · 추가된 항목 #29, #30, #31, #32, #33, #34, #35, #36, #37, #38, #39, #40, #41, #42, #43, #47
+- 다시 리뷰 필요: 2026-11-08 03:25 KST 리뷰 뒤에 체크 · 추가된 항목 #29, #30, #31, #32, #33, #34, #35, #36, #37, #38, #39, #40, #41, #42, #43, #47, #50, #51
 - 2026-11-08 03:25 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 1 · 하 4 · 리뷰 시점 체크 33/49
 - 리뷰 시점 테스트: ● GREEN · 1075 passed · 전체 · 66s · ./gradlew.bat test --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321/08c37085-5b3e-4ca0-b4d3…
   - 결론: 조건부 통과
@@ -92,7 +94,7 @@
 | 11/4 기획 수정안(소스 7.1) | 확정되면 학원 출입구를 기본 장소로 쓰고 직접 찍는 장소는 대안 0~2개가 됨 → 「첫 장소가 기본」 규칙이 바뀜 |
 
 ## 다음 단계
-- 남은 항목 16건부터 계속: /tdd domain place → /tdd go
+- 남은 항목 15건부터 계속: /tdd domain place → /tdd go
 - 다음 도메인: 픽업 (08_픽업-pickup.md). 시작: /tdd domain pickup
 
 ## 후속 과제
@@ -103,3 +105,4 @@
 - place 가정: SPOT-01 near는 한 파라미터 "lat,lng" 형식, 형식 오류도 422 VALIDATION_FAILED(fields near, 팀장 결정). near만 오면 fields radiusM, radiusM만 오면 fields near
 - [place 중간 리뷰] (1) 02 L72 네이티브 쿼리 예외에 DistancePort(SPOT-02 · 03 ST_DWithin 500m 검사, JdbcTemplate) 추가 필요(설계서 07 L86이 요구) (2) DB FK 없음 → 07 L147 지난 세션 장소 삭제 가정 다시 써야 함(pickup 전 결정: 삭제 대신 표시 등) (3) 기본 장소 유일성을 DB 부분 유니크 인덱스로도 막을지(07 L147 가정은 서비스만) (4) common GeoPoints.toPoint(LatLng) 추가 후보 (5) GeoOffsets 계산 근거 Javadoc
 - place: SPOT-02 name 공백만("   ") 처리 미정, stopPoint · meetingPoint 안 lat · lng 누락은 공통 LatLng가 primitive라 0.0이 될 수 있음(LatLng 범위 · 필수 검증은 공통 후속 과제와 같음)
+- place: SPOT-03 PATCH 오류 칸에 422 DEFAULT_SPOT_REQUIRED(#48)와 404가 설계서 API 표에 없음 — 문서 갱신 필요. PATCH "memo":null 직접 전송은 「안 보냄」으로 처리(지우기 방법 미정)
