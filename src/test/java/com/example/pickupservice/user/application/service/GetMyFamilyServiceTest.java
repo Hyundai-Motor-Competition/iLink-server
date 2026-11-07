@@ -110,6 +110,25 @@ class GetMyFamilyServiceTest {
 	}
 
 	@Test
+	@DisplayName("가족 조회(FAM-01) members[]는 LoadUserPort가 멤버를 섞인 순서로 돌려줘도 userId 오름차순이다")
+	void membersAreSortedByUserIdAscending() {
+		given(loadFamilyPort.loadFamily(FAMILY_ID))
+				.willReturn(Optional.of(Family.restore(FAMILY_ID, JoinCallMode.AUTO, 0)));
+		given(loadUserPort.loadUsers(FAMILY_ID)).willReturn(List.of(
+				User.restore(TEACHER_ID, FAMILY_ID, Role.TEACHER, "이선생", "+821098765432"),
+				User.restore(CHILD_SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", null),
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678"),
+				User.restore(CHILD_MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", null)));
+		lenient().when(loadVehiclePort.loadLinkedVehicleOfFamily(FAMILY_ID)).thenReturn(Optional.empty());
+		given(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList())).willReturn(Map.of());
+
+		FamilyResult result = getMyFamilyService.getMyFamily(new GetMyFamilyQuery(FAMILY_ID));
+
+		assertThat(result.members()).extracting(MemberResult::userId)
+				.containsExactly(GUARDIAN_ID, CHILD_MINJUN_ID, CHILD_SEOYUN_ID, TEACHER_ID);
+	}
+
+	@Test
 	@DisplayName("가족 조회는 연결 중인 차량이 없으면 vehicle을 null로 돌려준다")
 	void returnsNullVehicleWhenFamilyHasNoLinkedVehicle() {
 		given(loadFamilyPort.loadFamily(FAMILY_ID))

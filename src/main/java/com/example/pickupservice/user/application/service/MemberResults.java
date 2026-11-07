@@ -5,6 +5,7 @@ import com.example.pickupservice.user.application.port.out.LoadMemberDeviceStatu
 import com.example.pickupservice.user.domain.DeviceStatus;
 import com.example.pickupservice.user.domain.User;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +18,7 @@ final class MemberResults {
 		Map<Long, DeviceStatus> deviceStatuses = deviceStatusPort.loadDeviceStatuses(
 				users.stream().map(User::getUserId).toList());
 		return users.stream()
+				.sorted(Comparator.comparing(User::getUserId))
 				.map(user -> toResult(user, deviceStatuses))
 				.toList();
 	}
