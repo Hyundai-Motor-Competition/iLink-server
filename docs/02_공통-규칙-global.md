@@ -166,6 +166,8 @@ Java 21 + Spring Boot 4 서버 하나에 PostgreSQL(PostGIS) 하나만 붙인다
 
 code 이름은 기획안 「4. 이벤트 · 상태」 탭의 ERR 이름을 그대로 쓴다. 아래 공통 오류는 모든 API에 해당하고, API별 오류는 각 도메인 설계서에 적는다.
 
+여러 모듈이 같은 뜻으로 쓰는 도메인 오류(예: VEHICLE_ALREADY_LINKED)도 common ErrorCode에 한 번만 둔다(03_공유모듈-shared.md 「오류 형식」 참고).
+
 | HTTP | code | 언제 |
 |---|---|---|
 | 400 | INVALID_REQUEST | JSON 형식이 틀림, 필수 요청 파라미터 · 요청 헤더가 빠짐, 요청 파라미터 타입이 틀림 (Idempotency-Key 헤더가 빠지면 400이 아니라 422 VALIDATION_FAILED) |

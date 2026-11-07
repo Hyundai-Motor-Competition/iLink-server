@@ -1,34 +1,27 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-08 02:01 KST · tdd-guard
+- 생성: 2026-11-08 02:43 KST · tdd-guard
 - 설계서: C:/pickup/docs
 - 프로젝트: gradle · C:/pickup
-- 테스트: ● GREEN · 990 passed · 전체 · 74s
-- 진행: 공유모듈 57/57 · 사용자 71/71 · 인증 120/120 · 일정 77/77 · 장소 0/43 · 픽업 0/203 · 알림 0/44 · 남은 항목 290/615
-- 현재 도메인: 일정 (06_일정-schedule.md) · 진행 시작: /tdd go
+- 테스트: ● GREEN · 996 passed · 전체 · 1.6s
+- 진행: 공유모듈 57/57 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 0/47 · 픽업 0/203 · 알림 0/44 · 남은 항목 294/621
+- 현재 도메인: 장소 (07_장소-place.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
 
 ## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 완료 · 항목 57/57 · 완료 기준 4/4 · 리뷰 11-07 15:37 조건부 통과 (상 0 · 중 1 · 하 9)
 - 남은 할 일 없음
 
-## 2. 사용자 (user) · 04_사용자-user.md · 대기 · 항목 71/71 · 완료 기준 3/4 · 리뷰 11-07 18:02 조건부 통과 (상 1 · 중 7 · 하 11)
-### 완료 기준
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+## 2. 사용자 (user) · 04_사용자-user.md · 완료 · 항목 73/73 · 완료 기준 4/4 · 리뷰 11-08 02:39 조건부 통과 (상 0 · 중 1 · 하 5)
+- 남은 할 일 없음
 
 ## 3. 인증 (auth) · 05_인증-auth.md · 완료 · 항목 120/120 · 완료 기준 4/4 · 리뷰 11-07 23:03 통과 (상 1 · 중 0 · 하 5)
 - 남은 할 일 없음
 
-## 4. 일정 (schedule) · 06_일정-schedule.md · 진행 중 · 항목 77/77 · 완료 기준 0/4 · 리뷰 11-08 01:55 조건부 통과 (상 0 · 중 0 · 하 7) · 재리뷰 필요
-### 도메인 리뷰
-- [ ] 2026-11-08 01:55 KST 리뷰 뒤에 체크 · 추가된 항목 #77 → /tdd review schedule
-### 완료 기준
-- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
-- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+## 4. 일정 (schedule) · 06_일정-schedule.md · 완료 · 항목 77/77 · 완료 기준 4/4 · 리뷰 11-08 02:05 조건부 통과 (상 0 · 중 0 · 하 2)
+- 남은 할 일 없음
 
-## 5. 장소 (place) · 07_장소-place.md · 대기 · 항목 0/43 · 완료 기준 0/4
+## 5. 장소 (place) · 07_장소-place.md · 진행 중 · 항목 0/47 · 완료 기준 0/4
 ### 테스트 케이스
 - [ ] #1 [기반] 기본 장소 규칙은 가족 · 학원의 첫 장소를 isDefault true로 만든다
 - [ ] #2 [기반] 기본 장소 규칙은 새 기본 장소를 지정하면 같은 가족 · 학원의 이전 기본 장소를 false로 바꾼다
@@ -73,6 +66,10 @@
 - [ ] #41 [web] DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다
 - [ ] #42 [web] DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다
 - [ ] #43 [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
+- [ ] #44 [persistence] pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다
+- [ ] #45 [persistence] LoadAcademyPort 어댑터는 schedule의 LoadAcademyUseCase.findAcademy 결과를 place가 쓰는 학원 정보(academyId · name · location)로 바꿔 돌려주고 없으면 빈 값을 돌려준다
+- [ ] #46 [서비스] findSpot은 spotId의 장소를 돌려주고 없으면 빈 값을, findSpots는 가족의 학원 목록에 속한 장소를 spotId · academyId · name · isDefault로 돌려준다
+- [ ] #47 schedule의 임시 LoadPickupSpotPort를 place findSpots 연동으로 바꿔 설정 요약 · 주간 일정의 PICKUP_SPOT 판정이 실제 장소를 본다
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치

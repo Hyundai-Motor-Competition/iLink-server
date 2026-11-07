@@ -5,7 +5,7 @@
 | 항목 | 내용 |
 |---|---|
 | 범위 | 엔티티 Family · User · Vehicle. API FAM-01~03 · FAM-07(가족 멤버), LINK-05(차량 연결 해제), SET-06(합류 안내 방식). 다른 모듈용 in 포트(보호자 · 가족 생성, 차량 등록 · 조회, 멤버 · 가족 조회) |
-| 의존 | 03_공유모듈-shared. auth의 in 포트(멤버 기기 상태 조회, 멤버 해제 때 기기 · 토큰 폐기, LINK-05 차량 기기 폐기), pickup의 in 포트(진행 중 픽업 여부). 둘 다 user out 포트로 두고 구현 전에는 테스트 대역으로 검증 |
+| 의존 | 03_공유모듈-shared. auth의 in 포트(멤버 기기 상태 조회, 멤버 해제 때 기기 · 토큰 폐기, LINK-05 차량 기기 폐기), pickup의 in 포트(진행 중 픽업 여부). 둘 다 user out 포트로 둔다. auth는 연동됨(기기 상태 · 기기 폐기), pickup(CheckActivePickupPort)만 구현 전 임시 false |
 | 진행 | 계층 병렬 |
 
 ## 구조
@@ -48,11 +48,12 @@ user
 | vehicleId | BIGINT | PK | |
 | familyId | BIGINT | FK → Family, NULL | 연결 승인 전에는 비어 있음 |
 | vin | CHAR(17) | 연결 중인 행끼리 UNIQUE | 차대번호 |
-| model | VARCHAR(50) | | |
-| plateNumber | VARCHAR(20) | | |
+| model | VARCHAR(50) | NULL | |
+| plateNumber | VARCHAR(20) | NULL | |
 | unlinkedAt | TIMESTAMPTZ | NULL | 연결 해제 시각 |
 | version | BIGINT | NOT NULL, 기본값 0 | 낙관적 잠금(@Version). 같은 대기 차량에 NEW 승인이 동시에 오면 하나만 성공 |
 
+- 연결 중인 차량 = unlinkedAt이 빈 행(05_인증-auth.md LINK-03과 같음).
 - VIN 유니크는 연결 중인 행끼리만 건다. schema.sql: `CREATE UNIQUE INDEX IF NOT EXISTS … ON vehicle (vin) WHERE unlinked_at IS NULL`.
 - 연결을 해제해도 행은 지우지 않고 unlinkedAt만 채운다. 같은 차를 다시 연결하면 새 행(새 vehicleId)이 생겨 가족별 픽업 기록이 섞이지 않는다.
 
@@ -62,7 +63,7 @@ user
 |---|---|---|---|---|---|
 | FAM-01 | GET /v1/families/me | GUARDIAN · CO_GUARDIAN | 불필요 | — → 200 familyId, joinCallMode, vehicle(vehicleId · model · plateNumberMasked, 없으면 null), members[](userId · role · name · phone · deviceStatus) | 공통 |
 | FAM-02 | POST /v1/families/me/members | GUARDIAN · CO_GUARDIAN | 필요 | role(CHILD · CO_GUARDIAN · DELEGATE · TEACHER), name(1~20자, 이모지 · 제어문자 불가), phone(국제 형식, 자녀 외 필수) → 201 userId | 422 MEMBER_LIMIT_EXCEEDED(자녀 외 멤버가 이미 5명), 403 FORBIDDEN(공동 보호자가 공동 보호자를 추가) |
-| FAM-03 | PATCH /v1/families/me/members/{userId} | GUARDIAN · CO_GUARDIAN | 불필요 | name, phone, role(모두 선택, 보낸 필드만 바뀜) → 200 userId · role · name · phone · deviceStatus | 422 전화번호 형식 오류, role 변경은 GUARDIAN만(403) |
+| FAM-03 | PATCH /v1/families/me/members/{userId} | GUARDIAN · CO_GUARDIAN | 불필요 | name, phone, role(모두 선택, 보낸 필드만 바뀜) → 200 userId · role · name · phone · deviceStatus | 422 VALIDATION_FAILED(role GUARDIAN 지정 · GUARDIAN 자신의 role 변경 → fields role, 전화번호 형식 오류, phone 없는 CHILD를 자녀 외 role로 변경 → fields phone), 422 MEMBER_LIMIT_EXCEEDED(CHILD를 자녀 외 role로 바꿀 때 자녀 외 멤버가 이미 5명), 403 FORBIDDEN(GUARDIAN이 아닌 멤버가 role 변경) |
 | FAM-07 | DELETE /v1/families/me/members/{userId} | GUARDIAN | 필요 | — → 204 | 409 MEMBER_IN_ACTIVE_PICKUP, 422 CANNOT_REMOVE_GUARDIAN |
 | LINK-05 | DELETE /v1/vehicle-links/{vehicleId} | GUARDIAN | 필요 | — → 204 | 409 ACTIVE_PICKUP_EXISTS |
 | SET-06 | PUT /v1/families/me/call-mode | GUARDIAN · CO_GUARDIAN | 불필요 | joinCallMode(AUTO · GUARDIAN_CONFIRM) → 200 joinCallMode, settingsVersion | 공통 |
@@ -79,7 +80,10 @@ user
 - 자녀 외 멤버(CHILD가 아닌 role)는 가족당 최대 5명. 넘으면 422 MEMBER_LIMIT_EXCEEDED.
 - CO_GUARDIAN은 멤버를 추가할 수 있지만 CO_GUARDIAN은 추가하지 못한다(403 FORBIDDEN).
 - 이름은 1~20자, 이모지 · 제어문자 불가. 전화번호는 국제 형식(+8210…), CHILD만 생략 가능.
-- FAM-03은 보낸 필드만 바꾼다. role 변경은 GUARDIAN만 하고, GUARDIAN 자신의 role은 바꾸지 못한다.
+- FAM-03은 보낸 필드만 바꾼다. role 변경은 GUARDIAN만 하고(아니면 403 FORBIDDEN), GUARDIAN 자신의 role은 바꾸지 못한다(422 VALIDATION_FAILED, fields role).
+- FAM-03으로 role을 GUARDIAN으로 지정하면 422 VALIDATION_FAILED(fields role). 전화번호 형식이 틀리면 422 VALIDATION_FAILED.
+- FAM-03으로 CHILD를 자녀 외 role로 바꿀 때: phone이 없으면(요청에도 기존 값에도) 422 VALIDATION_FAILED(fields phone), 자녀 외 멤버가 이미 5명이면 422 MEMBER_LIMIT_EXCEEDED(사람 결정 2026-11-07).
+- 멤버 목록(FAM-01 members[] · findMembers)은 userId 오름차순으로 돌려준다.
 - FAM-07은 GUARDIAN만. 자기 자신은 422 CANNOT_REMOVE_GUARDIAN, 진행 중 픽업에 묶인 멤버는 409 MEMBER_IN_ACTIVE_PICKUP. 해제하면 그 멤버의 기기와 토큰을 auth in 포트로 함께 폐기한다.
 - 다른 가족의 userId는 404 NOT_FOUND.
 
@@ -89,7 +93,7 @@ user
 
 ### 차량
 - AUTH-02(auth)가 차량 기기를 등록할 때 Vehicle 행을 familyId 없이 만든다(RegisterVehicleUseCase).
-- LINK-04 NEW(auth)가 승인되면 Family와 User(GUARDIAN)를 만들고 Vehicle.familyId를 채운다(CreateGuardianUseCase).
+- LINK-04 NEW(auth)가 승인되면 Family와 User(GUARDIAN)를 만들고 Vehicle.familyId를 채운다(CreateGuardianUseCase). 이미 가족에 연결됐거나 연결이 해제된 차량이면 409 VEHICLE_ALREADY_LINKED로 거절하고 아무것도 저장하지 않는다. 이 코드는 common ErrorCode 하나로 두고 user · auth가 같이 쓴다(문구 「이미 보호자가 연결된 차량입니다」).
 - LINK-05: GUARDIAN만, 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS, 성공하면 unlinkedAt을 채우고 그 차량의 살아 있는 기기를 모두 폐기한다(RevokeVehicleDevicesPort → auth RevokeVehicleDevicesUseCase, 사람 결정 2026-11-07). 해제 뒤 같은 VIN은 AUTH-02에서 새 행으로 등록된다.
 - 번호판 마스킹: 뒷자리를 가린다(예: 「12가 ****」).
 
@@ -203,13 +207,15 @@ boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);
 - [x] [서비스] 멤버 수정으로 CHILD를 자녀 외 role로 바꿀 때 자녀 외 멤버가 이미 5명이면 MEMBER_LIMIT_EXCEEDED로 거절한다
 - [x] [web] PATCH /v1/families/me/members/{userId}에 role GUARDIAN을 보내면 422 VALIDATION_FAILED와 fields의 role을 돌려준다
 - [x] [서비스] createGuardian은 이미 가족에 연결됐거나 연결이 해제된 차량이면 409 VEHICLE_ALREADY_LINKED로 거절하고 아무것도 저장하지 않는다
+- [x] 멤버 목록(findMembers · FAM-01 members[])은 userId 오름차순으로 돌려준다
+- [x] VEHICLE_ALREADY_LINKED는 common ErrorCode 하나로 정의되고 user · auth 모두 409 「이미 보호자가 연결된 차량입니다」로 응답한다
 
 ## 확인 필요 사항
 
 | 항목 | 현재 가정 |
 |---|---|
 | 「자녀 외 멤버 최대 5명」에 GUARDIAN 자신이 들어가는지 | 소스에 없음. GUARDIAN 포함 CHILD가 아닌 멤버 전체를 센다고 가정 |
-| GUARDIAN이 자기 role을 바꾸려 할 때 오류 코드 | 소스에 없음(「못 바꿈」만 있음). 422 VALIDATION_FAILED로 가정 |
+| GUARDIAN이 자기 role을 바꾸려 할 때 오류 코드 | 결정됨: 422 VALIDATION_FAILED(fields role), 항목 #32 · #67 |
 | 전화번호 국제 형식 범위 | 예시가 +8210…뿐. +로 시작하는 국제 형식(E.164)을 받는다고 가정 |
 | 멤버 해제 때 User 행 처리 | 소스에 없음. SessionChild · PickupSchedule이 User를 FK로 가리켜 지난 기록이 있는 멤버는 행을 지울 수 없음. 삭제 대신 표시만 하는 방식이 필요한지 정해야 함 |
 | 멤버 해제 때 그 자녀의 일정 · 장소 처리 | 소스에 없음. 그대로 둔다고 가정 |
@@ -217,8 +223,8 @@ boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);
 | LINK-05 때 차량 기기 토큰 폐기 | 결정됨(사람 결정 2026-11-07). 해제하면 그 차량의 살아 있는 기기를 모두 폐기한다. 해제된 차량 앱은 AUTH-02로 다시 등록한다. 포트도 결정됨: RevokeVehicleDevicesPort → auth RevokeVehicleDevicesUseCase |
 | settingsVersion을 올리는 변경의 범위 | SET-06만 명시됨. 일정(SET-02 · 03) · 장소(SPOT-02 · 03) · 멤버 변경도 올리는지 정해야 함(SET-08 충돌 판단에 영향) |
 | 번호판 마스킹 규칙 | 예시 「12가 ****」뿐. 마지막 숫자 4자리를 *로 바꾼다고 가정 |
-| user ↔ auth 서로 부름 | auth는 User 생성을 user에 요청하고, user는 기기 상태 · 폐기를 auth에 요청. user 쪽은 out 포트로 두고 auth 구현 전에는 테스트 대역으로 검증 |
-| 진행 중 픽업 확인(FAM-07 · LINK-05)을 pickup in 포트로 부르는 것 | pickup이 user보다 뒤에 구현되므로 out 포트 + 테스트 대역으로 먼저 검증 |
+| user ↔ auth 서로 부름 | auth는 User 생성을 user에 요청하고, user는 기기 상태 · 폐기를 auth에 요청. user 쪽은 out 포트로 둔다. auth 쪽 임시 어댑터(LoadMemberDeviceStatusPort 기기 상태 · RevokeMemberDevicesPort 기기 폐기)는 auth 연동으로 교체됨 |
+| 진행 중 픽업 확인(FAM-07 · LINK-05)을 pickup in 포트로 부르는 것 | pickup이 user보다 뒤에 구현되므로 out 포트 + 테스트 대역으로 먼저 검증. pickup 쪽 CheckActivePickupPort만 아직 임시 어댑터(늘 false). pickup 구현 때 교체해야 함 |
 | 포트 · 유스케이스 이름 | 소스 2.2 예시(StartPickupUseCase, LoadSessionPort)의 이름 규칙을 따른 제안 |
 | LINK-04 NEW로 만드는 GUARDIAN의 name · phone | name은 결정됨(사람 결정 2026-11-07). LINK-04 요청 name, mode NEW일 때 필수(05_인증-auth.md와 같음). phone은 미정. 요청에 없어 null로 만들고 있어 「자녀 외 phone 필수」 규칙과 어긋남. 보호자 전화번호를 받을 곳을 정해야 함 |
 | Role enum 위치 | 해소: 02에 「common 순수 타입(Role · PrincipalType · LatLng)은 domain에서 써도 된다」 예외를 둠. user/domain은 common.security.Role을 그대로 쓰고 Role enum을 따로 만들지 않음(사람 결정 2026-11-07, 03 확인 필요 사항) |

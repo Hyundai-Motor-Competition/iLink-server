@@ -15,7 +15,7 @@
 ```text
 common
 ├─ security        SecurityConfig(SecurityFilterChain · @EnableMethodSecurity · PublicEndpoints 빈을 모아 permitAll), PublicEndpoints · PublicEndpoint(인증 없는 API 등록), JwtDecoderConfig(HS256 검증 · exp 필수), AuthPrincipalJwtConverter(클레임 → AuthPrincipal), AuthPrincipal · PrincipalType · Role, 401 · 403 처리
-├─ error           ErrorResponse, ErrorCode(02 공통 코드, TOO_MANY_REQUESTS 포함), BusinessException(정적 팩토리만), GlobalExceptionHandler(@RestControllerAdvice), ValidationFieldErrors, ErrorResponseWriter(필터 단계 오류 본문)
+├─ error           ErrorResponse, ErrorCode(02 공통 코드와 여러 모듈이 같이 쓰는 도메인 코드, TOO_MANY_REQUESTS 포함), BusinessException(정적 팩토리만), GlobalExceptionHandler(@RestControllerAdvice), ValidationFieldErrors, ErrorResponseWriter(필터 단계 오류 본문)
 ├─ idempotency     IdempotencyKeyFilter, @IdempotencyKeyRequired, IdempotencyKeyEntity · IdempotencyKeyRepository, IdempotencyKeyCleaner(@Scheduled 만료 삭제), CachedBodyRequest(본문 다시 읽기)
 ├─ logging         RequestIdFilter(MDC requestId), RequestLoggingInterceptor(HandlerInterceptor, AOP 아님), @PollingLog
 ├─ web             Spring MVC 공통 설정: JsonOnlyWebMvcConfig(응답은 JSON만), 검증 재정의 허용(ValidationConfigurationCustomizer)
@@ -92,12 +92,12 @@ common에는 엔드포인트가 없다. 아래 부품이 모든 도메인의 API
 
 | 팩토리 | 쓰는 때 | 응답 |
 |---|---|---|
-| of(ErrorCode) | 02의 공통 코드(NOT_FOUND · FORBIDDEN 등) | 그 코드의 HTTP 상태 · code · 문구 |
-| of(HttpStatus, String code, String message) | 도메인 오류 코드(문자열) | 넣은 상태 · code · message |
+| of(ErrorCode) | 02의 공통 코드(NOT_FOUND · FORBIDDEN 등), 여러 모듈이 같이 쓰는 도메인 코드(VEHICLE_ALREADY_LINKED) | 그 코드의 HTTP 상태 · code · 문구 |
+| of(HttpStatus, String code, String message) | 한 모듈만 쓰는 도메인 오류 코드(문자열) | 넣은 상태 · code · message |
 | tooManyRequests(int retryAfterSeconds) | 429 횟수 제한 | 429 TOO_MANY_REQUESTS, retryAfterSeconds 채움 |
 | conflictWithOverlap(HttpStatus status, String code, String message, List\<Long\> overlapScheduleIds) | 겹치는 일정 id를 함께 보내는 도메인 오류(schedule SCHEDULE_OVERLAP) | 넣은 상태 · code · message, error.overlapScheduleIds 채움 |
 
-- ErrorCode enum에는 02의 공통 코드만 둔다(TOO_MANY_REQUESTS 포함). 도메인 코드는 enum에 넣지 않는다.
+- ErrorCode enum에는 02의 공통 코드만 둔다(TOO_MANY_REQUESTS 포함). 도메인 코드는 enum에 넣지 않는다. 단, 여러 모듈이 같은 뜻으로 쓰는 도메인 오류는 한 번만 ErrorCode에 둔다(예: VEHICLE_ALREADY_LINKED 409 「이미 보호자가 연결된 차량입니다」 — user createGuardian · auth LINK-01 · LINK-04, 사람 결정 user #73).
 - 429는 retryAfterSeconds를 채운다. 도메인 코드로 429를 낼 때 retryAfterSeconds를 채우는 방법은 확인 필요.
 - 500은 고정 문구를 보내고 예외 내용은 서버 로그에만 남긴다(MDC requestId가 함께 찍힘).
 - 409 STATE_VERSION_CONFLICT 응답에는 error와 함께 최신 세션 뷰가 실린다(pickup이 채움). 실리는 필드 이름은 확인 필요.
@@ -227,7 +227,7 @@ record PublicEndpoint(HttpMethod method, String pattern) {}
 // PublicEndpoints: 인증 없는 API를 가진 도메인이 내는 빈. PublicEndpoint 목록을 담고 SecurityConfig가 모두 모아 permitAll
 
 // common.error
-// ErrorCode: 02의 공통 코드(TOO_MANY_REQUESTS 포함). 코드마다 HTTP 상태 · 기본 문구
+// ErrorCode: 02의 공통 코드(TOO_MANY_REQUESTS 포함)와 여러 모듈이 같이 쓰는 도메인 코드(VEHICLE_ALREADY_LINKED). 코드마다 HTTP 상태 · 기본 문구
 class BusinessException extends RuntimeException {   // 공개 생성자 없음
     static BusinessException of(ErrorCode errorCode);
     static BusinessException of(HttpStatus status, String code, String message);
