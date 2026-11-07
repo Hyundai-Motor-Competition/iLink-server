@@ -1,5 +1,12 @@
 package com.example.pickupservice.user.adapter.out;
 
+import com.example.pickupservice.auth.application.port.out.LoadDevicePort;
+import com.example.pickupservice.auth.application.port.out.SaveDevicePort;
+import com.example.pickupservice.auth.application.port.out.SaveInvitePort;
+import com.example.pickupservice.auth.domain.Device;
+import com.example.pickupservice.auth.domain.MemberInvite;
+import com.example.pickupservice.auth.domain.OwnerType;
+import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
 import com.example.pickupservice.user.application.port.out.CheckActivePickupPort;
 import com.example.pickupservice.user.application.port.out.LoadMemberDeviceStatusPort;
@@ -11,29 +18,33 @@ import org.junit.jupiter.api.Test;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 
+import java.time.Instant;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 
 @RequiredArgsConstructor
 class UserModuleLinkAdaptersTest extends IntegrationTestSupport {
 
 	private static final String OUT_ADAPTER_PACKAGE = "com.example.pickupservice.user.adapter.out.";
+	private static final AtomicLong UNUSED_USER_ID =
+			new AtomicLong(8_000_000_000L + ThreadLocalRandom.current().nextLong(1_000_000_000L) * 1_000L);
 
 	private final ApplicationContext applicationContext;
+	private final SaveDevicePort saveDevicePort;
+	private final LoadDevicePort loadDevicePort;
+	private final SaveInvitePort saveInvitePort;
 
 	@Test
-	@DisplayName("auth · pickup 구현 전 임시 어댑터가 빈으로 등록된다: LoadMemberDeviceStatusPort는 모든 userId에 NONE, RevokeMemberDevicesPort는 아무것도 하지 않음, CheckActivePickupPort는 false")
-	void temporaryModuleAdaptersAreRegisteredWithPlaceholderBehavior() {
-		LoadMemberDeviceStatusPort deviceStatusPort = onlyBeanOf(LoadMemberDeviceStatusPort.class);
-		RevokeMemberDevicesPort revokePort = onlyBeanOf(RevokeMemberDevicesPort.class);
+	@DisplayName("pickup 구현 전 임시 CheckActivePickupPort는 isInActivePickup · hasActivePickup 모두 false를 돌려준다")
+	void temporaryActivePickupAdapterReturnsFalse() {
 		CheckActivePickupPort activePickupPort = onlyBeanOf(CheckActivePickupPort.class);
 
-		assertThat(deviceStatusPort.loadDeviceStatuses(List.of(1L, 2L)))
-				.containsExactlyInAnyOrderEntriesOf(Map.of(1L, DeviceStatus.NONE, 2L, DeviceStatus.NONE));
-		assertThatCode(() -> revokePort.revokeDevicesOf(1L)).doesNotThrowAnyException();
 		assertThat(activePickupPort.isInActivePickup(1L)).isFalse();
 		assertThat(activePickupPort.hasActivePickup(1L)).isFalse();
 	}
@@ -50,16 +61,23 @@ class UserModuleLinkAdaptersTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("LoadMemberDeviceStatusPort는 요청한 userId마다 NONE을 담고 그 밖의 키는 담지 않는다")
-	void deviceStatusPortReturnsNoneForEveryRequestedUserId() {
+	@DisplayName("LoadMemberDeviceStatusPort는 auth 판정 결과를 돌려준다: 살아 있는 USER 기기가 있으면 CONNECTED, 사용 전 · 만료 전 초대만 있으면 INVITE_PENDING, 기기도 초대도 없으면 NONE")
+	void deviceStatusPortReturnsAuthJudgement() {
 		LoadMemberDeviceStatusPort deviceStatusPort = onlyBeanOf(LoadMemberDeviceStatusPort.class);
+		long connectedUserId = UNUSED_USER_ID.incrementAndGet();
+		long invitedUserId = UNUSED_USER_ID.incrementAndGet();
+		long bareUserId = UNUSED_USER_ID.incrementAndGet();
+		Instant now = Instant.now();
+		saveDevicePort.saveDevice(liveUserDevice(connectedUserId, now));
+		saveInvitePort.saveInvite(MemberInvite.issue(invitedUserId, uniqueInviteToken(), now));
 
-		Map<Long, DeviceStatus> statuses = deviceStatusPort.loadDeviceStatuses(List.of(101L, 131L, 9_999_999L));
+		Map<Long, DeviceStatus> statuses = deviceStatusPort.loadDeviceStatuses(
+				List.of(connectedUserId, invitedUserId, bareUserId));
 
 		assertThat(statuses).containsExactlyInAnyOrderEntriesOf(Map.of(
-				101L, DeviceStatus.NONE,
-				131L, DeviceStatus.NONE,
-				9_999_999L, DeviceStatus.NONE));
+				connectedUserId, DeviceStatus.CONNECTED,
+				invitedUserId, DeviceStatus.INVITE_PENDING,
+				bareUserId, DeviceStatus.NONE));
 	}
 
 	@Test
@@ -71,14 +89,20 @@ class UserModuleLinkAdaptersTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("RevokeMemberDevicesPort는 어떤 userId로 불러도 예외 없이 끝난다")
-	void revokePortDoesNothing() {
+	@DisplayName("RevokeMemberDevicesPort는 auth를 거쳐 그 멤버의 살아 있는 USER 기기를 모두 폐기하고 다른 멤버의 기기는 그대로 둔다")
+	void revokePortRevokesLiveDevicesOfThatMemberThroughAuth() {
 		RevokeMemberDevicesPort revokePort = onlyBeanOf(RevokeMemberDevicesPort.class);
+		long targetUserId = UNUSED_USER_ID.incrementAndGet();
+		long otherUserId = UNUSED_USER_ID.incrementAndGet();
+		Instant now = Instant.now();
+		saveDevicePort.saveDevice(liveUserDevice(targetUserId, now));
+		saveDevicePort.saveDevice(liveUserDevice(targetUserId, now));
+		saveDevicePort.saveDevice(liveUserDevice(otherUserId, now));
 
-		assertThatCode(() -> {
-			revokePort.revokeDevicesOf(1L);
-			revokePort.revokeDevicesOf(9_999_999L);
-		}).doesNotThrowAnyException();
+		revokePort.revokeDevicesOf(targetUserId);
+
+		assertThat(loadDevicePort.loadLiveDevices(OwnerType.USER, targetUserId)).isEmpty();
+		assertThat(loadDevicePort.loadLiveDevices(OwnerType.USER, otherUserId)).hasSize(1);
 	}
 
 	@Test
@@ -90,6 +114,21 @@ class UserModuleLinkAdaptersTest extends IntegrationTestSupport {
 		assertThat(activePickupPort.isInActivePickup(9_999_999L)).isFalse();
 		assertThat(activePickupPort.hasActivePickup(77L)).isFalse();
 		assertThat(activePickupPort.hasActivePickup(9_999_999L)).isFalse();
+	}
+
+	private static Device liveUserDevice(long userId, Instant at) {
+		return Device.register(OwnerType.USER, userId, Platform.ANDROID, "push-" + UUID.randomUUID(), at,
+				randomSha256Hex());
+	}
+
+	private static String uniqueInviteToken() {
+		return UUID.randomUUID().toString().replace("-", "");
+	}
+
+	private static String randomSha256Hex() {
+		byte[] bytes = new byte[32];
+		ThreadLocalRandom.current().nextBytes(bytes);
+		return HexFormat.of().formatHex(bytes);
 	}
 
 	private <T> T onlyBeanOf(Class<T> type) {
