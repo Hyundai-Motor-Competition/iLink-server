@@ -11,6 +11,7 @@ public class BusinessException extends RuntimeException {
 	private final String code;
 	private final Integer retryAfterSeconds;
 	private final List<FieldError> fields;
+	private final List<Long> overlapScheduleIds;
 
 	private BusinessException(StatusCode statusCode, String message, Details details) {
 		super(message);
@@ -18,6 +19,7 @@ public class BusinessException extends RuntimeException {
 		this.code = statusCode.code();
 		this.retryAfterSeconds = details.retryAfterSeconds();
 		this.fields = details.fields();
+		this.overlapScheduleIds = details.overlapScheduleIds();
 	}
 
 	public static BusinessException of(ErrorCode errorCode) {
@@ -31,13 +33,23 @@ public class BusinessException extends RuntimeException {
 	public static BusinessException tooManyRequests(int retryAfterSeconds) {
 		ErrorCode errorCode = ErrorCode.TOO_MANY_REQUESTS;
 		return new BusinessException(StatusCode.from(errorCode), errorCode.getMessage(),
-				new Details(retryAfterSeconds, null));
+				new Details(retryAfterSeconds, null, null));
 	}
 
 	public static BusinessException invalidField(String field, String reason) {
 		ErrorCode errorCode = ErrorCode.VALIDATION_FAILED;
 		return new BusinessException(StatusCode.from(errorCode), errorCode.getMessage(),
-				new Details(null, List.of(new FieldError(field, reason))));
+				new Details(null, List.of(new FieldError(field, reason)), null));
+	}
+
+	public static BusinessException conflictWithOverlap(HttpStatus status, String code, String message,
+			List<Long> overlapScheduleIds) {
+		return new BusinessException(new StatusCode(status, code), message,
+				new Details(null, null, List.copyOf(overlapScheduleIds)));
+	}
+
+	public List<Long> overlapScheduleIds() {
+		return overlapScheduleIds;
 	}
 
 	public HttpStatus status() {
@@ -63,9 +75,9 @@ public class BusinessException extends RuntimeException {
 		}
 	}
 
-	private record Details(Integer retryAfterSeconds, List<FieldError> fields) {
+	private record Details(Integer retryAfterSeconds, List<FieldError> fields, List<Long> overlapScheduleIds) {
 
-		private static final Details NONE = new Details(null, null);
+		private static final Details NONE = new Details(null, null, null);
 	}
 
 }
