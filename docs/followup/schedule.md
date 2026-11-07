@@ -1,8 +1,8 @@
 # FOLLOWUP · 일정 (schedule)
 
-- 생성: 2026-11-08 02:01 KST · tdd-guard
-- 상태: 진행 중 (체크 77/77 · 완료 기준 0/4)
-- 테스트: ● GREEN · 990 passed · 전체 · 74s · cd /c/pickup && ./gradlew.bat test --console=plain 2>&1 | tail -30; ls build/test-results/test/*.xml | wc -l; grep -ho …
+- 생성: 2026-11-08 02:05 KST · tdd-guard
+- 상태: 완료 (체크 77/77 · 완료 기준 4/4)
+- 테스트: ● GREEN · 990 passed · 전체 · 1.6s · cd /c/pickup && ./gradlew.bat test --rerun --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321…
 - 설계서: C:/pickup/docs/06_일정-schedule.md
 
 ## 완료 항목
@@ -80,7 +80,7 @@
 - [x] #72 일정 수정은 자기 자신을 뺀 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절한다 ← UpdateScheduleServiceTest.일정 수정은 자기 자신을 뺀 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절하고 저장하지 않는다
 - [x] #73 loadSchedules는 여러 scheduleId의 일정을 학원과 함께 한 번에 읽어 돌려준다(일정 조회 1회 · 학원 조회 1회) ← SchedulePersistenceAdapterTest.loadSchedules는 여러 scheduleId의 일정을 학원과 함께 한 번에 돌려주고 없는 id는 빼며, SQL은 일정 조회 1회 + 학원 조회 1회 이하다
 - [x] #74 findSchedules는 loadSchedules를 한 번만 불러 받은 순서대로 돌려주고 없는 id는 뺀다 ← LoadScheduleServiceTest.findSchedules는 loadSchedules를 받은 id 목록 그대로 정확히 1번 부르고 loadSchedule은 부르지 않는다
-- [x] #75 joinCallMode는 schedule 자체 enum으로 설정 요약 · 차량용 설정 요약 in 포트와 응답에 담고 user.domain 타입을 import하지 않는다 ← ScheduleModuleImportTest.schedule main 소스는 user.domain 타입을 쓰지 않는다(다른 모듈은 in 포트만)
+- [x] #75 joinCallMode는 schedule 자체 enum으로 설정 요약 · 차량용 설정 요약 in 포트와 응답에 담고 user.domain 타입을 import하지 않는다 ← ScheduleModuleImportTest.schedule main 소스 어디에도 user.domain 패키지 문자열(com.example.pickupservice.user.domain)이 없다
 - [x] #76 POST /v1/children/{childId}/schedules · PUT /v1/schedules/{scheduleId}에 101자 externalPlaceId를 보내면 422 VALIDATION_FAILED를 돌려준다 ← ScheduleControllerTest.POST /v1/children/{childId}/schedules에 101자 externalPlaceId를 보내면 422 VALIDATION_FAILED와 fields의 academy.externalPlaceId를 돌려주고 유스케이스를 부르지 않는다
 - [x] #77 일정 수정은 등록과 같이 저장한 학원(기존 출입구 반영) 기준으로 status를 판정한다 ← UpdateScheduleServiceTest.일정 수정은 등록과 같이 저장한 학원(기존 출입구 반영) 기준으로 status를 판정한다 (다른 가족이 먼저 출입구와 함께 저장한 새 학원이면 요청 entrance가 없어도 READY)
 
@@ -88,26 +88,22 @@
 - 없음
 
 ## 완료 기준 (공통 규칙 문서)
-- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
-- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+- [x] C1 설계서의 테스트 케이스가 모두 GREEN
+- [x] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [x] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 다시 리뷰 필요: 2026-11-08 01:55 KST 리뷰 뒤에 체크 · 추가된 항목 #77
-- 2026-11-08 01:55 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 0 · 하 7 · 리뷰 시점 체크 76/76
-- 리뷰 시점 테스트: ● GREEN · 988 passed · 전체 · 1.2s · cd C:/pickup && ./gradlew.bat test --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321/08c3708…
+- 2026-11-08 02:05 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 0 · 하 2 · 리뷰 시점 체크 77/77
+- 리뷰 시점 테스트: ● GREEN · 990 passed · 전체 · 1.6s · cd /c/pickup && ./gradlew.bat test --rerun --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321…
   - 결론: 조건부 통과
-  - 이전 리뷰 [중] 4건 모두 해소(#70 #71 #73 #74 #76, 설계서 반영). [상] · [중] 없음. 새 [하] 7건.
-  - [하] 일정 수정만 status를 저장 전 학원 기준으로 정함(등록은 저장 뒤 학원 기준). 다른 가족이 같은 새 학원을 출입구와 함께 먼저 넣은 경우 entrance 없이 수정하면 upsert가 출입구를 지키는데도 DRAFT로 저장 — UpdateScheduleService.java:45,56-59, CreateScheduleService.java:37 → 항목 추가
-  - [하] 이미 있는 학원은 JPA merge로 행 전체를 덮어써, 동시 수정 때 다른 가족이 막 넣은 entrance가 null로 지워질 수 있음 — SchedulePersistenceAdapter.java:47-48, Academy.java:30-32 → note
-  - [하] 학원 upsert 네이티브 쿼리 — 02 L72 네이티브 쿼리 예외는 SPOT-01뿐 — AcademyJpaRepository.java:19-37 → 사람 결정
-  - [하] 06 L81 「academy.entrance가 없으면 DRAFT」 · ScheduleApiDoc.java:25 설명이 #70 이전 문장 → note
-  - [하] 06 검증 순서 표(404 → 422)와 달리 웹 @Valid 422가 404보다 먼저 — 06 L84-91 → note
-  - [하] 테스트에 RED 단계용 우회(JoinCallModeFixture 리플렉션, Object + isInstanceOf + Enum 캐스트), ScheduleModuleImportTest 이름과 검사 범위 차이 — GetSetupSummaryServiceTest.java:233-236, GetVehicleSettingsSummaryServiceTest.java:92-95, ScheduleModuleImportTest.java:21-35 → 리팩터링
-  - [하] FOLLOWUP 확인 필요 표(schedule.md:119-134)가 06 반영 전 내용, 해소된 메모 5건 · 다른 저장소 메모 5건 남음 → note
-  - 완료 기준: C1 충족(76/76, 988 passed) · C2 충족(문서 표현 [하] 2건, 동시 실행 [하] 2건 남음) · C3 사람 확인 필요(02 L72 네이티브 쿼리 예외에 academy upsert 추가 여부) · C4 충족
-- 이전 리뷰: 2026-11-08 01:22 KST (조건부 통과), 2026-11-08 00:43 KST (조건부 통과), 2026-11-08 00:22 KST (조건부 통과), 2026-10-28 21:19 KST (조건부 통과)
+  - 이전 재리뷰의 하 7건 처리 끝: 1 해소(#77, UpdateScheduleService.java:56-60, 새 테스트가 옛 코드에서 실패하는 단언) · 2 note(06 L257) · 3 해소(사람 결정, 02 L72) · 4 해소(06 L81, ScheduleApiDoc.java:25,38) · 5 해소(06 L85-91 5단계가 코드 순서와 같음) · 6 해소(JoinCallModeFixture 삭제, ScheduleModuleImportTest 이름) · 7 일부 해소(확인 필요 표 동기화, 해소된 메모 5건 · 다른 저장소 메모 5건 남음, note)
+  - 상 · 중 등급 발견 사항 없음. 새 발견 2건(모두 하).
+  - [하] #75 증거 테스트 이름이 바뀐 DisplayName을 따라가지 않음 — docs/followup/schedule.md:83, ScheduleModuleImportTest.java:21 → 증거 이름 갱신(처리함: #75를 새 이름으로 다시 체크)
+  - [하] 수정 서비스가 같은 입력으로 일정을 두 번 만듦(candidate · judged). 동작 문제 없음, 의도가 코드에 덜 드러남 — UpdateScheduleService.java:40,56-60 → 리팩터링(선택, 후속 과제)
+  - 완료 기준: C1 충족(77/77, test --rerun 990 passed) · C2 충족(06 L81 · 검증 순서 표 = 코드, 동시 수정 merge는 후속 과제) · C3 충족(02 L72 예외 반영, 공통 규칙 위반 없음) · C4 충족(06 확인 필요 14행 = FOLLOWUP 표)
+  - 테스트: ./gradlew.bat test --rerun → BUILD SUCCESSFUL, 126 XML, 990 tests 실패 0
+- 이전 리뷰: 2026-11-08 02:05 KST (조건부 통과), 2026-11-08 01:55 KST (조건부 통과), 2026-11-08 01:22 KST (조건부 통과), 2026-11-08 00:43 KST (조건부 통과)
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -128,7 +124,6 @@
 | schedule ↔ place 서로 부름 | place는 Academy를 참조하고, SET-07 · 09는 place 장소를 읽음. schedule 쪽은 out 포트 + 테스트 대역으로 먼저 검증하고, place 구현 전에는 임시 어댑터(adapter/out/place)가 빈 목록을 돌려줌 |
 
 ## 다음 단계
-- 도메인 리뷰: /tdd review schedule (2026-11-08 01:55 KST 리뷰 뒤에 체크 · 추가된 항목 #77)
 - 커밋 · 푸시: /tdd commit (기능별 분할 커밋) · /tdd push (커밋 후 기능 브랜치 푸시)
 - 다음 도메인: 장소 (07_장소-place.md). 시작: /tdd domain place
 
@@ -161,3 +156,4 @@
 - [결정 · 사람, 도메인 리뷰 뒤] (1) 학원 재사용 때 entrance · phone이 비면 기존 값 유지 (2) loadSchedules(List<Long>) 포트 지금 추가 (3) JoinCallMode는 schedule 자체 enum (4) 동시 등록 유니크 충돌은 다시 읽어 재사용. [공통 · 하] LatLng 범위 검증 없음(location {} → (0,0), lat 999 → 500 가능) — place 도메인과 함께 공통에서 처리할지 결정 필요. [하] pickup_schedule.child_user_id 인덱스 없음, prod external_place_id DDL 계획 없음
 - schedule 결정(팀장): 동시 등록 충돌로 학원을 재사용할 때도 name · address · location은 요청 값, entrance · phone은 비어 있으면 기존 값(COALESCE). 「비어 있으면」은 null만 — 빈 문자열 · 공백 phone 처리 미정
 - [결정 · 사람] 02 L72 네이티브 쿼리 예외에 academy upsert 추가. [재리뷰 하 · 후속] 이미 있는 학원 갱신은 JPA merge라 동시 수정 때 다른 가족이 막 넣은 entrance를 지울 수 있음(이미 있는 학원도 DB COALESCE로 저장할지). FOLLOWUP 확인 필요 표가 06 해소 반영 전 내용이고, 해소된 메모(findSchedules N+1 · joinCallMode · 출입구 null · externalPlaceId 길이 · 좌표 500)와 다른 저장소 메모 5건이 남아 있음 — 정리 필요. name · address · phone 길이 테스트 없음. 빈 문자열 phone은 기존 값을 덮어씀(설계 결정 필요)
+- [재리뷰 2 · 하 · 선택] UpdateScheduleService가 같은 입력으로 일정을 두 번 만듦(candidate는 겹침 · 한도용, judged는 저장 학원 기준 status용). 도메인에 id를 유지한 채 학원을 바꾸는 메서드를 두면 의도가 드러남
