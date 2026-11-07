@@ -1,10 +1,10 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-08 02:54 KST · tdd-guard
+- 생성: 2026-11-08 03:30 KST · tdd-guard
 - 설계서: C:/pickup/docs
 - 프로젝트: gradle · C:/pickup
-- 테스트: ● GREEN · 1 passed · cd C:/pickup; ./gradlew.bat test --cons… · 19s
-- 진행: 공유모듈 57/57 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 8/47 · 픽업 0/203 · 알림 0/44 · 남은 항목 286/621
+- 테스트: ● GREEN · 1079 passed · 전체 · 73s
+- 진행: 공유모듈 57/57 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 36/51 · 픽업 0/203 · 알림 0/44 · 남은 항목 262/625
 - 현재 도메인: 장소 (07_장소-place.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
@@ -21,28 +21,8 @@
 ## 4. 일정 (schedule) · 06_일정-schedule.md · 완료 · 항목 77/77 · 완료 기준 4/4 · 리뷰 11-08 02:05 조건부 통과 (상 0 · 중 0 · 하 2)
 - 남은 할 일 없음
 
-## 5. 장소 (place) · 07_장소-place.md · 진행 중 · 항목 8/47 · 완료 기준 0/4
+## 5. 장소 (place) · 07_장소-place.md · 진행 중 · 항목 36/51 · 완료 기준 0/4 · 리뷰 11-08 03:25 조건부 통과 (상 0 · 중 1 · 하 4) · 재리뷰 필요
 ### 테스트 케이스
-- [ ] #9 [persistence] PickupSpot을 저장하고 읽으면 stopPoint · meetingPoint의 lat · lng가 소수점 6자리까지 같다
-- [ ] #10 [persistence] stop_point 컬럼에 GIST 인덱스가 있다
-- [ ] #11 [persistence] loadSpots는 그 가족의 장소만 돌려주고 academyId를 주면 그 학원 장소만 돌려준다
-- [ ] #12 [persistence] loadSpotsWithin은 near에서 radiusM 안에 정차 지점이 있는 장소만 돌려준다
-- [ ] #13 [persistence] isWithinMeters는 학원에서 499m인 좌표에 true, 501m인 좌표에 false를 돌려준다
-- [ ] #14 [persistence] loadDefaultSpot은 가족 · 학원의 isDefault true 장소를 돌려준다
-- [ ] #15 [서비스] 장소 추가는 학원의 첫 장소면 isDefault false로 보내도 isDefault true로 저장한다
-- [ ] #16 [서비스] 장소 추가는 isDefault true면 같은 학원의 이전 기본 장소를 해제한다
-- [ ] #17 [서비스] 장소 추가는 정차 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
-- [ ] #18 [서비스] 장소 추가는 만남 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
-- [ ] #19 [서비스] 장소 추가는 호출한 보호자를 createdBy로 저장한다
-- [ ] #20 [서비스] 장소 수정은 보낸 필드만 바꾼다
-- [ ] #21 [서비스] 장소 수정은 바꾼 좌표가 500m를 넘으면 SPOT_TOO_FAR로 거절한다
-- [ ] #22 [서비스] 장소 수정은 isDefault true로 바꾸면 같은 학원의 이전 기본 장소를 해제한다
-- [ ] #23 [서비스] 장소 삭제는 진행 중 세션이 쓰는 장소면 SPOT_IN_USE로 거절한다
-- [ ] #24 [서비스] 장소 삭제는 다른 장소가 남은 기본 장소면 DEFAULT_SPOT_REQUIRED로 거절한다
-- [ ] #25 [서비스] 다른 가족의 spotId를 수정 · 삭제하려 하면 NOT_FOUND로 거절한다
-- [ ] #26 [서비스] 장소 조회는 학원별로 묶어 academyName과 함께 돌려준다
-- [ ] #27 [서비스] 장소 조회는 진행 중 세션이 없으면 walkMinutes를 null로 돌려준다
-- [ ] #28 [서비스] findDefaultSpot은 가족 · 학원의 기본 장소를 돌려주고 없으면 빈 값을 돌려준다
 - [ ] #29 [web] GET /v1/families/me/pickup-spots는 200과 academies[]를 돌려준다
 - [ ] #30 [web] GET /v1/families/me/pickup-spots는 차량 토큰으로도 200을 돌려준다
 - [ ] #31 [web] GET /v1/families/me/pickup-spots에 near만 보내고 radiusM을 빼면 422 VALIDATION_FAILED를 돌려준다
@@ -58,10 +38,6 @@
 - [ ] #41 [web] DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다
 - [ ] #42 [web] DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다
 - [ ] #43 [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
-- [ ] #44 [persistence] pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다
-- [ ] #45 [persistence] LoadAcademyPort 어댑터는 schedule의 LoadAcademyUseCase.findAcademy 결과를 place가 쓰는 학원 정보(academyId · name · location)로 바꿔 돌려주고 없으면 빈 값을 돌려준다
-- [ ] #46 [서비스] findSpot은 spotId의 장소를 돌려주고 없으면 빈 값을, findSpots는 가족의 학원 목록에 속한 장소를 spotId · academyId · name · isDefault로 돌려준다
-- [ ] #47 schedule의 임시 LoadPickupSpotPort를 place findSpots 연동으로 바꿔 설정 요약 · 주간 일정의 PICKUP_SPOT 판정이 실제 장소를 본다
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
