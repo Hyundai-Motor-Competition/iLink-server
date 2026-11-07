@@ -14,6 +14,7 @@ import com.example.pickupservice.user.domain.Family;
 import com.example.pickupservice.user.domain.User;
 import com.example.pickupservice.user.domain.Vehicle;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,7 +39,11 @@ public class CreateGuardianService implements CreateGuardianUseCase {
 		long familyId = family.getFamilyId();
 		User guardian = saveUserPort.saveUser(User.create(familyId, Role.GUARDIAN, command.name(), command.phone()));
 		vehicle.linkTo(familyId);
-		saveVehiclePort.saveVehicle(vehicle);
+		try {
+			saveVehiclePort.saveVehicle(vehicle);
+		} catch (OptimisticLockingFailureException e) {
+			throw UserErrors.vehicleAlreadyLinked();
+		}
 		return new GuardianAccount(familyId, guardian.getUserId());
 	}
 }

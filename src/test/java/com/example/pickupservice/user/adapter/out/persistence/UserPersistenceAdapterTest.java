@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @RequiredArgsConstructor
 class UserPersistenceAdapterTest extends IntegrationTestSupport {
@@ -108,14 +110,17 @@ class UserPersistenceAdapterTest extends IntegrationTestSupport {
 
 		assertThat(loadVehiclePort.loadVehicle(savedLinked.getVehicleId())).get()
 				.usingRecursiveComparison()
+				.ignoringFields("version")
 				.isEqualTo(Vehicle.restore(savedLinked.getVehicleId(), familyId, linkedVin, "아이오닉 5",
 						"12가 3456", null));
 		assertThat(loadVehiclePort.loadVehicle(savedUnlinked.getVehicleId())).get()
 				.usingRecursiveComparison()
+				.ignoringFields("version")
 				.isEqualTo(Vehicle.restore(savedUnlinked.getVehicleId(), familyId, savedUnlinked.getVin(), "쏘렌토",
 						"34나 5678", UNLINKED_AT));
 		assertThat(loadVehiclePort.loadVehicle(savedUnowned.getVehicleId())).get()
 				.usingRecursiveComparison()
+				.ignoringFields("version")
 				.isEqualTo(Vehicle.restore(savedUnowned.getVehicleId(), null, savedUnowned.getVin(), "EV9", null,
 						null));
 	}
@@ -155,8 +160,37 @@ class UserPersistenceAdapterTest extends IntegrationTestSupport {
 				.isEqualTo(User.restore(member.getUserId(), familyId, Role.TEACHER, "박대리", "+821098765432"));
 		assertThat(loadVehiclePort.loadVehicle(vehicle.getVehicleId())).get()
 				.usingRecursiveComparison()
+				.ignoringFields("version")
 				.isEqualTo(Vehicle.restore(vehicle.getVehicleId(), familyId, vehicle.getVin(), "아이오닉 5", "12가 3456",
 						UNLINKED_AT));
+	}
+
+	@Test
+	@DisplayName("같은 Vehicle을 두 번 읽어 각각 familyId를 바꿔 저장하면 두 번째 저장은 낙관적 잠금 충돌로 실패하고 첫 번째 값이 남는다")
+	void secondSaveOfStaleVehicleFailsWithOptimisticLockConflict() {
+		long firstFamilyId = newFamilyId();
+		long secondFamilyId = newFamilyId();
+		Vehicle pending = saveVehiclePort.saveVehicle(Vehicle.register(randomVin(), "EV9"));
+		long vehicleId = pending.getVehicleId();
+		vehicleIds.add(vehicleId);
+		clearPersistenceContext();
+
+		Vehicle readByFirst = loadVehiclePort.loadVehicle(vehicleId).orElseThrow();
+		Vehicle readBySecond = loadVehiclePort.loadVehicle(vehicleId).orElseThrow();
+
+		readByFirst.linkTo(firstFamilyId);
+		saveVehiclePort.saveVehicle(readByFirst);
+
+		readBySecond.linkTo(secondFamilyId);
+		assertThatThrownBy(() -> saveVehiclePort.saveVehicle(readBySecond))
+				.as("먼저 읽은 버전으로 저장하면 충돌")
+				.isInstanceOf(OptimisticLockingFailureException.class);
+		clearPersistenceContext();
+
+		assertThat(loadVehiclePort.loadVehicle(vehicleId)).get()
+				.extracting(Vehicle::getFamilyId)
+				.as("먼저 저장한 가족이 남음")
+				.isEqualTo(firstFamilyId);
 	}
 
 	@Test
@@ -173,6 +207,7 @@ class UserPersistenceAdapterTest extends IntegrationTestSupport {
 
 		assertThat(loadVehiclePort.loadLinkedVehicleByVin(vin)).get()
 				.usingRecursiveComparison()
+				.ignoringFields("version")
 				.isEqualTo(Vehicle.restore(linked.getVehicleId(), newFamilyId, vin, "아이오닉 5", "12가 3456", null));
 		assertThat(linked.getVehicleId()).as("해제된 행과 다른 새 행").isNotEqualTo(unlinked.getVehicleId());
 	}
@@ -204,6 +239,7 @@ class UserPersistenceAdapterTest extends IntegrationTestSupport {
 
 		assertThat(loadVehiclePort.loadLinkedVehicleOfFamily(familyA)).get()
 				.usingRecursiveComparison()
+				.ignoringFields("version")
 				.isEqualTo(Vehicle.restore(linkedA.getVehicleId(), familyA, linkedVinA, "아이오닉 5", "12가 3456", null));
 		assertThat(loadVehiclePort.loadLinkedVehicleOfFamily(familyB)).get()
 				.extracting(Vehicle::getVehicleId)

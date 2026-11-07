@@ -7,9 +7,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
 
@@ -36,14 +38,25 @@ public class VehicleEntity extends BaseTimeEntity {
 
 	private Instant unlinkedAt;
 
+	@Version
+	@Column(nullable = false)
+	@ColumnDefault("0")
+	private Long version;
+
 	public VehicleEntity(Long vehicleId, Long familyId, String vin, String model, String plateNumber,
 			Instant unlinkedAt) {
+		this(vehicleId, familyId, vin, model, plateNumber, unlinkedAt, null);
+	}
+
+	public VehicleEntity(Long vehicleId, Long familyId, String vin, String model, String plateNumber,
+			Instant unlinkedAt, Long version) {
 		this.vehicleId = vehicleId;
 		this.familyId = familyId;
 		this.vin = vin;
 		this.model = model;
 		this.plateNumber = plateNumber;
 		this.unlinkedAt = unlinkedAt;
+		this.version = version;
 	}
 
 }

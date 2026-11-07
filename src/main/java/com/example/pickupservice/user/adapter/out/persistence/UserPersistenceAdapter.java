@@ -77,7 +77,14 @@ class UserPersistenceAdapter implements LoadFamilyPort, SaveFamilyPort, LoadUser
 
 	@Override
 	public Vehicle saveVehicle(Vehicle vehicle) {
-		return toDomain(vehicleJpaRepository.save(toEntity(vehicle)));
+		return toDomain(vehicleJpaRepository.saveAndFlush(toEntity(vehicle, versionToSave(vehicle))));
+	}
+
+	private Long versionToSave(Vehicle vehicle) {
+		if (vehicle.getVersion() != null || vehicle.getVehicleId() == null) {
+			return vehicle.getVersion();
+		}
+		return vehicleJpaRepository.findVersionByVehicleId(vehicle.getVehicleId()).orElse(null);
 	}
 
 	private static FamilyEntity toEntity(Family family) {
@@ -88,9 +95,9 @@ class UserPersistenceAdapter implements LoadFamilyPort, SaveFamilyPort, LoadUser
 		return new UserEntity(user.getUserId(), user.getFamilyId(), user.getRole(), user.getName(), user.getPhone());
 	}
 
-	private static VehicleEntity toEntity(Vehicle vehicle) {
+	private static VehicleEntity toEntity(Vehicle vehicle, Long version) {
 		return new VehicleEntity(vehicle.getVehicleId(), vehicle.getFamilyId(), vehicle.getVin(), vehicle.getModel(),
-				vehicle.getPlateNumber(), vehicle.getUnlinkedAt());
+				vehicle.getPlateNumber(), vehicle.getUnlinkedAt(), version);
 	}
 
 	private static Family toDomain(FamilyEntity entity) {
@@ -104,7 +111,7 @@ class UserPersistenceAdapter implements LoadFamilyPort, SaveFamilyPort, LoadUser
 
 	private static Vehicle toDomain(VehicleEntity entity) {
 		return Vehicle.restore(entity.getVehicleId(), entity.getFamilyId(), entity.getVin(), entity.getModel(),
-				entity.getPlateNumber(), entity.getUnlinkedAt());
+				entity.getPlateNumber(), entity.getUnlinkedAt(), entity.getVersion());
 	}
 
 }

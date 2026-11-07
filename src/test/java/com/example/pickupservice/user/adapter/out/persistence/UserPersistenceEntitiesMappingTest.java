@@ -84,6 +84,27 @@ class UserPersistenceEntitiesMappingTest extends IntegrationTestSupport {
 				.containsExactly(VARCHAR, 20);
 	}
 
+	@Test
+	@DisplayName("vehicle.version 컬럼은 BIGINT NOT NULL이고 DB 기본값 0을 가져 행이 있는 테이블에도 추가할 수 있다")
+	void vehicleVersionColumnIsNotNullWithDefaultZero() {
+		Map<String, Object> version = jdbcTemplate.queryForMap("""
+				select data_type, is_nullable, column_default
+				from information_schema.columns
+				where table_schema = current_schema()
+				  and table_name = 'vehicle'
+				  and column_name = 'version'
+				""");
+
+		assertThat(version.get("data_type")).isEqualTo(BIGINT);
+		assertThat(version.get("is_nullable")).isEqualTo(NOT_NULL);
+		assertThat(version.get("column_default")).as("vehicle.version의 DB 기본값").isNotNull();
+		assertThat(normalizeDefault((String) version.get("column_default"))).isEqualTo("0");
+	}
+
+	private static String normalizeDefault(String columnDefault) {
+		return columnDefault.replace("::bigint", "").replace("(", "").replace(")", "").replace("'", "").trim();
+	}
+
 	private Map<String, ColumnType> columnsOf(String tableName) {
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
 				select column_name, data_type, character_maximum_length, is_nullable

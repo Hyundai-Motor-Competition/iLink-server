@@ -16,14 +16,20 @@ public class Vehicle {
 	private String model;
 	private String plateNumber;
 	private Instant unlinkedAt;
+	private final Long version;
 
 	public static Vehicle restore(Long vehicleId, Long familyId, String vin, String model, String plateNumber,
 			Instant unlinkedAt) {
-		return new Vehicle(vehicleId, familyId, vin, model, plateNumber, unlinkedAt);
+		return restore(vehicleId, familyId, vin, model, plateNumber, unlinkedAt, null);
+	}
+
+	public static Vehicle restore(Long vehicleId, Long familyId, String vin, String model, String plateNumber,
+			Instant unlinkedAt, Long version) {
+		return new Vehicle(vehicleId, familyId, vin, model, plateNumber, unlinkedAt, version);
 	}
 
 	public static Vehicle register(String vin, String model) {
-		return new Vehicle(null, null, vin, model, null, null);
+		return new Vehicle(null, null, vin, model, null, null, null);
 	}
 
 	public void linkTo(long familyId) {
