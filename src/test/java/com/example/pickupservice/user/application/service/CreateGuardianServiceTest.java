@@ -17,12 +17,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
+import java.time.Instant;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
@@ -124,6 +129,31 @@ class CreateGuardianServiceTest {
 		assertThat(exception).isNotNull();
 		assertThat(exception.code()).isEqualTo(ErrorCode.NOT_FOUND.name());
 		assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
+		verify(saveFamilyPort, never()).saveFamily(any());
+		verify(saveUserPort, never()).saveUser(any());
+		verify(saveVehiclePort, never()).saveVehicle(any());
+	}
+
+	static Stream<Arguments> alreadyLinkedOrUnlinkedVehicles() {
+		return Stream.of(
+				Arguments.of("다른 가족에 연결된 차량", Vehicle.restore(VEHICLE_ID, 5L, VIN, MODEL, null, null)),
+				Arguments.of("연결이 해제된 차량",
+						Vehicle.restore(VEHICLE_ID, null, VIN, MODEL, null, Instant.parse("2026-11-01T00:00:00Z"))));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("alreadyLinkedOrUnlinkedVehicles")
+	@DisplayName("createGuardian은 이미 가족에 연결됐거나 연결이 해제된 차량이면 409 VEHICLE_ALREADY_LINKED로 거절하고 아무것도 저장하지 않는다")
+	void rejectsAlreadyLinkedOrUnlinkedVehicle(String caseName, Vehicle vehicle) {
+		given(loadVehiclePort.loadVehicle(VEHICLE_ID)).willReturn(Optional.of(vehicle));
+		CreateGuardianCommand command = new CreateGuardianCommand(VEHICLE_ID, PHONE, NAME);
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> createGuardianService.createGuardian(command));
+
+		assertThat(exception).as(caseName).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("VEHICLE_ALREADY_LINKED");
 		verify(saveFamilyPort, never()).saveFamily(any());
 		verify(saveUserPort, never()).saveUser(any());
 		verify(saveVehiclePort, never()).saveVehicle(any());

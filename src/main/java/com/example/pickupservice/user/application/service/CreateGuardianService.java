@@ -31,6 +31,9 @@ public class CreateGuardianService implements CreateGuardianUseCase {
 	public GuardianAccount createGuardian(CreateGuardianCommand command) {
 		Vehicle vehicle = loadVehiclePort.loadVehicle(command.vehicleId())
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
+		if (vehicle.getFamilyId() != null || vehicle.getUnlinkedAt() != null) {
+			throw UserErrors.vehicleAlreadyLinked();
+		}
 		Family family = saveFamilyPort.saveFamily(Family.create());
 		long familyId = family.getFamilyId();
 		User guardian = saveUserPort.saveUser(User.create(familyId, Role.GUARDIAN, command.name(), command.phone()));
