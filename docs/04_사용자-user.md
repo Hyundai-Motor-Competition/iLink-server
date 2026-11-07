@@ -130,23 +130,23 @@ boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);
 ```
 
 ## 테스트 케이스
-- [ ] [기반] Role은 GUARDIAN · CO_GUARDIAN · DELEGATE · TEACHER · CHILD 다섯 값을 갖는다
-- [ ] [기반] JoinCallMode는 AUTO · GUARDIAN_CONFIRM 두 값을 갖는다
-- [ ] [기반] 새로 만든 Family의 joinCallMode는 AUTO이고 settingsVersion은 0이다
-- [ ] [기반] Family.changeCallMode를 부르면 joinCallMode가 바뀌고 settingsVersion이 1 오른다
-- [ ] [기반] Vehicle.unlink를 부르면 unlinkedAt이 채워지고 vehicleId · vin은 그대로다
-- [ ] [기반] unlinkedAt이 채워진 Vehicle은 연결 중이 아니다
-- [ ] [기반] 이름 규칙은 0자와 21자 이름을 거절하고 1자와 20자 이름을 받는다
-- [ ] [기반] 이름 규칙은 이모지나 제어문자가 든 이름을 거절한다
-- [ ] [기반] 전화번호 규칙은 +821012345678을 받고 01012345678을 거절한다
-- [ ] [기반] 번호판 마스킹은 「12가 3456」을 「12가 ****」로 바꾼다
-- [ ] [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
-- [ ] [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [ ] [기반] FamilyEntity · UserEntity · VehicleEntity가 BaseTimeEntity를 상속하고 UserEntity는 users 테이블에 매핑된다
-- [ ] [기반] 테스트 시드로 가족 1개 · GUARDIAN 1명(김보호) · CHILD 2명(민준 · 서윤) · 연결된 차량 1대(아이오닉 5)를 만든다
+- [x] [기반] Role은 GUARDIAN · CO_GUARDIAN · DELEGATE · TEACHER · CHILD 다섯 값을 갖는다
+- [x] [기반] JoinCallMode는 AUTO · GUARDIAN_CONFIRM 두 값을 갖는다
+- [x] [기반] 새로 만든 Family의 joinCallMode는 AUTO이고 settingsVersion은 0이다
+- [x] [기반] Family.changeCallMode를 부르면 joinCallMode가 바뀌고 settingsVersion이 1 오른다
+- [x] [기반] Vehicle.unlink를 부르면 unlinkedAt이 채워지고 vehicleId · vin은 그대로다
+- [x] [기반] unlinkedAt이 채워진 Vehicle은 연결 중이 아니다
+- [x] [기반] 이름 규칙은 0자와 21자 이름을 거절하고 1자와 20자 이름을 받는다
+- [x] [기반] 이름 규칙은 이모지나 제어문자가 든 이름을 거절한다
+- [x] [기반] 전화번호 규칙은 +821012345678을 받고 01012345678을 거절한다
+- [x] [기반] 번호판 마스킹은 「12가 3456」을 「12가 ****」로 바꾼다
+- [x] [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
+- [x] [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
+- [x] [기반] FamilyEntity · UserEntity · VehicleEntity가 BaseTimeEntity를 상속하고 UserEntity는 users 테이블에 매핑된다
+- [x] [기반] 테스트 시드로 가족 1개 · GUARDIAN 1명(김보호) · CHILD 2명(민준 · 서윤) · 연결된 차량 1대(아이오닉 5)를 만든다
 - [ ] [persistence] Family · User · Vehicle을 저장한 뒤 다시 읽으면 도메인 객체의 값이 같다
-- [ ] [persistence] users.phone 컬럼에는 평문이 아닌 암호문이 저장되고 읽으면 원래 번호로 돌아온다
-- [ ] [persistence] 같은 전화번호를 두 번 저장하면 두 암호문이 서로 다르다
+- [x] [persistence] users.phone 컬럼에는 평문이 아닌 암호문이 저장되고 읽으면 원래 번호로 돌아온다
+- [x] [persistence] 같은 전화번호를 두 번 저장하면 두 암호문이 서로 다르다
 - [ ] [persistence] 서버가 뜨면 schema.sql의 VIN 부분 유니크 인덱스가 vehicle 테이블에 만들어진다
 - [ ] [persistence] unlinkedAt이 빈 같은 VIN 차량 행을 두 개 저장하면 유니크 위반이 난다
 - [ ] [persistence] 같은 VIN이라도 기존 행의 unlinkedAt이 채워져 있으면 새 행이 저장된다
@@ -189,6 +189,11 @@ boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);
 - [ ] [web] PUT /v1/families/me/call-mode는 200과 joinCallMode · settingsVersion을 돌려준다
 - [ ] [web] PUT /v1/families/me/call-mode를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
 - [ ] [web] Idempotency-Key는 POST /v1/families/me/members · DELETE /v1/families/me/members/{userId} · DELETE /v1/vehicle-links/{vehicleId}에만 요구된다
+- [x] [기반] Family.restore는 familyId · joinCallMode · settingsVersion을 그대로 가진 Family를 만든다
+- [x] [기반] User.create는 userId가 빈 User를 만들고 User.restore는 userId · familyId · role · name · phone을 그대로 가진 User를 만든다
+- [x] [기반] User.changeName · changePhone · changeRole은 그 필드만 바꾸고 나머지는 그대로 둔다
+- [x] [기반] Vehicle.register는 familyId · unlinkedAt이 빈 Vehicle을 만들고 Vehicle.linkTo는 familyId를 채운다
+- [x] [기반] auth · pickup 구현 전 임시 어댑터가 빈으로 등록된다: LoadMemberDeviceStatusPort는 모든 userId에 NONE, RevokeMemberDevicesPort는 아무것도 하지 않음, CheckActivePickupPort는 false
 
 ## 확인 필요 사항
 
