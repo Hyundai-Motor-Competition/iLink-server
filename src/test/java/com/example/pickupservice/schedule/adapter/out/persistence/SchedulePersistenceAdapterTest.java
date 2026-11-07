@@ -1,0 +1,252 @@
+package com.example.pickupservice.schedule.adapter.out.persistence;
+
+import com.example.pickupservice.common.fixture.IntegrationTestSupport;
+import com.example.pickupservice.common.geo.LatLng;
+import com.example.pickupservice.schedule.application.port.out.LoadAcademyPort;
+import com.example.pickupservice.schedule.application.port.out.LoadSchedulePort;
+import com.example.pickupservice.schedule.application.port.out.SaveAcademyPort;
+import com.example.pickupservice.schedule.application.port.out.SaveSchedulePort;
+import com.example.pickupservice.schedule.domain.Academy;
+import com.example.pickupservice.schedule.domain.PickupSchedule;
+import com.example.pickupservice.user.fixture.UserSeed;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import lombok.RequiredArgsConstructor;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.TimeZone;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
+
+@RequiredArgsConstructor
+@Import(UserSeed.class)
+class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
+
+	private static final double COORDINATE_TOLERANCE = 1e-9;
+	private static final LatLng ACADEMY_LOCATION = new LatLng(37.501234, 127.039876);
+	private static final LatLng ACADEMY_ENTRANCE = new LatLng(37.501150, 127.039790);
+	private static final LocalTime SIX_PM = LocalTime.of(18, 0);
+	private static final String FAR_EAST_ZONE = "Pacific/Kiritimati";
+
+	private final SaveAcademyPort saveAcademyPort;
+	private final LoadAcademyPort loadAcademyPort;
+	private final SaveSchedulePort saveSchedulePort;
+	private final LoadSchedulePort loadSchedulePort;
+	private final UserSeed userSeed;
+	private final EntityManager entityManager;
+	private final EntityManagerFactory entityManagerFactory;
+	private final TransactionTemplate transactionTemplate;
+	private final JdbcTemplate jdbcTemplate;
+
+	private final List<Long> academyIds = new ArrayList<>();
+	private final List<Long> scheduleIds = new ArrayList<>();
+	private UserSeed.Result users;
+
+	@BeforeEach
+	void seedUsers() {
+		users = userSeed.seed();
+	}
+
+	@AfterEach
+	void clear() {
+		transactionTemplate.executeWithoutResult(status -> {
+			if (!scheduleIds.isEmpty()) {
+				entityManager.createQuery("delete from PickupScheduleEntity s where s.scheduleId in :ids")
+						.setParameter("ids", scheduleIds)
+						.executeUpdate();
+			}
+			if (!academyIds.isEmpty()) {
+				entityManager.createQuery("delete from AcademyEntity a where a.academyId in :ids")
+						.setParameter("ids", academyIds)
+						.executeUpdate();
+			}
+		});
+		userSeed.clear(users);
+	}
+
+	@Test
+	@DisplayName("Academy를 저장하고 읽으면 location · entrance 좌표가 같다")
+	void savedAcademyIsLoadedWithSameLocationAndEntrance() {
+		Academy saved = saveAcademyPort.saveAcademy(Academy.create("해솔영어학원", "서울 강남구 테헤란로 152",
+				ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
+		assertThat(saved.getAcademyId()).as("저장된 academyId").isNotNull();
+		academyIds.add(saved.getAcademyId());
+		Academy savedWithoutEntrance = saveAcademyPort.saveAcademy(Academy.create("바른수학학원",
+				"서울 강남구 역삼로 10", ACADEMY_LOCATION, null, null));
+		academyIds.add(savedWithoutEntrance.getAcademyId());
+		clearPersistenceContext();
+
+		Academy loaded = loadAcademyPort.loadAcademy(saved.getAcademyId()).orElseThrow();
+		assertThat(loaded.getAcademyId()).isEqualTo(saved.getAcademyId());
+		assertThat(loaded.getName()).isEqualTo("해솔영어학원");
+		assertThat(loaded.getAddress()).isEqualTo("서울 강남구 테헤란로 152");
+		assertThat(loaded.getPhone()).isEqualTo("02-555-1234");
+		assertThat(loaded.getLocation().lat()).as("location 위도").isCloseTo(ACADEMY_LOCATION.lat(),
+				within(COORDINATE_TOLERANCE));
+		assertThat(loaded.getLocation().lng()).as("location 경도").isCloseTo(ACADEMY_LOCATION.lng(),
+				within(COORDINATE_TOLERANCE));
+		assertThat(loaded.getEntrance()).as("entrance").isNotNull();
+		assertThat(loaded.getEntrance().lat()).as("entrance 위도").isCloseTo(ACADEMY_ENTRANCE.lat(),
+				within(COORDINATE_TOLERANCE));
+		assertThat(loaded.getEntrance().lng()).as("entrance 경도").isCloseTo(ACADEMY_ENTRANCE.lng(),
+				within(COORDINATE_TOLERANCE));
+
+		Academy loadedWithoutEntrance = loadAcademyPort.loadAcademy(savedWithoutEntrance.getAcademyId())
+				.orElseThrow();
+		assertThat(loadedWithoutEntrance.getEntrance()).as("출입구 없이 저장한 학원의 entrance").isNull();
+		assertThat(loadedWithoutEntrance.getPhone()).as("대표번호 없이 저장한 학원의 phone").isNull();
+	}
+
+	@Test
+	@DisplayName("weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다")
+	void weekdaysAreStoredAsCommaSeparatedAbbreviationsAndLoadedBack() {
+		Academy academy = newAcademy();
+		PickupSchedule saved = saveSchedulePort.saveSchedule(PickupSchedule.create(users.minjunId(), academy,
+				Set.of(DayOfWeek.FRIDAY, DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY), SIX_PM, 5));
+		assertThat(saved.getScheduleId()).as("저장된 scheduleId").isNotNull();
+		scheduleIds.add(saved.getScheduleId());
+		clearPersistenceContext();
+
+		String column = jdbcTemplate.queryForObject(
+				"select weekdays from pickup_schedule where schedule_id = ?", String.class, saved.getScheduleId());
+		assertThat(column).as("weekdays 컬럼 원문").isEqualTo("MON,WED,FRI");
+
+		PickupSchedule loaded = loadSchedulePort.loadSchedule(saved.getScheduleId()).orElseThrow();
+		assertThat(loaded.getWeekdays())
+				.containsExactlyInAnyOrder(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY);
+		assertThat(loaded.getChildUserId()).isEqualTo(users.minjunId());
+		assertThat(loaded.getAcademy().getAcademyId()).isEqualTo(academy.getAcademyId());
+		assertThat(loaded.getTargetPickup()).isEqualTo(5);
+		assertThat(loaded.getStatus()).isEqualTo(saved.getStatus());
+	}
+
+	@Test
+	@DisplayName("classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다")
+	void classEndTimeIsLoadedWithoutTimeZoneConversion() {
+		Academy academy = newAcademy();
+		TimeZone original = TimeZone.getDefault();
+		PickupSchedule loaded;
+		long scheduleId;
+		try {
+			TimeZone.setDefault(TimeZone.getTimeZone(FAR_EAST_ZONE));
+			PickupSchedule saved = saveSchedulePort.saveSchedule(PickupSchedule.create(users.minjunId(), academy,
+					Set.of(DayOfWeek.TUESDAY), SIX_PM, 0));
+			scheduleId = saved.getScheduleId();
+			scheduleIds.add(scheduleId);
+			clearPersistenceContext();
+			loaded = loadSchedulePort.loadSchedule(scheduleId).orElseThrow();
+		}
+		finally {
+			TimeZone.setDefault(original);
+		}
+
+		assertThat(loaded.getClassEndTime()).as("JVM 시간대가 UTC+14일 때 저장 · 조회한 classEndTime").isEqualTo(SIX_PM);
+		String column = jdbcTemplate.queryForObject(
+				"select class_end_time::text from pickup_schedule where schedule_id = ?", String.class, scheduleId);
+		assertThat(column).as("class_end_time 컬럼 원문").isEqualTo("18:00:00");
+		assertThat(loadSchedulePort.loadSchedule(scheduleId).orElseThrow().getClassEndTime())
+				.as("기본 시간대로 다시 읽은 classEndTime")
+				.isEqualTo(SIX_PM);
+	}
+
+	@Test
+	@DisplayName("loadSchedulesOfChild는 그 자녀의 일정만 돌려준다")
+	void loadSchedulesOfChildReturnsOnlySchedulesOfThatChild() {
+		Academy academy = newAcademy();
+		PickupSchedule minjunMonday = newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
+		PickupSchedule minjunThursday = newSchedule(users.minjunId(), academy, DayOfWeek.THURSDAY);
+		newSchedule(users.seoyunId(), academy, DayOfWeek.MONDAY);
+		clearPersistenceContext();
+
+		List<PickupSchedule> loaded = loadSchedulePort.loadSchedulesOfChild(users.minjunId());
+
+		assertThat(loaded).extracting(PickupSchedule::getScheduleId)
+				.containsExactlyInAnyOrder(minjunMonday.getScheduleId(), minjunThursday.getScheduleId());
+		assertThat(loaded).extracting(PickupSchedule::getChildUserId)
+				.as("모두 민준의 일정")
+				.containsOnly(users.minjunId());
+		assertThat(loadSchedulePort.loadSchedulesOfChild(users.guardianId())).as("일정이 없는 사용자").isEmpty();
+	}
+
+	@Test
+	@DisplayName("loadSchedulesOfChildren은 여러 자녀의 일정을 한 번에 돌려주고 목록에 없는 자녀의 일정은 빼며, 일정 조회 쿼리는 자녀 수와 상관없이 1회다")
+	void loadSchedulesOfChildrenReturnsSchedulesOfAllGivenChildrenAtOnce() {
+		Academy academy = newAcademy();
+		PickupSchedule minjunMonday = newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
+		PickupSchedule minjunThursday = newSchedule(users.minjunId(), academy, DayOfWeek.THURSDAY);
+		PickupSchedule seoyunTuesday = newSchedule(users.seoyunId(), academy, DayOfWeek.TUESDAY);
+		newSchedule(users.guardianId(), academy, DayOfWeek.FRIDAY);
+		clearPersistenceContext();
+
+		Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+		boolean statisticsWasEnabled = statistics.isStatisticsEnabled();
+		List<PickupSchedule> loaded;
+		long statementCount;
+		try {
+			statistics.setStatisticsEnabled(true);
+			statistics.clear();
+			loaded = loadSchedulePort.loadSchedulesOfChildren(List.of(users.minjunId(), users.seoyunId()));
+			statementCount = statistics.getPrepareStatementCount();
+		}
+		finally {
+			statistics.setStatisticsEnabled(statisticsWasEnabled);
+		}
+
+		assertThat(loaded).extracting(PickupSchedule::getScheduleId)
+				.containsExactlyInAnyOrder(minjunMonday.getScheduleId(), minjunThursday.getScheduleId(),
+						seoyunTuesday.getScheduleId());
+		assertThat(loaded).extracting(PickupSchedule::getChildUserId)
+				.as("민준 · 서윤의 일정만")
+				.containsOnly(users.minjunId(), users.seoyunId());
+		assertThat(loaded).extracting(schedule -> schedule.getAcademy().getAcademyId())
+				.as("일정마다 학원이 채워진다")
+				.containsOnly(academy.getAcademyId());
+		assertThat(statementCount).as("SQL 수 (일정 IN 조회 1회 + 학원 조회 1회 이하)").isLessThanOrEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("loadSchedulesOfChildren에 빈 목록을 주면 빈 목록을 돌려준다")
+	void loadSchedulesOfChildrenReturnsEmptyListForEmptyInput() {
+		Academy academy = newAcademy();
+		newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
+		clearPersistenceContext();
+
+		assertThat(loadSchedulePort.loadSchedulesOfChildren(List.of())).isNotNull().isEmpty();
+		assertThat(loadSchedulePort.loadSchedulesOfChildren(List.of(users.guardianId())))
+				.as("일정이 없는 사용자만 넘긴 경우")
+				.isEmpty();
+	}
+
+	private Academy newAcademy() {
+		Academy academy = saveAcademyPort.saveAcademy(Academy.create("해솔영어학원", "서울 강남구 테헤란로 152",
+				ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
+		academyIds.add(academy.getAcademyId());
+		return academy;
+	}
+
+	private PickupSchedule newSchedule(long childUserId, Academy academy, DayOfWeek weekday) {
+		PickupSchedule schedule = saveSchedulePort.saveSchedule(
+				PickupSchedule.create(childUserId, academy, Set.of(weekday), SIX_PM, 5));
+		scheduleIds.add(schedule.getScheduleId());
+		return schedule;
+	}
+
+	private void clearPersistenceContext() {
+		transactionTemplate.executeWithoutResult(status -> entityManager.clear());
+	}
+
+}
