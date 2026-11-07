@@ -1,8 +1,8 @@
 # FOLLOWUP · 일정 (schedule)
 
-- 생성: 2026-11-07 23:49 KST · tdd-guard
-- 상태: 진행 중 (체크 11/55 · 완료 기준 0/4)
-- 테스트: ● GREEN · 779 passed · 전체 · 81s · cd C:/pickup && ./gradlew.bat test --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321/08c3708…
+- 생성: 2026-11-08 00:07 KST · tdd-guard
+- 상태: 진행 중 (체크 12/61 · 완료 기준 0/4)
+- 테스트: ● GREEN · 783 passed · 전체 · 91s · cd C:/pickup && ./gradlew.bat test --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321/08c3708…
 - 설계서: C:/pickup/docs/06_일정-schedule.md
 
 ## 완료 항목
@@ -17,6 +17,7 @@
 - [x] #9 [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다 ← ScheduleOutPortsTest.핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
 - [x] #10 [기반] AcademyEntity · PickupScheduleEntity가 BaseTimeEntity를 상속하고 location · entrance는 geography(Point,4326)로 매핑된다 ← SchedulePersistenceEntitiesTest.AcademyEntity · PickupScheduleEntity는 @Entity이고 BaseTimeEntity를 바로 상속한다
 - [x] #11 [기반] 테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다 ← ScheduleSeedTest.테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다
+- [x] #60 [기반] 공통 BusinessException에 overlapScheduleIds를 담아 던지면 오류 응답 error.overlapScheduleIds에 실리고, 담지 않으면 그 키가 응답에 없다 ← GlobalExceptionHandlerTest.컨트롤러가 overlapScheduleIds [801, 802]를 담은 BusinessException.conflictWithOverlap(409 · SCHEDULE_OVERLAP · 메시지 · [801, 802])을 던지면 409와 error.overlapScheduleIds [801, 802]를 돌려주고 error.code · error.message · error.retryAfterSeconds(null) 키는 그대로 있으며 error.fields는 채우지 않는다
 
 ## 미완료 항목
 - [ ] #12 [persistence] Academy를 저장하고 읽으면 location · entrance 좌표가 같다
@@ -63,6 +64,11 @@
 - [ ] #53 [web] GET /v1/vehicles/me/weekly-pickups를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
 - [ ] #54 [web] GET /v1/vehicles/me/settings-summary는 차량 토큰으로 200과 guardianNameMasked · children · joinCallMode를 돌려준다
 - [ ] #55 [web] Idempotency-Key는 POST /v1/children/{childId}/schedules · POST /v1/children/{childId}/setup-completion에만 요구된다
+- [ ] #56 [persistence] 지도 API 어댑터는 카카오 로컬 검색 응답을 externalPlaceId(kakao:{id}) · name · address · location의 AcademyCandidate로 바꾼다
+- [ ] #57 [persistence] 지도 API 어댑터는 외부 API 오류 · 시간 초과면 502 MAP_API_UNAVAILABLE로 거절한다
+- [ ] #58 [persistence] place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다
+- [ ] #59 [persistence] LoadMemberDeviceStatusPort 어댑터는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다
+- [ ] #61 [서비스] findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려주고 없으면 빈 값을 돌려준다
 
 ## 완료 기준 (공통 규칙 문서)
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
@@ -71,7 +77,7 @@
 - [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 다시 리뷰 필요: 2026-10-28 21:19 KST 리뷰 뒤에 체크 · 추가된 항목 #1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11, #12, #13, #14, #15, #16, #17, #18, #19, #20, #21, #22, #23, #24, #25, #26, #27, #28, #29, #30, #31, #32, #33, #34, #35, #36, #37, #38, #39, #40, #41, #42, #43, #44, #45, #46, #47, #48, #49, #50, #51, #52, #53, #54, #55
+- 다시 리뷰 필요: 2026-10-28 21:19 KST 리뷰 뒤에 체크 · 추가된 항목 #1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11, #12, #13, #14, #15, #16, #17, #18, #19, #20, #21, #22, #23, #24, #25, #26, #27, #28, #29, #30, #31, #32, #33, #34, #35, #36, #37, #38, #39, #40, #41, #42, #43, #44, #45, #46, #47, #48, #49, #50, #51, #52, #53, #54, #55, #56, #57, #58, #59, #60, #61
 - 2026-10-28 21:19 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 0 · 하 6 · 리뷰 시점 체크 15/15
 - 리뷰 시점 테스트: ● GREEN · 1194 passed · 1 skipped · 전체 · 2.2s · cd /c/designdot/designdot-server && ./gradlew.bat test --console=plain --rerun 2>&1 | grep -E "BUILD|FAILED|> Task :tes…
   - 결론: 조건부 통과
@@ -114,7 +120,7 @@
 | schedule ↔ place 서로 부름 | place는 Academy를 참조하고, SET-07 · 09는 place 장소를 읽음. schedule 쪽은 out 포트 + 테스트 대역으로 먼저 검증 |
 
 ## 다음 단계
-- 남은 항목 44건부터 계속: /tdd domain schedule → /tdd go
+- 남은 항목 49건부터 계속: /tdd domain schedule → /tdd go
 - 다음 도메인: 장소 (07_장소-place.md). 시작: /tdd domain place
 
 ## 후속 과제
@@ -127,3 +133,8 @@
 - schedule: DeviceStatus를 auth.domain.MemberDeviceStatus 재사용 대신 schedule.domain.DeviceStatus로 따로 둠(어댑터에서 변환). joinCallMode는 user.domain.JoinCallMode 재사용. SpotSummary에 academyId 추가(PICKUP_SPOT 학원별 판정용). ScheduleInfo에 targetPickupTime 없음(pickup이 계산)
 - 환경: 시스템(Machine) PATH에 줄바꿈이 섞인 항목 "C:\Program⏎ Files\JetBrains\IntelliJ IDEA 2026.1.3\plugins\maven\lib\maven3\bin"이 있음. Docker가 꺼져 있으면 Testcontainers가 PATH를 읽다 InvalidPathException. 사람이 시스템 PATH를 고쳐야 함
 - schedule: pickup_schedule.child_user_id → users, academy_id → academy는 설계서상 FK지만 DB FK 없이 Long 칼럼만 둠(user · auth와 같은 관례). DB FK가 필요하면 schema.sql로 추가할지 결정 필요
+- schedule: 자녀 확인은 auth와 같이 user in 포트 LoadMemberUseCase를 서비스에 직접 주입함. 설계서 「시그니처」 out 포트 목록에 user 연결이 없으니 설계서 의존 · 시그니처에 반영 필요
+- auth: GetMemberDeviceStatusService.getDeviceStatuses가 userId마다 loadLiveDevices · loadLatestInvite를 따로 불러 1명당 쿼리 2회(N+1). schedule SET-07 · 09가 이를 거침
+- [결정 · 사람] 공통 오류 응답에 선택 칸 overlapScheduleIds(값 있을 때만 키 노출) 추가. 03 공유모듈 설계서 L89 「본문 키 고정」 문장과 BusinessException 시그니처 갱신 필요
+- schedule 가정: SET-07 일정이 하나도 없으면 missing에 SCHEDULE만 넣고 PICKUP_SPOT은 넣지 않음. PICKUP_SPOT 판정에 DRAFT 일정 학원 포함 여부 미정(지금은 모든 일정 학원 포함). 기기 상태가 없으면 NONE으로 봄
+- schedule: 카카오 학원 검색에 카테고리 필터(category_group_code=AC5 학원) · size · page를 쓸지 설계서에 없음. 지금은 키워드 검색만. 지도 API 시간 초과 값은 테스트로 확인하지 못함
