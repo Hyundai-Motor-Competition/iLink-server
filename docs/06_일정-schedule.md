@@ -132,27 +132,27 @@ Map<Long, DeviceStatus> loadDeviceStatuses(List<Long> userIds);          // Load
 - [x] [persistence] classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다
 - [x] [persistence] loadSchedulesOfChild는 그 자녀의 일정만 돌려준다
 - [x] [persistence] loadSchedulesOfChildren은 여러 자녀의 일정을 한 번에 돌려준다
-- [ ] [서비스] 학원 검색은 외부 지도 API 결과를 저장하지 않고 externalPlaceId · name · address · location으로 돌려준다
-- [ ] [서비스] 학원 검색은 외부 지도 API가 실패하면 MAP_API_UNAVAILABLE로 거절한다
-- [ ] [서비스] 일정 등록은 학원을 만들고 scheduleId · academyId · status를 돌려준다
-- [ ] [서비스] 일정 등록은 출입구 없는 학원이면 status DRAFT를 돌려준다
-- [ ] [서비스] 일정 등록은 childId가 CHILD가 아니면 NOT_FOUND로 거절한다
-- [ ] [서비스] 일정 등록은 다른 가족의 자녀면 NOT_FOUND로 거절한다
-- [ ] [서비스] 일정 등록은 겹치는 일정이 있으면 SCHEDULE_OVERLAP과 겹치는 scheduleId 목록으로 거절한다
-- [ ] [서비스] 일정 등록은 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절한다
-- [ ] [서비스] 일정 수정은 자기 자신과는 겹침으로 판정하지 않는다
-- [ ] [서비스] 일정 수정은 요일 · 시간 · 학원을 바꾸고 status를 다시 판정한다
-- [ ] [서비스] 설정 요약은 자녀 기기가 CONNECTED가 아니면 missing에 CHILD_DEVICE를 넣는다
-- [ ] [서비스] 설정 요약은 READY 일정이 없으면 missing에 SCHEDULE을 넣는다
-- [ ] [서비스] 설정 요약은 일정 학원에 기본 장소가 없으면 missing에 PICKUP_SPOT을 넣는다
-- [ ] [서비스] 설정 요약은 joinCallMode와 Family.settingsVersion을 담는다
-- [ ] [서비스] 설정 완료는 settingsVersion이 다르면 SETTINGS_VERSION_CONFLICT로 거절한다
-- [ ] [서비스] 설정 완료는 missing이 남아 있으면 SETUP_INCOMPLETE로 거절한다
-- [ ] [서비스] 주간 일정은 weekStart가 없으면 한국 날짜 기준 이번 주 월요일부터 7일을 돌려준다
-- [ ] [서비스] 주간 일정은 요일이 맞는 날짜에만 그 일정을 넣는다
-- [ ] [서비스] 주간 일정 readiness는 자녀 기기나 기본 장소가 빠지면 startable false와 missing을 돌려준다
-- [ ] [서비스] 차량용 설정 요약은 GUARDIAN 이름을 가려서 돌려주고 자녀 목록과 joinCallMode를 담는다
-- [ ] [서비스] findSchedules는 scheduleId 목록의 일정과 학원 정보를 돌려준다
+- [x] [서비스] 학원 검색은 외부 지도 API 결과를 저장하지 않고 externalPlaceId · name · address · location으로 돌려준다
+- [x] [서비스] 학원 검색은 외부 지도 API가 실패하면 MAP_API_UNAVAILABLE로 거절한다
+- [x] [서비스] 일정 등록은 학원을 만들고 scheduleId · academyId · status를 돌려준다
+- [x] [서비스] 일정 등록은 출입구 없는 학원이면 status DRAFT를 돌려준다
+- [x] [서비스] 일정 등록은 childId가 CHILD가 아니면 NOT_FOUND로 거절한다
+- [x] [서비스] 일정 등록은 다른 가족의 자녀면 NOT_FOUND로 거절한다
+- [x] [서비스] 일정 등록은 겹치는 일정이 있으면 SCHEDULE_OVERLAP과 겹치는 scheduleId 목록으로 거절한다
+- [x] [서비스] 일정 등록은 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절한다
+- [x] [서비스] 일정 수정은 자기 자신과는 겹침으로 판정하지 않는다
+- [x] [서비스] 일정 수정은 요일 · 시간 · 학원을 바꾸고 status를 다시 판정한다
+- [x] [서비스] 설정 요약은 자녀 기기가 CONNECTED가 아니면 missing에 CHILD_DEVICE를 넣는다
+- [x] [서비스] 설정 요약은 READY 일정이 없으면 missing에 SCHEDULE을 넣는다
+- [x] [서비스] 설정 요약은 일정 학원에 기본 장소가 없으면 missing에 PICKUP_SPOT을 넣는다
+- [x] [서비스] 설정 요약은 joinCallMode와 Family.settingsVersion을 담는다
+- [x] [서비스] 설정 완료는 settingsVersion이 다르면 SETTINGS_VERSION_CONFLICT로 거절한다
+- [x] [서비스] 설정 완료는 missing이 남아 있으면 SETUP_INCOMPLETE로 거절한다
+- [x] [서비스] 주간 일정은 weekStart가 없으면 한국 날짜 기준 이번 주 월요일부터 7일을 돌려준다
+- [x] [서비스] 주간 일정은 요일이 맞는 날짜에만 그 일정을 넣는다
+- [x] [서비스] 주간 일정 readiness는 자녀 기기나 기본 장소가 빠지면 startable false와 missing을 돌려준다
+- [x] [서비스] 차량용 설정 요약은 GUARDIAN 이름을 가려서 돌려주고 자녀 목록과 joinCallMode를 담는다
+- [x] [서비스] findSchedules는 scheduleId 목록의 일정과 학원 정보를 돌려준다
 - [ ] [web] GET /v1/places/academies는 200과 items[]를 돌려준다
 - [ ] [web] GET /v1/places/academies에 1자 query를 보내면 422 VALIDATION_FAILED를 돌려준다
 - [ ] [web] GET /v1/places/academies가 외부 API 오류면 502 MAP_API_UNAVAILABLE을 돌려준다
@@ -176,11 +176,15 @@ Map<Long, DeviceStatus> loadDeviceStatuses(List<Long> userIds);          // Load
 - [x] [persistence] place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다
 - [x] [persistence] LoadMemberDeviceStatusPort 어댑터는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다
 - [x] [기반] 공통 BusinessException에 overlapScheduleIds를 담아 던지면 오류 응답 error.overlapScheduleIds에 실리고, 담지 않으면 그 키가 응답에 없다
-- [ ] [서비스] findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려주고 없으면 빈 값을 돌려준다
+- [x] [서비스] findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려주고 없으면 빈 값을 돌려준다
 - [x] 지도 API 어댑터는 200 응답이라도 본문을 읽지 못하거나 좌표가 없거나 숫자가 아니면 502 MAP_API_UNAVAILABLE로 거절한다
 - [x] saveSchedule로 scheduleId가 있는 일정을 다시 저장하면 새 행을 만들지 않고 그 행의 요일 · 시간 · 학원 · status가 바뀐다
 - [x] loadSchedule · loadAcademy에 없는 id를 주면 빈 값을 돌려준다
-- [ ] [서비스] 일정 목록은 그 자녀의 일정을 scheduleId · 학원(academyId · name) · weekdays · classEndTime · targetPickup · status로 돌려주고, 내 가족의 CHILD가 아니면 NOT_FOUND로 거절한다
+- [x] [서비스] 일정 목록은 그 자녀의 일정을 scheduleId · 학원(academyId · name) · weekdays · classEndTime · targetPickup · status로 돌려주고, 내 가족의 CHILD가 아니면 NOT_FOUND로 거절한다
+- [ ] PickupSchedule 검증 실패는 프레임워크와 무관한 도메인 예외(field · reason)로 던지고, 일정 등록 · 수정 서비스는 이를 422 VALIDATION_FAILED(fields)로 바꾼다
+- [ ] Academy는 externalPlaceId를 가지며 academy.external_place_id는 유니크로 저장되고, 저장한 학원을 externalPlaceId로 찾을 수 있다
+- [ ] 일정 등록 · 수정은 같은 externalPlaceId의 학원이 있으면 새로 만들지 않고 그 academyId를 쓰며 학원 정보는 요청 값으로 갱신한다
+- [ ] 주간 일정 readiness는 오늘 일정 중 DRAFT가 있으면 startable false를 돌려준다
 
 ## 확인 필요 사항
 

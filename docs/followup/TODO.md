@@ -1,10 +1,10 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-08 00:27 KST · tdd-guard
+- 생성: 2026-11-08 00:45 KST · tdd-guard
 - 설계서: C:/pickup/docs
 - 프로젝트: gradle · C:/pickup
-- 테스트: ● GREEN · 808 passed · 전체 · 113s
-- 진행: 공유모듈 57/57 · 사용자 71/71 · 인증 120/120 · 일정 24/65 · 장소 0/43 · 픽업 0/203 · 알림 0/44 · 남은 항목 331/603
+- 테스트: ● GREEN · 881 passed · 전체 · 93s
+- 진행: 공유모듈 57/57 · 사용자 71/71 · 인증 120/120 · 일정 47/69 · 장소 0/43 · 픽업 0/203 · 알림 0/44 · 남은 항목 312/607
 - 현재 도메인: 일정 (06_일정-schedule.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
@@ -19,29 +19,8 @@
 ## 3. 인증 (auth) · 05_인증-auth.md · 완료 · 항목 120/120 · 완료 기준 4/4 · 리뷰 11-07 23:03 통과 (상 1 · 중 0 · 하 5)
 - 남은 할 일 없음
 
-## 4. 일정 (schedule) · 06_일정-schedule.md · 진행 중 · 항목 24/65 · 완료 기준 0/4 · 리뷰 11-08 00:22 조건부 통과 (상 0 · 중 4 · 하 1) · 재리뷰 필요
+## 4. 일정 (schedule) · 06_일정-schedule.md · 진행 중 · 항목 47/69 · 완료 기준 0/4 · 리뷰 11-08 00:43 조건부 통과 (상 1 · 중 3 · 하 1) · 재리뷰 필요
 ### 테스트 케이스
-- [ ] #17 [서비스] 학원 검색은 외부 지도 API 결과를 저장하지 않고 externalPlaceId · name · address · location으로 돌려준다
-- [ ] #18 [서비스] 학원 검색은 외부 지도 API가 실패하면 MAP_API_UNAVAILABLE로 거절한다
-- [ ] #19 [서비스] 일정 등록은 학원을 만들고 scheduleId · academyId · status를 돌려준다
-- [ ] #20 [서비스] 일정 등록은 출입구 없는 학원이면 status DRAFT를 돌려준다
-- [ ] #21 [서비스] 일정 등록은 childId가 CHILD가 아니면 NOT_FOUND로 거절한다
-- [ ] #22 [서비스] 일정 등록은 다른 가족의 자녀면 NOT_FOUND로 거절한다
-- [ ] #23 [서비스] 일정 등록은 겹치는 일정이 있으면 SCHEDULE_OVERLAP과 겹치는 scheduleId 목록으로 거절한다
-- [ ] #24 [서비스] 일정 등록은 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절한다
-- [ ] #25 [서비스] 일정 수정은 자기 자신과는 겹침으로 판정하지 않는다
-- [ ] #26 [서비스] 일정 수정은 요일 · 시간 · 학원을 바꾸고 status를 다시 판정한다
-- [ ] #27 [서비스] 설정 요약은 자녀 기기가 CONNECTED가 아니면 missing에 CHILD_DEVICE를 넣는다
-- [ ] #28 [서비스] 설정 요약은 READY 일정이 없으면 missing에 SCHEDULE을 넣는다
-- [ ] #29 [서비스] 설정 요약은 일정 학원에 기본 장소가 없으면 missing에 PICKUP_SPOT을 넣는다
-- [ ] #30 [서비스] 설정 요약은 joinCallMode와 Family.settingsVersion을 담는다
-- [ ] #31 [서비스] 설정 완료는 settingsVersion이 다르면 SETTINGS_VERSION_CONFLICT로 거절한다
-- [ ] #32 [서비스] 설정 완료는 missing이 남아 있으면 SETUP_INCOMPLETE로 거절한다
-- [ ] #33 [서비스] 주간 일정은 weekStart가 없으면 한국 날짜 기준 이번 주 월요일부터 7일을 돌려준다
-- [ ] #34 [서비스] 주간 일정은 요일이 맞는 날짜에만 그 일정을 넣는다
-- [ ] #35 [서비스] 주간 일정 readiness는 자녀 기기나 기본 장소가 빠지면 startable false와 missing을 돌려준다
-- [ ] #36 [서비스] 차량용 설정 요약은 GUARDIAN 이름을 가려서 돌려주고 자녀 목록과 joinCallMode를 담는다
-- [ ] #37 [서비스] findSchedules는 scheduleId 목록의 일정과 학원 정보를 돌려준다
 - [ ] #38 [web] GET /v1/places/academies는 200과 items[]를 돌려준다
 - [ ] #39 [web] GET /v1/places/academies에 1자 query를 보내면 422 VALIDATION_FAILED를 돌려준다
 - [ ] #40 [web] GET /v1/places/academies가 외부 API 오류면 502 MAP_API_UNAVAILABLE을 돌려준다
@@ -60,8 +39,10 @@
 - [ ] #53 [web] GET /v1/vehicles/me/weekly-pickups를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
 - [ ] #54 [web] GET /v1/vehicles/me/settings-summary는 차량 토큰으로 200과 guardianNameMasked · children · joinCallMode를 돌려준다
 - [ ] #55 [web] Idempotency-Key는 POST /v1/children/{childId}/schedules · POST /v1/children/{childId}/setup-completion에만 요구된다
-- [ ] #61 [서비스] findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려주고 없으면 빈 값을 돌려준다
-- [ ] #65 [서비스] 일정 목록은 그 자녀의 일정을 scheduleId · 학원(academyId · name) · weekdays · classEndTime · targetPickup · status로 돌려주고, 내 가족의 CHILD가 아니면 NOT_FOUND로 거절한다
+- [ ] #66 PickupSchedule 검증 실패는 프레임워크와 무관한 도메인 예외(field · reason)로 던지고, 일정 등록 · 수정 서비스는 이를 422 VALIDATION_FAILED(fields)로 바꾼다
+- [ ] #67 Academy는 externalPlaceId를 가지며 academy.external_place_id는 유니크로 저장되고, 저장한 학원을 externalPlaceId로 찾을 수 있다
+- [ ] #68 일정 등록 · 수정은 같은 externalPlaceId의 학원이 있으면 새로 만들지 않고 그 academyId를 쓰며 학원 정보는 요청 값으로 갱신한다
+- [ ] #69 주간 일정 readiness는 오늘 일정 중 DRAFT가 있으면 startable false를 돌려준다
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
