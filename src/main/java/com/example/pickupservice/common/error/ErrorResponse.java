@@ -14,6 +14,11 @@ public record ErrorResponse(ErrorBody error) {
 		return new ErrorResponse(new ErrorBody(code, message, retryAfterSeconds, null));
 	}
 
+	public static ErrorResponse from(BusinessException exception) {
+		return new ErrorResponse(new ErrorBody(exception.code(), exception.getMessage(),
+				exception.retryAfterSeconds(), exception.fields()));
+	}
+
 	public record ErrorBody(
 			String code,
 			String message,
