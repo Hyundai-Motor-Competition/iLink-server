@@ -1,7 +1,5 @@
 package com.example.pickupservice.place.application.service;
 
-import com.example.pickupservice.common.error.BusinessException;
-import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.place.application.port.in.DeletePickupSpotUseCase;
 import com.example.pickupservice.place.application.port.in.DeleteSpotCommand;
 import com.example.pickupservice.place.application.port.out.CheckActivePickupPort;
@@ -24,10 +22,7 @@ public class DeletePickupSpotService implements DeletePickupSpotUseCase {
 	@Override
 	@Transactional
 	public void deleteSpot(DeleteSpotCommand command) {
-		PickupSpot target = loadSpotPort.loadSpot(command.spotId())
-				.filter(spot -> spot.getFamilyId() == command.familyId())
-				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
-
+		PickupSpot target = OwnedSpotLookup.load(loadSpotPort, command.familyId(), command.spotId());
 		if (checkActivePickupPort.isUsedByActiveSession(target.getSpotId())) {
 			throw PlaceErrors.spotInUse();
 		}

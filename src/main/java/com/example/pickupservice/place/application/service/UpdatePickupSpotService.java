@@ -21,8 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UpdatePickupSpotService implements UpdatePickupSpotUseCase {
 
-	private static final int MAX_DISTANCE_METERS = 500;
-
 	private final LoadAcademyPort loadAcademyPort;
 	private final LoadSpotPort loadSpotPort;
 	private final SaveSpotPort saveSpotPort;
@@ -31,43 +29,55 @@ public class UpdatePickupSpotService implements UpdatePickupSpotUseCase {
 	@Override
 	@Transactional
 	public SpotView updateSpot(UpdateSpotCommand command) {
-		PickupSpot current = loadSpotPort.loadSpot(command.spotId())
-				.filter(spot -> spot.getFamilyId() == command.familyId())
-				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
-
+		PickupSpot current = OwnedSpotLookup.load(loadSpotPort, command.familyId(), command.spotId());
 		if (current.isDefault() && Boolean.FALSE.equals(command.isDefault())) {
 			throw PlaceErrors.defaultSpotRequired();
 		}
+		requireChangedPointsNearAcademy(current.getAcademyId(), command);
 
-		if (command.stopPoint() != null || command.meetingPoint() != null) {
-			AcademyInfo academy = loadAcademyPort.loadAcademy(current.getAcademyId())
-					.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
-			requireNearAcademy(academy.location(), command.stopPoint());
-			requireNearAcademy(academy.location(), command.meetingPoint());
+		PickupSpot updated = applyChanges(current, command);
+		if (Boolean.TRUE.equals(command.isDefault())) {
+			demoteOtherDefaults(updated);
 		}
+		return toView(saveSpotPort.saveSpot(updated));
+	}
 
-		PickupSpot updated = PickupSpot.restore(current.getSpotId(), current.getFamilyId(), current.getAcademyId(),
+	/** 보낸(null 아닌) 좌표만 검사한다. 좌표를 안 보냈으면 학원도 읽지 않는다. */
+	private void requireChangedPointsNearAcademy(long academyId, UpdateSpotCommand command) {
+		if (command.stopPoint() == null && command.meetingPoint() == null) {
+			return;
+		}
+		AcademyInfo academy = loadAcademyPort.loadAcademy(academyId)
+				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
+		requireNearIfSent(academy.location(), command.stopPoint());
+		requireNearIfSent(academy.location(), command.meetingPoint());
+	}
+
+	private void requireNearIfSent(LatLng academyLocation, LatLng point) {
+		if (point != null) {
+			AcademyDistanceCheck.requireNear(distancePort, academyLocation, point);
+		}
+	}
+
+	private void demoteOtherDefaults(PickupSpot newDefault) {
+		DefaultSpotRule.demotePreviousDefaults(newDefault,
+				loadSpotPort.loadSpots(newDefault.getFamilyId(), newDefault.getAcademyId()))
+				.forEach(saveSpotPort::saveSpot);
+	}
+
+	private static PickupSpot applyChanges(PickupSpot current, UpdateSpotCommand command) {
+		return PickupSpot.restore(current.getSpotId(), current.getFamilyId(), current.getAcademyId(),
 				valueOr(command.name(), current.getName()),
 				valueOr(command.memo(), current.getMemo()),
 				valueOr(command.stopPoint(), current.getStopPoint()),
 				valueOr(command.meetingPoint(), current.getMeetingPoint()),
 				valueOr(command.isDefault(), current.isDefault()),
 				current.getCreatedBy());
-
-		if (Boolean.TRUE.equals(command.isDefault())) {
-			DefaultSpotRule.demotePreviousDefaults(updated,
-					loadSpotPort.loadSpots(updated.getFamilyId(), updated.getAcademyId()))
-					.forEach(saveSpotPort::saveSpot);
-		}
-		PickupSpot saved = saveSpotPort.saveSpot(updated);
-		return new SpotView(saved.getSpotId(), saved.getName(), saved.getStopPoint(), saved.getMeetingPoint(),
-				saved.getMemo(), saved.isDefault());
 	}
 
-	private void requireNearAcademy(LatLng academyLocation, LatLng point) {
-		if (point != null && !distancePort.isWithinMeters(academyLocation, point, MAX_DISTANCE_METERS)) {
-			throw PlaceErrors.spotTooFar();
-		}
+	private static SpotView toView(PickupSpot spot) {
+		return new SpotView(spot.getSpotId(), spot.getName(), spot.getStopPoint(), spot.getMeetingPoint(),
+				spot.getMemo(), spot.isDefault());
 	}
 
 	private static <T> T valueOr(T value, T fallback) {

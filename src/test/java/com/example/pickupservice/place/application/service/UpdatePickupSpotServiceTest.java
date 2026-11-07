@@ -131,9 +131,7 @@ class UpdatePickupSpotServiceTest {
 				() -> updatePickupSpotService.updateSpot(
 						new UpdateSpotCommand(FAMILY_ID, SPOT_ID, null, FAR_POINT, null, null, null)));
 
-		assertThat(exception).isNotNull();
-		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-		assertThat(exception.code()).isEqualTo("SPOT_TOO_FAR");
+		assertSpotTooFar(exception);
 		verify(saveSpotPort, never()).saveSpot(any());
 	}
 
@@ -148,9 +146,7 @@ class UpdatePickupSpotServiceTest {
 				() -> updatePickupSpotService.updateSpot(
 						new UpdateSpotCommand(FAMILY_ID, SPOT_ID, null, NEW_NEAR_STOP, FAR_POINT, null, null)));
 
-		assertThat(exception).isNotNull();
-		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-		assertThat(exception.code()).isEqualTo("SPOT_TOO_FAR");
+		assertSpotTooFar(exception);
 		verify(saveSpotPort, never()).saveSpot(any());
 	}
 
@@ -269,6 +265,12 @@ class UpdatePickupSpotServiceTest {
 
 		assertNotFound(exception);
 		verify(saveSpotPort, never()).saveSpot(any());
+	}
+
+	private static void assertSpotTooFar(BusinessException exception) {
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		assertThat(exception.code()).isEqualTo("SPOT_TOO_FAR");
 	}
 
 	private static void assertNotFound(BusinessException exception) {
