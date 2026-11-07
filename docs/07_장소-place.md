@@ -104,20 +104,20 @@ Optional<LatLng> loadActiveChildLocation(long familyId);                        
 - [x] [persistence] loadSpotsWithin은 near에서 radiusM 안에 정차 지점이 있는 장소만 돌려준다
 - [x] [persistence] isWithinMeters는 학원에서 499m인 좌표에 true, 501m인 좌표에 false를 돌려준다
 - [x] [persistence] loadDefaultSpot은 가족 · 학원의 isDefault true 장소를 돌려준다
-- [ ] [서비스] 장소 추가는 학원의 첫 장소면 isDefault false로 보내도 isDefault true로 저장한다
-- [ ] [서비스] 장소 추가는 isDefault true면 같은 학원의 이전 기본 장소를 해제한다
-- [ ] [서비스] 장소 추가는 정차 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
-- [ ] [서비스] 장소 추가는 만남 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
-- [ ] [서비스] 장소 추가는 호출한 보호자를 createdBy로 저장한다
-- [ ] [서비스] 장소 수정은 보낸 필드만 바꾼다
-- [ ] [서비스] 장소 수정은 바꾼 좌표가 500m를 넘으면 SPOT_TOO_FAR로 거절한다
-- [ ] [서비스] 장소 수정은 isDefault true로 바꾸면 같은 학원의 이전 기본 장소를 해제한다
-- [ ] [서비스] 장소 삭제는 진행 중 세션이 쓰는 장소면 SPOT_IN_USE로 거절한다
-- [ ] [서비스] 장소 삭제는 다른 장소가 남은 기본 장소면 DEFAULT_SPOT_REQUIRED로 거절한다
-- [ ] [서비스] 다른 가족의 spotId를 수정 · 삭제하려 하면 NOT_FOUND로 거절한다
-- [ ] [서비스] 장소 조회는 학원별로 묶어 academyName과 함께 돌려준다
-- [ ] [서비스] 장소 조회는 진행 중 세션이 없으면 walkMinutes를 null로 돌려준다
-- [ ] [서비스] findDefaultSpot은 가족 · 학원의 기본 장소를 돌려주고 없으면 빈 값을 돌려준다
+- [x] [서비스] 장소 추가는 학원의 첫 장소면 isDefault false로 보내도 isDefault true로 저장한다
+- [x] [서비스] 장소 추가는 isDefault true면 같은 학원의 이전 기본 장소를 해제한다
+- [x] [서비스] 장소 추가는 정차 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
+- [x] [서비스] 장소 추가는 만남 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
+- [x] [서비스] 장소 추가는 호출한 보호자를 createdBy로 저장한다
+- [x] [서비스] 장소 수정은 보낸 필드만 바꾼다
+- [x] [서비스] 장소 수정은 바꾼 좌표가 500m를 넘으면 SPOT_TOO_FAR로 거절한다
+- [x] [서비스] 장소 수정은 isDefault true로 바꾸면 같은 학원의 이전 기본 장소를 해제한다
+- [x] [서비스] 장소 삭제는 진행 중 세션이 쓰는 장소면 SPOT_IN_USE로 거절한다
+- [x] [서비스] 장소 삭제는 다른 장소가 남은 기본 장소면 DEFAULT_SPOT_REQUIRED로 거절한다
+- [x] [서비스] 다른 가족의 spotId를 수정 · 삭제하려 하면 NOT_FOUND로 거절한다
+- [x] [서비스] 장소 조회는 학원별로 묶어 academyName과 함께 돌려준다
+- [x] [서비스] 장소 조회는 진행 중 세션이 없으면 walkMinutes를 null로 돌려준다
+- [x] [서비스] findDefaultSpot은 가족 · 학원의 기본 장소를 돌려주고 없으면 빈 값을 돌려준다
 - [ ] [web] GET /v1/families/me/pickup-spots는 200과 academies[]를 돌려준다
 - [ ] [web] GET /v1/families/me/pickup-spots는 차량 토큰으로도 200을 돌려준다
 - [ ] [web] GET /v1/families/me/pickup-spots에 near만 보내고 radiusM을 빼면 422 VALIDATION_FAILED를 돌려준다
@@ -135,10 +135,12 @@ Optional<LatLng> loadActiveChildLocation(long familyId);                        
 - [ ] [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
 - [x] [persistence] pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다
 - [x] [persistence] LoadAcademyPort 어댑터는 schedule의 LoadAcademyUseCase.findAcademy 결과를 place가 쓰는 학원 정보(academyId · name · location)로 바꿔 돌려주고 없으면 빈 값을 돌려준다
-- [ ] [서비스] findSpot은 spotId의 장소를 돌려주고 없으면 빈 값을, findSpots는 가족의 학원 목록에 속한 장소를 spotId · academyId · name · isDefault로 돌려준다
+- [x] [서비스] findSpot은 spotId의 장소를 돌려주고 없으면 빈 값을, findSpots는 가족의 학원 목록에 속한 장소를 spotId · academyId · name · isDefault로 돌려준다
 - [ ] schedule의 임시 LoadPickupSpotPort를 place findSpots 연동으로 바꿔 설정 요약 · 주간 일정의 PICKUP_SPOT 판정이 실제 장소를 본다
-- [ ] [서비스] 장소 수정은 기본 장소를 isDefault false로 바꾸려 하면 DEFAULT_SPOT_REQUIRED로 거절한다(다른 장소를 기본으로 지정해야 바뀜)
+- [x] [서비스] 장소 수정은 기본 장소를 isDefault false로 바꾸려 하면 DEFAULT_SPOT_REQUIRED로 거절한다(다른 장소를 기본으로 지정해야 바뀜)
 - [x] [persistence] deleteSpot은 그 장소 행만 지우고 같은 가족 · 학원의 다른 장소는 남긴다
+- [ ] 장소 삭제는 진행 중 세션이 쓰는 기본 장소면 같은 학원에 다른 장소가 남아 있어도 SPOT_IN_USE를 먼저 돌려준다
+- [ ] 장소 수정은 좌표를 바꿀 때 학원 정보가 없으면 NOT_FOUND로 거절하고 저장하지 않는다
 
 ## 확인 필요 사항
 
