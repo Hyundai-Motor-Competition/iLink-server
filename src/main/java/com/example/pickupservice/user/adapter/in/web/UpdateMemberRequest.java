@@ -7,7 +7,7 @@ import com.example.pickupservice.user.application.port.in.UpdateMemberCommand;
 public record UpdateMemberRequest(
 		@ValidName String name,
 		@ValidPhone String phone,
-		Role role
+		@MemberRole Role role
 ) {
 
 	public UpdateMemberCommand toCommand(AuthPrincipal requester, long userId) {

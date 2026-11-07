@@ -6,7 +6,7 @@ import com.example.pickupservice.user.application.port.in.RegisterMemberCommand;
 import jakarta.validation.constraints.NotNull;
 
 public record RegisterMemberRequest(
-		@NotNull(message = "필수 값입니다") Role role,
+		@NotNull(message = "필수 값입니다") @MemberRole Role role,
 		@NotNull(message = "필수 값입니다") @ValidName String name,
 		@ValidPhone String phone
 ) {

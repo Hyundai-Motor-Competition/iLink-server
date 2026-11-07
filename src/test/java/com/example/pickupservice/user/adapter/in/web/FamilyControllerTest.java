@@ -17,6 +17,8 @@ import com.example.pickupservice.user.domain.JoinCallMode;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -60,6 +62,9 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 	private static final long CHILD_USER_ID = 131L;
 	private static final long DELEGATE_USER_ID = 121L;
 	private static final long VEHICLE_ID = 77L;
+	private static final String GUARDIAN_ROLE_BODY = """
+			{"role":"GUARDIAN","name":"이보호","phone":"+821011112222"}
+			""";
 
 	private final MockMvc mockMvc;
 	private final AccessTokenFixture accessTokenFixture;
@@ -163,6 +168,45 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 	}
 
 	@Test
+	@DisplayName("POST /v1/families/me/members에 role GUARDIAN을 보내면 422 VALIDATION_FAILED와 fields의 role을 돌려준다")
+	void registerMemberWithGuardianRoleReturns422WithRoleField() throws Exception {
+		mockMvc.perform(registerMemberRequest(guardianBearer(), GUARDIAN_ROLE_BODY))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("role")));
+
+		then(registerMemberUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/families/me/members에 CO_GUARDIAN 토큰으로 role GUARDIAN을 보내면 422 VALIDATION_FAILED와 fields의 role을 돌려주고 유스케이스를 부르지 않는다")
+	void registerMemberWithGuardianRoleByCoGuardianReturns422WithRoleField() throws Exception {
+		mockMvc.perform(registerMemberRequest(userBearer(CO_GUARDIAN_USER_ID, Role.CO_GUARDIAN), GUARDIAN_ROLE_BODY))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("role")));
+
+		then(registerMemberUseCase).shouldHaveNoInteractions();
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = Role.class, names = {"CHILD", "CO_GUARDIAN", "DELEGATE", "TEACHER"})
+	@DisplayName("POST /v1/families/me/members는 role CHILD · CO_GUARDIAN · DELEGATE · TEACHER를 받아 201을 돌려준다")
+	void registerMemberAcceptsAllowedRoles(Role role) throws Exception {
+		given(registerMemberUseCase.registerMember(any())).willReturn(TEACHER_USER_ID);
+
+		mockMvc.perform(registerMemberRequest(guardianBearer(), """
+						{"role":"%s","name":"이멤버","phone":"+821011112222"}
+						""".formatted(role.name())))
+				.andExpect(status().isCreated());
+
+		then(registerMemberUseCase).should().registerMember(
+				new RegisterMemberCommand(FAMILY_ID, Role.GUARDIAN, role, "이멤버", "+821011112222"));
+	}
+
+	@Test
 	@DisplayName("POST /v1/families/me/members가 한도를 넘으면 422 MEMBER_LIMIT_EXCEEDED를 돌려준다")
 	void registerMemberOverLimitReturns422MemberLimitExceeded() throws Exception {
 		given(registerMemberUseCase.registerMember(any())).willThrow(BusinessException.of(
@@ -216,6 +260,23 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 				.andExpect(commonErrorKeys())
 				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
 				.andExpect(jsonPath("$.error.fields[*].field", hasItem("phone")));
+
+		then(updateMemberUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("PATCH /v1/families/me/members/{userId}에 role GUARDIAN을 보내면 422 VALIDATION_FAILED와 fields의 role을 돌려준다")
+	void updateMemberWithGuardianRoleReturns422WithRoleField() throws Exception {
+		given(updateMemberUseCase.updateMember(any())).willReturn(
+				new MemberResult(CO_GUARDIAN_USER_ID, Role.GUARDIAN, "이보호", "+821011112222", DeviceStatus.CONNECTED));
+
+		mockMvc.perform(updateMemberRequest(CO_GUARDIAN_USER_ID, """
+						{"role":"GUARDIAN"}
+						"""))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("role")));
 
 		then(updateMemberUseCase).shouldHaveNoInteractions();
 	}
@@ -349,8 +410,12 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 	}
 
 	private MockHttpServletRequestBuilder registerMemberRequest(String body) {
+		return registerMemberRequest(guardianBearer(), body);
+	}
+
+	private MockHttpServletRequestBuilder registerMemberRequest(String bearer, String body) {
 		return post(MEMBERS_PATH)
-				.header(HttpHeaders.AUTHORIZATION, guardianBearer())
+				.header(HttpHeaders.AUTHORIZATION, bearer)
 				.header(IDEMPOTENCY_KEY_HEADER, UUID.randomUUID().toString())
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(body);
