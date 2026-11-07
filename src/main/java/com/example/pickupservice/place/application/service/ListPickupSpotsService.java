@@ -11,6 +11,7 @@ import com.example.pickupservice.place.application.port.out.LoadAcademyPort;
 import com.example.pickupservice.place.application.port.out.LoadSpotPort;
 import com.example.pickupservice.place.domain.PickupSpot;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
@@ -19,6 +20,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+@Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ListPickupSpotsService implements ListPickupSpotsUseCase {

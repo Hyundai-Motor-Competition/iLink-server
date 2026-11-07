@@ -14,10 +14,12 @@ import com.example.pickupservice.place.application.port.out.SaveSpotPort;
 import com.example.pickupservice.place.domain.DefaultSpotRule;
 import com.example.pickupservice.place.domain.PickupSpot;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Service
 @RequiredArgsConstructor
 public class AddPickupSpotService implements AddPickupSpotUseCase {
 
