@@ -662,3 +662,5 @@ Map<Long, DeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean hasLocat
 | OUT-03 note 저장 위치 | PickupOutcome에 note 컬럼이 없음. 정해야 함 |
 | OUT-04 learningConsent · 파기 대기 저장 위치 | 테이블이 없음. 저장 위치와 「파기 대기」 처리를 정해야 함. 경로가 /guardians/me라 user 도메인으로 옮길지도 정해야 함(소스는 pickup 4.11) |
 | 문서 크기 | 엔드포인트 28개 · 항목이 많음. 소스의 모듈 경계(pickup 한 패키지)를 따라 한 문서로 둠. 나눌지 팀장이 정함 |
+| SIG-02 eventId와 idempotency_key 테이블 | 03에서 idempotency_key는 주체별 Idempotency-Key와 2xx 응답(상태 · 본문)을 저장하는 구조로 정해짐. eventId를 이 테이블에 넣을지 다시 정해야 함 |
+| SES-08 SSE 요청 로그 · 비동기 실행기 | 03 요청 로깅은 SSE를 연결(stream=open) · 종료(stream=closed) 두 줄로 남김. 타임아웃 · 연결 끊김 · completeWithError 때 종료 줄의 status · errorCode와 MVC 비동기 실행기 설정 필요 여부를 SES-08 때 정해야 함 |
