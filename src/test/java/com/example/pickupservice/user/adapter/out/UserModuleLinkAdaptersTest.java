@@ -41,15 +41,6 @@ class UserModuleLinkAdaptersTest extends IntegrationTestSupport {
 	private final SaveInvitePort saveInvitePort;
 
 	@Test
-	@DisplayName("pickup 구현 전 임시 CheckActivePickupPort는 isInActivePickup · hasActivePickup 모두 false를 돌려준다")
-	void temporaryActivePickupAdapterReturnsFalse() {
-		CheckActivePickupPort activePickupPort = onlyBeanOf(CheckActivePickupPort.class);
-
-		assertThat(activePickupPort.isInActivePickup(1L)).isFalse();
-		assertThat(activePickupPort.hasActivePickup(1L)).isFalse();
-	}
-
-	@Test
 	@DisplayName("세 포트는 각각 빈이 정확히 1개이고 user.adapter.out 아래 클래스가 구현한다")
 	void eachPortHasExactlyOneBeanInUserOutAdapterPackage() {
 		for (Class<?> port : List.of(LoadMemberDeviceStatusPort.class, RevokeMemberDevicesPort.class, CheckActivePickupPort.class)) {
@@ -110,8 +101,10 @@ class UserModuleLinkAdaptersTest extends IntegrationTestSupport {
 	void activePickupPortAlwaysReturnsFalse() {
 		CheckActivePickupPort activePickupPort = onlyBeanOf(CheckActivePickupPort.class);
 
+		assertThat(activePickupPort.isInActivePickup(1L)).isFalse();
 		assertThat(activePickupPort.isInActivePickup(101L)).isFalse();
 		assertThat(activePickupPort.isInActivePickup(9_999_999L)).isFalse();
+		assertThat(activePickupPort.hasActivePickup(1L)).isFalse();
 		assertThat(activePickupPort.hasActivePickup(77L)).isFalse();
 		assertThat(activePickupPort.hasActivePickup(9_999_999L)).isFalse();
 	}

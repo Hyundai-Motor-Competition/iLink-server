@@ -21,8 +21,6 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class UpdateMemberService implements UpdateMemberUseCase {
 
-	private static final long NON_CHILD_MEMBER_LIMIT = 5;
-
 	private final LoadUserPort loadUserPort;
 	private final SaveUserPort saveUserPort;
 	private final LoadMemberDeviceStatusPort loadMemberDeviceStatusPort;
@@ -60,9 +58,7 @@ public class UpdateMemberService implements UpdateMemberUseCase {
 		if (phone == null || phone.isBlank()) {
 			throw BusinessException.invalidField("phone", "자녀 외 멤버는 전화번호가 필요합니다");
 		}
-		if (loadUserPort.countNonChildMembers(command.familyId()) >= NON_CHILD_MEMBER_LIMIT) {
-			throw UserErrors.memberLimitExceeded();
-		}
+		NonChildMemberLimit.checkRoomFor(loadUserPort, command.familyId());
 	}
 
 	private void applyChanges(User user, UpdateMemberCommand command) {
