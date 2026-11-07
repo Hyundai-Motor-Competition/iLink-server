@@ -2,6 +2,7 @@ package com.example.pickupservice.user.application.service;
 
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.error.ErrorCode;
+import com.example.pickupservice.common.text.PlateNumberMasker;
 import com.example.pickupservice.user.application.port.in.FamilyResult;
 import com.example.pickupservice.user.application.port.in.GetMyFamilyQuery;
 import com.example.pickupservice.user.application.port.in.GetMyFamilyUseCase;
@@ -12,7 +13,6 @@ import com.example.pickupservice.user.application.port.out.LoadMemberDeviceStatu
 import com.example.pickupservice.user.application.port.out.LoadUserPort;
 import com.example.pickupservice.user.application.port.out.LoadVehiclePort;
 import com.example.pickupservice.user.domain.Family;
-import com.example.pickupservice.user.domain.PlateNumberMasker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

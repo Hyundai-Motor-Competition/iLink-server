@@ -1,7 +1,7 @@
 package com.example.pickupservice.auth.adapter.in.web;
 
 import com.example.pickupservice.auth.domain.LinkMode;
-import com.example.pickupservice.user.domain.NameRule;
+import com.example.pickupservice.common.text.NameRule;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 

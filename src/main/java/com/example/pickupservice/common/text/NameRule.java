@@ -1,4 +1,4 @@
-package com.example.pickupservice.user.domain;
+package com.example.pickupservice.common.text;
 
 public final class NameRule {
 
