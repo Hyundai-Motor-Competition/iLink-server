@@ -19,13 +19,14 @@ import org.mockito.quality.Strictness;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,14 +51,14 @@ class LoadScheduleServiceTest {
 	@InjectMocks
 	private LoadScheduleService service;
 
-	// #37
+	// #37 · #74
 
 	@Test
 	@DisplayName("findSchedules는 scheduleId의 일정 값과 학원 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려준다")
 	void findSchedulesReturnsScheduleWithAcademyInfo() {
 		Academy academy = Academy.restore(ACADEMY_ID, "kakao:12345", "해솔영어학원", "서울 강남구 테헤란로 1", LOCATION, ENTRANCE,
 				"02-555-1234");
-		given(loadSchedulePort.loadSchedule(SCHEDULE_ID)).willReturn(Optional.of(PickupSchedule.restore(SCHEDULE_ID,
+		given(loadSchedulePort.loadSchedules(List.of(SCHEDULE_ID))).willReturn(List.of(PickupSchedule.restore(SCHEDULE_ID,
 				MINJUN_ID, academy, Set.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY), LocalTime.of(18, 0), 5,
 				ScheduleStatus.READY)));
 
@@ -69,12 +70,29 @@ class LoadScheduleServiceTest {
 	}
 
 	@Test
-	@DisplayName("findSchedules는 여러 scheduleId를 받은 순서대로 돌려준다")
-	void findSchedulesReturnsSchedulesInRequestedOrder() {
-		givenSchedule(SCHEDULE_ID, MINJUN_ID, ACADEMY_ID, "해솔영어학원");
-		givenSchedule(OTHER_SCHEDULE_ID, SEOYEON_ID, OTHER_ACADEMY_ID, "한빛수학학원");
+	@DisplayName("findSchedules는 loadSchedules를 받은 id 목록 그대로 정확히 1번 부르고 loadSchedule은 부르지 않는다")
+	void findSchedulesCallsLoadSchedulesOnceWithRequestedIds() {
+		List<Long> requested = List.of(OTHER_SCHEDULE_ID, MISSING_SCHEDULE_ID, SCHEDULE_ID);
+		given(loadSchedulePort.loadSchedules(requested)).willReturn(List.of(
+				schedule(SCHEDULE_ID, MINJUN_ID, ACADEMY_ID, "해솔영어학원"),
+				schedule(OTHER_SCHEDULE_ID, SEOYEON_ID, OTHER_ACADEMY_ID, "한빛수학학원")));
 
-		List<ScheduleInfo> schedules = service.findSchedules(List.of(OTHER_SCHEDULE_ID, SCHEDULE_ID));
+		service.findSchedules(requested);
+
+		verify(loadSchedulePort, times(1)).loadSchedules(requested);
+		verify(loadSchedulePort, times(1)).loadSchedules(anyList());
+		verify(loadSchedulePort, never()).loadSchedule(anyLong());
+	}
+
+	@Test
+	@DisplayName("findSchedules는 포트가 다른 순서로 돌려줘도 받은 scheduleId 순서대로 돌려준다")
+	void findSchedulesReturnsSchedulesInRequestedOrder() {
+		List<Long> requested = List.of(OTHER_SCHEDULE_ID, SCHEDULE_ID);
+		given(loadSchedulePort.loadSchedules(requested)).willReturn(List.of(
+				schedule(SCHEDULE_ID, MINJUN_ID, ACADEMY_ID, "해솔영어학원"),
+				schedule(OTHER_SCHEDULE_ID, SEOYEON_ID, OTHER_ACADEMY_ID, "한빛수학학원")));
+
+		List<ScheduleInfo> schedules = service.findSchedules(requested);
 
 		assertThat(schedules).extracting(ScheduleInfo::scheduleId).containsExactly(OTHER_SCHEDULE_ID, SCHEDULE_ID);
 		assertThat(schedules).extracting(info -> info.academy().name()).containsExactly("한빛수학학원", "해솔영어학원");
@@ -85,7 +103,7 @@ class LoadScheduleServiceTest {
 	void findSchedulesReturnsDraftScheduleWithNullEntrance() {
 		Academy academy = Academy.restore(ACADEMY_ID, "kakao:12345", "해솔영어학원", "서울 강남구 테헤란로 1", LOCATION, null,
 				"02-555-1234");
-		given(loadSchedulePort.loadSchedule(SCHEDULE_ID)).willReturn(Optional.of(PickupSchedule.restore(SCHEDULE_ID,
+		given(loadSchedulePort.loadSchedules(List.of(SCHEDULE_ID))).willReturn(List.of(PickupSchedule.restore(SCHEDULE_ID,
 				MINJUN_ID, academy, Set.of(DayOfWeek.FRIDAY), LocalTime.of(17, 30), 0, ScheduleStatus.DRAFT)));
 
 		List<ScheduleInfo> schedules = service.findSchedules(List.of(SCHEDULE_ID));
@@ -97,14 +115,16 @@ class LoadScheduleServiceTest {
 	}
 
 	@Test
-	@DisplayName("findSchedules는 없는 scheduleId를 빼고 나머지만 돌려준다")
+	@DisplayName("findSchedules는 포트가 돌려주지 않은 없는 scheduleId를 빼고 나머지만 받은 순서대로 돌려준다")
 	void findSchedulesSkipsMissingScheduleIds() {
-		givenSchedule(SCHEDULE_ID, MINJUN_ID, ACADEMY_ID, "해솔영어학원");
-		given(loadSchedulePort.loadSchedule(MISSING_SCHEDULE_ID)).willReturn(Optional.empty());
+		List<Long> requested = List.of(OTHER_SCHEDULE_ID, MISSING_SCHEDULE_ID, SCHEDULE_ID);
+		given(loadSchedulePort.loadSchedules(requested)).willReturn(List.of(
+				schedule(SCHEDULE_ID, MINJUN_ID, ACADEMY_ID, "해솔영어학원"),
+				schedule(OTHER_SCHEDULE_ID, SEOYEON_ID, OTHER_ACADEMY_ID, "한빛수학학원")));
 
-		List<ScheduleInfo> schedules = service.findSchedules(List.of(MISSING_SCHEDULE_ID, SCHEDULE_ID));
+		List<ScheduleInfo> schedules = service.findSchedules(requested);
 
-		assertThat(schedules).extracting(ScheduleInfo::scheduleId).containsExactly(SCHEDULE_ID);
+		assertThat(schedules).extracting(ScheduleInfo::scheduleId).containsExactly(OTHER_SCHEDULE_ID, SCHEDULE_ID);
 	}
 
 	@Test
@@ -113,12 +133,13 @@ class LoadScheduleServiceTest {
 		List<ScheduleInfo> schedules = service.findSchedules(List.of());
 
 		assertThat(schedules).isEmpty();
+		verify(loadSchedulePort, never()).loadSchedules(anyList());
 		verify(loadSchedulePort, never()).loadSchedule(anyLong());
 	}
 
-	private void givenSchedule(long scheduleId, long childUserId, long academyId, String academyName) {
+	private static PickupSchedule schedule(long scheduleId, long childUserId, long academyId, String academyName) {
 		Academy academy = Academy.restore(academyId, "kakao:" + academyId, academyName, "서울 강남구", OTHER_LOCATION, ENTRANCE, "02-000-0000");
-		given(loadSchedulePort.loadSchedule(scheduleId)).willReturn(Optional.of(PickupSchedule.restore(scheduleId,
-				childUserId, academy, Set.of(DayOfWeek.TUESDAY), LocalTime.of(16, 0), 10, ScheduleStatus.READY)));
+		return PickupSchedule.restore(scheduleId, childUserId, academy, Set.of(DayOfWeek.TUESDAY), LocalTime.of(16, 0), 10,
+				ScheduleStatus.READY);
 	}
 }

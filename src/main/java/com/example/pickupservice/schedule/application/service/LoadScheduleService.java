@@ -9,7 +9,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,9 +26,11 @@ public class LoadScheduleService implements LoadScheduleUseCase {
 		if (scheduleIds.isEmpty()) {
 			return List.of();
 		}
+		Map<Long, PickupSchedule> schedulesById = loadSchedulePort.loadSchedules(scheduleIds).stream()
+				.collect(Collectors.toMap(PickupSchedule::getScheduleId, Function.identity()));
 		return scheduleIds.stream()
-				.map(loadSchedulePort::loadSchedule)
-				.flatMap(Optional::stream)
+				.map(schedulesById::get)
+				.filter(Objects::nonNull)
 				.map(LoadScheduleService::toInfo)
 				.toList();
 	}
