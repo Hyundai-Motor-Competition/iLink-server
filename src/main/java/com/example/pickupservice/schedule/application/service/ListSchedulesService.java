@@ -1,8 +1,5 @@
 package com.example.pickupservice.schedule.application.service;
 
-import com.example.pickupservice.common.error.BusinessException;
-import com.example.pickupservice.common.error.ErrorCode;
-import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.schedule.application.port.in.ChildQuery;
 import com.example.pickupservice.schedule.application.port.in.ListSchedulesUseCase;
 import com.example.pickupservice.schedule.application.port.in.ScheduleAcademy;
@@ -28,7 +25,7 @@ public class ListSchedulesService implements ListSchedulesUseCase {
 	@Override
 	@Transactional(readOnly = true)
 	public List<ScheduleView> listSchedules(ChildQuery query) {
-		requireChildOfFamily(query.familyId(), query.childId());
+		FamilyChildGuard.requireChildOfFamily(loadMemberUseCase, query.familyId(), query.childId());
 
 		return loadSchedulePort.loadSchedulesOfChild(query.childId()).stream()
 				.sorted(Comparator.comparing(PickupSchedule::getScheduleId))
@@ -42,12 +39,5 @@ public class ListSchedulesService implements ListSchedulesUseCase {
 				new ScheduleAcademy(academy.getAcademyId(), academy.getName()),
 				schedule.getWeekdays().stream().sorted().toList(),
 				schedule.getClassEndTime(), schedule.getTargetPickup(), schedule.getStatus());
-	}
-
-	private void requireChildOfFamily(long familyId, long childId) {
-		loadMemberUseCase.findMember(childId)
-				.filter(member -> member.familyId() == familyId)
-				.filter(member -> member.role() == Role.CHILD)
-				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
 	}
 }

@@ -10,7 +10,6 @@ import com.example.pickupservice.schedule.application.port.in.WeeklyPickups;
 import com.example.pickupservice.schedule.application.port.out.LoadMemberDeviceStatusPort;
 import com.example.pickupservice.schedule.application.port.out.LoadPickupSpotPort;
 import com.example.pickupservice.schedule.application.port.out.LoadSchedulePort;
-import com.example.pickupservice.schedule.application.port.out.SpotSummary;
 import com.example.pickupservice.schedule.domain.DeviceStatus;
 import com.example.pickupservice.schedule.domain.MissingSetupItem;
 import com.example.pickupservice.schedule.domain.PickupSchedule;
@@ -28,8 +27,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -50,28 +49,32 @@ public class GetWeeklyPickupsService implements GetWeeklyPickupsUseCase {
 		LocalDate start = weekStart != null
 				? weekStart
 				: today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-
-		Map<Long, String> childNames = loadMemberUseCase.findMembers(familyId).stream()
-				.filter(member -> member.role() == Role.CHILD)
-				.collect(Collectors.toMap(MemberInfo::userId, MemberInfo::name));
+		Map<Long, String> childNames = childNamesOf(familyId);
 		List<PickupSchedule> schedules = loadSchedulePort.loadSchedulesOfChildren(List.copyOf(childNames.keySet()));
 
-		List<DailyPickups> days = new ArrayList<>();
-		for (int i = 0; i < DAYS_OF_WEEK; i++) {
-			LocalDate date = start.plusDays(i);
-			List<WeeklyPickup> pickups = schedulesOn(schedules, date.getDayOfWeek()).stream()
-					.map(schedule -> new WeeklyPickup(schedule.getScheduleId(),
-							childNames.get(schedule.getChildUserId()), schedule.getAcademy().getName(),
-							schedule.getClassEndTime(), schedule.targetPickupTime()))
-					.toList();
-			days.add(new DailyPickups(date, pickups));
-		}
-
-		return new WeeklyPickups(start, List.copyOf(days),
-				readiness(familyId, schedulesOn(schedules, today.getDayOfWeek())));
+		List<DailyPickups> days = IntStream.range(0, DAYS_OF_WEEK)
+				.mapToObj(offset -> dailyPickups(start.plusDays(offset), schedules, childNames))
+				.toList();
+		return new WeeklyPickups(start, days, readiness(familyId, schedulesOn(schedules, today.getDayOfWeek())));
 	}
 
-	private List<PickupSchedule> schedulesOn(List<PickupSchedule> schedules, DayOfWeek dayOfWeek) {
+	private Map<Long, String> childNamesOf(long familyId) {
+		return loadMemberUseCase.findMembers(familyId).stream()
+				.filter(member -> member.role() == Role.CHILD)
+				.collect(Collectors.toMap(MemberInfo::userId, MemberInfo::name));
+	}
+
+	private static DailyPickups dailyPickups(LocalDate date, List<PickupSchedule> schedules,
+			Map<Long, String> childNames) {
+		List<WeeklyPickup> pickups = schedulesOn(schedules, date.getDayOfWeek()).stream()
+				.map(schedule -> new WeeklyPickup(schedule.getScheduleId(),
+						childNames.get(schedule.getChildUserId()), schedule.getAcademy().getName(),
+						schedule.getClassEndTime(), schedule.targetPickupTime()))
+				.toList();
+		return new DailyPickups(date, pickups);
+	}
+
+	private static List<PickupSchedule> schedulesOn(List<PickupSchedule> schedules, DayOfWeek dayOfWeek) {
 		return schedules.stream()
 				.filter(schedule -> schedule.getWeekdays().contains(dayOfWeek))
 				.sorted(Comparator.comparing(PickupSchedule::getClassEndTime))
@@ -82,32 +85,24 @@ public class GetWeeklyPickupsService implements GetWeeklyPickupsUseCase {
 		if (todaySchedules.isEmpty()) {
 			return new PickupReadiness(false, List.of());
 		}
+		List<MissingSetupItem> missing = new ArrayList<>();
+		if (!allDevicesConnected(todaySchedules)) {
+			missing.add(MissingSetupItem.CHILD_DEVICE);
+		}
+		List<Long> academyIds = SetupChecks.academyIdsOf(todaySchedules);
+		if (SetupChecks.lacksDefaultSpot(loadPickupSpotPort.loadSpots(familyId, academyIds), academyIds)) {
+			missing.add(MissingSetupItem.PICKUP_SPOT);
+		}
+		return new PickupReadiness(missing.isEmpty(), List.copyOf(missing));
+	}
 
+	private boolean allDevicesConnected(List<PickupSchedule> todaySchedules) {
 		List<Long> childIds = todaySchedules.stream()
 				.map(PickupSchedule::getChildUserId)
 				.distinct()
 				.toList();
-		List<Long> academyIds = todaySchedules.stream()
-				.map(schedule -> schedule.getAcademy().getAcademyId())
-				.distinct()
-				.toList();
-
-		List<MissingSetupItem> missing = new ArrayList<>();
 		Map<Long, DeviceStatus> deviceStatuses = loadMemberDeviceStatusPort.loadDeviceStatuses(childIds);
-		boolean allConnected = childIds.stream()
+		return childIds.stream()
 				.allMatch(childId -> deviceStatuses.getOrDefault(childId, DeviceStatus.NONE) == DeviceStatus.CONNECTED);
-		if (!allConnected) {
-			missing.add(MissingSetupItem.CHILD_DEVICE);
-		}
-
-		Set<Long> academiesWithDefaultSpot = loadPickupSpotPort.loadSpots(familyId, academyIds).stream()
-				.filter(SpotSummary::isDefault)
-				.map(SpotSummary::academyId)
-				.collect(Collectors.toSet());
-		if (!academiesWithDefaultSpot.containsAll(academyIds)) {
-			missing.add(MissingSetupItem.PICKUP_SPOT);
-		}
-
-		return new PickupReadiness(missing.isEmpty(), List.copyOf(missing));
 	}
 }
