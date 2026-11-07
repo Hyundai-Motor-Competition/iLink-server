@@ -374,6 +374,34 @@ class ScheduleControllerTest extends ScheduleWebTestSupport {
 	}
 
 	@Test
+	@DisplayName("POST /v1/children/{childId}/schedules에 101자 externalPlaceId를 보내면 422 VALIDATION_FAILED와 fields의 academy.externalPlaceId를 돌려주고 유스케이스를 부르지 않는다")
+	void createScheduleWith101CharExternalPlaceIdReturns422ValidationFailed() throws Exception {
+		mockMvc.perform(createScheduleRequest(guardianBearer(), scheduleBody(
+						academyJsonWithExternalPlaceId("k".repeat(101)), "[\"MON\"]", "\"18:00\"", "5")))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("academy.externalPlaceId")));
+
+		then(createScheduleUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/children/{childId}/schedules에 경계값 100자 externalPlaceId를 보내면 201이고 그 값을 그대로 넘긴다")
+	void createScheduleWith100CharExternalPlaceIdReturns201() throws Exception {
+		given(createScheduleUseCase.createSchedule(any())).willReturn(readyResult());
+		String externalPlaceId = "k".repeat(100);
+
+		mockMvc.perform(createScheduleRequest(guardianBearer(), scheduleBody(
+						academyJsonWithExternalPlaceId(externalPlaceId), "[\"MON\"]", "\"18:00\"", "5")))
+				.andExpect(status().isCreated());
+
+		ArgumentCaptor<CreateScheduleCommand> captor = ArgumentCaptor.forClass(CreateScheduleCommand.class);
+		then(createScheduleUseCase).should().createSchedule(captor.capture());
+		assertThat(captor.getValue().academy().externalPlaceId()).isEqualTo(externalPlaceId);
+	}
+
+	@Test
 	@DisplayName("POST /v1/children/{childId}/schedules가 겹치면 409 SCHEDULE_OVERLAP과 overlapScheduleIds를 돌려준다")
 	void createScheduleWhenOverlappingReturns409ScheduleOverlapWithIds() throws Exception {
 		given(createScheduleUseCase.createSchedule(any())).willThrow(BusinessException.conflictWithOverlap(
@@ -456,6 +484,34 @@ class ScheduleControllerTest extends ScheduleWebTestSupport {
 				.andExpect(jsonPath("$.error.fields[*].field", hasItem("targetPickup")));
 
 		then(updateScheduleUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("PUT /v1/schedules/{scheduleId}에 101자 externalPlaceId를 보내면 422 VALIDATION_FAILED와 fields의 academy.externalPlaceId를 돌려주고 유스케이스를 부르지 않는다")
+	void updateScheduleWith101CharExternalPlaceIdReturns422ValidationFailed() throws Exception {
+		mockMvc.perform(updateScheduleRequest(guardianBearer(), scheduleBody(
+						academyJsonWithExternalPlaceId("k".repeat(101)), "[\"MON\"]", "\"18:00\"", "5")))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("academy.externalPlaceId")));
+
+		then(updateScheduleUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("PUT /v1/schedules/{scheduleId}에 경계값 100자 externalPlaceId를 보내면 200이고 그 값을 그대로 넘긴다")
+	void updateScheduleWith100CharExternalPlaceIdReturns200() throws Exception {
+		given(updateScheduleUseCase.updateSchedule(any())).willReturn(readyResult());
+		String externalPlaceId = "k".repeat(100);
+
+		mockMvc.perform(updateScheduleRequest(guardianBearer(), scheduleBody(
+						academyJsonWithExternalPlaceId(externalPlaceId), "[\"MON\"]", "\"18:00\"", "5")))
+				.andExpect(status().isOk());
+
+		ArgumentCaptor<UpdateScheduleCommand> captor = ArgumentCaptor.forClass(UpdateScheduleCommand.class);
+		then(updateScheduleUseCase).should().updateSchedule(captor.capture());
+		assertThat(captor.getValue().academy().externalPlaceId()).isEqualTo(externalPlaceId);
 	}
 
 	@Test
@@ -584,6 +640,10 @@ class ScheduleControllerTest extends ScheduleWebTestSupport {
 		return """
 				{"academy":%s,"weekdays":%s,"classEndTime":%s,"targetPickup":%s}
 				""".formatted(academyJson, weekdaysJson, classEndTimeJson, targetPickupJson);
+	}
+
+	private static String academyJsonWithExternalPlaceId(String externalPlaceId) {
+		return FULL_ACADEMY_JSON.replace("\"kakao:12345\"", "\"" + externalPlaceId + "\"");
 	}
 
 	private static ScheduleResult readyResult() {

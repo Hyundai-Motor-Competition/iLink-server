@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record AcademyRequest(
-		@NotBlank String externalPlaceId,
+		@NotBlank @Size(max = 100) String externalPlaceId,
 		@NotBlank @Size(max = 100) String name,
 		@NotBlank @Size(max = 255) String address,
 		@NotNull LatLng location,
