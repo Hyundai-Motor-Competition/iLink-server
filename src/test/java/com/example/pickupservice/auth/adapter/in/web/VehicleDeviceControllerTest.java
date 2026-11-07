@@ -3,6 +3,7 @@ package com.example.pickupservice.auth.adapter.in.web;
 import com.example.pickupservice.auth.application.port.in.RegisterVehicleDeviceCommand;
 import com.example.pickupservice.auth.application.port.in.VehicleDeviceResult;
 import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
@@ -113,8 +114,7 @@ class VehicleDeviceControllerTest extends AuthWebTestSupport {
 	@DisplayName("POST /v1/vehicle-devices가 연결된 VIN이면 409 VEHICLE_ALREADY_LINKED를 돌려준다")
 	void registerVehicleDeviceWithLinkedVinReturns409() throws Exception {
 		given(registerVehicleDeviceUseCase.registerVehicleDevice(any()))
-				.willThrow(BusinessException.of(
-						HttpStatus.CONFLICT, "VEHICLE_ALREADY_LINKED", "이미 보호자가 연결된 차량입니다"));
+				.willThrow(BusinessException.of(ErrorCode.VEHICLE_ALREADY_LINKED));
 
 		mockMvc.perform(registerRequest(VALID_VIN, MODEL))
 				.andExpect(commonError(HttpStatus.CONFLICT, "VEHICLE_ALREADY_LINKED"));

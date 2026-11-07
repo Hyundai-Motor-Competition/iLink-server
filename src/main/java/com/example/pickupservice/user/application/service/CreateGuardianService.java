@@ -33,7 +33,7 @@ public class CreateGuardianService implements CreateGuardianUseCase {
 		Vehicle vehicle = loadVehiclePort.loadVehicle(command.vehicleId())
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
 		if (vehicle.getFamilyId() != null || vehicle.getUnlinkedAt() != null) {
-			throw UserErrors.vehicleAlreadyLinked();
+			throw BusinessException.of(ErrorCode.VEHICLE_ALREADY_LINKED);
 		}
 		Family family = saveFamilyPort.saveFamily(Family.create());
 		long familyId = family.getFamilyId();
@@ -42,7 +42,7 @@ public class CreateGuardianService implements CreateGuardianUseCase {
 		try {
 			saveVehiclePort.saveVehicle(vehicle);
 		} catch (OptimisticLockingFailureException e) {
-			throw UserErrors.vehicleAlreadyLinked();
+			throw BusinessException.of(ErrorCode.VEHICLE_ALREADY_LINKED);
 		}
 		return new GuardianAccount(familyId, guardian.getUserId());
 	}

@@ -6,6 +6,8 @@ import com.example.pickupservice.auth.application.port.in.LinkCodeResult;
 import com.example.pickupservice.auth.application.port.out.LoadLinkCodePort;
 import com.example.pickupservice.auth.application.port.out.SaveLinkCodePort;
 import com.example.pickupservice.auth.domain.LinkCode;
+import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.user.application.port.in.LoadVehicleUseCase;
 import com.example.pickupservice.user.application.port.in.VehicleInfo;
 import lombok.RequiredArgsConstructor;
@@ -52,7 +54,7 @@ public class IssueLinkCodeService implements IssueLinkCodeUseCase {
 			throw AuthErrors.vehicleUnlinked();
 		}
 		if (issuedBeforeLink && vehicle.map(VehicleInfo::familyId).isPresent()) {
-			throw AuthErrors.vehicleAlreadyLinked();
+			throw BusinessException.of(ErrorCode.VEHICLE_ALREADY_LINKED);
 		}
 	}
 

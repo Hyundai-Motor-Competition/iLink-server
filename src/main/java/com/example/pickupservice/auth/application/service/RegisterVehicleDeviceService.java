@@ -10,6 +10,8 @@ import com.example.pickupservice.auth.application.port.out.TokenSubject;
 import com.example.pickupservice.auth.domain.Device;
 import com.example.pickupservice.auth.domain.OwnerType;
 import com.example.pickupservice.auth.domain.Platform;
+import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.user.application.port.in.LoadVehicleUseCase;
 import com.example.pickupservice.user.application.port.in.RegisterVehicleUseCase;
@@ -47,7 +49,7 @@ public class RegisterVehicleDeviceService implements RegisterVehicleDeviceUseCas
 			return registerVehicleUseCase.registerVehicle(command.vin(), command.model());
 		}
 		if (vehicle.familyId() != null) {
-			throw AuthErrors.vehicleAlreadyLinked();
+			throw BusinessException.of(ErrorCode.VEHICLE_ALREADY_LINKED);
 		}
 		return vehicle.vehicleId();
 	}

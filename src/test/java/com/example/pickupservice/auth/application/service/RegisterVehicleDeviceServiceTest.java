@@ -90,7 +90,7 @@ class RegisterVehicleDeviceServiceTest {
 	}
 
 	@Test
-	@DisplayName("차량 기기 등록은 연결된 VIN이면 VEHICLE_ALREADY_LINKED로 거절한다")
+	@DisplayName("차량 기기 등록은 연결된 VIN이면 409 VEHICLE_ALREADY_LINKED 「이미 보호자가 연결된 차량입니다」로 거절한다")
 	void registerVehicleDeviceRejectsVinLinkedToFamily() {
 		when(loadVehicleUseCase.findLinkedVehicleByVin(VIN)).thenReturn(Optional.of(
 				new VehicleInfo(77L, 12L, VIN, MODEL, "12가3456", true)));
@@ -99,6 +99,7 @@ class RegisterVehicleDeviceServiceTest {
 				.isInstanceOfSatisfying(BusinessException.class, e -> {
 					assertThat(e.status()).isEqualTo(HttpStatus.CONFLICT);
 					assertThat(e.code()).isEqualTo("VEHICLE_ALREADY_LINKED");
+					assertThat(e.getMessage()).isEqualTo("이미 보호자가 연결된 차량입니다");
 				});
 
 		verify(registerVehicleUseCase, never()).registerVehicle(anyString(), anyString());

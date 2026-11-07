@@ -27,9 +27,4 @@ final class UserErrors {
 		return BusinessException.of(HttpStatus.CONFLICT, "ACTIVE_PICKUP_EXISTS",
 				"진행 중인 픽업이 있어 차량 연결을 해제할 수 없습니다");
 	}
-
-	static BusinessException vehicleAlreadyLinked() {
-		return BusinessException.of(HttpStatus.CONFLICT, "VEHICLE_ALREADY_LINKED",
-				"이미 연결됐거나 연결이 해제된 차량입니다");
-	}
 }

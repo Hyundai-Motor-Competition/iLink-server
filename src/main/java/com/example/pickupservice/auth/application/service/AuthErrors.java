@@ -13,11 +13,6 @@ final class AuthErrors {
 				"refresh 토큰이 만료됐거나 폐기됐습니다");
 	}
 
-	static BusinessException vehicleAlreadyLinked() {
-		return BusinessException.of(HttpStatus.CONFLICT, "VEHICLE_ALREADY_LINKED",
-				"이미 보호자가 연결된 차량입니다");
-	}
-
 	static BusinessException vehicleUnlinked() {
 		return BusinessException.of(HttpStatus.CONFLICT, "VEHICLE_UNLINKED",
 				"연결이 해제된 차량입니다. 앱을 다시 등록해 주세요");

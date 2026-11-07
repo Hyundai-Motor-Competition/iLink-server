@@ -150,6 +150,8 @@ class VehicleLinkCodeControllerConcurrencyTest extends IntegrationTestSupport {
 				.findFirst().orElseThrow();
 		String conflictCode = JsonPath.read(conflict.getResponse().getContentAsString(), "$.error.code");
 		assertThat(conflictCode).as("충돌 응답 code").isEqualTo("VEHICLE_ALREADY_LINKED");
+		String conflictMessage = JsonPath.read(conflict.getResponse().getContentAsString(), "$.error.message");
+		assertThat(conflictMessage).as("충돌 응답 message").isEqualTo("이미 보호자가 연결된 차량입니다");
 
 		long linkedFamilyId = ((Number) JsonPath.read(success.getResponse().getContentAsString(), "$.familyId"))
 				.longValue();

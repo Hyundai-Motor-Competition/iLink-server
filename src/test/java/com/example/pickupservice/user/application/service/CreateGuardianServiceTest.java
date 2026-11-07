@@ -158,4 +158,20 @@ class CreateGuardianServiceTest {
 		verify(saveUserPort, never()).saveUser(any());
 		verify(saveVehiclePort, never()).saveVehicle(any());
 	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("alreadyLinkedOrUnlinkedVehicles")
+	@DisplayName("createGuardian의 VEHICLE_ALREADY_LINKED는 common ErrorCode.VEHICLE_ALREADY_LINKED와 같은 409 「이미 보호자가 연결된 차량입니다」다")
+	void vehicleAlreadyLinkedUsesCommonErrorCode(String caseName, Vehicle vehicle) {
+		given(loadVehiclePort.loadVehicle(VEHICLE_ID)).willReturn(Optional.of(vehicle));
+		CreateGuardianCommand command = new CreateGuardianCommand(VEHICLE_ID, PHONE, NAME);
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> createGuardianService.createGuardian(command));
+
+		assertThat(exception).as(caseName).isNotNull();
+		assertThat(exception.status()).isEqualTo(ErrorCode.VEHICLE_ALREADY_LINKED.getStatus());
+		assertThat(exception.code()).isEqualTo(ErrorCode.VEHICLE_ALREADY_LINKED.name());
+		assertThat(exception.getMessage()).isEqualTo("이미 보호자가 연결된 차량입니다");
+	}
 }
