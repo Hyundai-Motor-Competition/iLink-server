@@ -87,6 +87,21 @@ class PlacePersistenceEntitiesMappingTest extends IntegrationTestSupport {
 		}
 	}
 
+	@Test
+	@DisplayName("서버가 뜨면 pickup_spot.stop_point에 GIST 인덱스가 만들어진다")
+	void stopPointHasGistIndex() {
+		List<String> indexDefinitions = jdbcTemplate.queryForList("""
+				select indexdef
+				from pg_indexes
+				where schemaname = current_schema()
+				  and tablename = 'pickup_spot'
+				""", String.class);
+
+		assertThat(indexDefinitions)
+				.filteredOn(definition -> definition.contains("USING gist (stop_point)"))
+				.hasSize(1);
+	}
+
 	private Map<String, ColumnType> columnsOf(String tableName) {
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
 				select column_name, data_type, character_maximum_length, is_nullable
