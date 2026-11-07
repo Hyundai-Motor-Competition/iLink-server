@@ -8,6 +8,7 @@ import com.example.pickupservice.common.security.PrincipalType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.util.UrlPathHelper;
 
 import java.util.regex.Pattern;
 
@@ -31,7 +32,7 @@ public class PreLinkTokenInterceptor implements HandlerInterceptor {
 
 	private static boolean isAllowedForPreLink(HttpServletRequest request) {
 		String method = request.getMethod();
-		String path = request.getServletPath();
+		String path = UrlPathHelper.defaultInstance.getPathWithinApplication(request);
 		return ("POST".equals(method) && ISSUE_LINK_CODE_PATH.equals(path))
 				|| ("GET".equals(method) && LINK_STATUS_PATH.matcher(path).matches());
 	}
