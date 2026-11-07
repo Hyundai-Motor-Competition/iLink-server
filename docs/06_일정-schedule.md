@@ -116,17 +116,17 @@ Map<Long, DeviceStatus> loadDeviceStatuses(List<Long> userIds);          // Load
 ```
 
 ## 테스트 케이스
-- [ ] [기반] PickupSchedule은 학원 출입구가 없으면 DRAFT, 있으면 READY로 만들어진다
-- [ ] [기반] 일정 규칙은 targetPickup이 0~60을 벗어나면 거절한다
-- [ ] [기반] 일정 규칙은 weekdays가 비어 있으면 거절한다
-- [ ] [기반] 겹침 규칙은 같은 자녀 · 같은 요일 · 같은 classEndTime 일정을 겹침으로 판정한다
-- [ ] [기반] 하루 한도 규칙은 같은 자녀 같은 요일에 네 번째 일정이면 한도 초과로 판정한다
-- [ ] [기반] targetPickupTime 계산은 classEndTime 18:00 · targetPickup 5에서 18:05를 돌려준다
-- [ ] [기반] 이름 마스킹은 김보호를 김*호로 바꾼다
-- [ ] [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
-- [ ] [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [ ] [기반] AcademyEntity · PickupScheduleEntity가 BaseTimeEntity를 상속하고 location · entrance는 geography(Point,4326)로 매핑된다
-- [ ] [기반] 테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다
+- [x] [기반] PickupSchedule은 학원 출입구가 없으면 DRAFT, 있으면 READY로 만들어진다
+- [x] [기반] 일정 규칙은 targetPickup이 0~60을 벗어나면 거절한다
+- [x] [기반] 일정 규칙은 weekdays가 비어 있으면 거절한다
+- [x] [기반] 겹침 규칙은 같은 자녀 · 같은 요일 · 같은 classEndTime 일정을 겹침으로 판정한다
+- [x] [기반] 하루 한도 규칙은 같은 자녀 같은 요일에 네 번째 일정이면 한도 초과로 판정한다
+- [x] [기반] targetPickupTime 계산은 classEndTime 18:00 · targetPickup 5에서 18:05를 돌려준다
+- [x] [기반] 이름 마스킹은 김보호를 김*호로 바꾼다
+- [x] [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
+- [x] [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
+- [x] [기반] AcademyEntity · PickupScheduleEntity가 BaseTimeEntity를 상속하고 location · entrance는 geography(Point,4326)로 매핑된다
+- [x] [기반] 테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다
 - [ ] [persistence] Academy를 저장하고 읽으면 location · entrance 좌표가 같다
 - [ ] [persistence] weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다
 - [ ] [persistence] classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다
