@@ -1,10 +1,10 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-08 00:45 KST · tdd-guard
+- 생성: 2026-11-08 01:15 KST · tdd-guard
 - 설계서: C:/pickup/docs
 - 프로젝트: gradle · C:/pickup
-- 테스트: ● GREEN · 881 passed · 전체 · 93s
-- 진행: 공유모듈 57/57 · 사용자 71/71 · 인증 120/120 · 일정 47/69 · 장소 0/43 · 픽업 0/203 · 알림 0/44 · 남은 항목 312/607
+- 테스트: ● GREEN · 971 passed · 전체 · 119s
+- 진행: 공유모듈 57/57 · 사용자 71/71 · 인증 120/120 · 일정 69/69 · 장소 0/43 · 픽업 0/203 · 알림 0/44 · 남은 항목 290/607
 - 현재 도메인: 일정 (06_일정-schedule.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
@@ -19,30 +19,9 @@
 ## 3. 인증 (auth) · 05_인증-auth.md · 완료 · 항목 120/120 · 완료 기준 4/4 · 리뷰 11-07 23:03 통과 (상 1 · 중 0 · 하 5)
 - 남은 할 일 없음
 
-## 4. 일정 (schedule) · 06_일정-schedule.md · 진행 중 · 항목 47/69 · 완료 기준 0/4 · 리뷰 11-08 00:43 조건부 통과 (상 1 · 중 3 · 하 1) · 재리뷰 필요
-### 테스트 케이스
-- [ ] #38 [web] GET /v1/places/academies는 200과 items[]를 돌려준다
-- [ ] #39 [web] GET /v1/places/academies에 1자 query를 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #40 [web] GET /v1/places/academies가 외부 API 오류면 502 MAP_API_UNAVAILABLE을 돌려준다
-- [ ] #41 [web] POST /v1/children/{childId}/schedules는 201과 scheduleId · academyId · status를 돌려준다
-- [ ] #42 [web] POST /v1/children/{childId}/schedules에 targetPickup 61을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #43 [web] POST /v1/children/{childId}/schedules가 겹치면 409 SCHEDULE_OVERLAP과 overlapScheduleIds를 돌려준다
-- [ ] #44 [web] POST /v1/children/{childId}/schedules가 하루 한도를 넘으면 422 DAILY_SCHEDULE_LIMIT을 돌려준다
-- [ ] #45 [web] PUT /v1/schedules/{scheduleId}는 200과 scheduleId · academyId · status를 돌려준다
-- [ ] #46 [web] PUT /v1/schedules/{scheduleId}를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] #47 [web] GET /v1/children/{childId}/schedules는 200과 items[]를 돌려준다
-- [ ] #48 [web] GET /v1/children/{childId}/setup-summary는 200과 child · schedules · pickupSpots · joinCallMode · missing · settingsVersion을 돌려준다
-- [ ] #49 [web] POST /v1/children/{childId}/setup-completion은 200과 syncedToVehicle을 돌려준다
-- [ ] #50 [web] POST /v1/children/{childId}/setup-completion이 버전 충돌이면 409 SETTINGS_VERSION_CONFLICT를 돌려준다
-- [ ] #51 [web] POST /v1/children/{childId}/setup-completion이 누락이 있으면 422 SETUP_INCOMPLETE를 돌려준다
-- [ ] #52 [web] GET /v1/vehicles/me/weekly-pickups는 차량 토큰으로 200과 weekStart · days · readiness를 돌려준다
-- [ ] #53 [web] GET /v1/vehicles/me/weekly-pickups를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] #54 [web] GET /v1/vehicles/me/settings-summary는 차량 토큰으로 200과 guardianNameMasked · children · joinCallMode를 돌려준다
-- [ ] #55 [web] Idempotency-Key는 POST /v1/children/{childId}/schedules · POST /v1/children/{childId}/setup-completion에만 요구된다
-- [ ] #66 PickupSchedule 검증 실패는 프레임워크와 무관한 도메인 예외(field · reason)로 던지고, 일정 등록 · 수정 서비스는 이를 422 VALIDATION_FAILED(fields)로 바꾼다
-- [ ] #67 Academy는 externalPlaceId를 가지며 academy.external_place_id는 유니크로 저장되고, 저장한 학원을 externalPlaceId로 찾을 수 있다
-- [ ] #68 일정 등록 · 수정은 같은 externalPlaceId의 학원이 있으면 새로 만들지 않고 그 academyId를 쓰며 학원 정보는 요청 값으로 갱신한다
-- [ ] #69 주간 일정 readiness는 오늘 일정 중 DRAFT가 있으면 startable false를 돌려준다
+## 4. 일정 (schedule) · 06_일정-schedule.md · 진행 중 · 항목 69/69 · 완료 기준 0/4 · 리뷰 11-08 00:43 조건부 통과 (상 1 · 중 3 · 하 1) · 재리뷰 필요
+### 도메인 리뷰
+- [ ] 2026-11-08 00:43 KST 리뷰 뒤에 체크 · 추가된 항목 #38, #39, #40, #41, #42, #43, #44, #45, #46, #47, #48, #49, #50, #51, #52, #53, #54, #55, #66, #67, #68, #69 → /tdd review schedule
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
