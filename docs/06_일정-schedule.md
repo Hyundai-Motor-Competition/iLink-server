@@ -78,16 +78,17 @@ schedule
 
 ### 일정 등록 · 수정 (SET-02 · 03)
 - childId는 내 가족의 CHILD여야 한다(아니면 404 NOT_FOUND). SET-03은 scheduleId가 없거나 내 가족 자녀 일정이 아니면 404 NOT_FOUND.
-- academy.entrance가 없으면 status DRAFT(픽업 시작 불가), 있으면 READY.
+- 저장한 학원(요청 entrance가 비면 기존 값을 유지한 학원)에 출입구가 없으면 status DRAFT(픽업 시작 불가), 있으면 READY. 등록 · 수정 모두 저장한 학원 기준으로 판정한다.
 - weekdays는 MON~SUN 1개 이상, classEndTime은 한국 시간 HH:MM, targetPickup은 0~60. weekdays 중복(["MON","MON"])은 하나로 합친다. classEndTime 형식 오류는 422.
 - 검증 순서와 오류
 
 | 순서 | 검사 | 오류 |
 |---|---|---|
-| 1 | 자녀 확인(SET-03은 일정 확인 포함) | 404 NOT_FOUND |
-| 2 | 값 검증 | 422 VALIDATION_FAILED(fields) |
-| 3 | 겹침 | 409 SCHEDULE_OVERLAP, overlapScheduleIds |
-| 4 | 하루 한도 | 422 DAILY_SCHEDULE_LIMIT |
+| 1 | 요청 형식 검증(웹 @Valid, 유스케이스 호출 전) | 422 VALIDATION_FAILED(fields) |
+| 2 | 자녀 확인(SET-03은 일정 확인 포함) | 404 NOT_FOUND |
+| 3 | 도메인 검증(InvalidScheduleException) | 422 VALIDATION_FAILED(fields) |
+| 4 | 겹침 | 409 SCHEDULE_OVERLAP, overlapScheduleIds |
+| 5 | 하루 한도 | 422 DAILY_SCHEDULE_LIMIT |
 
 - 겹침과 한도가 둘 다면 겹침(409)이 먼저다.
 - 겹침의 현재 가정: 같은 자녀 · 같은 요일 · 같은 classEndTime.
@@ -246,12 +247,14 @@ InvalidScheduleException(String field, String reason)                   // 도�
 - [x] findSchedules는 loadSchedules를 한 번만 불러 받은 순서대로 돌려주고 없는 id는 뺀다
 - [x] joinCallMode는 schedule 자체 enum으로 설정 요약 · 차량용 설정 요약 in 포트와 응답에 담고 user.domain 타입을 import하지 않는다
 - [x] POST /v1/children/{childId}/schedules · PUT /v1/schedules/{scheduleId}에 101자 externalPlaceId를 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] 일정 수정은 등록과 같이 저장한 학원(기존 출입구 반영) 기준으로 status를 판정한다
 
 ## 확인 필요 사항
 
 | 항목 | 현재 가정 |
 |---|---|
 | Academy에 externalPlaceId 칸이 없음 | 해소: externalPlaceId 컬럼(UNIQUE)으로 같은 학원을 다시 씀(가족 간 공유). 핵심 로직 「학원 다시 쓰기」 |
+| 이미 있는 학원 갱신의 동시 수정 | 후속 과제. 이미 있는 학원 갱신은 JPA merge라 동시 수정 때 다른 가족이 막 넣은 entrance를 지울 수 있음 |
 | 일정 수정 때 학원 정보가 바뀐 경우 | 해소: 같은 externalPlaceId면 그 행을 갱신, 다르면 그 학원을 찾거나 새로 만듦 |
 | 「겹침」의 정의 | 소스는 「같은 아이의 겹치는 일정」만 있음. 같은 자녀 · 같은 요일 · 같은 classEndTime으로 가정 |
 | 「하루 3개」의 기준 | 자녀별인지 가족 · 차량별인지 소스에 없음. 자녀별 같은 요일로 가정 |
