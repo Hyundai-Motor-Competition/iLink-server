@@ -4,10 +4,12 @@ import com.example.pickupservice.schedule.application.port.in.AcademyInfo;
 import com.example.pickupservice.schedule.application.port.in.LoadAcademyUseCase;
 import com.example.pickupservice.schedule.application.port.out.LoadAcademyPort;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
+@Service
 @RequiredArgsConstructor
 public class LoadAcademyService implements LoadAcademyUseCase {
 

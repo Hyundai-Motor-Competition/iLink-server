@@ -174,6 +174,44 @@ class CreateScheduleServiceTest {
 		verifyNoInteractions(saveAcademyPort, saveSchedulePort);
 	}
 
+	@Test
+	@DisplayName("일정 등록은 겹치는 일정이 있으면 SCHEDULE_OVERLAP과 겹치는 scheduleId 목록으로 거절한다")
+	void createScheduleRejectsWithScheduleOverlapAndOverlappingScheduleIds() {
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+		given(loadSchedulePort.loadSchedulesOfChild(CHILD_ID)).willReturn(List.of(
+				existingSchedule(801L, Set.of(DayOfWeek.MONDAY), CLASS_END_TIME),
+				existingSchedule(802L, Set.of(DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY), CLASS_END_TIME),
+				existingSchedule(803L, Set.of(DayOfWeek.MONDAY), LocalTime.of(17, 0))));
+
+		BusinessException thrown = catchThrowableOfType(BusinessException.class,
+				() -> createScheduleService.createSchedule(command(ENTRANCE)));
+
+		assertThat(thrown).isNotNull();
+		assertThat(thrown.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(thrown.code()).isEqualTo("SCHEDULE_OVERLAP");
+		assertThat(thrown.overlapScheduleIds()).containsExactlyInAnyOrder(801L, 802L);
+		verifyNoInteractions(saveAcademyPort, saveSchedulePort);
+	}
+
+	@Test
+	@DisplayName("일정 등록은 겹침과 하루 한도가 둘 다 해당하면 SCHEDULE_OVERLAP으로 먼저 거절한다")
+	void createScheduleRejectsWithScheduleOverlapBeforeDailyScheduleLimit() {
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+		given(loadSchedulePort.loadSchedulesOfChild(CHILD_ID)).willReturn(List.of(
+				existingSchedule(601L, Set.of(DayOfWeek.MONDAY), LocalTime.of(15, 0)),
+				existingSchedule(602L, Set.of(DayOfWeek.MONDAY), LocalTime.of(16, 0)),
+				existingSchedule(801L, Set.of(DayOfWeek.MONDAY), CLASS_END_TIME)));
+
+		BusinessException thrown = catchThrowableOfType(BusinessException.class,
+				() -> createScheduleService.createSchedule(command(ENTRANCE)));
+
+		assertThat(thrown).isNotNull();
+		assertThat(thrown.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(thrown.code()).isEqualTo("SCHEDULE_OVERLAP");
+		assertThat(thrown.overlapScheduleIds()).containsExactly(801L);
+		verifyNoInteractions(saveAcademyPort, saveSchedulePort);
+	}
+
 	private static PickupSchedule existingSchedule(long scheduleId, Set<DayOfWeek> weekdays, LocalTime classEndTime) {
 		Academy academy = Academy.restore(SAVED_ACADEMY_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE,
 				"02-555-1234");

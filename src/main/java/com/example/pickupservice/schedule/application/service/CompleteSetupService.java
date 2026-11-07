@@ -7,8 +7,10 @@ import com.example.pickupservice.schedule.application.port.in.GetSetupSummaryUse
 import com.example.pickupservice.schedule.application.port.in.SetupCompletionResult;
 import com.example.pickupservice.schedule.application.port.in.SetupSummary;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Service
 @RequiredArgsConstructor
 public class CompleteSetupService implements CompleteSetupUseCase {
 

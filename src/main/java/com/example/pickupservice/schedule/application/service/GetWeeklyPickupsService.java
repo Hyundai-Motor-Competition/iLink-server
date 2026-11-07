@@ -17,6 +17,7 @@ import com.example.pickupservice.schedule.domain.PickupSchedule;
 import com.example.pickupservice.user.application.port.in.LoadMemberUseCase;
 import com.example.pickupservice.user.application.port.in.MemberInfo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Service
 @RequiredArgsConstructor
 public class GetWeeklyPickupsService implements GetWeeklyPickupsUseCase {
 

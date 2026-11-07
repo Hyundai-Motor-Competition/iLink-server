@@ -5,9 +5,11 @@ import com.example.pickupservice.schedule.application.port.in.AcademyCandidate;
 import com.example.pickupservice.schedule.application.port.in.SearchAcademyUseCase;
 import com.example.pickupservice.schedule.application.port.out.SearchAcademyPort;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Service
 @RequiredArgsConstructor
 public class SearchAcademyService implements SearchAcademyUseCase {
 

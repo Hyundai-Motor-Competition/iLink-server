@@ -100,6 +100,30 @@ class UpdateScheduleServiceTest {
 	}
 
 	@Test
+	@DisplayName("일정 수정은 다른 일정과 겹치면 SCHEDULE_OVERLAP과 자기 자신을 뺀 겹치는 scheduleId 목록으로 거절한다")
+	void updateScheduleRejectsWithScheduleOverlapExcludingItself() {
+		PickupSchedule self = savedSchedule(SCHEDULE_ID, OLD_WEEKDAYS, OLD_CLASS_END_TIME, oldAcademyWithEntrance(),
+				ScheduleStatus.READY);
+		given(loadSchedulePort.loadSchedule(SCHEDULE_ID)).willReturn(Optional.of(self));
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+		given(loadSchedulePort.loadSchedulesOfChild(CHILD_ID)).willReturn(List.of(self,
+				savedSchedule(801L, Set.of(DayOfWeek.MONDAY), OLD_CLASS_END_TIME, oldAcademyWithEntrance(),
+						ScheduleStatus.READY),
+				savedSchedule(803L, Set.of(DayOfWeek.MONDAY), LocalTime.of(17, 0), oldAcademyWithEntrance(),
+						ScheduleStatus.READY)));
+
+		BusinessException thrown = catchThrowableOfType(BusinessException.class,
+				() -> updateScheduleService.updateSchedule(
+						command(OLD_WEEKDAYS, OLD_CLASS_END_TIME, 10, oldAcademyInput())));
+
+		assertThat(thrown).isNotNull();
+		assertThat(thrown.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(thrown.code()).isEqualTo("SCHEDULE_OVERLAP");
+		assertThat(thrown.overlapScheduleIds()).containsExactly(801L);
+		verifyNoInteractions(saveAcademyPort, saveSchedulePort);
+	}
+
+	@Test
 	@DisplayName("일정 수정은 하루 한도를 셀 때 자기 자신을 빼고 센다")
 	void updateScheduleExcludesItselfWhenCountingDailyLimit() {
 		PickupSchedule self = savedSchedule(SCHEDULE_ID, Set.of(DayOfWeek.MONDAY), OLD_CLASS_END_TIME,

@@ -5,11 +5,13 @@ import com.example.pickupservice.schedule.application.port.in.ScheduleInfo;
 import com.example.pickupservice.schedule.application.port.out.LoadSchedulePort;
 import com.example.pickupservice.schedule.domain.PickupSchedule;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
+@Service
 @RequiredArgsConstructor
 public class LoadScheduleService implements LoadScheduleUseCase {
 

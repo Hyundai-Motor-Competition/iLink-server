@@ -13,10 +13,15 @@ import com.example.pickupservice.schedule.application.port.out.SaveSchedulePort;
 import com.example.pickupservice.schedule.domain.Academy;
 import com.example.pickupservice.schedule.domain.DailyScheduleLimitRule;
 import com.example.pickupservice.schedule.domain.PickupSchedule;
+import com.example.pickupservice.schedule.domain.ScheduleOverlapRule;
 import com.example.pickupservice.user.application.port.in.LoadMemberUseCase;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
+@Service
 @RequiredArgsConstructor
 public class CreateScheduleService implements CreateScheduleUseCase {
 
@@ -35,7 +40,12 @@ public class CreateScheduleService implements CreateScheduleUseCase {
 				input.phone());
 		PickupSchedule candidate = PickupSchedule.create(command.childId(), academy, command.weekdays(),
 				command.classEndTime(), command.targetPickup());
-		if (DailyScheduleLimitRule.exceedsLimit(candidate, loadSchedulePort.loadSchedulesOfChild(command.childId()))) {
+		List<PickupSchedule> existingSchedules = loadSchedulePort.loadSchedulesOfChild(command.childId());
+		List<Long> overlapScheduleIds = ScheduleOverlapRule.findOverlapScheduleIds(candidate, existingSchedules);
+		if (!overlapScheduleIds.isEmpty()) {
+			throw ScheduleErrors.scheduleOverlap(overlapScheduleIds);
+		}
+		if (DailyScheduleLimitRule.exceedsLimit(candidate, existingSchedules)) {
 			throw ScheduleErrors.dailyScheduleLimit();
 		}
 

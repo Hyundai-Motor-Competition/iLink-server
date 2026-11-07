@@ -9,10 +9,12 @@ import com.example.pickupservice.user.application.port.in.LoadFamilyUseCase;
 import com.example.pickupservice.user.application.port.in.LoadMemberUseCase;
 import com.example.pickupservice.user.application.port.in.MemberInfo;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Service
 @RequiredArgsConstructor
 public class GetVehicleSettingsSummaryService implements GetVehicleSettingsSummaryUseCase {
 

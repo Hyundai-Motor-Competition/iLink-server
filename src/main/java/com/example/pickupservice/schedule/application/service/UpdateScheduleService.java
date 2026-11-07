@@ -13,13 +13,16 @@ import com.example.pickupservice.schedule.application.port.out.SaveSchedulePort;
 import com.example.pickupservice.schedule.domain.Academy;
 import com.example.pickupservice.schedule.domain.DailyScheduleLimitRule;
 import com.example.pickupservice.schedule.domain.PickupSchedule;
+import com.example.pickupservice.schedule.domain.ScheduleOverlapRule;
 import com.example.pickupservice.user.application.port.in.LoadMemberUseCase;
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
 
+@Service
 @RequiredArgsConstructor
 public class UpdateScheduleService implements UpdateScheduleUseCase {
 
@@ -44,6 +47,10 @@ public class UpdateScheduleService implements UpdateScheduleUseCase {
 		List<PickupSchedule> others = loadSchedulePort.loadSchedulesOfChild(childUserId).stream()
 				.filter(schedule -> !Objects.equals(schedule.getScheduleId(), existing.getScheduleId()))
 				.toList();
+		List<Long> overlapScheduleIds = ScheduleOverlapRule.findOverlapScheduleIds(candidate, others);
+		if (!overlapScheduleIds.isEmpty()) {
+			throw ScheduleErrors.scheduleOverlap(overlapScheduleIds);
+		}
 		if (DailyScheduleLimitRule.exceedsLimit(candidate, others)) {
 			throw ScheduleErrors.dailyScheduleLimit();
 		}

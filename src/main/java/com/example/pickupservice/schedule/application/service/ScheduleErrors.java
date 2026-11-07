@@ -3,6 +3,8 @@ package com.example.pickupservice.schedule.application.service;
 import com.example.pickupservice.common.error.BusinessException;
 import org.springframework.http.HttpStatus;
 
+import java.util.List;
+
 final class ScheduleErrors {
 
 	private ScheduleErrors() {
@@ -13,6 +15,11 @@ final class ScheduleErrors {
 				"지도 검색을 잠시 사용할 수 없습니다");
 		exception.initCause(cause);
 		return exception;
+	}
+
+	static BusinessException scheduleOverlap(List<Long> overlapScheduleIds) {
+		return BusinessException.conflictWithOverlap(HttpStatus.CONFLICT, "SCHEDULE_OVERLAP",
+				"같은 요일 · 같은 시간에 이미 일정이 있습니다", overlapScheduleIds);
 	}
 
 	static BusinessException dailyScheduleLimit() {
