@@ -69,7 +69,7 @@ com.{team}.pickupservice
 
 - 의존 방향은 항상 안쪽이다. adapter → application → domain. domain은 어떤 패키지도 모른다. 예외: 프레임워크에 기대지 않는 common의 순수 타입(enum · 값 객체: `common.security.Role` · `common.security.PrincipalType` · `common.geo.LatLng`)은 domain에서 써도 된다. 그래서 Role enum은 `common.security.Role` 하나만 둔다.
 - domain에는 Spring · JPA 어노테이션을 붙이지 않는다. JPA 엔티티는 adapter/out/persistence에 따로 두고 도메인 객체와 서로 변환한다.
-- 조회는 Spring Data JPA 메서드 이름 쿼리(findBy…)가 기본이다. 동적 쿼리는 Specification이나 간단한 JPQL(@Query)로 하고 QueryDSL은 쓰지 않는다. 예외: SPOT-01 지도 반경 조회는 PostGIS 함수가 필요해 네이티브 쿼리로 둔다. academy upsert(일정 SET-02 · 03, externalPlaceId 충돌 때 INSERT … ON CONFLICT … COALESCE)도 JPA로 원자적 처리가 안 돼 네이티브 쿼리로 둔다.
+- 조회는 Spring Data JPA 메서드 이름 쿼리(findBy…)가 기본이다. 동적 쿼리는 Specification이나 간단한 JPQL(@Query)로 하고 QueryDSL은 쓰지 않는다. 예외: SPOT-01 지도 반경 조회는 PostGIS 함수가 필요해 네이티브 쿼리로 둔다. 장소 500m 거리 검사(SPOT-02 · 03, DistancePort ST_DWithin)도 07 시그니처가 ST_DWithin을 요구해 네이티브 쿼리로 둔다. academy upsert(일정 SET-02 · 03, externalPlaceId 충돌 때 INSERT … ON CONFLICT … COALESCE)도 JPA로 원자적 처리가 안 돼 네이티브 쿼리로 둔다.
 - 다른 모듈이 필요하면 그 모듈의 in 포트(유스케이스)만 부른다.
 - 다른 모듈이 뒤이어 처리할 일(알림 발송 등)은 in 포트를 부르지 않고 Spring 이벤트로 알린다(아래 「모듈 사이 이벤트」).
 - 컨트롤러는 in 포트 인터페이스만 알고 서비스 클래스를 직접 주입받지 않는다.

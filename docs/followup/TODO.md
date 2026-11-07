@@ -1,10 +1,10 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-08 03:30 KST · tdd-guard
+- 생성: 2026-11-08 03:35 KST · tdd-guard
 - 설계서: C:/pickup/docs
 - 프로젝트: gradle · C:/pickup
-- 테스트: ● GREEN · 1079 passed · 전체 · 73s
-- 진행: 공유모듈 57/57 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 36/51 · 픽업 0/203 · 알림 0/44 · 남은 항목 262/625
+- 테스트: ● GREEN · 1127 passed · 전체 · 69s
+- 진행: 공유모듈 57/57 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 51/51 · 픽업 0/203 · 알림 0/44 · 남은 항목 247/625
 - 현재 도메인: 장소 (07_장소-place.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
@@ -21,23 +21,9 @@
 ## 4. 일정 (schedule) · 06_일정-schedule.md · 완료 · 항목 77/77 · 완료 기준 4/4 · 리뷰 11-08 02:05 조건부 통과 (상 0 · 중 0 · 하 2)
 - 남은 할 일 없음
 
-## 5. 장소 (place) · 07_장소-place.md · 진행 중 · 항목 36/51 · 완료 기준 0/4 · 리뷰 11-08 03:25 조건부 통과 (상 0 · 중 1 · 하 4) · 재리뷰 필요
-### 테스트 케이스
-- [ ] #29 [web] GET /v1/families/me/pickup-spots는 200과 academies[]를 돌려준다
-- [ ] #30 [web] GET /v1/families/me/pickup-spots는 차량 토큰으로도 200을 돌려준다
-- [ ] #31 [web] GET /v1/families/me/pickup-spots에 near만 보내고 radiusM을 빼면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #32 [web] GET /v1/families/me/pickup-spots에 radiusM 3001을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #33 [web] GET /v1/families/me/pickup-spots를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] #34 [web] POST /v1/families/me/pickup-spots는 201과 spotId · isDefault를 돌려준다
-- [ ] #35 [web] POST /v1/families/me/pickup-spots에 51자 name을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #36 [web] POST /v1/families/me/pickup-spots가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
-- [ ] #37 [web] POST /v1/families/me/pickup-spots를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] #38 [web] PATCH /v1/pickup-spots/{spotId}는 200과 spotId · name · stopPoint · meetingPoint · memo · isDefault를 돌려준다
-- [ ] #39 [web] PATCH /v1/pickup-spots/{spotId}가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
-- [ ] #40 [web] DELETE /v1/pickup-spots/{spotId}는 204를 돌려준다
-- [ ] #41 [web] DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다
-- [ ] #42 [web] DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다
-- [ ] #43 [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
+## 5. 장소 (place) · 07_장소-place.md · 진행 중 · 항목 51/51 · 완료 기준 0/4 · 리뷰 11-08 03:25 조건부 통과 (상 0 · 중 1 · 하 4) · 재리뷰 필요
+### 도메인 리뷰
+- [ ] 2026-11-08 03:25 KST 리뷰 뒤에 체크 · 추가된 항목 #29, #30, #31, #32, #33, #34, #35, #36, #37, #38, #39, #40, #41, #42, #43, #47, #50, #51 → /tdd review place
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치

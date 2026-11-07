@@ -5,7 +5,7 @@
 | 항목 | 내용 |
 |---|---|
 | 범위 | 엔티티 Academy · PickupSchedule. API SET-01~04, SET-07~10. 다른 모듈용 in 포트(일정 조회 · 학원 조회) |
-| 의존 | 03_공유모듈-shared, 04_사용자-user(자녀 · 가족 · 합류 안내 방식 · settingsVersion · 보호자 이름. 서비스가 user in 포트 LoadMemberUseCase · LoadFamilyUseCase를 직접 부름), 05_인증-auth(자녀 기기 상태. out 포트 LoadMemberDeviceStatusPort → auth in 포트). place의 in 포트(장소 목록 · 기본 장소 유무)는 out 포트 LoadPickupSpotPort + 임시 어댑터(place 구현 전 빈 목록). schedule 코드는 user.domain 타입을 쓰지 않는다(JoinCallMode · DeviceStatus는 schedule 자체 enum) |
+| 의존 | 03_공유모듈-shared, 04_사용자-user(자녀 · 가족 · 합류 안내 방식 · settingsVersion · 보호자 이름. 서비스가 user in 포트 LoadMemberUseCase · LoadFamilyUseCase를 직접 부름), 05_인증-auth(자녀 기기 상태. out 포트 LoadMemberDeviceStatusPort → auth in 포트). 07_장소-place(장소 목록 · 기본 장소 유무. out 포트 LoadPickupSpotPort → place in 포트 LoadPickupSpotUseCase.findSpots). schedule 코드는 user.domain 타입을 쓰지 않는다(JoinCallMode · DeviceStatus는 schedule 자체 enum) |
 | 진행 | 계층 병렬 |
 
 ## 구조
@@ -16,7 +16,7 @@ schedule
 ├─ adapter/out/persistence AcademyEntity · PickupScheduleEntity, 저장소
 ├─ adapter/out/map         KakaoMapSearchAdapter: 카카오 로컬 키워드 검색(RestClient), 키는 환경 변수 KAKAO_REST_API_KEY, 연결 2s · 읽기 3s
 ├─ adapter/out/auth        LoadMemberDeviceStatusPort 구현 → auth in 포트
-├─ adapter/out/place       LoadPickupSpotPort 임시 어댑터(place 구현 전 빈 목록)
+├─ adapter/out/place       LoadPickupSpotPort 구현 → place in 포트 LoadPickupSpotUseCase.findSpots
 ├─ application/port/in · out · service
 └─ domain                  Academy, PickupSchedule, ScheduleStatus, JoinCallMode · DeviceStatus(schedule 자체 enum), InvalidScheduleException, 겹침 · 하루 한도 규칙, 이름 마스킹
 ```
@@ -266,4 +266,4 @@ InvalidScheduleException(String field, String reason)                   // 도�
 | 외부 지도 API 공급자 · 키 | 해소: 카카오 로컬 키워드 검색(KakaoMapSearchAdapter), 키는 환경 변수 KAKAO_REST_API_KEY, 연결 2s · 읽기 3s(구조 절) |
 | 일정 변경이 settingsVersion을 올리는지 | 04_사용자-user.md와 같은 질문. 올리지 않는다고 가정 |
 | SET-05 | API 번호가 SET-04 다음 SET-06으로 건너뜀. 빠진 API가 없는지 확인 필요 |
-| schedule ↔ place 서로 부름 | place는 Academy를 참조하고, SET-07 · 09는 place 장소를 읽음. schedule 쪽은 out 포트 + 테스트 대역으로 먼저 검증하고, place 구현 전에는 임시 어댑터(adapter/out/place)가 빈 목록을 돌려줌 |
+| schedule ↔ place 서로 부름 | 해소: place는 Academy를 schedule in 포트 LoadAcademyUseCase.findAcademy로 읽고, SET-07 · 09는 adapter/out/place가 place in 포트 LoadPickupSpotUseCase.findSpots로 실제 장소를 읽음(임시 어댑터는 연동으로 바뀜) |

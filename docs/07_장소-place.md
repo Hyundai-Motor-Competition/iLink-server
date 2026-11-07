@@ -5,7 +5,7 @@
 | 항목 | 내용 |
 |---|---|
 | 범위 | 엔티티 PickupSpot. API SPOT-01(조회) · SPOT-02(추가) · SPOT-03(수정 · 삭제). 다른 모듈용 in 포트(기본 장소 · 장소 조회) |
-| 의존 | 03_공유모듈-shared, 04_사용자-user(가족 · 작성자), 06_일정-schedule(Academy 위치). pickup의 in 포트(진행 중 세션이 쓰는 장소, 자녀 현재 위치)는 out 포트 + 테스트 대역 |
+| 의존 | 03_공유모듈-shared, 04_사용자-user(가족 · 작성자), 06_일정-schedule(Academy 위치. out 포트 LoadAcademyPort → schedule in 포트 LoadAcademyUseCase.findAcademy). pickup의 in 포트(진행 중 세션이 쓰는 장소, 자녀 현재 위치)는 out 포트 CheckActivePickupPort + 임시 어댑터(pickup 구현 전). schedule의 LoadPickupSpotPort는 place LoadPickupSpotUseCase.findSpots에 위임 |
 | 진행 | 계층 병렬 |
 
 ## 구조
@@ -13,7 +13,10 @@
 ```text
 place
 ├─ adapter/in/web          PickupSpotController(SPOT-01~03), PickupSpotApiDoc
-├─ adapter/out/persistence PickupSpotEntity, 저장소, 반경 · 거리 네이티브 쿼리(ST_DWithin)
+├─ adapter/out/persistence PickupSpotEntity, PlacePersistenceAdapter(LoadSpotPort · SaveSpotPort),
+│                          PostgisDistanceAdapter(DistancePort, ST_DWithin), PickupSpotJpaRepository(반경 네이티브 쿼리 2개)
+├─ adapter/out/schedule    PlaceAcademyAdapter(LoadAcademyPort → schedule in 포트 LoadAcademyUseCase.findAcademy, academyId · name · location)
+├─ adapter/out/pickup      PlacePickupActivityAdapter(CheckActivePickupPort, pickup 구현 전 임시: isUsedByActiveSession false, loadActiveChildLocation 빈 값)
 ├─ application/port/in · out · service
 └─ domain                  PickupSpot, 기본 장소 규칙
 ```
@@ -25,23 +28,25 @@ place
 | 컬럼 | 타입 | 키 · 제약 | 설명 |
 |---|---|---|---|
 | spotId | BIGINT | PK | |
-| familyId | BIGINT | FK → Family | |
-| academyId | BIGINT | FK → Academy | |
+| familyId | BIGINT | | Family 참조(DB FK 제약 없음) |
+| academyId | BIGINT | | Academy 참조(DB FK 제약 없음) |
 | name | VARCHAR(50) | | 1~50자 |
 | memo | VARCHAR(200) | NULL | 0~200자 |
 | stopPoint | geography(Point,4326) | GIST | 정차 지점 |
 | meetingPoint | geography(Point,4326) | | 만남 지점(WGS84) |
 | isDefault | BOOLEAN | | 가족 · 학원마다 하나만 true |
-| createdBy | BIGINT | FK → User | |
+| createdBy | BIGINT | | User 참조(DB FK 제약 없음) |
+
+familyId · academyId · createdBy는 프로젝트 관례대로 DB FK 제약 없이 컬럼만 둔다.
 
 ## API 명세
 
 | ID | Method · 경로 | 호출 | Idempotency-Key | 요청 → 응답 | 오류 |
 |---|---|---|---|---|---|
-| SPOT-01 | GET /v1/families/me/pickup-spots | GUARDIAN · CO_GUARDIAN · DELEGATE, 차량 앱 | 불필요 | query academyId(선택), near(lat,lng · radiusM과 함께), radiusM(50~3000 · near와 함께) → 200 academies[](academyId · academyName · spots[](spotId · name · stopPoint · meetingPoint · memo · isDefault · walkMinutes)) | 공통 |
-| SPOT-02 | POST /v1/families/me/pickup-spots | GUARDIAN · CO_GUARDIAN | 필요 | academyId, name(1~50자), stopPoint{lat, lng}, meetingPoint{lat, lng}, memo(0~200자, 선택), isDefault(기본 false) → 201 spotId, isDefault | 422 SPOT_TOO_FAR |
-| SPOT-03 | PATCH /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 불필요 | name, stopPoint, meetingPoint, memo, isDefault(모두 선택) → 200 spotId · name · stopPoint · meetingPoint · memo · isDefault | 422 SPOT_TOO_FAR |
-| SPOT-03 | DELETE /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 필요 | — → 204 | 409 SPOT_IN_USE, 422 DEFAULT_SPOT_REQUIRED |
+| SPOT-01 | GET /v1/families/me/pickup-spots | GUARDIAN · CO_GUARDIAN · DELEGATE, 차량 앱 | 불필요 | query academyId(선택), near(한 파라미터 "lat,lng" 형식 · radiusM과 함께), radiusM(50~3000 · near와 함께) → 200 academies[](academyId · academyName · spots[](spotId · name · stopPoint · meetingPoint · memo · isDefault · walkMinutes)). 차량 토큰은 토큰의 familyId | 422 VALIDATION_FAILED(near · radiusM 중 하나만, radiusM 50~3000 밖, near 형식 오류) |
+| SPOT-02 | POST /v1/families/me/pickup-spots | GUARDIAN · CO_GUARDIAN | 필요 | academyId, name(1~50자), stopPoint{lat, lng}, meetingPoint{lat, lng}, memo(0~200자, 선택), isDefault(기본 false) → 201 spotId, isDefault | 404 NOT_FOUND(학원 없음), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR |
+| SPOT-03 | PATCH /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 불필요 | name, stopPoint, meetingPoint, memo, isDefault(모두 선택) → 200 spotId · name · stopPoint · meetingPoint · memo · isDefault | 404 NOT_FOUND(다른 가족 · 없는 spotId, 좌표를 바꿀 때 학원 없음), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR, 422 DEFAULT_SPOT_REQUIRED(기본 장소를 isDefault false로) |
+| SPOT-03 | DELETE /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 필요 | — → 204 | 404 NOT_FOUND, 409 SPOT_IN_USE, 422 DEFAULT_SPOT_REQUIRED |
 
 응답 예시
 - SPOT-01: `{"academies":[{"academyId":55,"academyName":"해솔영어학원","spots":[{"spotId":21,"name":"정문 앞","stopPoint":{"lat":37.501234,"lng":127.039876},"meetingPoint":{"lat":37.501301,"lng":127.039901},"memo":"편의점 앞","isDefault":true,"walkMinutes":null}]}]}`
@@ -51,20 +56,30 @@ place
 
 ### 조회 (SPOT-01)
 - 내 가족(차량은 차량 토큰의 familyId)의 장소를 학원별로 묶어 돌려준다. academyId를 주면 그 학원 장소만.
-- near · radiusM을 주면 정차 지점이 반경 안에 있는 장소만 공간 인덱스로 조회한다(PostGIS 네이티브 쿼리, ST_DWithin). 둘 중 하나만 주면 422 VALIDATION_FAILED(현재 가정).
-- walkMinutes는 진행 중 세션이 있을 때만 채운다. 자녀 현재 위치에서 걸어서 몇 분인지. 없으면 null.
+- 순서: 학원 묶음은 academyId 오름차순, 묶음 안 장소는 spotId 오름차순.
+- 학원 이름은 학원마다 한 번만 읽는다. 학원 정보가 없으면 academyName은 null.
+- near · radiusM을 주면 정차 지점이 반경 안에 있는 장소만 공간 인덱스로 조회한다(PostGIS 네이티브 쿼리, ST_DWithin). 둘 중 하나만 주면 422 VALIDATION_FAILED(빠진 쪽을 fields에).
+- walkMinutes는 계산 방법이 정해질 때까지 늘 null이다.
 
 ### 추가 (SPOT-02)
+- 학원이 없으면 404 NOT_FOUND.
 - 지도에서 찍은 WGS84 좌표를 geography로 저장한다. createdBy는 호출한 보호자.
-- 정차 지점이나 만남 지점이 학원 위치에서 500m를 넘으면 422 SPOT_TOO_FAR(ST_DWithin으로 검사).
+- 정차 지점과 만남 지점을 모두 검사해 하나라도 학원 위치에서 500m를 넘으면 422 SPOT_TOO_FAR(ST_DWithin으로 검사).
 - 가족 · 학원별 첫 장소는 isDefault 값과 상관없이 기본 장소가 된다.
 - isDefault = true로 추가하면 같은 가족 · 학원의 이전 기본 장소는 해제된다.
 
 ### 수정 · 삭제 (SPOT-03)
-- PATCH는 보낸 필드만 바꾼다. 바꾼 좌표가 500m를 넘으면 422 SPOT_TOO_FAR. isDefault = true로 바꾸면 같은 학원의 이전 기본 장소는 해제된다.
-- DELETE: 진행 중 세션이 쓰는 장소는 409 SPOT_IN_USE. 같은 학원에 다른 장소가 남아 있는데 기본 장소를 지우려 하면 422 DEFAULT_SPOT_REQUIRED(먼저 다른 장소를 기본으로 지정).
+- 다른 가족의 spotId와 없는 spotId는 404 NOT_FOUND.
+- PATCH는 보낸(null 아닌) 필드만 바꾼다. null은 「안 보냄」이라 memo를 지우는 방법은 아직 없다.
+- PATCH로 기본 장소를 isDefault false로 바꾸면 남은 장소 수와 상관없이 422 DEFAULT_SPOT_REQUIRED. 장소가 있는 학원엔 기본 장소가 늘 하나이고, 다른 장소를 기본으로 지정해야 바뀐다. 이 거절은 500m 검사보다 먼저 한다.
+- PATCH는 바꾼 좌표만 500m를 검사해 넘으면 422 SPOT_TOO_FAR. 좌표를 바꿀 때 학원이 없으면 404 NOT_FOUND이고 저장하지 않는다.
+- PATCH로 isDefault = true로 바꾸면 같은 학원의 이전 기본 장소는 해제된다.
+- DELETE 검사 순서: 404 NOT_FOUND(다른 가족 · 없음) → 409 SPOT_IN_USE(진행 중 세션이 쓰는 장소) → 422 DEFAULT_SPOT_REQUIRED(같은 학원에 다른 장소가 남은 기본 장소. 먼저 다른 장소를 기본으로 지정).
+- 저장소의 deleteSpot은 없는 spotId면 조용히 무시한다(서비스가 먼저 404를 돌려줌).
 - 장소를 고쳐도 진행 중 세션과 지난 결과는 세션의 스냅샷(spotName · stopPoint · meetingPoint)을 쓴다.
-- 다른 가족의 spotId는 404 NOT_FOUND.
+
+### 다른 모듈용 조회
+- findSpots는 가족 장소를 한 번 읽어 받은 학원 목록으로 거른다.
 
 ### 시그니처
 
@@ -118,21 +133,21 @@ Optional<LatLng> loadActiveChildLocation(long familyId);                        
 - [x] [서비스] 장소 조회는 학원별로 묶어 academyName과 함께 돌려준다
 - [x] [서비스] 장소 조회는 진행 중 세션이 없으면 walkMinutes를 null로 돌려준다
 - [x] [서비스] findDefaultSpot은 가족 · 학원의 기본 장소를 돌려주고 없으면 빈 값을 돌려준다
-- [ ] [web] GET /v1/families/me/pickup-spots는 200과 academies[]를 돌려준다
-- [ ] [web] GET /v1/families/me/pickup-spots는 차량 토큰으로도 200을 돌려준다
-- [ ] [web] GET /v1/families/me/pickup-spots에 near만 보내고 radiusM을 빼면 422 VALIDATION_FAILED를 돌려준다
-- [ ] [web] GET /v1/families/me/pickup-spots에 radiusM 3001을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] [web] GET /v1/families/me/pickup-spots를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] [web] POST /v1/families/me/pickup-spots는 201과 spotId · isDefault를 돌려준다
-- [ ] [web] POST /v1/families/me/pickup-spots에 51자 name을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] [web] POST /v1/families/me/pickup-spots가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
-- [ ] [web] POST /v1/families/me/pickup-spots를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] [web] PATCH /v1/pickup-spots/{spotId}는 200과 spotId · name · stopPoint · meetingPoint · memo · isDefault를 돌려준다
-- [ ] [web] PATCH /v1/pickup-spots/{spotId}가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
-- [ ] [web] DELETE /v1/pickup-spots/{spotId}는 204를 돌려준다
-- [ ] [web] DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다
-- [ ] [web] DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다
-- [ ] [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
+- [x] [web] GET /v1/families/me/pickup-spots는 200과 academies[]를 돌려준다
+- [x] [web] GET /v1/families/me/pickup-spots는 차량 토큰으로도 200을 돌려준다
+- [x] [web] GET /v1/families/me/pickup-spots에 near만 보내고 radiusM을 빼면 422 VALIDATION_FAILED를 돌려준다
+- [x] [web] GET /v1/families/me/pickup-spots에 radiusM 3001을 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] [web] GET /v1/families/me/pickup-spots를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] [web] POST /v1/families/me/pickup-spots는 201과 spotId · isDefault를 돌려준다
+- [x] [web] POST /v1/families/me/pickup-spots에 51자 name을 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] [web] POST /v1/families/me/pickup-spots가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
+- [x] [web] POST /v1/families/me/pickup-spots를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] [web] PATCH /v1/pickup-spots/{spotId}는 200과 spotId · name · stopPoint · meetingPoint · memo · isDefault를 돌려준다
+- [x] [web] PATCH /v1/pickup-spots/{spotId}가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
+- [x] [web] DELETE /v1/pickup-spots/{spotId}는 204를 돌려준다
+- [x] [web] DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다
+- [x] [web] DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다
+- [x] [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
 - [x] [persistence] pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다
 - [x] [persistence] LoadAcademyPort 어댑터는 schedule의 LoadAcademyUseCase.findAcademy 결과를 place가 쓰는 학원 정보(academyId · name · location)로 바꿔 돌려주고 없으면 빈 값을 돌려준다
 - [x] [서비스] findSpot은 spotId의 장소를 돌려주고 없으면 빈 값을, findSpots는 가족의 학원 목록에 속한 장소를 spotId · academyId · name · isDefault로 돌려준다
@@ -146,13 +161,14 @@ Optional<LatLng> loadActiveChildLocation(long familyId);                        
 
 | 항목 | 현재 가정 |
 |---|---|
-| 지난 세션이 가리키는 장소의 삭제 | PickupSession.spotId가 PickupSpot FK라 지난 세션이 쓴 장소는 행을 지울 수 없음. 삭제 대신 표시만 할지 정해야 함 |
+| 지난 세션이 가리키는 장소의 삭제 | DB FK가 없어 지금은 지워지고, 지난 세션의 spotId가 없는 행을 가리킬 수 있음. pickup 설계 때 삭제 대신 표시 등을 정함 |
 | 반경 조회 기준 좌표 | near · radiusM이 정차 지점 기준인지 만남 지점 기준인지 소스에 없음. GIST가 걸린 정차 지점 기준으로 가정 |
 | ST_MakeEnvelope(지도 범위) 조회 | 소스 2.2는 지도 범위 조회를 말하지만 API에는 near · radiusM만 있음. 범위(사각형) 파라미터는 두지 않음 |
-| near · radiusM 중 하나만 온 경우 | 소스는 「함께」만 있음. 422 VALIDATION_FAILED로 가정 |
-| walkMinutes 계산 방법 | 걷는 속도 · 경로 계산 방법이 소스에 없음. 정해야 함 |
-| 유일한 기본 장소를 PATCH로 isDefault false로 바꾸는 경우 | 「가족 · 학원마다 하나만 true」와 충돌. 거절(422 DEFAULT_SPOT_REQUIRED)로 가정 |
+| near · radiusM 중 하나만 온 경우 | 결정됨: 422 VALIDATION_FAILED(빠진 쪽을 fields에) |
+| walkMinutes 계산 방법 | 걷는 속도 · 경로 계산 방법이 소스에 없음. 정해야 함. 지금은 늘 null |
+| 유일한 기본 장소를 PATCH로 isDefault false로 바꾸는 경우 | 결정됨: 남은 장소 수와 상관없이 422 DEFAULT_SPOT_REQUIRED(다른 장소를 기본으로 지정해야 바뀜) |
+| PATCH로 memo 지우기 | null은 「안 보냄」이라 지금은 못 지움. 빈 문자열을 「지움」으로 볼지 정해야 함 |
 | 기본 장소 유일성을 DB로도 막을지 | 소스에는 규칙만 있음. 서비스에서만 지킨다고 가정 |
-| SPOT-02의 academyId가 가족 일정에 없는 학원인 경우 | 소스에 없음. Academy가 있으면 받는다고 가정, 없으면 404 |
+| SPOT-02의 academyId가 가족 일정에 없는 학원인 경우 | 그대로 둠: Academy가 있으면 받고, 없으면 404 |
 | 장소 변경이 settingsVersion을 올리는지 | 04_사용자-user.md와 같은 질문. 올리지 않는다고 가정 |
 | 11/4 기획 수정안(소스 7.1) | 확정되면 학원 출입구를 기본 장소로 쓰고 직접 찍는 장소는 대안 0~2개가 됨 → 「첫 장소가 기본」 규칙이 바뀜 |

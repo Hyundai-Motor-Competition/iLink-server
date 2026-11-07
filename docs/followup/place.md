@@ -1,8 +1,8 @@
 # FOLLOWUP · 장소 (place)
 
-- 생성: 2026-11-08 03:30 KST · tdd-guard
-- 상태: 진행 중 (체크 36/51 · 완료 기준 0/4)
-- 테스트: ● GREEN · 1079 passed · 전체 · 73s · cd C:/pickup; ./gradlew.bat test --console=plain 2>&1 | grep -E "FAILED|BUILD|tests completed" | tail -20; cd build/tes…
+- 생성: 2026-11-08 03:35 KST · tdd-guard
+- 상태: 진행 중 (체크 51/51 · 완료 기준 0/4)
+- 테스트: ● GREEN · 1127 passed · 전체 · 69s · cd C:/pickup && ./gradlew.bat test --console=plain 2>&1 | grep -E "FAILED|BUILD|tests completed" | tail -20; cd build/t…
 - 설계서: C:/pickup/docs/07_장소-place.md
 
 ## 완료 항목
@@ -34,6 +34,21 @@
 - [x] #26 [서비스] 장소 조회는 학원별로 묶어 academyName과 함께 돌려준다 ← ListPickupSpotsServiceTest.장소 조회는 학원별로 묶어 academyName과 함께 academyId · spotId 오름차순으로 돌려준다
 - [x] #27 [서비스] 장소 조회는 진행 중 세션이 없으면 walkMinutes를 null로 돌려준다 ← ListPickupSpotsServiceTest.장소 조회는 진행 중 세션이 없으면 모든 장소의 walkMinutes를 null로 돌려준다
 - [x] #28 [서비스] findDefaultSpot은 가족 · 학원의 기본 장소를 돌려주고 없으면 빈 값을 돌려준다 ← LoadPickupSpotServiceTest.findDefaultSpot은 가족 · 학원의 기본 장소를 SpotInfo로 돌려준다
+- [x] #29 [web] GET /v1/families/me/pickup-spots는 200과 academies[]를 돌려준다 ← PickupSpotControllerTest.GET /v1/families/me/pickup-spots는 200과 academies[](academyId · academyName · spots[])를 isDefault 키와 null walkMinutes 그대로 돌려준다
+- [x] #30 [web] GET /v1/families/me/pickup-spots는 차량 토큰으로도 200을 돌려준다 ← PickupSpotControllerTest.GET /v1/families/me/pickup-spots는 차량 토큰으로도 200과 academies[]를 돌려준다
+- [x] #31 [web] GET /v1/families/me/pickup-spots에 near만 보내고 radiusM을 빼면 422 VALIDATION_FAILED를 돌려준다 ← PickupSpotControllerTest.GET /v1/families/me/pickup-spots에 near만 보내고 radiusM을 빼면 422 VALIDATION_FAILED와 fields의 radiusM을 돌려주고 유스케이스를 부르지 않는다
+- [x] #32 [web] GET /v1/families/me/pickup-spots에 radiusM 3001을 보내면 422 VALIDATION_FAILED를 돌려준다 ← PickupSpotControllerTest.[2] radiusM = 3001
+- [x] #33 [web] GET /v1/families/me/pickup-spots를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupSpotControllerTest.GET /v1/families/me/pickup-spots를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다
+- [x] #34 [web] POST /v1/families/me/pickup-spots는 201과 spotId · isDefault를 돌려준다 ← PickupSpotControllerTest.POST /v1/families/me/pickup-spots는 201과 spotId · isDefault를 돌려준다
+- [x] #35 [web] POST /v1/families/me/pickup-spots에 51자 name을 보내면 422 VALIDATION_FAILED를 돌려준다 ← PickupSpotControllerTest.POST /v1/families/me/pickup-spots에 51자 name을 보내면 422 VALIDATION_FAILED와 fields의 name을 돌려주고 유스케이스를 부르지 않는다
+- [x] #36 [web] POST /v1/families/me/pickup-spots가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다 ← PickupSpotControllerTest.POST /v1/families/me/pickup-spots가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
+- [x] #37 [web] POST /v1/families/me/pickup-spots를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupSpotControllerTest.POST /v1/families/me/pickup-spots를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다
+- [x] #38 [web] PATCH /v1/pickup-spots/{spotId}는 200과 spotId · name · stopPoint · meetingPoint · memo · isDefault를 돌려준다 ← PickupSpotControllerTest.PATCH /v1/pickup-spots/{spotId}는 200과 spotId · name · stopPoint · meetingPoint · memo · isDefault를 돌려준다
+- [x] #39 [web] PATCH /v1/pickup-spots/{spotId}가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다 ← PickupSpotControllerTest.PATCH /v1/pickup-spots/{spotId}가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
+- [x] #40 [web] DELETE /v1/pickup-spots/{spotId}는 204를 돌려준다 ← PickupSpotControllerTest.DELETE /v1/pickup-spots/{spotId}를 CO_GUARDIAN 토큰으로 부르면 204를 돌려준다
+- [x] #41 [web] DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다 ← PickupSpotControllerTest.DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다
+- [x] #42 [web] DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다 ← PickupSpotControllerTest.DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다
+- [x] #43 [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다 ← PlaceIdempotencyKeyTest.Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
 - [x] #44 [persistence] pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다 ← PlaceModuleLinkAdaptersTest.pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다
 - [x] #45 [persistence] LoadAcademyPort 어댑터는 schedule의 LoadAcademyUseCase.findAcademy 결과를 place가 쓰는 학원 정보(academyId · name · location)로 바꿔 돌려주고 없으면 빈 값을 돌려준다 ← PlaceModuleLinkAdaptersTest.LoadAcademyPort 어댑터는 schedule의 LoadAcademyUseCase.findAcademy 결과를 place 학원 정보(academyId · name · location)로 바꿔 돌려준다
 - [x] #46 [서비스] findSpot은 spotId의 장소를 돌려주고 없으면 빈 값을, findSpots는 가족의 학원 목록에 속한 장소를 spotId · academyId · name · isDefault로 돌려준다 ← LoadPickupSpotServiceTest.findSpots는 가족의 학원 목록에 속한 장소만 spotId · academyId · name · isDefault로 돌려주고 장소 조회는 1회만 한다
@@ -44,21 +59,7 @@
 - [x] #51 장소 수정은 좌표를 바꿀 때 학원 정보가 없으면 NOT_FOUND로 거절하고 저장하지 않는다 ← UpdatePickupSpotServiceTest.장소 수정은 좌표를 바꿀 때 학원 정보가 없으면 NOT_FOUND로 거절하고 저장하지 않는다
 
 ## 미완료 항목
-- [ ] #29 [web] GET /v1/families/me/pickup-spots는 200과 academies[]를 돌려준다
-- [ ] #30 [web] GET /v1/families/me/pickup-spots는 차량 토큰으로도 200을 돌려준다
-- [ ] #31 [web] GET /v1/families/me/pickup-spots에 near만 보내고 radiusM을 빼면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #32 [web] GET /v1/families/me/pickup-spots에 radiusM 3001을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #33 [web] GET /v1/families/me/pickup-spots를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] #34 [web] POST /v1/families/me/pickup-spots는 201과 spotId · isDefault를 돌려준다
-- [ ] #35 [web] POST /v1/families/me/pickup-spots에 51자 name을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #36 [web] POST /v1/families/me/pickup-spots가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
-- [ ] #37 [web] POST /v1/families/me/pickup-spots를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] #38 [web] PATCH /v1/pickup-spots/{spotId}는 200과 spotId · name · stopPoint · meetingPoint · memo · isDefault를 돌려준다
-- [ ] #39 [web] PATCH /v1/pickup-spots/{spotId}가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
-- [ ] #40 [web] DELETE /v1/pickup-spots/{spotId}는 204를 돌려준다
-- [ ] #41 [web] DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다
-- [ ] #42 [web] DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다
-- [ ] #43 [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
+- 없음
 
 ## 완료 기준 (공통 규칙 문서)
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
@@ -94,7 +95,8 @@
 | 11/4 기획 수정안(소스 7.1) | 확정되면 학원 출입구를 기본 장소로 쓰고 직접 찍는 장소는 대안 0~2개가 됨 → 「첫 장소가 기본」 규칙이 바뀜 |
 
 ## 다음 단계
-- 남은 항목 15건부터 계속: /tdd domain place → /tdd go
+- 도메인 리뷰: /tdd review place (2026-11-08 03:25 KST 리뷰 뒤에 체크 · 추가된 항목 #29, #30, #31, #32, #33, #34, #35, #36, #37, #38, #39, #40, #41, #42, #43, #47, #50, #51)
+- 커밋 · 푸시: /tdd commit (기능별 분할 커밋) · /tdd push (커밋 후 기능 브랜치 푸시)
 - 다음 도메인: 픽업 (08_픽업-pickup.md). 시작: /tdd domain pickup
 
 ## 후속 과제
