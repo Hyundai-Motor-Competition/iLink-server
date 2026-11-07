@@ -8,6 +8,7 @@ import com.example.pickupservice.schedule.application.port.out.SaveAcademyPort;
 import com.example.pickupservice.schedule.application.port.out.SaveSchedulePort;
 import com.example.pickupservice.schedule.domain.Academy;
 import com.example.pickupservice.schedule.domain.PickupSchedule;
+import com.example.pickupservice.schedule.domain.ScheduleStatus;
 import com.example.pickupservice.user.fixture.UserSeed;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -26,6 +27,7 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 
@@ -131,7 +133,51 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 		assertThat(loaded.getChildUserId()).isEqualTo(users.minjunId());
 		assertThat(loaded.getAcademy().getAcademyId()).isEqualTo(academy.getAcademyId());
 		assertThat(loaded.getTargetPickup()).isEqualTo(5);
-		assertThat(loaded.getStatus()).isEqualTo(saved.getStatus());
+		assertThat(loaded.getStatus()).as("출입구가 있는 학원의 일정 status").isEqualTo(ScheduleStatus.READY);
+	}
+
+	@Test
+	@DisplayName("saveSchedule로 scheduleId가 있는 일정을 다시 저장하면 새 행을 만들지 않고 그 행의 요일 · 시간 · 학원 · status가 바뀐다")
+	void savingScheduleWithIdUpdatesSameRowInsteadOfInsertingNewOne() {
+		Academy academy = newAcademy();
+		PickupSchedule saved = newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
+		Academy academyWithoutEntrance = saveAcademyPort.saveAcademy(Academy.create("바른수학학원",
+				"서울 강남구 역삼로 10", ACADEMY_LOCATION, null, null));
+		academyIds.add(academyWithoutEntrance.getAcademyId());
+		clearPersistenceContext();
+		Integer rowsBefore = jdbcTemplate.queryForObject(
+				"select count(*) from pickup_schedule where child_user_id = ?", Integer.class, users.minjunId());
+
+		PickupSchedule updated = saveSchedulePort.saveSchedule(PickupSchedule.restore(saved.getScheduleId(),
+				users.minjunId(), academyWithoutEntrance, Set.of(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY),
+				LocalTime.of(19, 30), 10, ScheduleStatus.DRAFT));
+		clearPersistenceContext();
+
+		assertThat(updated.getScheduleId()).as("다시 저장한 일정의 scheduleId").isEqualTo(saved.getScheduleId());
+		Integer rowsAfter = jdbcTemplate.queryForObject(
+				"select count(*) from pickup_schedule where child_user_id = ?", Integer.class, users.minjunId());
+		assertThat(rowsAfter).as("민준의 일정 행 수").isEqualTo(rowsBefore).isEqualTo(1);
+		Map<String, Object> row = jdbcTemplate.queryForMap(
+				"select weekdays, class_end_time::text as class_end_time, academy_id, target_pickup, status"
+						+ " from pickup_schedule where schedule_id = ?", saved.getScheduleId());
+		assertThat(row.get("weekdays")).as("weekdays 컬럼").isEqualTo("TUE,THU");
+		assertThat(row.get("class_end_time")).as("class_end_time 컬럼").isEqualTo("19:30:00");
+		assertThat(((Number) row.get("academy_id")).longValue()).as("academy_id 컬럼")
+				.isEqualTo(academyWithoutEntrance.getAcademyId());
+		assertThat(((Number) row.get("target_pickup")).intValue()).as("target_pickup 컬럼").isEqualTo(10);
+		assertThat(row.get("status")).as("status 컬럼").isEqualTo("DRAFT");
+	}
+
+	@Test
+	@DisplayName("loadSchedule · loadAcademy에 없는 id를 주면 빈 값을 돌려준다")
+	void loadScheduleAndLoadAcademyReturnEmptyForUnknownId() {
+		Long maxScheduleId = jdbcTemplate.queryForObject(
+				"select coalesce(max(schedule_id), 0) from pickup_schedule", Long.class);
+		Long maxAcademyId = jdbcTemplate.queryForObject(
+				"select coalesce(max(academy_id), 0) from academy", Long.class);
+
+		assertThat(loadSchedulePort.loadSchedule(maxScheduleId + 1000)).as("없는 scheduleId").isEmpty();
+		assertThat(loadAcademyPort.loadAcademy(maxAcademyId + 1000)).as("없는 academyId").isEmpty();
 	}
 
 	@Test
