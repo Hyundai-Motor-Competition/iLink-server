@@ -60,7 +60,7 @@ class VehicleVinIndexTest extends IntegrationTestSupport {
 
 		assertThatThrownBy(() -> saveVehiclePort.saveVehicle(Vehicle.register(vin, "아이오닉 5")))
 				.isExactlyInstanceOf(DataIntegrityViolationException.class)
-				.hasStackTraceContaining("ux_vehicle_vin_linked");
+				.hasStackTraceContaining("uk_vehicle_vin_linked");
 
 		assertThat(countRowsOf(vin)).as("같은 VIN 행 수").isEqualTo(1);
 	}
