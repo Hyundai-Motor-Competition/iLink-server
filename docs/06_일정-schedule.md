@@ -127,11 +127,11 @@ Map<Long, DeviceStatus> loadDeviceStatuses(List<Long> userIds);          // Load
 - [x] [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
 - [x] [기반] AcademyEntity · PickupScheduleEntity가 BaseTimeEntity를 상속하고 location · entrance는 geography(Point,4326)로 매핑된다
 - [x] [기반] 테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다
-- [ ] [persistence] Academy를 저장하고 읽으면 location · entrance 좌표가 같다
-- [ ] [persistence] weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다
-- [ ] [persistence] classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다
-- [ ] [persistence] loadSchedulesOfChild는 그 자녀의 일정만 돌려준다
-- [ ] [persistence] loadSchedulesOfChildren은 여러 자녀의 일정을 한 번에 돌려준다
+- [x] [persistence] Academy를 저장하고 읽으면 location · entrance 좌표가 같다
+- [x] [persistence] weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다
+- [x] [persistence] classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다
+- [x] [persistence] loadSchedulesOfChild는 그 자녀의 일정만 돌려준다
+- [x] [persistence] loadSchedulesOfChildren은 여러 자녀의 일정을 한 번에 돌려준다
 - [ ] [서비스] 학원 검색은 외부 지도 API 결과를 저장하지 않고 externalPlaceId · name · address · location으로 돌려준다
 - [ ] [서비스] 학원 검색은 외부 지도 API가 실패하면 MAP_API_UNAVAILABLE로 거절한다
 - [ ] [서비스] 일정 등록은 학원을 만들고 scheduleId · academyId · status를 돌려준다
@@ -171,12 +171,16 @@ Map<Long, DeviceStatus> loadDeviceStatuses(List<Long> userIds);          // Load
 - [ ] [web] GET /v1/vehicles/me/weekly-pickups를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
 - [ ] [web] GET /v1/vehicles/me/settings-summary는 차량 토큰으로 200과 guardianNameMasked · children · joinCallMode를 돌려준다
 - [ ] [web] Idempotency-Key는 POST /v1/children/{childId}/schedules · POST /v1/children/{childId}/setup-completion에만 요구된다
-- [ ] [persistence] 지도 API 어댑터는 카카오 로컬 검색 응답을 externalPlaceId(kakao:{id}) · name · address · location의 AcademyCandidate로 바꾼다
-- [ ] [persistence] 지도 API 어댑터는 외부 API 오류 · 시간 초과면 502 MAP_API_UNAVAILABLE로 거절한다
-- [ ] [persistence] place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다
-- [ ] [persistence] LoadMemberDeviceStatusPort 어댑터는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다
+- [x] [persistence] 지도 API 어댑터는 카카오 로컬 검색 응답을 externalPlaceId(kakao:{id}) · name · address · location의 AcademyCandidate로 바꾼다
+- [x] [persistence] 지도 API 어댑터는 외부 API 오류 · 시간 초과면 502 MAP_API_UNAVAILABLE로 거절한다
+- [x] [persistence] place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다
+- [x] [persistence] LoadMemberDeviceStatusPort 어댑터는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다
 - [x] [기반] 공통 BusinessException에 overlapScheduleIds를 담아 던지면 오류 응답 error.overlapScheduleIds에 실리고, 담지 않으면 그 키가 응답에 없다
 - [ ] [서비스] findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려주고 없으면 빈 값을 돌려준다
+- [x] 지도 API 어댑터는 200 응답이라도 본문을 읽지 못하거나 좌표가 없거나 숫자가 아니면 502 MAP_API_UNAVAILABLE로 거절한다
+- [x] saveSchedule로 scheduleId가 있는 일정을 다시 저장하면 새 행을 만들지 않고 그 행의 요일 · 시간 · 학원 · status가 바뀐다
+- [x] loadSchedule · loadAcademy에 없는 id를 주면 빈 값을 돌려준다
+- [ ] [서비스] 일정 목록은 그 자녀의 일정을 scheduleId · 학원(academyId · name) · weekdays · classEndTime · targetPickup · status로 돌려주고, 내 가족의 CHILD가 아니면 NOT_FOUND로 거절한다
 
 ## 확인 필요 사항
 

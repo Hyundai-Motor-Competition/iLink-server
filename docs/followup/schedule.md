@@ -1,8 +1,8 @@
 # FOLLOWUP · 일정 (schedule)
 
-- 생성: 2026-11-08 00:07 KST · tdd-guard
-- 상태: 진행 중 (체크 12/61 · 완료 기준 0/4)
-- 테스트: ● GREEN · 783 passed · 전체 · 91s · cd C:/pickup && ./gradlew.bat test --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321/08c3708…
+- 생성: 2026-11-08 00:27 KST · tdd-guard
+- 상태: 진행 중 (체크 24/65 · 완료 기준 0/4)
+- 테스트: ● GREEN · 808 passed · 전체 · 113s · cd C:/pickup && ./gradlew.bat test --console=plain 2>&1 | grep -E "FAILED|BUILD|tests completed" ; cd build/test-result…
 - 설계서: C:/pickup/docs/06_일정-schedule.md
 
 ## 완료 항목
@@ -17,14 +17,21 @@
 - [x] #9 [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다 ← ScheduleOutPortsTest.핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
 - [x] #10 [기반] AcademyEntity · PickupScheduleEntity가 BaseTimeEntity를 상속하고 location · entrance는 geography(Point,4326)로 매핑된다 ← SchedulePersistenceEntitiesTest.AcademyEntity · PickupScheduleEntity는 @Entity이고 BaseTimeEntity를 바로 상속한다
 - [x] #11 [기반] 테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다 ← ScheduleSeedTest.테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다
+- [x] #12 [persistence] Academy를 저장하고 읽으면 location · entrance 좌표가 같다 ← SchedulePersistenceAdapterTest.Academy를 저장하고 읽으면 location · entrance 좌표가 같다
+- [x] #13 [persistence] weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다 ← SchedulePersistenceAdapterTest.weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다
+- [x] #14 [persistence] classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다 ← SchedulePersistenceAdapterTest.classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다
+- [x] #15 [persistence] loadSchedulesOfChild는 그 자녀의 일정만 돌려준다 ← SchedulePersistenceAdapterTest.loadSchedulesOfChild는 그 자녀의 일정만 돌려준다
+- [x] #16 [persistence] loadSchedulesOfChildren은 여러 자녀의 일정을 한 번에 돌려준다 ← SchedulePersistenceAdapterTest.loadSchedulesOfChildren은 여러 자녀의 일정을 한 번에 돌려주고 목록에 없는 자녀의 일정은 빼며, 일정 조회 쿼리는 자녀 수와 상관없이 1회다
+- [x] #56 [persistence] 지도 API 어댑터는 카카오 로컬 검색 응답을 externalPlaceId(kakao:{id}) · name · address · location의 AcademyCandidate로 바꾼다 ← KakaoMapSearchAdapterTest.카카오 키워드 검색 응답을 kakao:{id} · 이름 · 도로명 주소 · 위치(y=lat, x=lng)의 AcademyCandidate로 바꾼다
+- [x] #57 [persistence] 지도 API 어댑터는 외부 API 오류 · 시간 초과면 502 MAP_API_UNAVAILABLE로 거절한다 ← KakaoMapSearchAdapterTest.카카오 API 응답 읽기 시간이 초과되면 502 MAP_API_UNAVAILABLE로 거절한다
+- [x] #58 [persistence] place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다 ← ScheduleModuleLinkAdaptersTest.place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다
+- [x] #59 [persistence] LoadMemberDeviceStatusPort 어댑터는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다 ← ScheduleModuleLinkAdaptersTest.LoadMemberDeviceStatusPort는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다: CONNECTED · INVITE_PENDING · INVITE_EXPIRED · NONE
 - [x] #60 [기반] 공통 BusinessException에 overlapScheduleIds를 담아 던지면 오류 응답 error.overlapScheduleIds에 실리고, 담지 않으면 그 키가 응답에 없다 ← GlobalExceptionHandlerTest.컨트롤러가 overlapScheduleIds [801, 802]를 담은 BusinessException.conflictWithOverlap(409 · SCHEDULE_OVERLAP · 메시지 · [801, 802])을 던지면 409와 error.overlapScheduleIds [801, 802]를 돌려주고 error.code · error.message · error.retryAfterSeconds(null) 키는 그대로 있으며 error.fields는 채우지 않는다
+- [x] #62 지도 API 어댑터는 200 응답이라도 본문을 읽지 못하거나 좌표가 없거나 숫자가 아니면 502 MAP_API_UNAVAILABLE로 거절한다 ← KakaoMapSearchAdapterTest.카카오 API가 200이라도 본문이 JSON이 아니면 502 MAP_API_UNAVAILABLE로 거절한다
+- [x] #63 saveSchedule로 scheduleId가 있는 일정을 다시 저장하면 새 행을 만들지 않고 그 행의 요일 · 시간 · 학원 · status가 바뀐다 ← SchedulePersistenceAdapterTest.saveSchedule로 scheduleId가 있는 일정을 다시 저장하면 새 행을 만들지 않고 그 행의 요일 · 시간 · 학원 · status가 바뀐다
+- [x] #64 loadSchedule · loadAcademy에 없는 id를 주면 빈 값을 돌려준다 ← SchedulePersistenceAdapterTest.loadSchedule · loadAcademy에 없는 id를 주면 빈 값을 돌려준다
 
 ## 미완료 항목
-- [ ] #12 [persistence] Academy를 저장하고 읽으면 location · entrance 좌표가 같다
-- [ ] #13 [persistence] weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다
-- [ ] #14 [persistence] classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다
-- [ ] #15 [persistence] loadSchedulesOfChild는 그 자녀의 일정만 돌려준다
-- [ ] #16 [persistence] loadSchedulesOfChildren은 여러 자녀의 일정을 한 번에 돌려준다
 - [ ] #17 [서비스] 학원 검색은 외부 지도 API 결과를 저장하지 않고 externalPlaceId · name · address · location으로 돌려준다
 - [ ] #18 [서비스] 학원 검색은 외부 지도 API가 실패하면 MAP_API_UNAVAILABLE로 거절한다
 - [ ] #19 [서비스] 일정 등록은 학원을 만들고 scheduleId · academyId · status를 돌려준다
@@ -64,11 +71,8 @@
 - [ ] #53 [web] GET /v1/vehicles/me/weekly-pickups를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
 - [ ] #54 [web] GET /v1/vehicles/me/settings-summary는 차량 토큰으로 200과 guardianNameMasked · children · joinCallMode를 돌려준다
 - [ ] #55 [web] Idempotency-Key는 POST /v1/children/{childId}/schedules · POST /v1/children/{childId}/setup-completion에만 요구된다
-- [ ] #56 [persistence] 지도 API 어댑터는 카카오 로컬 검색 응답을 externalPlaceId(kakao:{id}) · name · address · location의 AcademyCandidate로 바꾼다
-- [ ] #57 [persistence] 지도 API 어댑터는 외부 API 오류 · 시간 초과면 502 MAP_API_UNAVAILABLE로 거절한다
-- [ ] #58 [persistence] place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다
-- [ ] #59 [persistence] LoadMemberDeviceStatusPort 어댑터는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다
 - [ ] #61 [서비스] findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려주고 없으면 빈 값을 돌려준다
+- [ ] #65 [서비스] 일정 목록은 그 자녀의 일정을 scheduleId · 학원(academyId · name) · weekdays · classEndTime · targetPickup · status로 돌려주고, 내 가족의 CHILD가 아니면 NOT_FOUND로 거절한다
 
 ## 완료 기준 (공통 규칙 문서)
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
@@ -77,30 +81,17 @@
 - [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 다시 리뷰 필요: 2026-10-28 21:19 KST 리뷰 뒤에 체크 · 추가된 항목 #1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11, #12, #13, #14, #15, #16, #17, #18, #19, #20, #21, #22, #23, #24, #25, #26, #27, #28, #29, #30, #31, #32, #33, #34, #35, #36, #37, #38, #39, #40, #41, #42, #43, #44, #45, #46, #47, #48, #49, #50, #51, #52, #53, #54, #55, #56, #57, #58, #59, #60, #61
-- 2026-10-28 21:19 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 0 · 하 6 · 리뷰 시점 체크 15/15
-- 리뷰 시점 테스트: ● GREEN · 1194 passed · 1 skipped · 전체 · 2.2s · cd /c/designdot/designdot-server && ./gradlew.bat test --console=plain --rerun 2>&1 | grep -E "BUILD|FAILED|> Task :tes…
+- 다시 리뷰 필요: 2026-11-08 00:22 KST 리뷰 뒤에 체크 · 추가된 항목 #17, #18, #19, #20, #21, #22, #23, #24, #25, #26, #27, #28, #29, #30, #31, #32, #33, #34, #35, #36, #37, #38, #39, #40, #41, #42, #43, #44, #45, #46, #47, #48, #49, #50, #51, #52, #53, #54, #55, #61, #62, #63, #64, #65
+- 2026-11-08 00:22 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 4 · 하 1 · 리뷰 시점 체크 21/64
+- 리뷰 시점 테스트: ● GREEN · 803 passed · 전체 · 129s · cd C:/pickup && ./gradlew.bat test --console=plain 2>&1 | tail -25
   - 결론: 조건부 통과
-  - (상 0 · 중 0 · 하 6 · 리뷰 시점 체크 15/15 · 완료 기준 5/8. 조건: 커밋 전 [하]③ 되돌리기 · [하]② 기록 정정, [하]① CalendarConfig 바인딩 테스트를 항목으로 올릴지 결정)
-  - [하] CalendarConfig 바인딩 회귀 보호 없음 — CalendarConfig.java:16이 유일한 바인딩 지점인데 src/test에 CalendarConfig 테스트 0건, application*.yml · test resources 어디에도 week-start 키 없음. 키 오타 · 이름 변경 시 기본 MONDAY로 조용히 떨어져 어떤 테스트도 실패하지 않음 → 항목 추가 권고(테스트만: ApplicationContextRunner + CalendarConfig로 SUNDAY → SUNDAY, 생략 → MONDAY, 소문자 sunday → SUNDAY, xyz → 기동 실패). application.yml 명시 여부는 사람 결정
-  - [하] 진행 기록과 실제 상태 불일치 — REVIEW.md:4 · schedule.md:41 "리뷰 시점 테스트: ● RED · 0 passed · 4 failed"는 2차 리뷰어의 의도된 xyz 기동 실패 실험이 마지막 실행으로 기록된 것. 실제는 1195 · 실패 0 · 스킵 1 GREEN → note(기록 정정)
-  - [하] schedule/adapter/in/web/dto/package-info.java:1 Javadoc 여는 줄 앞 공백 4칸(이번 작업에서 생긴 변경), 빌드 영향 없음 → 리팩터링(커밋 전 되돌리기)
-  - [하] archfixture ServiceUsingAutowired의 불필요한 school 참조 남음(ServiceUsingAutowired.java:3), 판정 영향 없음 → 리팩터링
-  - [하] 01:305 다이어그램 라벨 `sc1(CalendarGrid) -->|"Period.MAX_DAYS · dDayFrom"|` — dDayFrom 호출자는 GetUpcomingExhibitionsService, 라벨만 보면 도메인→도메인 참조로 읽힘(06:23은 정확) → note
-  - [하] PublicAccess POST 403 단언 중복(ScheduleControllerTest:640-661과 파라미터화 8행 중 POST 2행) → note(실패 위치 좁힘 용도면 유지)
-  - 점검 요약: (1) #13 충족 — 픽스처 4개 @Service 없음, AllowedTransactionalService는 Service.class 상수로 stereotype 참조 유지. ArchfixtureIsolationTest는 HealthCheckTest · ApiDocsTest와 애노테이션 동일, 전체 실행 로그에서 같은 설정 @SpringBootTest 8개 중 컨텍스트 기동 로그 1건뿐 → 새 컨텍스트 없음. ArchitectureTest 25/25, applicationSpringRuleCatchesValueAutowiredAndEventPublisherInFixtures 위반 3 · 허용 2 유지. @Service 상태였다면 isEmpty() 실패하므로 우연 통과 아님. 02:639 · p…
-  - 완료 기준:
-  - C1 충족 — CalendarGrid는 java.time + Period.MAX_DAYS(허용 ③)만, domainIsPureJava ok
-  - C2 충족 — UseCase 2 · Result 3 · LoadSchedulePort · Row 2 · 서비스 2
-  - C3 충족(해당 없음 명시) — QueryDSL 어댑터, 자체 엔티티 · 시드 · ops/ddl 없음, 쿼리 1회 #15, 인덱스는 2차 EXPLAIN
-  - C4 충족 — Controller · ApiDocs · dto 3
-  - C5 충족 — schedule 120건 + ArchitectureTest 25 · ArchfixtureIsolationTest 1 · ApiDocsTest 13 · PeriodTest 24. 전체 1195 · 실패 0 · 스킵 1. 단 CalendarConfig 바인딩 테스트 없음
-  - C6 사람 확인 필요 — Swagger 완료, 프론트 공유 · 주 시작 요일 미확인
-  - C7 미충족 — 커밋 0, dev 배포 전
-  - C8 미충족 — 원격 브랜치 · PR 없음
-  - 후속 과제: 08 접두어 남음 / 2차 중간 ① 해소 · ② 설계 결정 필요 · ③ 해소 · ④ 남음 · ⑤ 의도적 유지 · ⑥ 남음 / 도메인 리뷰(10-28) ① 해소 · ② 남음 · ③ 남음 · ④ ⑤ 해소(#14 · #15) · ⑥ note 유지 · ⑦ 남음 · ⑧ 해소 / 정정 note ① ② 남음 · ③ 사람 결정 · ④ 해소(01:305 라벨 위치는 위 [하])
-  - 테스트: ./gradlew.bat test --console=plain --rerun → BUILD SUCCESSFUL in 1m 8s, tests=1195 · failures=0 · errors=0 · skipped=1(SchemaDdlExportTest). 코드 · 테스트 · 설계서 수정 없음
-- 이전 리뷰: 2026-10-28 20:31 KST (조건부 통과), 2026-10-28 00:38 KST (조건부 통과)
+  - 중간 리뷰(persistence lane 병합 뒤, 기반 #1~#11 · #60 포함). 전체 GREEN 803 passed. 리팩터링 1건(KakaoMapSearchAdapter 호출 · 예외 변환 메서드 추출).
+  - [중] KakaoMapSearchAdapter가 RestClientResponseException · ResourceAccessException만 잡아 200 본문 오류는 500 → 항목 추가
+  - [중] 좌표 x · y 없음/숫자 아님이면 500 → 항목 추가
+  - [중] PickupSchedule(domain)이 BusinessException 사용 — 02 L70 위반 소지, 설계 결정 필요
+  - [중] 수정 저장(merge) · 없는 id 조회 테스트 없음 → 항목 추가
+  - [하] status 단언 약함, 컨텍스트 테스트 이름 불일치, 502 원인 로그 없음, 규칙 유틸 private 생성자 없음, 목록 정렬 · 인덱스 없음, valueOf 변환, 설계서 구조 누락, 자기 제외 책임 문서화
+- 이전 리뷰: 2026-10-28 21:19 KST (조건부 통과), 2026-10-28 20:31 KST (조건부 통과), 2026-10-28 00:38 KST (조건부 통과)
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -120,7 +111,7 @@
 | schedule ↔ place 서로 부름 | place는 Academy를 참조하고, SET-07 · 09는 place 장소를 읽음. schedule 쪽은 out 포트 + 테스트 대역으로 먼저 검증 |
 
 ## 다음 단계
-- 남은 항목 49건부터 계속: /tdd domain schedule → /tdd go
+- 남은 항목 41건부터 계속: /tdd domain schedule → /tdd go
 - 다음 도메인: 장소 (07_장소-place.md). 시작: /tdd domain place
 
 ## 후속 과제
@@ -138,3 +129,9 @@
 - [결정 · 사람] 공통 오류 응답에 선택 칸 overlapScheduleIds(값 있을 때만 키 노출) 추가. 03 공유모듈 설계서 L89 「본문 키 고정」 문장과 BusinessException 시그니처 갱신 필요
 - schedule 가정: SET-07 일정이 하나도 없으면 missing에 SCHEDULE만 넣고 PICKUP_SPOT은 넣지 않음. PICKUP_SPOT 판정에 DRAFT 일정 학원 포함 여부 미정(지금은 모든 일정 학원 포함). 기기 상태가 없으면 NONE으로 봄
 - schedule: 카카오 학원 검색에 카테고리 필터(category_group_code=AC5 학원) · size · page를 쓸지 설계서에 없음. 지금은 키워드 검색만. 지도 API 시간 초과 값은 테스트로 확인하지 못함
+- schedule: 카카오 응답 좌표 문자열이 잘못 오면 Double.parseDouble NumberFormatException으로 500(502 아님). 200 응답 본문 이상 처리 미정
+- schedule 가정(SET-09): readiness 대상은 한국 날짜 오늘 일정이 있는 자녀 · 학원만. 오늘 일정이 없으면 startable false · missing 빈 목록. 하루 안 classEndTime 오름차순. 월요일이 아닌 weekStart 처리(422 또는 그 주 월요일로 맞춤) 미정. 「DRAFT를 readiness에 반영」 방식 미정(missing 값에 해당 없음). 「하루 최대 3개」 자르기 안 함
+- schedule: SET-01 query를 아예 안 보내면 공통 처리로 400 INVALID_REQUEST(422 아님). 「필수」 위반을 422로 맞출지 결정 필요. 2~50자 길이 기준(code point/UTF-16) 미정
+- schedule: findSchedules(pickup SES-02용)가 LoadSchedulePort.loadSchedule을 id마다 불러 N+1. 여러 id 조회 out 포트 추가 여부 결정 필요. SET-10에서 GUARDIAN이 없으면 guardianNameMasked null
+- [중간 리뷰 · persistence 병합] [중] PickupSchedule(domain)이 common.error.BusinessException(Spring HttpStatus 의존)을 던짐 — 02 L70 「domain은 프레임워크 무관 common 순수 타입만」 위반. 도메인 전용 예외 + 변환 또는 BusinessException을 예외 목록에 넣을지 결정 필요(사람). [하] SchedulePersistenceAdapterTest:134 status 단언 약함(READY로), KakaoMapSearchAdapterContextTest 이름과 달리 키 비어 있음 보장 안 함, 502 변환 때 원인 로그 없음, ScheduleOverlapRule · DailyScheduleLimitRule private 생성자 없음, findByChildUserId 정렬 · child_user_id 인덱스 없음(SET-04 순서 기준 미정), DeviceStatus.valueOf(name()) 값 추가 때 깨짐, 설계서 구조에 adapter/out/auth · place 없음 · 지도 어댑터 lane 표와 다름, 수정 때 자기 제외는 service 몫임을 설계서에 적을 것
+- schedule: SET-02 weekdays 중복(["MON","MON"]) 처리 미정. classEndTime 형식 오류를 422로 처리(02 공통 규칙의 400 타입 오류와 경계 확인 필요)
