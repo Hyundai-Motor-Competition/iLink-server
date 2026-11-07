@@ -13,7 +13,6 @@ import com.example.pickupservice.schedule.application.port.in.SetupSummary;
 import com.example.pickupservice.schedule.domain.DeviceStatus;
 import com.example.pickupservice.schedule.domain.MissingSetupItem;
 import com.example.pickupservice.schedule.domain.ScheduleStatus;
-import com.example.pickupservice.user.domain.JoinCallMode;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +27,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import java.util.List;
 import java.util.UUID;
 
+import static com.example.pickupservice.schedule.fixture.JoinCallModeFixture.joinCallModeOf;
 import static com.example.pickupservice.common.fixture.AccessTokenFixture.bearer;
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonError;
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonErrorKeys;
@@ -88,7 +88,7 @@ class SetupControllerTest extends ScheduleWebTestSupport {
 				new SetupChild(CHILD_USER_ID, "민준", DeviceStatus.CONNECTED),
 				List.of(),
 				List.of(new SetupSpot(21L, "정문 앞", true), new SetupSpot(22L, "후문", false)),
-				JoinCallMode.AUTO,
+				joinCallModeOf(SetupSummary.class, "AUTO"),
 				List.of(),
 				SETTINGS_VERSION));
 
@@ -105,7 +105,7 @@ class SetupControllerTest extends ScheduleWebTestSupport {
 				new SetupChild(CHILD_USER_ID, "민준", DeviceStatus.INVITE_PENDING),
 				List.of(new SetupSchedule(801L, "해솔영어학원", ScheduleStatus.DRAFT)),
 				List.of(),
-				JoinCallMode.GUARDIAN_CONFIRM,
+				joinCallModeOf(SetupSummary.class, "GUARDIAN_CONFIRM"),
 				List.of(MissingSetupItem.CHILD_DEVICE, MissingSetupItem.SCHEDULE, MissingSetupItem.PICKUP_SPOT),
 				3));
 
@@ -261,7 +261,7 @@ class SetupControllerTest extends ScheduleWebTestSupport {
 				new SetupChild(CHILD_USER_ID, "민준", DeviceStatus.CONNECTED),
 				List.of(new SetupSchedule(801L, "해솔영어학원", ScheduleStatus.READY)),
 				List.of(new SetupSpot(21L, "정문 앞", true)),
-				JoinCallMode.AUTO,
+				joinCallModeOf(SetupSummary.class, "AUTO"),
 				List.of(),
 				SETTINGS_VERSION);
 	}

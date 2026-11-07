@@ -11,6 +11,8 @@ import com.example.pickupservice.user.domain.JoinCallMode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -19,6 +21,7 @@ import org.mockito.quality.Strictness;
 
 import java.util.List;
 
+import static com.example.pickupservice.schedule.fixture.JoinCallModeFixture.joinCallModeOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 
@@ -76,17 +79,20 @@ class GetVehicleSettingsSummaryServiceTest {
 				new VehicleChild(SEOYEON_ID, "서연"));
 	}
 
-	@Test
-	@DisplayName("차량용 설정 요약은 가족의 joinCallMode를 담는다")
-	void summaryContainsJoinCallModeOfFamily() {
+	@ParameterizedTest
+	@EnumSource(JoinCallMode.class)
+	@DisplayName("차량용 설정 요약은 가족의 joinCallMode를 같은 이름의 schedule JoinCallMode로 바꿔 담는다")
+	void summaryConvertsJoinCallModeOfFamilyToScheduleEnum(JoinCallMode familyMode) {
 		givenMembers(
 				member(GUARDIAN_ID, Role.GUARDIAN, "김보호"),
 				member(MINJUN_ID, Role.CHILD, "민준"));
-		givenFamily(JoinCallMode.GUARDIAN_CONFIRM);
+		givenFamily(familyMode);
 
 		VehicleSettingsSummary summary = service.getVehicleSettingsSummary(FAMILY_ID);
 
-		assertThat(summary.joinCallMode()).isEqualTo(JoinCallMode.GUARDIAN_CONFIRM);
+		Object joinCallMode = summary.joinCallMode();
+		assertThat(joinCallMode).isInstanceOf(com.example.pickupservice.schedule.domain.JoinCallMode.class);
+		assertThat(((Enum<?>) joinCallMode).name()).isEqualTo(familyMode.name());
 	}
 
 	@Test
@@ -100,7 +106,7 @@ class GetVehicleSettingsSummaryServiceTest {
 		VehicleSettingsSummary summary = service.getVehicleSettingsSummary(FAMILY_ID);
 
 		assertThat(summary).isEqualTo(new VehicleSettingsSummary("김*호",
-				List.of(new VehicleChild(MINJUN_ID, "민준")), JoinCallMode.AUTO));
+				List.of(new VehicleChild(MINJUN_ID, "민준")), joinCallModeOf(VehicleSettingsSummary.class, "AUTO")));
 	}
 
 	private void givenMembers(MemberInfo... members) {

@@ -11,6 +11,7 @@ import com.example.pickupservice.schedule.application.port.out.LoadPickupSpotPor
 import com.example.pickupservice.schedule.application.port.out.LoadSchedulePort;
 import com.example.pickupservice.schedule.application.port.out.SpotSummary;
 import com.example.pickupservice.schedule.domain.DeviceStatus;
+import com.example.pickupservice.schedule.domain.JoinCallMode;
 import com.example.pickupservice.schedule.domain.MissingSetupItem;
 import com.example.pickupservice.schedule.domain.PickupSchedule;
 import com.example.pickupservice.schedule.domain.ScheduleStatus;
@@ -46,7 +47,7 @@ public class GetSetupSummaryService implements GetSetupSummaryUseCase {
 		List<SpotSummary> spots = spotsOf(query.familyId(), SetupChecks.academyIdsOf(schedules));
 
 		return new SetupSummary(new SetupChild(child.userId(), child.name(), deviceStatus),
-				toSetupSchedules(schedules), toSetupSpots(spots), family.joinCallMode(),
+				toSetupSchedules(schedules), toSetupSpots(spots), JoinCallMode.valueOf(family.joinCallMode().name()),
 				missingItems(deviceStatus, schedules, spots), family.settingsVersion());
 	}
 

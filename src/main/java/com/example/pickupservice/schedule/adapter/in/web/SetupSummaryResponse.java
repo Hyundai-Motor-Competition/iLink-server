@@ -7,7 +7,7 @@ import com.example.pickupservice.schedule.application.port.in.SetupSummary;
 import com.example.pickupservice.schedule.domain.DeviceStatus;
 import com.example.pickupservice.schedule.domain.MissingSetupItem;
 import com.example.pickupservice.schedule.domain.ScheduleStatus;
-import com.example.pickupservice.user.domain.JoinCallMode;
+import com.example.pickupservice.schedule.domain.JoinCallMode;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;

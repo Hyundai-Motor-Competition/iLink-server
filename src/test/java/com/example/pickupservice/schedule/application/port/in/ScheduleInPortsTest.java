@@ -4,7 +4,7 @@ import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.schedule.domain.DeviceStatus;
 import com.example.pickupservice.schedule.domain.MissingSetupItem;
 import com.example.pickupservice.schedule.domain.ScheduleStatus;
-import com.example.pickupservice.user.domain.JoinCallMode;
+import com.example.pickupservice.schedule.domain.JoinCallMode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

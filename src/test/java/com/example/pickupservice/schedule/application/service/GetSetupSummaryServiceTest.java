@@ -220,17 +220,20 @@ class GetSetupSummaryServiceTest {
 				.containsExactlyInAnyOrder(MissingSetupItem.CHILD_DEVICE, MissingSetupItem.SCHEDULE);
 	}
 
-	@Test
-	@DisplayName("설정 요약은 가족의 joinCallMode와 settingsVersion을 담는다")
-	void getSetupSummaryContainsJoinCallModeAndFamilySettingsVersion() {
+	@ParameterizedTest
+	@EnumSource(JoinCallMode.class)
+	@DisplayName("설정 요약은 가족의 joinCallMode를 같은 이름의 schedule JoinCallMode로 바꿔 담고 settingsVersion을 담는다")
+	void getSetupSummaryConvertsJoinCallModeToScheduleEnumAndContainsSettingsVersion(JoinCallMode familyMode) {
 		givenChild(FAMILY_ID, Role.CHILD);
-		givenFamily(JoinCallMode.GUARDIAN_CONFIRM, 12);
+		givenFamily(familyMode, 12);
 		givenDeviceStatus(DeviceStatus.CONNECTED);
 		givenReadyScheduleWithDefaultSpot();
 
 		SetupSummary summary = getSetupSummaryService.getSetupSummary(QUERY);
 
-		assertThat(summary.joinCallMode()).isEqualTo(JoinCallMode.GUARDIAN_CONFIRM);
+		Object joinCallMode = summary.joinCallMode();
+		assertThat(joinCallMode).isInstanceOf(com.example.pickupservice.schedule.domain.JoinCallMode.class);
+		assertThat(((Enum<?>) joinCallMode).name()).isEqualTo(familyMode.name());
 		assertThat(summary.settingsVersion()).isEqualTo(12);
 	}
 

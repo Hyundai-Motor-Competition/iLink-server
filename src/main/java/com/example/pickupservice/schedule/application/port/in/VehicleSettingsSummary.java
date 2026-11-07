@@ -1,6 +1,6 @@
 package com.example.pickupservice.schedule.application.port.in;
 
-import com.example.pickupservice.user.domain.JoinCallMode;
+import com.example.pickupservice.schedule.domain.JoinCallMode;
 
 import java.util.List;
 

@@ -5,6 +5,7 @@ import com.example.pickupservice.schedule.application.port.in.GetVehicleSettings
 import com.example.pickupservice.schedule.application.port.in.VehicleChild;
 import com.example.pickupservice.schedule.application.port.in.VehicleSettingsSummary;
 import com.example.pickupservice.schedule.domain.GuardianNameMasker;
+import com.example.pickupservice.schedule.domain.JoinCallMode;
 import com.example.pickupservice.user.application.port.in.LoadFamilyUseCase;
 import com.example.pickupservice.user.application.port.in.LoadMemberUseCase;
 import com.example.pickupservice.user.application.port.in.MemberInfo;
@@ -35,6 +36,6 @@ public class GetVehicleSettingsSummaryService implements GetVehicleSettingsSumma
 				.map(member -> new VehicleChild(member.userId(), member.name()))
 				.toList();
 		return new VehicleSettingsSummary(guardianNameMasked, children,
-				loadFamilyUseCase.findFamily(familyId).joinCallMode());
+				JoinCallMode.valueOf(loadFamilyUseCase.findFamily(familyId).joinCallMode().name()));
 	}
 }

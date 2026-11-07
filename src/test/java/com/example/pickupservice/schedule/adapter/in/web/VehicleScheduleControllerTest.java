@@ -9,7 +9,6 @@ import com.example.pickupservice.schedule.application.port.in.VehicleSettingsSum
 import com.example.pickupservice.schedule.application.port.in.WeeklyPickup;
 import com.example.pickupservice.schedule.application.port.in.WeeklyPickups;
 import com.example.pickupservice.schedule.domain.MissingSetupItem;
-import com.example.pickupservice.user.domain.JoinCallMode;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
+import static com.example.pickupservice.schedule.fixture.JoinCallModeFixture.joinCallModeOf;
 import static com.example.pickupservice.common.fixture.AccessTokenFixture.bearer;
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonError;
 import static org.mockito.ArgumentMatchers.any;
@@ -128,7 +128,7 @@ class VehicleScheduleControllerTest extends ScheduleWebTestSupport {
 	@DisplayName("GET /v1/vehicles/me/settings-summary는 차량 토큰으로 200과 guardianNameMasked · children · joinCallMode를 돌려준다")
 	void getSettingsSummaryWithVehicleTokenReturns200WithMaskedNameChildrenAndJoinCallMode() throws Exception {
 		given(getVehicleSettingsSummaryUseCase.getVehicleSettingsSummary(anyLong())).willReturn(
-				new VehicleSettingsSummary("김*호", List.of(new VehicleChild(CHILD_USER_ID, "민준")), JoinCallMode.AUTO));
+				new VehicleSettingsSummary("김*호", List.of(new VehicleChild(CHILD_USER_ID, "민준")), joinCallModeOf(VehicleSettingsSummary.class, "AUTO")));
 
 		mockMvc.perform(settingsSummaryRequest(vehicleBearer()))
 				.andExpect(status().isOk())
@@ -141,7 +141,7 @@ class VehicleScheduleControllerTest extends ScheduleWebTestSupport {
 	@DisplayName("GET /v1/vehicles/me/settings-summary는 차량 토큰의 familyId를 유스케이스에 넘긴다")
 	void getSettingsSummaryPassesFamilyIdToUseCase() throws Exception {
 		given(getVehicleSettingsSummaryUseCase.getVehicleSettingsSummary(anyLong())).willReturn(
-				new VehicleSettingsSummary("김*호", List.of(), JoinCallMode.GUARDIAN_CONFIRM));
+				new VehicleSettingsSummary("김*호", List.of(), joinCallModeOf(VehicleSettingsSummary.class, "GUARDIAN_CONFIRM")));
 
 		mockMvc.perform(settingsSummaryRequest(vehicleBearer()))
 				.andExpect(status().isOk());
