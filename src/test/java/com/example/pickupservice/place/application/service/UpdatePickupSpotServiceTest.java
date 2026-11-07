@@ -151,6 +151,20 @@ class UpdatePickupSpotServiceTest {
 	}
 
 	@Test
+	@DisplayName("장소 수정은 좌표를 바꿀 때 학원 정보가 없으면 NOT_FOUND로 거절하고 저장하지 않는다")
+	void updateSpotRejectsWithNotFoundAndDoesNotSaveWhenAcademyIsMissingWhileChangingPoint() {
+		givenSpot(spot(SPOT_ID, FAMILY_ID, "후문", null, NEAR_STOP, NEAR_MEETING, false));
+		given(loadAcademyPort.loadAcademy(ACADEMY_ID)).willReturn(Optional.empty());
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> updatePickupSpotService.updateSpot(
+						new UpdateSpotCommand(FAMILY_ID, SPOT_ID, null, NEW_NEAR_STOP, NEW_NEAR_MEETING, null, null)));
+
+		assertNotFound(exception);
+		verify(saveSpotPort, never()).saveSpot(any());
+	}
+
+	@Test
 	@DisplayName("장소 수정은 바꾸지 않은 좌표는 500m 검사를 하지 않는다")
 	void updateSpotDoesNotCheckDistanceOfUnchangedPoint() {
 		givenSpot(spot(SPOT_ID, FAMILY_ID, "후문", null, NEAR_STOP, FAR_POINT, false));

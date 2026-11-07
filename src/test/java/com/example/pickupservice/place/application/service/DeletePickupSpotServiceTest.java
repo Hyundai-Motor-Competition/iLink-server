@@ -99,6 +99,24 @@ class DeletePickupSpotServiceTest {
 	}
 
 	@Test
+	@DisplayName("장소 삭제는 진행 중 세션이 쓰는 기본 장소면 같은 학원에 다른 장소가 남아 있어도 SPOT_IN_USE를 먼저 돌려준다")
+	void deleteSpotRejectsWithSpotInUseBeforeDefaultSpotRequiredWhenDefaultSpotWithSiblingsIsUsedByActiveSession() {
+		PickupSpot target = spot(SPOT_ID, FAMILY_ID, "정문 앞", true);
+		PickupSpot sibling = spot(OTHER_SPOT_ID, FAMILY_ID, "후문", false);
+		givenSpot(target);
+		given(checkActivePickupPort.isUsedByActiveSession(SPOT_ID)).willReturn(true);
+		lenient().when(loadSpotPort.loadSpots(FAMILY_ID, ACADEMY_ID)).thenReturn(List.of(target, sibling));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> deletePickupSpotService.deleteSpot(new DeleteSpotCommand(FAMILY_ID, SPOT_ID)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("SPOT_IN_USE");
+		verify(saveSpotPort, never()).deleteSpot(anyLong());
+	}
+
+	@Test
 	@DisplayName("장소 삭제는 다른 장소가 남은 기본 장소면 DEFAULT_SPOT_REQUIRED로 거절한다")
 	void deleteSpotRejectsWithDefaultSpotRequiredWhenDefaultSpotHasSiblings() {
 		PickupSpot target = spot(SPOT_ID, FAMILY_ID, "정문 앞", true);
