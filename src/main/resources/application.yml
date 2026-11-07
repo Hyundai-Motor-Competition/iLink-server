@@ -21,6 +21,10 @@ pickup:
       queue-capacity: 100
   idempotency:
     cleanup-interval: PT1H
+  jwt:
+    access-ttl: PT30M
+  invite:
+    base-url: https://app.example/invite/
 
 logging:
   pattern:
