@@ -1,6 +1,5 @@
 package com.example.pickupservice.schedule.domain;
 
-import com.example.pickupservice.common.error.BusinessException;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -48,13 +47,13 @@ public class PickupSchedule {
 
 	private static void validateWeekdays(Set<DayOfWeek> weekdays) {
 		if (weekdays == null || weekdays.isEmpty()) {
-			throw BusinessException.invalidField("weekdays", "1개 이상이어야 합니다");
+			throw new InvalidScheduleException("weekdays","1개 이상이어야 합니다");
 		}
 	}
 
 	private static void validateTargetPickup(int targetPickup) {
 		if (targetPickup < MIN_TARGET_PICKUP || targetPickup > MAX_TARGET_PICKUP) {
-			throw BusinessException.invalidField("targetPickup", "0~60이어야 합니다");
+			throw new InvalidScheduleException("targetPickup","0~60이어야 합니다");
 		}
 	}
 }
