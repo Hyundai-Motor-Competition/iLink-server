@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
-/** pickup 도메인 구현 전 임시 어댑터. 진행 중 세션이 없다고 본다. */
+// pickup 구현 전 임시 동작: 진행 중 세션이 없다고 본다
 @Component
 class PlacePickupActivityAdapter implements CheckActivePickupPort {
 

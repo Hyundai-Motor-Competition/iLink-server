@@ -13,7 +13,7 @@ import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
-public class PlacePersistenceAdapter implements LoadSpotPort, SaveSpotPort {
+class PlacePersistenceAdapter implements LoadSpotPort, SaveSpotPort {
 
 	private final PickupSpotJpaRepository pickupSpotJpaRepository;
 

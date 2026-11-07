@@ -17,6 +17,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.locationtech.jts.geom.Point;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -327,8 +328,7 @@ class PlacePersistenceAdapterTest extends IntegrationTestSupport {
 		long id = transactionTemplate.execute(status -> {
 			AcademyEntity academy = new AcademyEntity(null, "kakao:place-test-" + UUID.randomUUID(), "다른학원",
 					"서울 강남구 강남대로 396",
-					GeoPoints.toPoint(OTHER_ACADEMY_LOCATION.lat(), OTHER_ACADEMY_LOCATION.lng()),
-					GeoPoints.toPoint(OTHER_ACADEMY_LOCATION.lat(), OTHER_ACADEMY_LOCATION.lng()), null);
+					toPoint(OTHER_ACADEMY_LOCATION), toPoint(OTHER_ACADEMY_LOCATION), null);
 			entityManager.persist(academy);
 			entityManager.flush();
 			return academy.getAcademyId();
@@ -339,26 +339,25 @@ class PlacePersistenceAdapterTest extends IntegrationTestSupport {
 
 	private long persistSpotAt(long spotFamilyId, long spotAcademyId, String name, LatLng stop, LatLng meeting,
 			long createdBy) {
+		return persistEntity(new PickupSpotEntity(null, spotFamilyId, spotAcademyId, name, null, toPoint(stop),
+				toPoint(meeting), false, createdBy));
+	}
+
+	private long persistSpot(long spotFamilyId, long spotAcademyId, String name, boolean isDefault, long createdBy) {
+		return persistEntity(new PickupSpotEntity(null, spotFamilyId, spotAcademyId, name, null,
+				toPoint(OTHER_ACADEMY_LOCATION), toPoint(OTHER_ACADEMY_LOCATION), isDefault, createdBy));
+	}
+
+	private long persistEntity(PickupSpotEntity spot) {
 		return transactionTemplate.execute(status -> {
-			PickupSpotEntity spot = new PickupSpotEntity(null, spotFamilyId, spotAcademyId, name, null,
-					GeoPoints.toPoint(stop.lat(), stop.lng()), GeoPoints.toPoint(meeting.lat(), meeting.lng()), false,
-					createdBy);
 			entityManager.persist(spot);
 			entityManager.flush();
 			return spot.getSpotId();
 		});
 	}
 
-	private long persistSpot(long spotFamilyId, long spotAcademyId, String name, boolean isDefault, long createdBy) {
-		return transactionTemplate.execute(status -> {
-			PickupSpotEntity spot = new PickupSpotEntity(null, spotFamilyId, spotAcademyId, name, null,
-					GeoPoints.toPoint(OTHER_ACADEMY_LOCATION.lat(), OTHER_ACADEMY_LOCATION.lng()),
-					GeoPoints.toPoint(OTHER_ACADEMY_LOCATION.lat(), OTHER_ACADEMY_LOCATION.lng()), isDefault,
-					createdBy);
-			entityManager.persist(spot);
-			entityManager.flush();
-			return spot.getSpotId();
-		});
+	private static Point toPoint(LatLng latLng) {
+		return GeoPoints.toPoint(latLng.lat(), latLng.lng());
 	}
 
 }
