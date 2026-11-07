@@ -21,7 +21,6 @@ import org.mockito.quality.Strictness;
 
 import java.util.List;
 
-import static com.example.pickupservice.schedule.fixture.JoinCallModeFixture.joinCallModeOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 
@@ -90,9 +89,8 @@ class GetVehicleSettingsSummaryServiceTest {
 
 		VehicleSettingsSummary summary = service.getVehicleSettingsSummary(FAMILY_ID);
 
-		Object joinCallMode = summary.joinCallMode();
-		assertThat(joinCallMode).isInstanceOf(com.example.pickupservice.schedule.domain.JoinCallMode.class);
-		assertThat(((Enum<?>) joinCallMode).name()).isEqualTo(familyMode.name());
+		assertThat(summary.joinCallMode()).as("schedule JoinCallMode로 바꾼 값")
+				.isEqualTo(com.example.pickupservice.schedule.domain.JoinCallMode.valueOf(familyMode.name()));
 	}
 
 	@Test
@@ -106,7 +104,7 @@ class GetVehicleSettingsSummaryServiceTest {
 		VehicleSettingsSummary summary = service.getVehicleSettingsSummary(FAMILY_ID);
 
 		assertThat(summary).isEqualTo(new VehicleSettingsSummary("김*호",
-				List.of(new VehicleChild(MINJUN_ID, "민준")), joinCallModeOf(VehicleSettingsSummary.class, "AUTO")));
+				List.of(new VehicleChild(MINJUN_ID, "민준")), com.example.pickupservice.schedule.domain.JoinCallMode.AUTO));
 	}
 
 	private void givenMembers(MemberInfo... members) {

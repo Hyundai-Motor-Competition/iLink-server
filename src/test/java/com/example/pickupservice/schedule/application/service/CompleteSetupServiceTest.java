@@ -9,6 +9,7 @@ import com.example.pickupservice.schedule.application.port.in.SetupChild;
 import com.example.pickupservice.schedule.application.port.in.SetupCompletionResult;
 import com.example.pickupservice.schedule.application.port.in.SetupSummary;
 import com.example.pickupservice.schedule.domain.DeviceStatus;
+import com.example.pickupservice.schedule.domain.JoinCallMode;
 import com.example.pickupservice.schedule.domain.MissingSetupItem;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +21,6 @@ import org.springframework.http.HttpStatus;
 
 import java.util.List;
 
-import static com.example.pickupservice.schedule.fixture.JoinCallModeFixture.joinCallModeOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.BDDMockito.given;
@@ -111,7 +111,7 @@ class CompleteSetupServiceTest {
 				new SetupChild(CHILD_ID, "민준", DeviceStatus.CONNECTED),
 				List.of(),
 				List.of(),
-				joinCallModeOf(SetupSummary.class, "AUTO"),
+				JoinCallMode.AUTO,
 				missing,
 				settingsVersion);
 	}

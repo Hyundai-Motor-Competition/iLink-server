@@ -9,6 +9,7 @@ import com.example.pickupservice.schedule.application.port.in.SetupSummary;
 import com.example.pickupservice.schedule.application.port.in.VehicleSettingsSummary;
 import com.example.pickupservice.schedule.application.port.in.WeeklyPickups;
 import com.example.pickupservice.schedule.domain.DeviceStatus;
+import com.example.pickupservice.schedule.domain.JoinCallMode;
 import com.example.pickupservice.schedule.domain.ScheduleStatus;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +23,6 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import java.time.LocalDate;
 import java.util.List;
 
-import static com.example.pickupservice.schedule.fixture.JoinCallModeFixture.joinCallModeOf;
 import static com.example.pickupservice.common.fixture.AccessTokenFixture.bearer;
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonErrorKeys;
 import static org.hamcrest.Matchers.hasSize;
@@ -71,11 +71,11 @@ class ScheduleIdempotencyKeyTest extends ScheduleWebTestSupport {
 		given(listSchedulesUseCase.listSchedules(any())).willReturn(List.of());
 		given(getSetupSummaryUseCase.getSetupSummary(any())).willReturn(new SetupSummary(
 				new SetupChild(CHILD_USER_ID, "민준", DeviceStatus.CONNECTED),
-				List.of(), List.of(), joinCallModeOf(SetupSummary.class, "AUTO"), List.of(), 8));
+				List.of(), List.of(), JoinCallMode.AUTO, List.of(), 8));
 		given(getWeeklyPickupsUseCase.getWeeklyPickups(anyLong(), any())).willReturn(new WeeklyPickups(
 				LocalDate.of(2026, 11, 2), List.of(), new PickupReadiness(true, List.of())));
 		given(getVehicleSettingsSummaryUseCase.getVehicleSettingsSummary(anyLong())).willReturn(
-				new VehicleSettingsSummary("김*호", List.of(), joinCallModeOf(VehicleSettingsSummary.class, "AUTO")));
+				new VehicleSettingsSummary("김*호", List.of(), JoinCallMode.AUTO));
 
 		assertAll(
 				() -> mockMvc.perform(withGuardian(post("/v1/children/{childId}/schedules", CHILD_USER_ID)

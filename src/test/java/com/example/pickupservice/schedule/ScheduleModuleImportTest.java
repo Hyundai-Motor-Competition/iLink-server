@@ -18,8 +18,8 @@ class ScheduleModuleImportTest {
 	private static final Path SCHEDULE_MAIN = Path.of("src/main/java/com/example/pickupservice/schedule");
 
 	@Test
-	@DisplayName("schedule main 소스는 user.domain 타입을 쓰지 않는다(다른 모듈은 in 포트만)")
-	void scheduleMainSourcesDoNotUseUserDomain() throws IOException {
+	@DisplayName("schedule main 소스 어디에도 user.domain 패키지 문자열(com.example.pickupservice.user.domain)이 없다")
+	void scheduleMainSourcesDoNotContainUserDomainPackageName() throws IOException {
 		List<Path> sources;
 		try (Stream<Path> files = Files.walk(SCHEDULE_MAIN)) {
 			sources = files.filter(file -> file.toString().endsWith(".java")).toList();

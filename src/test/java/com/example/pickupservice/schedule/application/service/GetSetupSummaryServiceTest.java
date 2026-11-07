@@ -231,9 +231,8 @@ class GetSetupSummaryServiceTest {
 
 		SetupSummary summary = getSetupSummaryService.getSetupSummary(QUERY);
 
-		Object joinCallMode = summary.joinCallMode();
-		assertThat(joinCallMode).isInstanceOf(com.example.pickupservice.schedule.domain.JoinCallMode.class);
-		assertThat(((Enum<?>) joinCallMode).name()).isEqualTo(familyMode.name());
+		assertThat(summary.joinCallMode()).as("schedule JoinCallMode로 바꾼 값")
+				.isEqualTo(com.example.pickupservice.schedule.domain.JoinCallMode.valueOf(familyMode.name()));
 		assertThat(summary.settingsVersion()).isEqualTo(12);
 	}
 
