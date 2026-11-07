@@ -39,6 +39,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonError;
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonErrorKeys;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -77,6 +79,7 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	private static final String COMMON_NOT_FOUND_PATH = "/test/common-error/business-common-not-found";
 	private static final String COMMON_ERROR_CODE_PATH = "/test/common-error/business-common-code/{code}";
 	private static final String INVALID_FIELD_PATH = "/test/common-error/business-invalid-field";
+	private static final String OVERLAP_PATH = "/test/common-error/business-overlap";
 	private static final String REQUIRED_HEADER_PATH = "/test/common-error/required-header";
 	private static final String JSON_ONLY_PATH = "/test/common-error/json-only";
 	private static final String RESPONSE_STATUS_EXCEPTION_PATH = "/test/common-error/response-status-exception";
@@ -93,6 +96,10 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	private static final int RETRY_AFTER_SECONDS = 30;
 	private static final String DOMAIN_CODE = "SOME_DOMAIN_CODE";
 	private static final String DOMAIN_CODE_MESSAGE = "도메인 규칙에 맞지 않는 요청입니다";
+	private static final String OVERLAP_CODE = "SCHEDULE_OVERLAP";
+	private static final String OVERLAP_MESSAGE = "겹치는 일정이 있습니다";
+	private static final long OVERLAP_SCHEDULE_ID_1 = 801L;
+	private static final long OVERLAP_SCHEDULE_ID_2 = 802L;
 
 	private static final String VALIDATION_FAILED_MESSAGE = "입력값을 확인해 주세요";
 	private static final String INVALID_FIELD_NAME = "phone";
@@ -299,6 +306,25 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 		mockMvc.perform(get(DOMAIN_CODE_PATH))
 				.andExpect(commonError(HttpStatus.CONFLICT, DOMAIN_CODE))
 				.andExpect(jsonPath("$.error.message").value(DOMAIN_CODE_MESSAGE));
+	}
+
+	@Test
+	@DisplayName("컨트롤러가 overlapScheduleIds [801, 802]를 담은 BusinessException.conflictWithOverlap(409 · SCHEDULE_OVERLAP · 메시지 · [801, 802])을 던지면 409와 error.overlapScheduleIds [801, 802]를 돌려주고 error.code · error.message · error.retryAfterSeconds(null) 키는 그대로 있으며 error.fields는 채우지 않는다")
+	void businessExceptionWithOverlapScheduleIdsReturns409WithOverlapScheduleIds() throws Exception {
+		mockMvc.perform(get(OVERLAP_PATH))
+				.andExpect(commonError(HttpStatus.CONFLICT, OVERLAP_CODE))
+				.andExpect(jsonPath("$.error.message").value(OVERLAP_MESSAGE))
+				.andExpect(jsonPath("$.error.overlapScheduleIds", hasSize(2)))
+				.andExpect(jsonPath("$.error.overlapScheduleIds[0]").value(OVERLAP_SCHEDULE_ID_1))
+				.andExpect(jsonPath("$.error.overlapScheduleIds[1]").value(OVERLAP_SCHEDULE_ID_2));
+	}
+
+	@Test
+	@DisplayName("overlapScheduleIds를 담지 않은 BusinessException.of(409 · SOME_DOMAIN_CODE · 메시지)를 던지면 409 응답의 error에 overlapScheduleIds 키가 없고 code · message · retryAfterSeconds 키는 그대로 있다")
+	void businessExceptionWithoutOverlapScheduleIdsOmitsOverlapScheduleIdsKey() throws Exception {
+		mockMvc.perform(get(DOMAIN_CODE_PATH))
+				.andExpect(commonError(HttpStatus.CONFLICT, DOMAIN_CODE))
+				.andExpect(jsonPath("$.error", not(hasKey("overlapScheduleIds"))));
 	}
 
 	@Test
@@ -538,6 +564,12 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 		@GetMapping(INVALID_FIELD_PATH)
 		public String throwInvalidField() {
 			throw BusinessException.invalidField(INVALID_FIELD_NAME, INVALID_FIELD_REASON);
+		}
+
+		@GetMapping(OVERLAP_PATH)
+		public String throwOverlap() {
+			throw BusinessException.conflictWithOverlap(HttpStatus.CONFLICT, OVERLAP_CODE, OVERLAP_MESSAGE,
+					List.of(OVERLAP_SCHEDULE_ID_1, OVERLAP_SCHEDULE_ID_2));
 		}
 
 	}
