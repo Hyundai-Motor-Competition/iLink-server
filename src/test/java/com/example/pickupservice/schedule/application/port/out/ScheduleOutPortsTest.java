@@ -58,6 +58,8 @@ class ScheduleOutPortsTest {
 				method("loadSchedule", generic(Optional.class, PickupSchedule.class), params(long.class)),
 				method("loadSchedulesOfChild", generic(List.class, PickupSchedule.class), params(long.class)),
 				method("loadSchedulesOfChildren", generic(List.class, PickupSchedule.class),
+						params(List.class), generic(List.class, Long.class)),
+				method("loadSchedules", generic(List.class, PickupSchedule.class),
 						params(List.class), generic(List.class, Long.class)));
 		assertPort(SaveSchedulePort.class,
 				method("saveSchedule", PickupSchedule.class.getName(), params(PickupSchedule.class)));

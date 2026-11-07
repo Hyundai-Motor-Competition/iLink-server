@@ -20,13 +20,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,7 +34,6 @@ import java.util.TimeZone;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 @RequiredArgsConstructor
@@ -159,21 +158,37 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("같은 externalPlaceId로 academyId 없는 학원을 한 번 더 저장하면 유니크 제약 위반으로 거절되고 행이 늘지 않는다")
-	void savingAnotherAcademyWithSameExternalPlaceIdViolatesUniqueConstraint() {
+	@DisplayName("같은 externalPlaceId의 학원이 이미 저장된 뒤 academyId 없는 새 학원을 저장하면(동시 등록 유니크 충돌) 오류 없이 이미 저장된 그 학원을 돌려주고 행이 늘지 않으며 같은 트랜잭션에서 계속 읽을 수 있다")
+	void savingNewAcademyWithAlreadySavedExternalPlaceIdReusesSavedAcademyWithoutError() {
 		String placeId = uniquePlaceId();
 		Academy first = saveAcademyPort.saveAcademy(Academy.create(placeId, "해솔영어학원", "서울 강남구 테헤란로 152",
 				ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
 		academyIds.add(first.getAcademyId());
 		clearPersistenceContext();
 
-		assertThatThrownBy(() -> saveAcademyPort.saveAcademy(Academy.create(placeId, "해솔영어학원 2관",
-				"서울 강남구 테헤란로 200", ACADEMY_LOCATION, null, null)))
-				.isInstanceOf(DataIntegrityViolationException.class);
+		Academy[] reusedAndReloaded = transactionTemplate.execute(status -> {
+			Academy reused = saveAcademyPort.saveAcademy(Academy.create(placeId, "해솔영어학원 2관",
+					"서울 강남구 테헤란로 200", ACADEMY_LOCATION, null, null));
+			Academy reloaded = loadAcademyPort.loadAcademyByExternalPlaceId(placeId).orElseThrow();
+			return new Academy[] {reused, reloaded};
+		});
+
+		Academy reused = reusedAndReloaded[0];
+		assertThat(reused.getAcademyId()).as("saveAcademy가 돌려준 학원의 academyId (이미 저장된 학원)")
+				.isEqualTo(first.getAcademyId());
+		assertThat(reused.getExternalPlaceId()).isEqualTo(placeId);
+		assertThat(reused.getEntrance()).as("새 학원의 entrance가 비어 있어도 이미 저장된 entrance는 남는다").isNotNull();
+		assertThat(reused.getEntrance().lat()).isCloseTo(ACADEMY_ENTRANCE.lat(), within(COORDINATE_TOLERANCE));
+		assertThat(reused.getPhone()).as("새 학원의 phone이 비어 있어도 이미 저장된 phone은 남는다").isEqualTo("02-555-1234");
+		assertThat(reusedAndReloaded[1].getAcademyId()).as("같은 트랜잭션에서 다시 읽은 academyId")
+				.isEqualTo(first.getAcademyId());
 
 		Integer rows = jdbcTemplate.queryForObject(
 				"select count(*) from academy where external_place_id = ?", Integer.class, placeId);
 		assertThat(rows).as("externalPlaceId %s인 academy 행 수", placeId).isEqualTo(1);
+		String storedEntrance = jdbcTemplate.queryForObject(
+				"select ST_AsText(entrance) from academy where academy_id = ?", String.class, first.getAcademyId());
+		assertThat(storedEntrance).as("DB에 남은 entrance").isNotNull();
 	}
 
 	@Test
@@ -366,6 +381,98 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 		assertThat(loadSchedulePort.loadSchedulesOfChildren(List.of())).isNotNull().isEmpty();
 		assertThat(loadSchedulePort.loadSchedulesOfChildren(List.of(users.guardianId())))
 				.as("일정이 없는 사용자만 넘긴 경우")
+				.isEmpty();
+	}
+
+	@Test
+	@DisplayName("loadSchedules는 여러 scheduleId의 일정을 학원과 함께 한 번에 돌려주고 없는 id는 빼며, SQL은 일정 조회 1회 + 학원 조회 1회 이하다")
+	void loadSchedulesReturnsSchedulesOfGivenIdsWithAcademiesAtOnce() {
+		Academy academy = newAcademy();
+		Academy otherAcademy = saveAcademyPort.saveAcademy(Academy.create(uniquePlaceId(), "한빛수학학원",
+				"서울 강남구 역삼로 10", ACADEMY_LOCATION, null, "02-777-0000"));
+		academyIds.add(otherAcademy.getAcademyId());
+		PickupSchedule minjunMonday = newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
+		PickupSchedule seoyunTuesday = newSchedule(users.seoyunId(), otherAcademy, DayOfWeek.TUESDAY);
+		PickupSchedule minjunThursday = newSchedule(users.minjunId(), otherAcademy, DayOfWeek.THURSDAY);
+		PickupSchedule notRequested = newSchedule(users.minjunId(), academy, DayOfWeek.FRIDAY);
+		Long maxScheduleId = jdbcTemplate.queryForObject(
+				"select coalesce(max(schedule_id), 0) from pickup_schedule", Long.class);
+		long missingScheduleId = maxScheduleId + 1000;
+		clearPersistenceContext();
+
+		Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+		boolean statisticsWasEnabled = statistics.isStatisticsEnabled();
+		List<PickupSchedule> loaded;
+		long statementCount;
+		try {
+			statistics.setStatisticsEnabled(true);
+			statistics.clear();
+			loaded = loadSchedulePort.loadSchedules(List.of(minjunMonday.getScheduleId(),
+					seoyunTuesday.getScheduleId(), missingScheduleId, minjunThursday.getScheduleId()));
+			statementCount = statistics.getPrepareStatementCount();
+		}
+		finally {
+			statistics.setStatisticsEnabled(statisticsWasEnabled);
+		}
+
+		assertThat(loaded).extracting(PickupSchedule::getScheduleId)
+				.as("요청한 id 중 있는 일정만 (없는 id · 요청하지 않은 일정은 빠짐)")
+				.containsExactlyInAnyOrder(minjunMonday.getScheduleId(), seoyunTuesday.getScheduleId(),
+						minjunThursday.getScheduleId())
+				.doesNotContain(notRequested.getScheduleId(), missingScheduleId);
+		Map<Long, PickupSchedule> byId = new HashMap<>();
+		loaded.forEach(schedule -> byId.put(schedule.getScheduleId(), schedule));
+		assertThat(byId.get(minjunMonday.getScheduleId()).getChildUserId()).isEqualTo(users.minjunId());
+		assertThat(byId.get(seoyunTuesday.getScheduleId()).getChildUserId()).isEqualTo(users.seoyunId());
+		assertThat(byId.get(minjunMonday.getScheduleId()).getWeekdays()).containsExactly(DayOfWeek.MONDAY);
+		assertThat(byId.get(minjunMonday.getScheduleId()).getAcademy().getAcademyId())
+				.as("월요일 일정의 학원")
+				.isEqualTo(academy.getAcademyId());
+		assertThat(byId.get(minjunMonday.getScheduleId()).getAcademy().getName()).isEqualTo("해솔영어학원");
+		assertThat(byId.get(minjunMonday.getScheduleId()).getAcademy().getPhone()).isEqualTo("02-555-1234");
+		assertThat(byId.get(minjunMonday.getScheduleId()).getAcademy().getEntrance()).as("entrance").isNotNull();
+		PickupSchedule otherAcademySchedule = byId.get(seoyunTuesday.getScheduleId());
+		assertThat(otherAcademySchedule.getAcademy().getAcademyId())
+				.as("화요일 일정의 학원")
+				.isEqualTo(otherAcademy.getAcademyId());
+		assertThat(otherAcademySchedule.getAcademy().getName()).isEqualTo("한빛수학학원");
+		assertThat(otherAcademySchedule.getAcademy().getAddress()).isEqualTo("서울 강남구 역삼로 10");
+		assertThat(otherAcademySchedule.getAcademy().getLocation().lat()).as("location 위도")
+				.isCloseTo(ACADEMY_LOCATION.lat(), within(COORDINATE_TOLERANCE));
+		assertThat(otherAcademySchedule.getAcademy().getEntrance()).as("출입구 없는 학원의 entrance").isNull();
+		assertThat(byId.get(minjunThursday.getScheduleId()).getAcademy().getAcademyId())
+				.isEqualTo(otherAcademy.getAcademyId());
+		assertThat(statementCount).as("SQL 수 (일정 IN 조회 1회 + 학원 조회 1회 이하)").isLessThanOrEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("loadSchedules에 빈 목록을 주면 SQL 없이 빈 목록을 돌려주고, 없는 id만 주면 빈 목록을 돌려준다")
+	void loadSchedulesReturnsEmptyListForEmptyInputWithoutQuery() {
+		Academy academy = newAcademy();
+		newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
+		Long maxScheduleId = jdbcTemplate.queryForObject(
+				"select coalesce(max(schedule_id), 0) from pickup_schedule", Long.class);
+		clearPersistenceContext();
+
+		Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+		boolean statisticsWasEnabled = statistics.isStatisticsEnabled();
+		List<PickupSchedule> loaded;
+		long statementCount;
+		try {
+			statistics.setStatisticsEnabled(true);
+			statistics.clear();
+			loaded = loadSchedulePort.loadSchedules(List.of());
+			statementCount = statistics.getPrepareStatementCount();
+		}
+		finally {
+			statistics.setStatisticsEnabled(statisticsWasEnabled);
+		}
+
+		assertThat(loaded).isNotNull().isEmpty();
+		assertThat(statementCount).as("빈 입력일 때 SQL 수").isZero();
+		assertThat(loadSchedulePort.loadSchedules(List.of(maxScheduleId + 1000, maxScheduleId + 1001)))
+				.as("없는 id만 넘긴 경우")
+				.isNotNull()
 				.isEmpty();
 	}
 

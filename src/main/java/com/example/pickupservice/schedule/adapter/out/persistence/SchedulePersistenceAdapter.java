@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import java.time.DayOfWeek;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -43,7 +44,17 @@ class SchedulePersistenceAdapter implements LoadAcademyPort, SaveAcademyPort, Lo
 
 	@Override
 	public Academy saveAcademy(Academy academy) {
-		return toDomain(academyJpaRepository.save(toEntity(academy)));
+		if (academy.getAcademyId() != null) {
+			return toDomain(academyJpaRepository.save(toEntity(academy)));
+		}
+		Long academyId = academyJpaRepository.upsertByExternalPlaceId(academy.getExternalPlaceId(), academy.getName(),
+				academy.getAddress(), toEwkt(academy.getLocation()), toEwkt(academy.getEntrance()), academy.getPhone());
+		return findAcademy(academyId);
+	}
+
+	private static String toEwkt(LatLng latLng) {
+		return latLng == null ? null
+				: String.format(Locale.ROOT, "SRID=4326;POINT(%s %s)", latLng.lng(), latLng.lat());
 	}
 
 	@Override
@@ -62,6 +73,14 @@ class SchedulePersistenceAdapter implements LoadAcademyPort, SaveAcademyPort, Lo
 			return List.of();
 		}
 		return toDomains(pickupScheduleJpaRepository.findByChildUserIdIn(childUserIds));
+	}
+
+	@Override
+	public List<PickupSchedule> loadSchedules(List<Long> scheduleIds) {
+		if (scheduleIds.isEmpty()) {
+			return List.of();
+		}
+		return toDomains(pickupScheduleJpaRepository.findAllById(scheduleIds));
 	}
 
 	@Override

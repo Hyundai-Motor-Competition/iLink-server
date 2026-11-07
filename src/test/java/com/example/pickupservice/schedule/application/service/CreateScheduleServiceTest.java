@@ -161,6 +161,41 @@ class CreateScheduleServiceTest {
 	}
 
 	@Test
+	@DisplayName("일정 등록은 같은 학원을 다시 쓸 때 요청의 entrance · phone이 비어 있으면 기존 entrance · phone을 유지해 저장하고 status는 READY다")
+	void createScheduleKeepsExistingEntranceAndPhoneWhenRequestLeavesThemEmpty() {
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+		Academy existingAcademy = Academy.restore(EXISTING_ACADEMY_ID, EXTERNAL_PLACE_ID, "해솔영어", "서울 강남구 옛 주소 1",
+				OLD_LOCATION, ENTRANCE, "02-555-0000");
+		given(loadAcademyPort.loadAcademyByExternalPlaceId(EXTERNAL_PLACE_ID)).willReturn(Optional.of(existingAcademy));
+		givenSavePortsAssignIds();
+		AcademyInput withoutEntranceAndPhone = new AcademyInput(EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152",
+				LOCATION, null, null);
+
+		ScheduleResult result = createScheduleService.createSchedule(
+				new CreateScheduleCommand(FAMILY_ID, CHILD_ID, withoutEntranceAndPhone, WEEKDAYS, CLASS_END_TIME,
+						TARGET_PICKUP));
+
+		assertThat(result).as("등록 결과 (기존 출입구를 유지했으니 READY)")
+				.isEqualTo(new ScheduleResult(SAVED_SCHEDULE_ID, EXISTING_ACADEMY_ID, ScheduleStatus.READY));
+
+		ArgumentCaptor<Academy> academyCaptor = ArgumentCaptor.forClass(Academy.class);
+		verify(saveAcademyPort).saveAcademy(academyCaptor.capture());
+		Academy savedAcademy = academyCaptor.getValue();
+		assertThat(savedAcademy.getAcademyId()).as("saveAcademy에 넘긴 학원의 academyId").isEqualTo(EXISTING_ACADEMY_ID);
+		assertThat(savedAcademy.getName()).as("요청 값으로 갱신한 name").isEqualTo("해솔영어학원");
+		assertThat(savedAcademy.getAddress()).as("요청 값으로 갱신한 address").isEqualTo("서울 강남구 테헤란로 152");
+		assertThat(savedAcademy.getLocation()).as("요청 값으로 갱신한 location").isEqualTo(LOCATION);
+		assertThat(savedAcademy.getEntrance()).as("요청 entrance가 비어 있어 유지한 기존 entrance").isEqualTo(ENTRANCE);
+		assertThat(savedAcademy.getPhone()).as("요청 phone이 비어 있어 유지한 기존 phone").isEqualTo("02-555-0000");
+
+		ArgumentCaptor<PickupSchedule> scheduleCaptor = ArgumentCaptor.forClass(PickupSchedule.class);
+		verify(saveSchedulePort).saveSchedule(scheduleCaptor.capture());
+		assertThat(scheduleCaptor.getValue().getStatus()).as("저장한 일정의 status").isEqualTo(ScheduleStatus.READY);
+		assertThat(scheduleCaptor.getValue().getAcademy().getEntrance()).as("저장한 일정의 학원 entrance")
+				.isEqualTo(ENTRANCE);
+	}
+
+	@Test
 	@DisplayName("일정 등록은 같은 externalPlaceId의 학원이 없으면 academyId 없는 새 학원을 externalPlaceId와 함께 저장한다")
 	void createScheduleCreatesNewAcademyWhenNoAcademyHasSameExternalPlaceId() {
 		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);

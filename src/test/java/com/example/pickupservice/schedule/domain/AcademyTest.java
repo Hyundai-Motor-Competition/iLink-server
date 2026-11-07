@@ -71,4 +71,47 @@ class AcademyTest {
 		assertThat(original.getPhone()).as("원래 학원의 phone").isNull();
 	}
 
+	@Test
+	@DisplayName("updateInfo는 받은 entrance · phone이 비어 있으면(null) 기존 entrance · phone을 유지하고 이름 · 주소 · 위치는 받은 값으로 바꾼다")
+	void updateInfoKeepsExistingEntranceAndPhoneWhenGivenValuesAreNull() {
+		Academy original = Academy.restore(301L, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION,
+				ENTRANCE, "02-555-1234");
+
+		Academy updated = original.updateInfo("해솔영어학원 본관", "서울 강남구 테헤란로 200", NEW_LOCATION, null, null);
+
+		assertThat(updated.getAcademyId()).as("갱신한 학원의 academyId").isEqualTo(301L);
+		assertThat(updated.getExternalPlaceId()).as("갱신한 학원의 externalPlaceId").isEqualTo(EXTERNAL_PLACE_ID);
+		assertThat(updated.getName()).as("받은 값으로 바꾼 name").isEqualTo("해솔영어학원 본관");
+		assertThat(updated.getAddress()).as("받은 값으로 바꾼 address").isEqualTo("서울 강남구 테헤란로 200");
+		assertThat(updated.getLocation()).as("받은 값으로 바꾼 location").isEqualTo(NEW_LOCATION);
+		assertThat(updated.getEntrance()).as("받은 entrance가 null이면 유지한 기존 entrance").isEqualTo(ENTRANCE);
+		assertThat(updated.getPhone()).as("받은 phone이 null이면 유지한 기존 phone").isEqualTo("02-555-1234");
+		assertThat(updated.hasEntrance()).as("기존 출입구를 유지했으니 hasEntrance").isTrue();
+	}
+
+	@Test
+	@DisplayName("updateInfo는 기존 entrance · phone이 있어도 받은 entrance · phone이 있으면 받은 값으로 바꾼다")
+	void updateInfoReplacesExistingEntranceAndPhoneWhenGivenValuesArePresent() {
+		Academy original = Academy.restore(301L, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION,
+				ENTRANCE, "02-555-1234");
+
+		Academy updated = original.updateInfo("해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, NEW_ENTRANCE,
+				"02-555-9999");
+
+		assertThat(updated.getEntrance()).as("받은 값으로 바꾼 entrance").isEqualTo(NEW_ENTRANCE);
+		assertThat(updated.getPhone()).as("받은 값으로 바꾼 phone").isEqualTo("02-555-9999");
+	}
+
+	@Test
+	@DisplayName("updateInfo는 받은 entrance만 비어 있으면 entrance는 유지하고 phone은 받은 값으로 바꾼다 (두 값은 따로 판단한다)")
+	void updateInfoJudgesEntranceAndPhoneSeparately() {
+		Academy original = Academy.restore(301L, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION,
+				ENTRANCE, "02-555-1234");
+
+		Academy updated = original.updateInfo("해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, null, "02-555-9999");
+
+		assertThat(updated.getEntrance()).as("받은 entrance가 null이면 유지한 기존 entrance").isEqualTo(ENTRANCE);
+		assertThat(updated.getPhone()).as("받은 값으로 바꾼 phone").isEqualTo("02-555-9999");
+	}
+
 }

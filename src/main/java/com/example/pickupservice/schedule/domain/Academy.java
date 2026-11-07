@@ -28,7 +28,8 @@ public class Academy {
 	}
 
 	public Academy updateInfo(String name, String address, LatLng location, LatLng entrance, String phone) {
-		return new Academy(academyId, externalPlaceId, name, address, location, entrance, phone);
+		return new Academy(academyId, externalPlaceId, name, address, location,
+				entrance != null ? entrance : this.entrance, phone != null ? phone : this.phone);
 	}
 
 	public boolean hasEntrance() {

@@ -152,6 +152,71 @@ class UpdateScheduleServiceTest {
 	}
 
 	@Test
+	@DisplayName("일정 수정은 자기 자신을 뺀 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절하고 저장하지 않는다")
+	void updateScheduleRejectsWithDailyScheduleLimitWhenOtherSchedulesOnSameWeekdayAreAlreadyThree() {
+		PickupSchedule self = savedSchedule(SCHEDULE_ID, Set.of(DayOfWeek.TUESDAY), OLD_CLASS_END_TIME,
+				oldAcademyWithEntrance(), ScheduleStatus.READY);
+		given(loadSchedulePort.loadSchedule(SCHEDULE_ID)).willReturn(Optional.of(self));
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+		given(loadSchedulePort.loadSchedulesOfChild(CHILD_ID)).willReturn(List.of(self,
+				savedSchedule(601L, Set.of(DayOfWeek.MONDAY), LocalTime.of(15, 0), oldAcademyWithEntrance(),
+						ScheduleStatus.READY),
+				savedSchedule(602L, Set.of(DayOfWeek.MONDAY), LocalTime.of(16, 0), oldAcademyWithEntrance(),
+						ScheduleStatus.READY),
+				savedSchedule(603L, Set.of(DayOfWeek.MONDAY), LocalTime.of(17, 0), oldAcademyWithEntrance(),
+						ScheduleStatus.READY)));
+
+		BusinessException thrown = catchThrowableOfType(BusinessException.class,
+				() -> updateScheduleService.updateSchedule(
+						command(Set.of(DayOfWeek.MONDAY), LocalTime.of(19, 0), OLD_TARGET_PICKUP, oldAcademyInput())));
+
+		assertThat(thrown).as("월요일에 다른 일정 3개가 있을 때 월요일로 옮기는 수정").isNotNull();
+		assertThat(thrown.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		assertThat(thrown.code()).isEqualTo("DAILY_SCHEDULE_LIMIT");
+		verifyNoInteractions(saveAcademyPort, saveSchedulePort);
+	}
+
+	@Test
+	@DisplayName("일정 수정은 같은 학원을 다시 쓸 때 요청의 entrance · phone이 비어 있으면 기존 entrance · phone을 유지해 저장하고 status는 READY다")
+	void updateScheduleKeepsExistingEntranceAndPhoneWhenRequestLeavesThemEmpty() {
+		PickupSchedule existing = savedSchedule(SCHEDULE_ID, OLD_WEEKDAYS, OLD_CLASS_END_TIME,
+				oldAcademyWithEntrance(), ScheduleStatus.READY);
+		given(loadSchedulePort.loadSchedule(SCHEDULE_ID)).willReturn(Optional.of(existing));
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+		given(loadSchedulePort.loadSchedulesOfChild(CHILD_ID)).willReturn(List.of(existing));
+		Academy existingAcademy = Academy.restore(EXISTING_NEW_PLACE_ACADEMY_ID, NEW_EXTERNAL_PLACE_ID, "새봄수학",
+				"서울 서초구 옛 주소 3", OLD_LOCATION, NEW_ENTRANCE, "02-777-1111");
+		given(loadAcademyPort.loadAcademyByExternalPlaceId(NEW_EXTERNAL_PLACE_ID))
+				.willReturn(Optional.of(existingAcademy));
+		givenSavePortsAssignIds();
+		AcademyInput withoutEntranceAndPhone = new AcademyInput(NEW_EXTERNAL_PLACE_ID, "새봄수학학원",
+				"서울 서초구 서초대로 77", NEW_LOCATION, null, null);
+
+		ScheduleResult result = updateScheduleService.updateSchedule(
+				command(OLD_WEEKDAYS, OLD_CLASS_END_TIME, OLD_TARGET_PICKUP, withoutEntranceAndPhone));
+
+		assertThat(result).as("수정 결과 (기존 출입구를 유지했으니 READY)")
+				.isEqualTo(new ScheduleResult(SCHEDULE_ID, EXISTING_NEW_PLACE_ACADEMY_ID, ScheduleStatus.READY));
+
+		ArgumentCaptor<Academy> academyCaptor = ArgumentCaptor.forClass(Academy.class);
+		verify(saveAcademyPort).saveAcademy(academyCaptor.capture());
+		Academy savedAcademy = academyCaptor.getValue();
+		assertThat(savedAcademy.getAcademyId()).as("saveAcademy에 넘긴 학원의 academyId")
+				.isEqualTo(EXISTING_NEW_PLACE_ACADEMY_ID);
+		assertThat(savedAcademy.getName()).as("요청 값으로 갱신한 name").isEqualTo("새봄수학학원");
+		assertThat(savedAcademy.getAddress()).as("요청 값으로 갱신한 address").isEqualTo("서울 서초구 서초대로 77");
+		assertThat(savedAcademy.getLocation()).as("요청 값으로 갱신한 location").isEqualTo(NEW_LOCATION);
+		assertThat(savedAcademy.getEntrance()).as("요청 entrance가 비어 있어 유지한 기존 entrance").isEqualTo(NEW_ENTRANCE);
+		assertThat(savedAcademy.getPhone()).as("요청 phone이 비어 있어 유지한 기존 phone").isEqualTo("02-777-1111");
+
+		ArgumentCaptor<PickupSchedule> scheduleCaptor = ArgumentCaptor.forClass(PickupSchedule.class);
+		verify(saveSchedulePort).saveSchedule(scheduleCaptor.capture());
+		assertThat(scheduleCaptor.getValue().getStatus()).as("저장한 일정의 status").isEqualTo(ScheduleStatus.READY);
+		assertThat(scheduleCaptor.getValue().getAcademy().getEntrance()).as("저장한 일정의 학원 entrance")
+				.isEqualTo(NEW_ENTRANCE);
+	}
+
+	@Test
 	@DisplayName("일정 수정은 요일 · 시간 · 학원을 바꾸고 status를 다시 판정한다 (출입구 있는 학원 → 없는 학원이면 DRAFT)")
 	void updateScheduleChangesWeekdaysTimeAcademyAndRejudgesStatusToDraft() {
 		PickupSchedule existing = savedSchedule(SCHEDULE_ID, OLD_WEEKDAYS, OLD_CLASS_END_TIME,

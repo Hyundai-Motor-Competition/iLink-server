@@ -12,4 +12,6 @@ public interface LoadSchedulePort {
 	List<PickupSchedule> loadSchedulesOfChild(long childUserId);
 
 	List<PickupSchedule> loadSchedulesOfChildren(List<Long> childUserIds);
+
+	List<PickupSchedule> loadSchedules(List<Long> scheduleIds);
 }
