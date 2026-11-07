@@ -22,11 +22,11 @@ class LinkStatusPollGuard {
 	private final Clock clock;
 	private final Map<Long, Instant> lastPolledAt = new ConcurrentHashMap<>();
 
-	void check(long vehicleId) {
+	void check(long deviceId) {
 		Instant now = clock.instant();
 		removeStaleEntries(now);
 		AtomicBoolean tooSoon = new AtomicBoolean(false);
-		lastPolledAt.compute(vehicleId, (id, last) -> {
+		lastPolledAt.compute(deviceId, (id, last) -> {
 			if (last != null && now.isBefore(last.plus(MIN_INTERVAL))) {
 				tooSoon.set(true);
 				return last;

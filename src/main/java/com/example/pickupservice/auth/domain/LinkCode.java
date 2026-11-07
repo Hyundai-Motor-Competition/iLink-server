@@ -15,6 +15,8 @@ public class LinkCode {
 
 	private final Long codeId;
 	private final long vehicleId;
+	private final Long issuedDeviceId;
+	private final boolean issuedBeforeLink;
 	private final String code;
 	private LinkCodeStatus status;
 	private Instant expiresAt;
@@ -22,14 +24,17 @@ public class LinkCode {
 	private LinkMode mode;
 	private Instant tokenDeliveredAt;
 
-	public static LinkCode issue(long vehicleId, String code, Instant issuedAt) {
-		return new LinkCode(null, vehicleId, code, LinkCodeStatus.ISSUED, issuedAt.plus(VALID_DURATION), null, null,
-				null);
+	public static LinkCode issue(long vehicleId, long deviceId, boolean issuedBeforeLink, String code,
+			Instant issuedAt) {
+		return new LinkCode(null, vehicleId, deviceId, issuedBeforeLink, code, LinkCodeStatus.ISSUED,
+				issuedAt.plus(VALID_DURATION), null, null, null);
 	}
 
-	public static LinkCode restore(Long codeId, long vehicleId, String code, LinkCodeStatus status, Instant expiresAt,
-			Instant usedAt, LinkMode mode, Instant tokenDeliveredAt) {
-		return new LinkCode(codeId, vehicleId, code, status, expiresAt, usedAt, mode, tokenDeliveredAt);
+	public static LinkCode restore(Long codeId, long vehicleId, Long issuedDeviceId, boolean issuedBeforeLink,
+			String code, LinkCodeStatus status, Instant expiresAt, Instant usedAt, LinkMode mode,
+			Instant tokenDeliveredAt) {
+		return new LinkCode(codeId, vehicleId, issuedDeviceId, issuedBeforeLink, code, status, expiresAt, usedAt, mode,
+				tokenDeliveredAt);
 	}
 
 	public boolean isExpired(Instant now) {

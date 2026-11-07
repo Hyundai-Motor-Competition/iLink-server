@@ -46,8 +46,9 @@ public class VehicleLinkCodeController implements VehicleLinkCodeApiDoc {
 	@PreAuthorize("hasAuthority('PRINCIPAL_VEHICLE')")
 	@GetMapping("/v1/vehicle-link-codes/{codeId}/status")
 	public LinkStatusResponse getLinkStatus(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable long codeId) {
-		linkStatusPollGuard.check(principal.id());
-		return LinkStatusResponse.from(getLinkStatusUseCase.getLinkStatus(codeId, principal.id()));
+		long deviceId = CurrentDevice.id();
+		linkStatusPollGuard.check(deviceId);
+		return LinkStatusResponse.from(getLinkStatusUseCase.getLinkStatus(codeId, principal.id(), deviceId));
 	}
 
 	@Override

@@ -55,13 +55,15 @@ public class ApproveLinkService implements ApproveLinkUseCase {
 		LinkCode linkCode = loadUsableCode(command.code(), now);
 		VehicleInfo vehicle = loadVehicleUseCase.findVehicle(linkCode.getVehicleId())
 				.orElseThrow(AuthErrors::linkCodeInvalid);
-		verifyMode(command.mode(), vehicle);
+		verifyMode(command.mode(), linkCode, vehicle);
 		ConsentRules.requireAgreed(Consents.requiredForGuardianLink(), command.consents());
 		GuardianAccount guardian = resolveGuardian(command, vehicle, now);
 		IssuedTokens tokens = registerGuardianDevice(guardian, command, now);
 		linkCode.approve(command.mode(), now);
 		saveLinkCodePort.saveLinkCode(linkCode);
-		linkCodeIssueCounter.reset(vehicle.vehicleId());
+		if (linkCode.getIssuedDeviceId() != null) {
+			linkCodeIssueCounter.reset(linkCode.getIssuedDeviceId());
+		}
 		return new VehicleLinkResult(vehicle.vehicleId(), guardian.familyId(), guardian.userId(),
 				tokens.accessToken(), tokens.refreshToken());
 	}
@@ -74,8 +76,8 @@ public class ApproveLinkService implements ApproveLinkUseCase {
 		return linkCode;
 	}
 
-	private static void verifyMode(LinkMode requested, VehicleInfo vehicle) {
-		if (requested != LinkCodeRules.actualModeOf(vehicle)) {
+	private static void verifyMode(LinkMode requested, LinkCode linkCode, VehicleInfo vehicle) {
+		if (requested != LinkCodeRules.actualModeOf(linkCode, vehicle)) {
 			throw AuthErrors.linkModeMismatch();
 		}
 	}

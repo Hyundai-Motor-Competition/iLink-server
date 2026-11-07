@@ -61,6 +61,8 @@ class GetLinkStatusServiceTest {
 	private static final long OTHER_VEHICLE_ID = 78L;
 	private static final long FAMILY_ID = 12L;
 	private static final long VEHICLE_DEVICE_ID = 601L;
+	private static final long OTHER_VEHICLE_DEVICE_ID = 602L;
+	private static final long OTHER_VEHICLE_OWN_DEVICE_ID = 701L;
 	private static final String OLD_VEHICLE_REFRESH_HASH = "0".repeat(64);
 
 	@Mock
@@ -102,11 +104,8 @@ class GetLinkStatusServiceTest {
 	void getLinkStatusRejectsCodeIssuedByOtherVehicle() {
 		givenCode(usedCode(LinkMode.NEW, null));
 
-		assertThatThrownBy(() -> getLinkStatusService.getLinkStatus(CODE_ID, OTHER_VEHICLE_ID))
-				.isInstanceOfSatisfying(BusinessException.class, e -> {
-					assertThat(e.status()).isEqualTo(HttpStatus.FORBIDDEN);
-					assertThat(e.code()).isEqualTo("NOT_CODE_OWNER");
-				});
+		assertNotCodeOwner(() -> getLinkStatusService.getLinkStatus(CODE_ID, OTHER_VEHICLE_ID,
+				OTHER_VEHICLE_OWN_DEVICE_ID));
 
 		verify(issueTokenPort, never()).issueTokens(any());
 		verify(saveLinkCodePort, never()).saveLinkCode(any());
@@ -116,10 +115,10 @@ class GetLinkStatusServiceTest {
 	@Test
 	@DisplayName("연결 상태 조회는 승인 전 코드에 WAITING과 pollAfterSeconds 2를 돌려준다")
 	void getLinkStatusReturnsWaitingWithPollAfterTwoSecondsForUnapprovedCode() {
-		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, "K7P2QX9M", LinkCodeStatus.ISSUED, NOW.plusSeconds(180),
+		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, "K7P2QX9M", LinkCodeStatus.ISSUED, NOW.plusSeconds(180),
 				null, null, null));
 
-		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID);
+		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID);
 
 		assertThat(result).isEqualTo(new LinkStatusResult(LinkStatus.WAITING, null, null, null, null, 2));
 		verify(issueTokenPort, never()).issueTokens(any());
@@ -128,10 +127,10 @@ class GetLinkStatusServiceTest {
 	@Test
 	@DisplayName("연결 상태 조회는 만료된 코드에 EXPIRED를 돌려준다")
 	void getLinkStatusReturnsExpiredForExpiredStatusCode() {
-		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, "K7P2QX9M", LinkCodeStatus.EXPIRED, NOW.plusSeconds(180),
+		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, "K7P2QX9M", LinkCodeStatus.EXPIRED, NOW.plusSeconds(180),
 				null, null, null));
 
-		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID);
+		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID);
 
 		assertThat(result).isEqualTo(new LinkStatusResult(LinkStatus.EXPIRED, null, null, null, null, null));
 		verify(issueTokenPort, never()).issueTokens(any());
@@ -140,10 +139,10 @@ class GetLinkStatusServiceTest {
 	@Test
 	@DisplayName("연결 상태 조회는 expiresAt이 지난 ISSUED 코드에도 EXPIRED를 돌려준다")
 	void getLinkStatusReturnsExpiredForIssuedCodePastExpiresAt() {
-		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, "K7P2QX9M", LinkCodeStatus.ISSUED, NOW.minusSeconds(1),
+		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, "K7P2QX9M", LinkCodeStatus.ISSUED, NOW.minusSeconds(1),
 				null, null, null));
 
-		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID);
+		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID);
 
 		assertThat(result).isEqualTo(new LinkStatusResult(LinkStatus.EXPIRED, null, null, null, null, null));
 		verify(issueTokenPort, never()).issueTokens(any());
@@ -155,9 +154,9 @@ class GetLinkStatusServiceTest {
 		LinkCode code = usedCode(LinkMode.NEW, null);
 		givenCode(code);
 		givenLinkedVehicle();
-		givenLiveVehicleDevices(liveVehicleDevice(VEHICLE_DEVICE_ID));
+		givenIssuedDevice(liveVehicleDevice(VEHICLE_DEVICE_ID));
 
-		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID);
+		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID);
 
 		assertThat(result.status()).isEqualTo(LinkStatus.LINKED);
 		assertThat(result.vehicleId()).isEqualTo(VEHICLE_ID);
@@ -186,18 +185,55 @@ class GetLinkStatusServiceTest {
 	}
 
 	@Test
-	@DisplayName("연결 상태 조회는 살아 있는 차량 기기가 여럿이면 deviceId가 가장 큰 기기에 차량 토큰을 준다")
-	void getLinkStatusIssuesVehicleTokensToLiveDeviceWithLargestDeviceId() {
+	@DisplayName("연결 코드는 발급한 deviceId를 기록하고, 연결 상태 조회는 발급한 기기가 아니면 NOT_CODE_OWNER로 거절하며 차량 토큰은 그 기기에만 준다")
+	void getLinkStatusRejectsOtherDeviceOfSameVehicleAndIssuesTokensOnlyToIssuingDevice() {
 		givenCode(usedCode(LinkMode.NEW, null));
+
+		assertNotCodeOwner(() -> getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, OTHER_VEHICLE_DEVICE_ID));
+
+		verify(issueTokenPort, never()).issueTokens(any());
+		verify(saveLinkCodePort, never()).saveLinkCode(any());
+		verify(saveDevicePort, never()).saveDevice(any());
+
 		givenLinkedVehicle();
-		givenLiveVehicleDevices(liveVehicleDevice(600L), liveVehicleDevice(602L), liveVehicleDevice(601L));
+		givenIssuedDevice(liveVehicleDevice(VEHICLE_DEVICE_ID));
 
-		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID);
+		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID);
 
-		assertThat(((Number) decode(result.accessToken()).getClaim("deviceId")).longValue()).isEqualTo(602L);
+		assertThat(result.status()).isEqualTo(LinkStatus.LINKED);
+		assertThat(((Number) decode(result.accessToken()).getClaim("deviceId")).longValue())
+				.isEqualTo(VEHICLE_DEVICE_ID);
 		ArgumentCaptor<Device> savedDevice = ArgumentCaptor.forClass(Device.class);
 		verify(saveDevicePort).saveDevice(savedDevice.capture());
-		assertThat(savedDevice.getValue().getDeviceId()).isEqualTo(602L);
+		assertThat(savedDevice.getValue().getDeviceId()).isEqualTo(VEHICLE_DEVICE_ID);
+	}
+
+	@Test
+	@DisplayName("연결 상태 조회는 같은 차량의 다른 기기가 승인 전 코드를 조회해도 NOT_CODE_OWNER로 거절한다")
+	void getLinkStatusRejectsOtherDeviceOfSameVehicleForWaitingCode() {
+		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, "K7P2QX9M", LinkCodeStatus.ISSUED,
+				NOW.plusSeconds(180), null, null, null));
+
+		assertNotCodeOwner(() -> getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, OTHER_VEHICLE_DEVICE_ID));
+	}
+
+	@Test
+	@DisplayName("연결 상태 조회는 살아 있는 차량 기기가 여럿이어도 deviceId 크기와 상관없이 코드를 발급한 기기에 차량 토큰을 준다")
+	void getLinkStatusIssuesVehicleTokensToIssuingDeviceEvenWhenLargerLiveDeviceExists() {
+		givenCode(usedCode(LinkMode.NEW, null));
+		givenLinkedVehicle();
+		givenIssuedDevice(liveVehicleDevice(VEHICLE_DEVICE_ID));
+		lenient().when(loadDevicePort.loadLiveDevices(OwnerType.VEHICLE, VEHICLE_ID)).thenReturn(List.of(
+				liveVehicleDevice(600L), liveVehicleDevice(OTHER_VEHICLE_DEVICE_ID),
+				liveVehicleDevice(VEHICLE_DEVICE_ID)));
+
+		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID);
+
+		assertThat(((Number) decode(result.accessToken()).getClaim("deviceId")).longValue())
+				.isEqualTo(VEHICLE_DEVICE_ID);
+		ArgumentCaptor<Device> savedDevice = ArgumentCaptor.forClass(Device.class);
+		verify(saveDevicePort).saveDevice(savedDevice.capture());
+		assertThat(savedDevice.getAllValues()).extracting(Device::getDeviceId).containsExactly(VEHICLE_DEVICE_ID);
 	}
 
 	@Test
@@ -205,9 +241,9 @@ class GetLinkStatusServiceTest {
 	void getLinkStatusReturnsRelinkedForRelinkApprovedCode() {
 		givenCode(usedCode(LinkMode.RELINK, null));
 		givenLinkedVehicle();
-		givenLiveVehicleDevices(liveVehicleDevice(VEHICLE_DEVICE_ID));
+		givenIssuedDevice(liveVehicleDevice(VEHICLE_DEVICE_ID));
 
-		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID);
+		LinkStatusResult result = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID);
 
 		assertThat(result.status()).isEqualTo(LinkStatus.RELINKED);
 		assertThat(result.vehicleId()).isEqualTo(VEHICLE_ID);
@@ -222,7 +258,7 @@ class GetLinkStatusServiceTest {
 	void getLinkStatusRejectsCodeWhoseTokensWereAlreadyDelivered() {
 		givenCode(usedCode(LinkMode.NEW, NOW.minusSeconds(2)));
 
-		assertLinkCodeInvalid(() -> getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID));
+		assertLinkCodeInvalid(() -> getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID));
 
 		verify(issueTokenPort, never()).issueTokens(any());
 		verify(saveDevicePort, never()).saveDevice(any());
@@ -233,12 +269,12 @@ class GetLinkStatusServiceTest {
 	void getLinkStatusRejectsSecondCallAfterDeliveringTokens() {
 		givenCode(usedCode(LinkMode.NEW, null));
 		givenLinkedVehicle();
-		givenLiveVehicleDevices(liveVehicleDevice(VEHICLE_DEVICE_ID));
+		givenIssuedDevice(liveVehicleDevice(VEHICLE_DEVICE_ID));
 
-		LinkStatusResult first = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID);
+		LinkStatusResult first = getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID);
 
 		assertThat(first.status()).isEqualTo(LinkStatus.LINKED);
-		assertLinkCodeInvalid(() -> getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID));
+		assertLinkCodeInvalid(() -> getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID));
 	}
 
 	@Test
@@ -246,20 +282,41 @@ class GetLinkStatusServiceTest {
 	void getLinkStatusRejectsUnknownCode() {
 		when(loadLinkCodePort.loadLinkCode(CODE_ID)).thenReturn(Optional.empty());
 
-		assertLinkCodeInvalid(() -> getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID));
+		assertLinkCodeInvalid(() -> getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID));
 	}
 
 	@Test
-	@DisplayName("연결 상태 조회는 승인된 코드인데 살아 있는 차량 기기가 없으면 LINK_CODE_INVALID로 거절한다")
-	void getLinkStatusRejectsApprovedCodeWithoutLiveVehicleDevice() {
+	@DisplayName("연결 상태 조회는 승인된 코드인데 발급한 기기가 없으면 LINK_CODE_INVALID로 거절한다")
+	void getLinkStatusRejectsApprovedCodeWhenIssuingDeviceIsMissing() {
 		givenCode(usedCode(LinkMode.NEW, null));
 		lenient().when(loadVehicleUseCase.findVehicle(VEHICLE_ID)).thenReturn(Optional.of(linkedVehicle()));
-		givenLiveVehicleDevices();
+		lenient().when(loadDevicePort.loadDevice(VEHICLE_DEVICE_ID)).thenReturn(Optional.empty());
+		lenient().when(loadDevicePort.loadLiveDevices(OwnerType.VEHICLE, VEHICLE_ID))
+				.thenReturn(List.of(liveVehicleDevice(OTHER_VEHICLE_DEVICE_ID)));
 
-		assertLinkCodeInvalid(() -> getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID));
+		assertLinkCodeInvalid(() -> getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID));
 
 		verify(issueTokenPort, never()).issueTokens(any());
 		verify(saveLinkCodePort, never()).saveLinkCode(any());
+		verify(saveDevicePort, never()).saveDevice(any());
+	}
+
+	@Test
+	@DisplayName("연결 상태 조회는 승인된 코드인데 발급한 기기가 폐기됐으면 LINK_CODE_INVALID로 거절한다")
+	void getLinkStatusRejectsApprovedCodeWhenIssuingDeviceIsRevoked() {
+		givenCode(usedCode(LinkMode.NEW, null));
+		lenient().when(loadVehicleUseCase.findVehicle(VEHICLE_ID)).thenReturn(Optional.of(linkedVehicle()));
+		lenient().when(loadDevicePort.loadDevice(VEHICLE_DEVICE_ID)).thenReturn(Optional.of(
+				Device.restore(VEHICLE_DEVICE_ID, OwnerType.VEHICLE, VEHICLE_ID, Platform.VEHICLE, null, null,
+						OLD_VEHICLE_REFRESH_HASH, NOW.minusSeconds(1))));
+		lenient().when(loadDevicePort.loadLiveDevices(OwnerType.VEHICLE, VEHICLE_ID))
+				.thenReturn(List.of(liveVehicleDevice(OTHER_VEHICLE_DEVICE_ID)));
+
+		assertLinkCodeInvalid(() -> getLinkStatusService.getLinkStatus(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID));
+
+		verify(issueTokenPort, never()).issueTokens(any());
+		verify(saveLinkCodePort, never()).saveLinkCode(any());
+		verify(saveDevicePort, never()).saveDevice(any());
 	}
 
 	private void givenCode(LinkCode code) {
@@ -270,8 +327,8 @@ class GetLinkStatusServiceTest {
 		when(loadVehicleUseCase.findVehicle(VEHICLE_ID)).thenReturn(Optional.of(linkedVehicle()));
 	}
 
-	private void givenLiveVehicleDevices(Device... devices) {
-		when(loadDevicePort.loadLiveDevices(OwnerType.VEHICLE, VEHICLE_ID)).thenReturn(List.of(devices));
+	private void givenIssuedDevice(Device device) {
+		when(loadDevicePort.loadDevice(device.getDeviceId())).thenReturn(Optional.of(device));
 	}
 
 	private static VehicleInfo linkedVehicle() {
@@ -279,13 +336,20 @@ class GetLinkStatusServiceTest {
 	}
 
 	private static LinkCode usedCode(LinkMode mode, Instant tokenDeliveredAt) {
-		return LinkCode.restore(CODE_ID, VEHICLE_ID, "K7P2QX9M", LinkCodeStatus.USED, NOW.plusSeconds(180),
+		return LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, "K7P2QX9M", LinkCodeStatus.USED, NOW.plusSeconds(180),
 				NOW.minusSeconds(5), mode, tokenDeliveredAt);
 	}
 
 	private static Device liveVehicleDevice(long deviceId) {
 		return Device.restore(deviceId, OwnerType.VEHICLE, VEHICLE_ID, Platform.VEHICLE, null, null,
 				OLD_VEHICLE_REFRESH_HASH, null);
+	}
+
+	private static void assertNotCodeOwner(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
+		assertThatThrownBy(call).isInstanceOfSatisfying(BusinessException.class, e -> {
+			assertThat(e.status()).isEqualTo(HttpStatus.FORBIDDEN);
+			assertThat(e.code()).isEqualTo("NOT_CODE_OWNER");
+		});
 	}
 
 	private static void assertLinkCodeInvalid(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {

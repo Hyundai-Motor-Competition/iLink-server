@@ -16,22 +16,23 @@ import jakarta.servlet.http.HttpServletRequest;
 @Tag(name = "차량 연결 코드", description = "QR 연결 코드 발급 · 상태 조회 · 코드 확인")
 public interface VehicleLinkCodeApiDoc {
 
-	@Operation(summary = "연결 코드 발급 (LINK-01)", description = "VEHICLE 토큰만(연결 전 기기 토큰 가능). 8자 코드를 5분 동안 유효하게 만들고 그 차량의 이전 ISSUED 코드는 EXPIRED로 바꾼다. qrPayload는 pickup://link?code={code}")
+	@Operation(summary = "연결 코드 발급 (LINK-01)", description = "VEHICLE 토큰만(연결 전 기기 토큰 가능). 8자 코드를 5분 동안 유효하게 만들고 같은 기기가 발급한 이전 ISSUED 코드는 EXPIRED로 바꾼다. qrPayload는 pickup://link?code={code}")
 	@ApiResponse(responseCode = "201", description = "codeId · code · qrPayload · expiresAt · reissuesLeft")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (USER 토큰)")
+	@ApiResponse(responseCode = "409", description = "VEHICLE_ALREADY_LINKED (연결 전 토큰인데 연결된 차량) · VEHICLE_UNLINKED (연결 해제된 차량, 앱을 다시 등록)")
 	@ApiResponse(responseCode = "429", description = "LINK_CODE_REISSUE_LIMIT (연속 5번 넘게 발급)")
 	LinkCodeResponse issueLinkCode(@Parameter(hidden = true) AuthPrincipal principal);
 
-	@Operation(summary = "연결 상태 조회 (LINK-02)", description = "코드를 발급한 차량의 토큰만. 승인 전 WAITING(pollAfterSeconds 2), 만료 EXPIRED, 승인되면 LINKED 또는 RELINKED와 차량 토큰을 한 번만 준다. 1초보다 자주 부르면 429")
+	@Operation(summary = "연결 상태 조회 (LINK-02)", description = "코드를 발급한 기기의 토큰만. 승인 전 WAITING(pollAfterSeconds 2), 만료 EXPIRED, 승인되면 LINKED 또는 RELINKED와 차량 토큰을 한 번만 준다. 1초보다 자주 부르면 429")
 	@ApiResponse(responseCode = "200", description = "status · vehicleId · familyId · accessToken · refreshToken · pollAfterSeconds")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
-	@ApiResponse(responseCode = "403", description = "NOT_CODE_OWNER (다른 차량이 발급한 코드) · FORBIDDEN (USER 토큰)")
+	@ApiResponse(responseCode = "403", description = "NOT_CODE_OWNER (다른 기기가 발급한 코드) · FORBIDDEN (USER 토큰)")
 	@ApiResponse(responseCode = "404", description = "LINK_CODE_INVALID (없거나 토큰을 이미 내려준 코드)")
 	@ApiResponse(responseCode = "429", description = "TOO_MANY_REQUESTS (1초보다 자주 부름)")
 	LinkStatusResponse getLinkStatus(@Parameter(hidden = true) AuthPrincipal principal, long codeId);
 
-	@Operation(summary = "연결 코드 확인 (LINK-03)", description = "인증 없이 부른다. 가족에 연결된 차량의 코드면 RELINK, 아니면 NEW. 연결은 만들지 않는다")
+	@Operation(summary = "연결 코드 확인 (LINK-03)", description = "인증 없이 부른다. 가족에 연결된 차량의 코드면 RELINK, 아니면 NEW. 연결 전 토큰으로 발급한 코드는 항상 NEW. 연결은 만들지 않는다")
 	@SecurityRequirements
 	@ApiResponse(responseCode = "200", description = "status · vehicleModel · plateNumberMasked · expiresAt")
 	@ApiResponse(responseCode = "404", description = "LINK_CODE_INVALID (없는 코드)")
@@ -43,9 +44,9 @@ public interface VehicleLinkCodeApiDoc {
 	@SecurityRequirements
 	@ApiResponse(responseCode = "201", description = "vehicleId · familyId · userId · accessToken · refreshToken")
 	@ApiResponse(responseCode = "404", description = "LINK_CODE_INVALID (없는 코드)")
-	@ApiResponse(responseCode = "409", description = "LINK_MODE_MISMATCH (mode가 코드의 실제 상태와 다름)")
+	@ApiResponse(responseCode = "409", description = "LINK_MODE_MISMATCH (mode가 코드의 실제 상태와 다름) · VEHICLE_ALREADY_LINKED (동시 승인 · 그 사이 다른 승인으로 연결됨)")
 	@ApiResponse(responseCode = "410", description = "LINK_CODE_EXPIRED (만료 · 사용된 코드)")
-	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED · CONSENT_REQUIRED (TERMS · PRIVACY 누락) · VEHICLE_MOVING (차량 주행 중)")
+	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED · CONSENT_REQUIRED (TERMS · PRIVACY 누락)")
 	VehicleLinkResponse approveLink(ApproveLinkRequest request);
 
 }

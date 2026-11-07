@@ -18,6 +18,11 @@ final class AuthErrors {
 				"이미 보호자가 연결된 차량입니다");
 	}
 
+	static BusinessException vehicleUnlinked() {
+		return BusinessException.of(HttpStatus.CONFLICT, "VEHICLE_UNLINKED",
+				"연결이 해제된 차량입니다. 앱을 다시 등록해 주세요");
+	}
+
 	static BusinessException activePickupExists() {
 		return BusinessException.of(HttpStatus.CONFLICT, "ACTIVE_PICKUP_EXISTS",
 				"진행 중인 픽업이 있어 로그아웃할 수 없습니다");

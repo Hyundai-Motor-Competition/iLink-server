@@ -74,7 +74,7 @@ class AuthInPortsTest {
 		assertUseCase(IssueLinkCodeUseCase.class,
 				method("issueLinkCode", LinkCodeResult.class.getName(), IssueLinkCodeCommand.class));
 		assertUseCase(GetLinkStatusUseCase.class,
-				method("getLinkStatus", LinkStatusResult.class.getName(), long.class, long.class));
+				method("getLinkStatus", LinkStatusResult.class.getName(), long.class, long.class, long.class));
 		assertUseCase(CheckLinkCodeUseCase.class,
 				method("checkLinkCode", LinkCodeInfo.class.getName(), String.class, String.class));
 		assertUseCase(ApproveLinkUseCase.class,

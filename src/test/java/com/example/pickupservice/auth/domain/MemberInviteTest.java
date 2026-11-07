@@ -120,7 +120,7 @@ class MemberInviteTest {
 	void linkCodeExpireAndMemberInviteMarkUsedAndRevokeChangeTheirFields() {
 		Instant now = ISSUED_AT.plusSeconds(120);
 
-		LinkCode linkCode = LinkCode.issue(77L, "K7P2QX9M", ISSUED_AT);
+		LinkCode linkCode = LinkCode.issue(77L, 601L, false, "K7P2QX9M", ISSUED_AT);
 		linkCode.expire();
 		assertThat(linkCode.getStatus()).isEqualTo(LinkCodeStatus.EXPIRED);
 

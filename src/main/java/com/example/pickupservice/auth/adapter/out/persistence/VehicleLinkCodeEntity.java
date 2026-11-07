@@ -15,6 +15,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
 
@@ -30,6 +31,12 @@ public class VehicleLinkCodeEntity extends BaseTimeEntity {
 
 	@Column(nullable = false)
 	private Long vehicleId;
+
+	private Long issuedDeviceId;
+
+	@Column(nullable = false)
+	@ColumnDefault("false")
+	private boolean issuedBeforeLink;
 
 	@Column(nullable = false, columnDefinition = "char(8)")
 	private String code;
@@ -49,10 +56,13 @@ public class VehicleLinkCodeEntity extends BaseTimeEntity {
 
 	private Instant tokenDeliveredAt;
 
-	public VehicleLinkCodeEntity(Long codeId, Long vehicleId, String code, LinkCodeStatus status, Instant expiresAt,
-			Instant usedAt, LinkMode mode, Instant tokenDeliveredAt) {
+	public VehicleLinkCodeEntity(Long codeId, Long vehicleId, Long issuedDeviceId, boolean issuedBeforeLink,
+			String code, LinkCodeStatus status, Instant expiresAt, Instant usedAt, LinkMode mode,
+			Instant tokenDeliveredAt) {
 		this.codeId = codeId;
 		this.vehicleId = vehicleId;
+		this.issuedDeviceId = issuedDeviceId;
+		this.issuedBeforeLink = issuedBeforeLink;
 		this.code = code;
 		this.status = status;
 		this.expiresAt = expiresAt;

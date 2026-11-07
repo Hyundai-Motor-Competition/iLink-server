@@ -16,7 +16,10 @@ final class LinkCodeRules {
 		return linkCode.getStatus() == LinkCodeStatus.ISSUED && !linkCode.isExpired(now);
 	}
 
-	static LinkMode actualModeOf(VehicleInfo vehicle) {
+	static LinkMode actualModeOf(LinkCode linkCode, VehicleInfo vehicle) {
+		if (linkCode.isIssuedBeforeLink()) {
+			return LinkMode.NEW;
+		}
 		return vehicle.linked() && vehicle.familyId() != null ? LinkMode.RELINK : LinkMode.NEW;
 	}
 }

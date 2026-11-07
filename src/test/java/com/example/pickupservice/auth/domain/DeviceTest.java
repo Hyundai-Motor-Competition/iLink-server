@@ -97,7 +97,7 @@ class DeviceTest {
 		Instant pushUpdatedAt = REGISTERED_AT.plusSeconds(10);
 		Instant revokedAt = REGISTERED_AT.plusSeconds(120);
 
-		LinkCode linkCode = LinkCode.restore(5012L, 77L, "K7P2QX9M", LinkCodeStatus.USED, expiresAt, usedAt,
+		LinkCode linkCode = LinkCode.restore(5012L, 77L, 601L, false, "K7P2QX9M", LinkCodeStatus.USED, expiresAt, usedAt,
 				LinkMode.NEW, deliveredAt);
 		MemberInvite invite = MemberInvite.restore(901L, 31L, "invite-token-1", expiresAt, usedAt);
 		Device device = Device.restore(4001L, OwnerType.VEHICLE, 77L, Platform.VEHICLE, "fcm-token-9", pushUpdatedAt,
@@ -105,6 +105,7 @@ class DeviceTest {
 
 		assertThat(linkCode.getCodeId()).isEqualTo(5012L);
 		assertThat(linkCode.getVehicleId()).isEqualTo(77L);
+		assertThat(linkCode.getIssuedDeviceId()).isEqualTo(601L);
 		assertThat(linkCode.getCode()).isEqualTo("K7P2QX9M");
 		assertThat(linkCode.getStatus()).isEqualTo(LinkCodeStatus.USED);
 		assertThat(linkCode.getExpiresAt()).isEqualTo(expiresAt);

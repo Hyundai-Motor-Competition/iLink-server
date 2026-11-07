@@ -65,7 +65,7 @@ class AuthIdempotencyKeyTest extends AuthWebTestSupport {
 				.willReturn(new TokenResult("eyJ.new-access-token", "rt_new-refresh-token", EXPIRES_AT));
 		given(issueLinkCodeUseCase.issueLinkCode(any()))
 				.willReturn(new LinkCodeResult(CODE_ID, CODE, "pickup://link?code=" + CODE, EXPIRES_AT, 4));
-		given(getLinkStatusUseCase.getLinkStatus(anyLong(), anyLong()))
+		given(getLinkStatusUseCase.getLinkStatus(anyLong(), anyLong(), anyLong()))
 				.willReturn(new LinkStatusResult(LinkStatus.WAITING, null, null, null, null, 2));
 		given(checkLinkCodeUseCase.checkLinkCode(anyString(), anyString()))
 				.willReturn(new LinkCodeInfo(LinkMode.NEW, "아이오닉 5", "12가 ****", EXPIRES_AT));

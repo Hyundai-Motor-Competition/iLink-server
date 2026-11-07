@@ -20,6 +20,7 @@ class AuthPersistenceEntitiesMappingTest extends IntegrationTestSupport {
 	private static final String VARCHAR = "character varying";
 	private static final String CHAR = "character";
 	private static final String TIMESTAMPTZ = "timestamp with time zone";
+	private static final String BOOLEAN = "boolean";
 	private static final String NULLABLE = "YES";
 	private static final String NOT_NULL = "NO";
 
@@ -43,19 +44,46 @@ class AuthPersistenceEntitiesMappingTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("vehicle_link_code 테이블은 code_id · vehicle_id · code CHAR(8) · status VARCHAR(20) · expires_at · used_at NULL · mode VARCHAR(10) NULL · token_delivered_at NULL과 created_at · updated_at 컬럼을 갖는다")
+	@DisplayName("vehicle_link_code 테이블은 code_id · vehicle_id · issued_device_id NULL · issued_before_link BOOLEAN · code CHAR(8) · status VARCHAR(20) · expires_at · used_at NULL · mode VARCHAR(10) NULL · token_delivered_at NULL과 created_at · updated_at 컬럼을 갖는다")
 	void vehicleLinkCodeTableHasDesignColumns() {
-		assertThat(columnsOf("vehicle_link_code")).containsAllEntriesOf(Map.of(
-				"code_id", new ColumnType(BIGINT, null, NOT_NULL),
-				"vehicle_id", new ColumnType(BIGINT, null, NOT_NULL),
-				"code", new ColumnType(CHAR, 8, NOT_NULL),
-				"status", new ColumnType(VARCHAR, 20, NOT_NULL),
-				"expires_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL),
-				"used_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE),
-				"mode", new ColumnType(VARCHAR, 10, NULLABLE),
-				"token_delivered_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE),
-				"created_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL),
-				"updated_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL)));
+		assertThat(columnsOf("vehicle_link_code")).containsAllEntriesOf(Map.ofEntries(
+				Map.entry("code_id", new ColumnType(BIGINT, null, NOT_NULL)),
+				Map.entry("vehicle_id", new ColumnType(BIGINT, null, NOT_NULL)),
+				Map.entry("issued_device_id", new ColumnType(BIGINT, null, NULLABLE)),
+				Map.entry("issued_before_link", new ColumnType(BOOLEAN, null, NOT_NULL)),
+				Map.entry("code", new ColumnType(CHAR, 8, NOT_NULL)),
+				Map.entry("status", new ColumnType(VARCHAR, 20, NOT_NULL)),
+				Map.entry("expires_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL)),
+				Map.entry("used_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE)),
+				Map.entry("mode", new ColumnType(VARCHAR, 10, NULLABLE)),
+				Map.entry("token_delivered_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE)),
+				Map.entry("created_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL)),
+				Map.entry("updated_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL))));
+	}
+
+	@Test
+	@DisplayName("vehicle_link_code.issued_before_link는 기본값이 false라 그 컬럼 없이 넣은 기존 방식의 행도 false로 읽힌다")
+	void vehicleLinkCodeIssuedBeforeLinkDefaultsToFalse() {
+		assertThat(jdbcTemplate.queryForObject("""
+				select column_default
+				from information_schema.columns
+				where table_schema = current_schema()
+				  and table_name = 'vehicle_link_code'
+				  and column_name = 'issued_before_link'
+				""", String.class)).as("issued_before_link 기본값").isEqualTo("false");
+
+		Long codeId = jdbcTemplate.queryForObject("""
+				insert into vehicle_link_code (vehicle_id, code, status, expires_at, created_at, updated_at)
+				values (?, 'LEGACY01', 'ISSUED', now(), now(), now())
+				returning code_id
+				""", Long.class, 9_876_543_210L);
+		try {
+			assertThat(jdbcTemplate.queryForObject(
+					"select issued_before_link from vehicle_link_code where code_id = ?", Boolean.class, codeId))
+					.as("issued_before_link 없이 넣은 행").isFalse();
+		} finally {
+			jdbcTemplate.update("delete from vehicle_link_code where code_id = ?", codeId);
+		}
 	}
 
 	@Test

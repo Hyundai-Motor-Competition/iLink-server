@@ -4,9 +4,9 @@ import com.example.pickupservice.auth.application.port.in.CheckLinkCodeUseCase;
 import com.example.pickupservice.auth.application.port.in.LinkCodeInfo;
 import com.example.pickupservice.auth.application.port.out.LoadLinkCodePort;
 import com.example.pickupservice.auth.domain.LinkCode;
+import com.example.pickupservice.common.text.PlateNumberMasker;
 import com.example.pickupservice.user.application.port.in.LoadVehicleUseCase;
 import com.example.pickupservice.user.application.port.in.VehicleInfo;
-import com.example.pickupservice.user.domain.PlateNumberMasker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +31,7 @@ public class CheckLinkCodeService implements CheckLinkCodeUseCase {
 		LinkCode linkCode = loadUsableCode(code, clientKey);
 		VehicleInfo vehicle = loadVehicleUseCase.findVehicle(linkCode.getVehicleId())
 				.orElseThrow(AuthErrors::linkCodeInvalid);
-		return new LinkCodeInfo(LinkCodeRules.actualModeOf(vehicle), vehicle.model(), PlateNumberMasker.mask(vehicle.plateNumber()),
+		return new LinkCodeInfo(LinkCodeRules.actualModeOf(linkCode, vehicle), vehicle.model(), PlateNumberMasker.mask(vehicle.plateNumber()),
 				linkCode.getExpiresAt());
 	}
 

@@ -1,5 +1,6 @@
 package com.example.pickupservice.auth.adapter.in.web;
 
+import com.example.pickupservice.auth.adapter.in.web.doc.VehicleLinkCodeApiDoc;
 import com.example.pickupservice.auth.application.port.in.ApproveLinkCommand;
 import com.example.pickupservice.auth.application.port.in.ConsentAgreement;
 import com.example.pickupservice.auth.application.port.in.IssueLinkCodeCommand;
@@ -14,8 +15,10 @@ import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
 import com.example.pickupservice.common.logging.RequestLogAttributes;
+import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +60,7 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	private static final String BY_CODE_PATH = "/v1/vehicle-link-codes/by-code/{code}";
 	private static final AtomicLong VEHICLE_IDS = new AtomicLong(7_000L);
 	private static final long DEVICE_ID_OFFSET = 100_000L;
+	private static final long SECOND_DEVICE_ID_OFFSET = 500_000L;
 	private static final long FAMILY_ID = 12L;
 	private static final long USER_ID = 101L;
 	private static final long CODE_ID = 5012L;
@@ -142,6 +147,67 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	}
 
 	@Test
+	@DisplayName("POST /v1/vehicle-link-codes가 연결 해제된 차량의 연결된 토큰(familyId 있음)이면 409 VEHICLE_UNLINKED를 돌려준다")
+	void issueLinkCodeForUnlinkedVehicleWithLinkedTokenReturns409VehicleUnlinked() throws Exception {
+		long vehicleId = nextVehicleId();
+		given(issueLinkCodeUseCase.issueLinkCode(any())).willThrow(vehicleUnlinked());
+
+		mockMvc.perform(issueRequest(linkedVehicleToken(vehicleId)))
+				.andExpect(commonError(HttpStatus.CONFLICT, "VEHICLE_UNLINKED"));
+
+		then(issueLinkCodeUseCase).should()
+				.issueLinkCode(new IssueLinkCodeCommand(deviceIdOf(vehicleId), vehicleId, FAMILY_ID));
+	}
+
+	@Test
+	@DisplayName("POST /v1/vehicle-link-codes가 연결 해제된 차량의 연결 전 토큰(familyId 없음)이면 409 VEHICLE_UNLINKED를 돌려준다")
+	void issueLinkCodeForUnlinkedVehicleWithPreLinkTokenReturns409VehicleUnlinked() throws Exception {
+		long vehicleId = nextVehicleId();
+		given(issueLinkCodeUseCase.issueLinkCode(any())).willThrow(vehicleUnlinked());
+
+		mockMvc.perform(issueRequest(unlinkedVehicleToken(vehicleId)))
+				.andExpect(commonError(HttpStatus.CONFLICT, "VEHICLE_UNLINKED"));
+
+		then(issueLinkCodeUseCase).should()
+				.issueLinkCode(new IssueLinkCodeCommand(deviceIdOf(vehicleId), vehicleId, null));
+	}
+
+	@Test
+	@DisplayName("POST /v1/vehicle-link-codes의 API 문서는 409 VEHICLE_UNLINKED 응답을 적는다")
+	void issueLinkCodeApiDocDescribes409VehicleUnlinked() throws Exception {
+		Method issueLinkCode = VehicleLinkCodeApiDoc.class.getMethod("issueLinkCode", AuthPrincipal.class);
+
+		assertThat(issueLinkCode.getAnnotationsByType(ApiResponse.class))
+				.filteredOn(response -> response.responseCode().equals("409"))
+				.singleElement()
+				.satisfies(response -> assertThat(response.description()).contains("VEHICLE_UNLINKED"));
+	}
+
+	@Test
+	@DisplayName("POST /v1/vehicle-link-codes를 연결 전 토큰(familyId 없음)으로 부르는데 차량이 이미 가족에 연결돼 있으면 409 VEHICLE_ALREADY_LINKED를 돌려준다")
+	void issueLinkCodeWithPreLinkTokenForLinkedVehicleReturns409VehicleAlreadyLinked() throws Exception {
+		long vehicleId = nextVehicleId();
+		given(issueLinkCodeUseCase.issueLinkCode(any())).willThrow(vehicleAlreadyLinked());
+
+		mockMvc.perform(issueRequest(unlinkedVehicleToken(vehicleId)))
+				.andExpect(commonError(HttpStatus.CONFLICT, "VEHICLE_ALREADY_LINKED"));
+
+		then(issueLinkCodeUseCase).should()
+				.issueLinkCode(new IssueLinkCodeCommand(deviceIdOf(vehicleId), vehicleId, null));
+	}
+
+	@Test
+	@DisplayName("POST /v1/vehicle-link-codes의 API 문서는 409 VEHICLE_ALREADY_LINKED 응답을 적는다")
+	void issueLinkCodeApiDocDescribes409VehicleAlreadyLinked() throws Exception {
+		Method issueLinkCode = VehicleLinkCodeApiDoc.class.getMethod("issueLinkCode", AuthPrincipal.class);
+
+		assertThat(issueLinkCode.getAnnotationsByType(ApiResponse.class))
+				.filteredOn(response -> response.responseCode().equals("409"))
+				.singleElement()
+				.satisfies(response -> assertThat(response.description()).contains("VEHICLE_ALREADY_LINKED"));
+	}
+
+	@Test
 	@DisplayName("POST /v1/vehicle-link-codes를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다")
 	void issueLinkCodeWithUserTokenReturns403() throws Exception {
 		String userToken = accessTokenFixture.user(USER_ID, FAMILY_ID, Role.GUARDIAN);
@@ -156,7 +222,7 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	@DisplayName("GET /v1/vehicle-link-codes/{codeId}/status는 200과 status를 돌려준다")
 	void getLinkStatusReturns200WithStatus() throws Exception {
 		long vehicleId = nextVehicleId();
-		given(getLinkStatusUseCase.getLinkStatus(CODE_ID, vehicleId)).willReturn(waitingResult());
+		given(getLinkStatusUseCase.getLinkStatus(CODE_ID, vehicleId, deviceIdOf(vehicleId))).willReturn(waitingResult());
 
 		mockMvc.perform(statusRequest(CODE_ID, linkedVehicleToken(vehicleId)))
 				.andExpect(status().isOk())
@@ -172,7 +238,7 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	@DisplayName("GET /v1/vehicle-link-codes/{codeId}/status는 LINKED면 vehicleId · familyId · accessToken · refreshToken과 pollAfterSeconds null을 돌려준다")
 	void getLinkStatusLinkedReturnsVehicleTokens() throws Exception {
 		long vehicleId = nextVehicleId();
-		given(getLinkStatusUseCase.getLinkStatus(CODE_ID, vehicleId)).willReturn(new LinkStatusResult(
+		given(getLinkStatusUseCase.getLinkStatus(CODE_ID, vehicleId, deviceIdOf(vehicleId))).willReturn(new LinkStatusResult(
 				LinkStatus.LINKED, vehicleId, FAMILY_ID, VEHICLE_ACCESS_TOKEN, VEHICLE_REFRESH_TOKEN, null));
 
 		mockMvc.perform(statusRequest(CODE_ID, unlinkedVehicleToken(vehicleId)))
@@ -187,22 +253,22 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	}
 
 	@Test
-	@DisplayName("GET /v1/vehicle-link-codes/{codeId}/status는 경로의 codeId와 토큰 sub의 vehicleId로 GetLinkStatusUseCase.getLinkStatus를 부른다")
-	void getLinkStatusPassesCodeIdAndTokenVehicleIdToUseCase() throws Exception {
+	@DisplayName("GET /v1/vehicle-link-codes/{codeId}/status는 경로의 codeId와 토큰 sub의 vehicleId · deviceId 클레임으로 GetLinkStatusUseCase.getLinkStatus를 부른다")
+	void getLinkStatusPassesCodeIdAndTokenVehicleIdAndDeviceIdToUseCase() throws Exception {
 		long vehicleId = nextVehicleId();
-		given(getLinkStatusUseCase.getLinkStatus(anyLong(), anyLong())).willReturn(waitingResult());
+		given(getLinkStatusUseCase.getLinkStatus(anyLong(), anyLong(), anyLong())).willReturn(waitingResult());
 
 		mockMvc.perform(statusRequest(CODE_ID, linkedVehicleToken(vehicleId)))
 				.andExpect(status().isOk());
 
-		then(getLinkStatusUseCase).should().getLinkStatus(CODE_ID, vehicleId);
+		then(getLinkStatusUseCase).should().getLinkStatus(CODE_ID, vehicleId, deviceIdOf(vehicleId));
 	}
 
 	@Test
 	@DisplayName("GET /v1/vehicle-link-codes/{codeId}/status는 @PollingLog 대상이라 응답 status 값을 요청 로그 폴링 상태로 남긴다")
 	void getLinkStatusRecordsPollStateForRequestLog() throws Exception {
 		long vehicleId = nextVehicleId();
-		given(getLinkStatusUseCase.getLinkStatus(CODE_ID, vehicleId)).willReturn(waitingResult());
+		given(getLinkStatusUseCase.getLinkStatus(CODE_ID, vehicleId, deviceIdOf(vehicleId))).willReturn(waitingResult());
 
 		MvcResult result = mockMvc.perform(statusRequest(CODE_ID, linkedVehicleToken(vehicleId)))
 				.andExpect(status().isOk())
@@ -215,7 +281,7 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	@DisplayName("GET /v1/vehicle-link-codes/{codeId}/status를 다른 차량 토큰으로 부르면 403 NOT_CODE_OWNER를 돌려준다")
 	void getLinkStatusWithOtherVehicleTokenReturns403() throws Exception {
 		long otherVehicleId = nextVehicleId();
-		given(getLinkStatusUseCase.getLinkStatus(CODE_ID, otherVehicleId))
+		given(getLinkStatusUseCase.getLinkStatus(CODE_ID, otherVehicleId, deviceIdOf(otherVehicleId)))
 				.willThrow(BusinessException.of(
 						HttpStatus.FORBIDDEN, "NOT_CODE_OWNER", "이 차량이 발급한 연결 코드가 아닙니다"));
 
@@ -228,7 +294,7 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	void getLinkStatusTwiceWithinOneSecondReturns429() throws Exception {
 		long vehicleId = nextVehicleId();
 		String token = linkedVehicleToken(vehicleId);
-		given(getLinkStatusUseCase.getLinkStatus(anyLong(), anyLong())).willReturn(waitingResult());
+		given(getLinkStatusUseCase.getLinkStatus(anyLong(), anyLong(), anyLong())).willReturn(waitingResult());
 
 		mockMvc.perform(statusRequest(CODE_ID, token))
 				.andExpect(status().isOk());
@@ -238,7 +304,7 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 				.andExpect(jsonPath("$.error.message").isNotEmpty())
 				.andExpect(jsonPath("$.error.retryAfterSeconds").value(1));
 
-		then(getLinkStatusUseCase).should(times(1)).getLinkStatus(anyLong(), anyLong());
+		then(getLinkStatusUseCase).should(times(1)).getLinkStatus(anyLong(), anyLong(), anyLong());
 	}
 
 	@Test
@@ -246,7 +312,7 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	void getLinkStatusByAnotherVehicleRightAfterReturns200() throws Exception {
 		long firstVehicleId = nextVehicleId();
 		long secondVehicleId = nextVehicleId();
-		given(getLinkStatusUseCase.getLinkStatus(anyLong(), anyLong())).willReturn(waitingResult());
+		given(getLinkStatusUseCase.getLinkStatus(anyLong(), anyLong(), anyLong())).willReturn(waitingResult());
 
 		mockMvc.perform(statusRequest(CODE_ID, linkedVehicleToken(firstVehicleId)))
 				.andExpect(status().isOk());
@@ -255,11 +321,32 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	}
 
 	@Test
+	@DisplayName("GET /v1/vehicle-link-codes/{codeId}/status의 1초 호출 제한은 기기(deviceId) 단위로 센다")
+	void getLinkStatusPollLimitIsCountedPerDevice() throws Exception {
+		long vehicleId = nextVehicleId();
+		long firstDeviceId = deviceIdOf(vehicleId);
+		long secondDeviceId = firstDeviceId + SECOND_DEVICE_ID_OFFSET;
+		given(getLinkStatusUseCase.getLinkStatus(anyLong(), anyLong(), anyLong())).willReturn(waitingResult());
+
+		mockMvc.perform(statusRequest(CODE_ID, linkedVehicleToken(vehicleId, firstDeviceId)))
+				.andExpect(status().isOk());
+		mockMvc.perform(statusRequest(CODE_ID, linkedVehicleToken(vehicleId, secondDeviceId)))
+				.andExpect(status().isOk());
+		mockMvc.perform(statusRequest(CODE_ID, linkedVehicleToken(vehicleId, firstDeviceId)))
+				.andExpect(status().isTooManyRequests())
+				.andExpect(jsonPath("$.error.code").value("TOO_MANY_REQUESTS"));
+
+		then(getLinkStatusUseCase).should().getLinkStatus(CODE_ID, vehicleId, firstDeviceId);
+		then(getLinkStatusUseCase).should().getLinkStatus(CODE_ID, vehicleId, secondDeviceId);
+		then(getLinkStatusUseCase).should(times(2)).getLinkStatus(anyLong(), anyLong(), anyLong());
+	}
+
+	@Test
 	@DisplayName("GET /v1/vehicle-link-codes/{codeId}/status를 1초가 지난 뒤 다시 부르면 200을 돌려준다")
 	void getLinkStatusAgainAfterOneSecondReturns200() throws Exception {
 		long vehicleId = nextVehicleId();
 		String token = linkedVehicleToken(vehicleId);
-		given(getLinkStatusUseCase.getLinkStatus(anyLong(), anyLong())).willReturn(waitingResult());
+		given(getLinkStatusUseCase.getLinkStatus(anyLong(), anyLong(), anyLong())).willReturn(waitingResult());
 
 		mockMvc.perform(statusRequest(CODE_ID, token))
 				.andExpect(status().isOk());
@@ -267,7 +354,7 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 		mockMvc.perform(statusRequest(CODE_ID, token))
 				.andExpect(status().isOk());
 
-		then(getLinkStatusUseCase).should(times(2)).getLinkStatus(CODE_ID, vehicleId);
+		then(getLinkStatusUseCase).should(times(2)).getLinkStatus(CODE_ID, vehicleId, deviceIdOf(vehicleId));
 	}
 
 	@Test
@@ -467,11 +554,15 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	}
 
 	private String linkedVehicleToken(long vehicleId) {
+		return linkedVehicleToken(vehicleId, deviceIdOf(vehicleId));
+	}
+
+	private String linkedVehicleToken(long vehicleId, long deviceId) {
 		return accessTokenFixture.signedWithClaims(Map.of(
 				"sub", String.valueOf(vehicleId),
 				"principalType", PrincipalType.VEHICLE.name(),
 				"familyId", FAMILY_ID,
-				"deviceId", deviceIdOf(vehicleId)));
+				"deviceId", deviceId));
 	}
 
 	private String unlinkedVehicleToken(long vehicleId) {
@@ -479,6 +570,14 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 				"sub", String.valueOf(vehicleId),
 				"principalType", PrincipalType.VEHICLE.name(),
 				"deviceId", deviceIdOf(vehicleId)));
+	}
+
+	private static BusinessException vehicleUnlinked() {
+		return BusinessException.of(HttpStatus.CONFLICT, "VEHICLE_UNLINKED", "연결이 해제된 차량입니다. 앱을 다시 등록해 주세요");
+	}
+
+	private static BusinessException vehicleAlreadyLinked() {
+		return BusinessException.of(HttpStatus.CONFLICT, "VEHICLE_ALREADY_LINKED", "이미 보호자가 연결된 차량입니다");
 	}
 
 	private static LinkCodeResult linkCodeResult() {

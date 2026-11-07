@@ -72,6 +72,8 @@ class ApproveLinkServiceTest {
 	private static final long CODE_ID = 5012L;
 	private static final String CODE = "K7P2QX9M";
 	private static final long VEHICLE_ID = 77L;
+	private static final long VEHICLE_DEVICE_ID = 601L;
+	private static final long OTHER_VEHICLE_DEVICE_ID = 602L;
 	private static final long FAMILY_ID = 12L;
 	private static final long NEW_GUARDIAN_ID = 21L;
 	private static final long GUARDIAN_ID = 31L;
@@ -389,18 +391,89 @@ class ApproveLinkServiceTest {
 	}
 
 	@Test
-	@DisplayName("연결 승인이 성공하면 그 차량의 연결 코드 발급 횟수를 처음으로 돌린다")
-	void approveLinkResetsIssueCounterOfVehicle() {
+	@DisplayName("연결 승인이 성공하면 그 코드를 발급한 기기의 연결 코드 발급 횟수만 처음으로 돌린다")
+	void approveLinkResetsIssueCounterOfIssuedDeviceOnly() {
 		for (int i = 0; i < 5; i++) {
-			linkCodeIssueCounter.increment(VEHICLE_ID);
+			linkCodeIssueCounter.increment(VEHICLE_DEVICE_ID);
+			linkCodeIssueCounter.increment(OTHER_VEHICLE_DEVICE_ID);
 		}
 		givenCode(issuedCode());
 		givenVehicle(pendingVehicle());
 
 		approveLinkService.approveLink(command(LinkMode.NEW, requiredConsents(), PUSH_TOKEN));
 
-		assertThat(linkCodeIssueCounter.isLimitReached(VEHICLE_ID)).isFalse();
-		assertThat(linkCodeIssueCounter.remaining(VEHICLE_ID)).isEqualTo(5);
+		assertThat(linkCodeIssueCounter.isLimitReached(VEHICLE_DEVICE_ID)).isFalse();
+		assertThat(linkCodeIssueCounter.remaining(VEHICLE_DEVICE_ID)).isEqualTo(5);
+		assertThat(linkCodeIssueCounter.isLimitReached(OTHER_VEHICLE_DEVICE_ID))
+				.as("같은 차량의 다른 기기 발급 횟수는 그대로").isTrue();
+	}
+
+	@Test
+	@DisplayName("LINK-04: 발급 기기 정보가 없는 옛 코드로 승인하면 발급 카운터 초기화를 건너뛰고 승인은 성공한다")
+	void approveLinkWithLegacyCodeWithoutIssuedDeviceSkipsCounterResetAndSucceeds() {
+		for (int i = 0; i < 5; i++) {
+			linkCodeIssueCounter.increment(VEHICLE_DEVICE_ID);
+			linkCodeIssueCounter.increment(OTHER_VEHICLE_DEVICE_ID);
+		}
+		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, null, false, CODE, LinkCodeStatus.ISSUED,
+				NOW.plusSeconds(180), null, null, null));
+		givenVehicle(pendingVehicle());
+
+		VehicleLinkResult result = approveLinkService.approveLink(
+				command(LinkMode.NEW, requiredConsents(), PUSH_TOKEN));
+
+		assertThat(result.vehicleId()).isEqualTo(VEHICLE_ID);
+		assertThat(result.familyId()).isEqualTo(FAMILY_ID);
+		assertThat(result.userId()).isEqualTo(NEW_GUARDIAN_ID);
+		assertThat(result.accessToken()).isNotBlank();
+		assertThat(result.refreshToken()).isNotBlank();
+		verify(createGuardianUseCase).createGuardian(new CreateGuardianCommand(VEHICLE_ID, null, GUARDIAN_NAME));
+
+		ArgumentCaptor<LinkCode> savedCode = ArgumentCaptor.forClass(LinkCode.class);
+		verify(saveLinkCodePort).saveLinkCode(savedCode.capture());
+		assertThat(savedCode.getValue().getCodeId()).isEqualTo(CODE_ID);
+		assertThat(savedCode.getValue().getIssuedDeviceId()).isNull();
+		assertThat(savedCode.getValue().getStatus()).isEqualTo(LinkCodeStatus.USED);
+		assertThat(savedCode.getValue().getUsedAt()).isEqualTo(NOW);
+		assertThat(savedCode.getValue().getMode()).isEqualTo(LinkMode.NEW);
+
+		verify(linkCodeIssueCounter, never()).reset(anyLong());
+		assertThat(linkCodeIssueCounter.isLimitReached(VEHICLE_DEVICE_ID))
+				.as("같은 차량 기기의 발급 횟수는 그대로").isTrue();
+		assertThat(linkCodeIssueCounter.remaining(VEHICLE_DEVICE_ID)).isZero();
+		assertThat(linkCodeIssueCounter.isLimitReached(OTHER_VEHICLE_DEVICE_ID))
+				.as("다른 기기의 발급 횟수는 그대로").isTrue();
+		assertThat(linkCodeIssueCounter.remaining(OTHER_VEHICLE_DEVICE_ID)).isZero();
+	}
+
+	@Test
+	@DisplayName("연결 전 토큰으로 발급한 코드는 승인 때 mode가 RELINK면 LINK_MODE_MISMATCH로 거절한다")
+	void approveLinkRejectsRelinkForCodeIssuedBeforeLink() {
+		givenCode(issuedBeforeLinkCode());
+		lenient().when(loadVehicleUseCase.findVehicle(VEHICLE_ID)).thenReturn(Optional.of(linkedVehicle()));
+		lenient().when(loadMemberUseCase.findMembers(FAMILY_ID)).thenReturn(List.of(
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, GUARDIAN_NAME, null)));
+		lenient().when(loadDevicePort.loadLiveDevices(OwnerType.USER, GUARDIAN_ID)).thenReturn(List.of(
+				liveUserDevice(OLD_DEVICE_ID_1, GUARDIAN_ID)));
+
+		assertError(() -> approveLinkService.approveLink(command(LinkMode.RELINK, requiredConsents(), PUSH_TOKEN)),
+				HttpStatus.CONFLICT, "LINK_MODE_MISMATCH");
+
+		assertNothingChanged();
+		verify(linkCodeIssueCounter, never()).reset(anyLong());
+	}
+
+	@Test
+	@DisplayName("연결 전 토큰으로 발급한 코드라도 연결 대기 차량에 NEW로 승인하면 GUARDIAN을 만든다")
+	void approveLinkNewForCodeIssuedBeforeLinkCreatesGuardian() {
+		givenCode(issuedBeforeLinkCode());
+		givenVehicle(pendingVehicle());
+
+		VehicleLinkResult result = approveLinkService.approveLink(
+				command(LinkMode.NEW, requiredConsents(), PUSH_TOKEN));
+
+		assertThat(result.userId()).isEqualTo(NEW_GUARDIAN_ID);
+		verify(createGuardianUseCase).createGuardian(new CreateGuardianCommand(VEHICLE_ID, null, GUARDIAN_NAME));
 	}
 
 	@Test
@@ -417,7 +490,7 @@ class ApproveLinkServiceTest {
 	@Test
 	@DisplayName("연결 승인은 expiresAt이 지난 ISSUED 코드면 LINK_CODE_EXPIRED로 거절한다")
 	void approveLinkRejectsIssuedCodePastExpiresAt() {
-		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, CODE, LinkCodeStatus.ISSUED, NOW.minusSeconds(1), null,
+		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, CODE, LinkCodeStatus.ISSUED, NOW.minusSeconds(1), null,
 				null, null));
 
 		assertError(() -> approveLinkService.approveLink(command(LinkMode.NEW, requiredConsents(), PUSH_TOKEN)),
@@ -429,7 +502,7 @@ class ApproveLinkServiceTest {
 	@Test
 	@DisplayName("연결 승인은 status가 EXPIRED인 코드면 LINK_CODE_EXPIRED로 거절한다")
 	void approveLinkRejectsExpiredStatusCode() {
-		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, CODE, LinkCodeStatus.EXPIRED, NOW.plusSeconds(180), null,
+		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, CODE, LinkCodeStatus.EXPIRED, NOW.plusSeconds(180), null,
 				null, null));
 
 		assertError(() -> approveLinkService.approveLink(command(LinkMode.NEW, requiredConsents(), PUSH_TOKEN)),
@@ -486,8 +559,13 @@ class ApproveLinkServiceTest {
 	}
 
 	private static LinkCode issuedCode() {
-		return LinkCode.restore(CODE_ID, VEHICLE_ID, CODE, LinkCodeStatus.ISSUED, NOW.plusSeconds(180), null, null,
+		return LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, CODE, LinkCodeStatus.ISSUED, NOW.plusSeconds(180), null, null,
 				null);
+	}
+
+	private static LinkCode issuedBeforeLinkCode() {
+		return LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, true, CODE, LinkCodeStatus.ISSUED,
+				NOW.plusSeconds(180), null, null, null);
 	}
 
 	private static VehicleInfo linkedVehicle() {

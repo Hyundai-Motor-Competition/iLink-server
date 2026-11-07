@@ -14,7 +14,6 @@ import com.example.pickupservice.auth.domain.Device;
 import com.example.pickupservice.auth.domain.LinkCode;
 import com.example.pickupservice.auth.domain.LinkCodeStatus;
 import com.example.pickupservice.auth.domain.LinkMode;
-import com.example.pickupservice.auth.domain.OwnerType;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.user.application.port.in.LoadVehicleUseCase;
 import com.example.pickupservice.user.application.port.in.VehicleInfo;
@@ -24,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
@@ -42,8 +40,8 @@ public class GetLinkStatusService implements GetLinkStatusUseCase {
 
 	@Override
 	@Transactional
-	public LinkStatusResult getLinkStatus(long codeId, long requesterVehicleId) {
-		LinkCode code = loadOwnedUndeliveredCode(codeId, requesterVehicleId);
+	public LinkStatusResult getLinkStatus(long codeId, long requesterVehicleId, long requesterDeviceId) {
+		LinkCode code = loadOwnedUndeliveredCode(codeId, requesterVehicleId, requesterDeviceId);
 		Instant now = clock.instant();
 		if (code.getStatus() == LinkCodeStatus.USED) {
 			return deliverTokens(code, now);
@@ -54,9 +52,10 @@ public class GetLinkStatusService implements GetLinkStatusUseCase {
 		return new LinkStatusResult(LinkStatus.WAITING, null, null, null, null, POLL_AFTER_SECONDS);
 	}
 
-	private LinkCode loadOwnedUndeliveredCode(long codeId, long requesterVehicleId) {
+	private LinkCode loadOwnedUndeliveredCode(long codeId, long requesterVehicleId, long requesterDeviceId) {
 		LinkCode code = loadLinkCodePort.loadLinkCode(codeId).orElseThrow(AuthErrors::linkCodeInvalid);
-		if (code.getVehicleId() != requesterVehicleId) {
+		if (code.getVehicleId() != requesterVehicleId
+				|| !Long.valueOf(requesterDeviceId).equals(code.getIssuedDeviceId())) {
 			throw AuthErrors.notCodeOwner();
 		}
 		if (code.getTokenDeliveredAt() != null) {
@@ -68,19 +67,15 @@ public class GetLinkStatusService implements GetLinkStatusUseCase {
 	private LinkStatusResult deliverTokens(LinkCode code, Instant now) {
 		VehicleInfo vehicle = loadVehicleUseCase.findVehicle(code.getVehicleId())
 				.orElseThrow(AuthErrors::linkCodeInvalid);
-		Device device = latestLiveVehicleDevice(vehicle.vehicleId());
+		Device device = loadDevicePort.loadDevice(code.getIssuedDeviceId())
+				.filter(Device::isLive)
+				.orElseThrow(AuthErrors::linkCodeInvalid);
 		IssuedTokens tokens = new DeviceTokenRotator(issueTokenPort, saveDevicePort).issueTo(device, new TokenSubject(
 				PrincipalType.VEHICLE, vehicle.vehicleId(), vehicle.familyId(), null, device.getDeviceId()));
 		code.markTokenDelivered(now);
 		saveLinkCodePort.saveLinkCode(code);
 		return new LinkStatusResult(linkedStatusOf(code), vehicle.vehicleId(), vehicle.familyId(),
 				tokens.accessToken(), tokens.refreshToken(), null);
-	}
-
-	private Device latestLiveVehicleDevice(long vehicleId) {
-		return loadDevicePort.loadLiveDevices(OwnerType.VEHICLE, vehicleId).stream()
-				.max(Comparator.comparing(Device::getDeviceId))
-				.orElseThrow(AuthErrors::linkCodeInvalid);
 	}
 
 	private static LinkStatus linkedStatusOf(LinkCode code) {

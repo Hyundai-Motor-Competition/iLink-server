@@ -39,6 +39,7 @@ class CheckLinkCodeServiceTest {
 	private static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 	private static final long CODE_ID = 5012L;
 	private static final long VEHICLE_ID = 77L;
+	private static final long VEHICLE_DEVICE_ID = 601L;
 	private static final long FAMILY_ID = 12L;
 	private static final String CODE = "K7P2QX9M";
 	private static final String UNKNOWN_CODE = "ZZZZ9999";
@@ -104,6 +105,20 @@ class CheckLinkCodeServiceTest {
 	}
 
 	@Test
+	@DisplayName("연결 코드 확인은 연결 전 토큰으로 발급한 코드면 그 사이 차량이 가족에 연결됐어도 NEW를 돌려준다")
+	void checkLinkCodeReturnsNewForCodeIssuedBeforeLinkEvenWhenVehicleIsNowLinked() {
+		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, true, CODE, LinkCodeStatus.ISSUED,
+				NOW.plusSeconds(180), null, null, null));
+		lenient().when(loadVehicleUseCase.findVehicle(VEHICLE_ID)).thenReturn(Optional.of(
+				new VehicleInfo(VEHICLE_ID, FAMILY_ID, "KMHJ381ABNU123456", MODEL, PLATE_NUMBER, true)));
+
+		LinkCodeInfo info = checkLinkCodeService.checkLinkCode(CODE, CLIENT_KEY);
+
+		assertThat(info).isEqualTo(new LinkCodeInfo(LinkMode.NEW, MODEL, PLATE_NUMBER_MASKED,
+				NOW.plusSeconds(180)));
+	}
+
+	@Test
 	@DisplayName("연결 코드 확인은 없는 코드면 LINK_CODE_INVALID로 거절한다")
 	void checkLinkCodeRejectsUnknownCode() {
 		assertLinkCodeInvalid(() -> checkLinkCodeService.checkLinkCode(UNKNOWN_CODE, CLIENT_KEY));
@@ -114,7 +129,7 @@ class CheckLinkCodeServiceTest {
 	@Test
 	@DisplayName("연결 코드 확인은 사용된 코드면 LINK_CODE_EXPIRED로 거절한다")
 	void checkLinkCodeRejectsUsedCode() {
-		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, CODE, LinkCodeStatus.USED, NOW.plusSeconds(180),
+		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, CODE, LinkCodeStatus.USED, NOW.plusSeconds(180),
 				NOW.minusSeconds(10), LinkMode.NEW, null));
 
 		assertLinkCodeExpired(() -> checkLinkCodeService.checkLinkCode(CODE, CLIENT_KEY));
@@ -125,7 +140,7 @@ class CheckLinkCodeServiceTest {
 	@Test
 	@DisplayName("연결 코드 확인은 status가 EXPIRED인 코드면 LINK_CODE_EXPIRED로 거절한다")
 	void checkLinkCodeRejectsExpiredStatusCode() {
-		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, CODE, LinkCodeStatus.EXPIRED, NOW.plusSeconds(180),
+		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, CODE, LinkCodeStatus.EXPIRED, NOW.plusSeconds(180),
 				null, null, null));
 
 		assertLinkCodeExpired(() -> checkLinkCodeService.checkLinkCode(CODE, CLIENT_KEY));
@@ -134,7 +149,7 @@ class CheckLinkCodeServiceTest {
 	@Test
 	@DisplayName("연결 코드 확인은 expiresAt이 지난 ISSUED 코드면 LINK_CODE_EXPIRED로 거절한다")
 	void checkLinkCodeRejectsIssuedCodePastExpiresAt() {
-		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, CODE, LinkCodeStatus.ISSUED, NOW.minusSeconds(1),
+		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, CODE, LinkCodeStatus.ISSUED, NOW.minusSeconds(1),
 				null, null, null));
 
 		assertLinkCodeExpired(() -> checkLinkCodeService.checkLinkCode(CODE, CLIENT_KEY));
@@ -172,7 +187,7 @@ class CheckLinkCodeServiceTest {
 	@Test
 	@DisplayName("연결 코드 확인은 LINK_CODE_EXPIRED 실패도 5번 실패에 센다")
 	void checkLinkCodeCountsExpiredCodeFailuresTowardAttemptLimit() {
-		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, CODE, LinkCodeStatus.USED, NOW.plusSeconds(180),
+		givenCode(LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, CODE, LinkCodeStatus.USED, NOW.plusSeconds(180),
 				NOW.minusSeconds(10), LinkMode.NEW, null));
 		for (int i = 0; i < 5; i++) {
 			assertLinkCodeExpired(() -> checkLinkCodeService.checkLinkCode(CODE, CLIENT_KEY));
@@ -227,7 +242,7 @@ class CheckLinkCodeServiceTest {
 	}
 
 	private static LinkCode issuedCode(Instant expiresAt) {
-		return LinkCode.restore(CODE_ID, VEHICLE_ID, CODE, LinkCodeStatus.ISSUED, expiresAt, null, null, null);
+		return LinkCode.restore(CODE_ID, VEHICLE_ID, VEHICLE_DEVICE_ID, false, CODE, LinkCodeStatus.ISSUED, expiresAt, null, null, null);
 	}
 
 	private static void assertLinkCodeInvalid(ThrowingCallable call) {

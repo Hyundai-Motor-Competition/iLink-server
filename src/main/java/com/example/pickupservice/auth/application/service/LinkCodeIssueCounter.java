@@ -12,19 +12,19 @@ public class LinkCodeIssueCounter {
 
 	private final Map<Long, Integer> issueCounts = new ConcurrentHashMap<>();
 
-	public boolean isLimitReached(long vehicleId) {
-		return issueCounts.getOrDefault(vehicleId, 0) >= LIMIT;
+	public boolean isLimitReached(long deviceId) {
+		return issueCounts.getOrDefault(deviceId, 0) >= LIMIT;
 	}
 
-	public void increment(long vehicleId) {
-		issueCounts.merge(vehicleId, 1, Integer::sum);
+	public void increment(long deviceId) {
+		issueCounts.merge(deviceId, 1, Integer::sum);
 	}
 
-	public int remaining(long vehicleId) {
-		return LIMIT - issueCounts.getOrDefault(vehicleId, 0);
+	public int remaining(long deviceId) {
+		return LIMIT - issueCounts.getOrDefault(deviceId, 0);
 	}
 
-	public void reset(long vehicleId) {
-		issueCounts.remove(vehicleId);
+	public void reset(long deviceId) {
+		issueCounts.remove(deviceId);
 	}
 }

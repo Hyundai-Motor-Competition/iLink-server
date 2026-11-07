@@ -50,32 +50,14 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 
 	private final List<Long> deviceIds = new ArrayList<>();
 	private final List<Long> codeIds = new ArrayList<>();
-	private final List<Long> inviteIds = new ArrayList<>();
 	private final List<String> inviteTokens = new ArrayList<>();
 
 	@AfterEach
 	void clear() {
 		transactionTemplate.executeWithoutResult(status -> {
-			if (!deviceIds.isEmpty()) {
-				entityManager.createQuery("delete from DeviceEntity d where d.deviceId in :ids")
-						.setParameter("ids", deviceIds)
-						.executeUpdate();
-			}
-			if (!codeIds.isEmpty()) {
-				entityManager.createQuery("delete from VehicleLinkCodeEntity c where c.codeId in :ids")
-						.setParameter("ids", codeIds)
-						.executeUpdate();
-			}
-			if (!inviteIds.isEmpty()) {
-				entityManager.createQuery("delete from MemberInviteEntity i where i.inviteId in :ids")
-						.setParameter("ids", inviteIds)
-						.executeUpdate();
-			}
-			if (!inviteTokens.isEmpty()) {
-				entityManager.createQuery("delete from MemberInviteEntity i where i.token in :tokens")
-						.setParameter("tokens", inviteTokens)
-						.executeUpdate();
-			}
+			deleteRows("delete from DeviceEntity d where d.deviceId in :values", deviceIds);
+			deleteRows("delete from VehicleLinkCodeEntity c where c.codeId in :values", codeIds);
+			deleteRows("delete from MemberInviteEntity i where i.token in :values", inviteTokens);
 		});
 	}
 
@@ -100,16 +82,17 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 	@DisplayName("LinkCode를 저장한 뒤 다시 읽으면 도메인 객체의 값이 같다")
 	void savedLinkCodeIsLoadedWithSameValues() {
 		long vehicleId = randomId();
+		long issuedDeviceId = randomId();
 		String code = randomCode();
-		LinkCode saved = saveLinkCode(LinkCode.restore(null, vehicleId, code, LinkCodeStatus.USED, LATER, AT,
-				LinkMode.RELINK, LATER));
+		LinkCode saved = saveLinkCode(LinkCode.restore(null, vehicleId, issuedDeviceId, true, code, LinkCodeStatus.USED,
+				LATER, AT, LinkMode.RELINK, LATER));
 		assertThat(saved.getCodeId()).as("저장된 codeId").isNotNull();
 		clearPersistenceContext();
 
 		assertThat(loadLinkCodePort.loadLinkCode(saved.getCodeId())).get()
 				.usingRecursiveComparison()
-				.isEqualTo(LinkCode.restore(saved.getCodeId(), vehicleId, code, LinkCodeStatus.USED, LATER, AT,
-						LinkMode.RELINK, LATER));
+				.isEqualTo(LinkCode.restore(saved.getCodeId(), vehicleId, issuedDeviceId, true, code, LinkCodeStatus.USED,
+						LATER, AT, LinkMode.RELINK, LATER));
 		assertThat(loadLinkCodePort.loadLinkCode(Long.MAX_VALUE)).as("없는 codeId").isEmpty();
 	}
 
@@ -132,9 +115,10 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 	void resavingRestoredObjectsUpdatesSameRows() {
 		long userId = randomId();
 		long vehicleId = randomId();
+		long issuedDeviceId = randomId();
 		Device device = saveDevice(Device.register(OwnerType.USER, userId, Platform.IOS, null, AT,
 				AuthSeed.sha256(randomToken())));
-		LinkCode linkCode = saveLinkCode(LinkCode.issue(vehicleId, randomCode(), AT));
+		LinkCode linkCode = saveLinkCode(LinkCode.issue(vehicleId, issuedDeviceId, true, randomCode(), AT));
 		String token = randomToken();
 		MemberInvite invite = saveInvite(MemberInvite.issue(userId, token, AT));
 		clearPersistenceContext();
@@ -161,16 +145,16 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 						LATER, newHash, LATER));
 		assertThat(loadLinkCodePort.loadLinkCode(linkCode.getCodeId())).get()
 				.usingRecursiveComparison()
-				.isEqualTo(LinkCode.restore(linkCode.getCodeId(), vehicleId, linkCode.getCode(), LinkCodeStatus.USED,
-						linkCode.getExpiresAt(), LATER, LinkMode.NEW, null));
+				.isEqualTo(LinkCode.restore(linkCode.getCodeId(), vehicleId, issuedDeviceId, true, linkCode.getCode(),
+						LinkCodeStatus.USED, linkCode.getExpiresAt(), LATER, LinkMode.NEW, null));
 		assertThat(loadInvitePort.loadLatestInvite(userId)).get()
 				.usingRecursiveComparison()
 				.isEqualTo(MemberInvite.restore(invite.getInviteId(), userId, token, invite.getExpiresAt(), LATER));
-		assertThat(countRows("select count(d) from DeviceEntity d where d.ownerId = :id", userId))
+		assertThat(countRows("select count(d) from DeviceEntity d where d.ownerId = :value", userId))
 				.as("기기 행 수").isEqualTo(1L);
-		assertThat(countRows("select count(c) from VehicleLinkCodeEntity c where c.vehicleId = :id", vehicleId))
+		assertThat(countRows("select count(c) from VehicleLinkCodeEntity c where c.vehicleId = :value", vehicleId))
 				.as("연결 코드 행 수").isEqualTo(1L);
-		assertThat(countRows("select count(i) from MemberInviteEntity i where i.userId = :id", userId))
+		assertThat(countRows("select count(i) from MemberInviteEntity i where i.userId = :value", userId))
 				.as("초대 행 수").isEqualTo(1L);
 	}
 
@@ -229,15 +213,16 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 	@DisplayName("loadLinkCodeByCode는 8자 code로 연결 코드를 찾는다")
 	void loadLinkCodeByCodeFindsLinkCodeByEightCharacterCode() {
 		long vehicleId = randomId();
+		long issuedDeviceId = randomId();
 		String code = randomCode();
 		assertThat(code).hasSize(8);
-		LinkCode target = saveLinkCode(LinkCode.issue(vehicleId, code, AT));
-		saveLinkCode(LinkCode.issue(randomId(), randomCode(), AT));
+		LinkCode target = saveLinkCode(LinkCode.issue(vehicleId, issuedDeviceId, false, code, AT));
+		saveLinkCode(LinkCode.issue(randomId(), randomId(), false, randomCode(), AT));
 		clearPersistenceContext();
 
 		assertThat(loadLinkCodePort.loadLinkCodeByCode(code)).get()
 				.usingRecursiveComparison()
-				.isEqualTo(LinkCode.restore(target.getCodeId(), vehicleId, code, LinkCodeStatus.ISSUED,
+				.isEqualTo(LinkCode.restore(target.getCodeId(), vehicleId, issuedDeviceId, false, code, LinkCodeStatus.ISSUED,
 						AT.plusSeconds(300), null, null, null));
 		assertThat(loadLinkCodePort.loadLinkCodeByCode(randomCode())).as("없는 code").isEmpty();
 	}
@@ -247,13 +232,13 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 	void loadIssuedCodesReturnsOnlyIssuedCodesOfThatVehicle() {
 		long vehicleId = randomId();
 		long otherVehicleId = randomId();
-		LinkCode issuedFirst = saveLinkCode(LinkCode.issue(vehicleId, randomCode(), AT));
-		LinkCode issuedSecond = saveLinkCode(LinkCode.issue(vehicleId, randomCode(), LATER));
-		saveLinkCode(LinkCode.restore(null, vehicleId, randomCode(), LinkCodeStatus.EXPIRED, AT.plusSeconds(300),
-				null, null, null));
-		saveLinkCode(LinkCode.restore(null, vehicleId, randomCode(), LinkCodeStatus.USED, AT.plusSeconds(300), AT,
-				LinkMode.NEW, null));
-		saveLinkCode(LinkCode.issue(otherVehicleId, randomCode(), AT));
+		LinkCode issuedFirst = saveLinkCode(LinkCode.issue(vehicleId, randomId(), false, randomCode(), AT));
+		LinkCode issuedSecond = saveLinkCode(LinkCode.issue(vehicleId, randomId(), false, randomCode(), LATER));
+		saveLinkCode(LinkCode.restore(null, vehicleId, randomId(), false, randomCode(), LinkCodeStatus.EXPIRED,
+				AT.plusSeconds(300), null, null, null));
+		saveLinkCode(LinkCode.restore(null, vehicleId, randomId(), false, randomCode(), LinkCodeStatus.USED,
+				AT.plusSeconds(300), AT, LinkMode.NEW, null));
+		saveLinkCode(LinkCode.issue(otherVehicleId, randomId(), false, randomCode(), AT));
 		clearPersistenceContext();
 
 		List<LinkCode> issuedCodes = loadLinkCodePort.loadIssuedCodes(vehicleId);
@@ -286,7 +271,8 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 
 		assertThatThrownBy(() -> saveInvitePort.saveInvite(MemberInvite.issue(randomId(), token, LATER)))
 				.isInstanceOf(DataIntegrityViolationException.class);
-		assertThat(countRowsByToken(token)).as("같은 token 행 수").isEqualTo(1L);
+		assertThat(countRows("select count(i) from MemberInviteEntity i where i.token = :value", token))
+				.as("같은 token 행 수").isEqualTo(1L);
 	}
 
 	@Test
@@ -322,21 +308,19 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 
 	private MemberInvite saveInvite(MemberInvite invite) {
 		inviteTokens.add(invite.getToken());
-		MemberInvite saved = saveInvitePort.saveInvite(invite);
-		inviteIds.add(saved.getInviteId());
-		return saved;
+		return saveInvitePort.saveInvite(invite);
 	}
 
-	private long countRows(String jpql, long id) {
+	private void deleteRows(String jpql, List<?> values) {
+		if (values.isEmpty()) {
+			return;
+		}
+		entityManager.createQuery(jpql).setParameter("values", values).executeUpdate();
+	}
+
+	private long countRows(String jpql, Object value) {
 		return transactionTemplate.execute(status -> entityManager.createQuery(jpql, Long.class)
-				.setParameter("id", id)
-				.getSingleResult());
-	}
-
-	private long countRowsByToken(String token) {
-		return transactionTemplate.execute(status -> entityManager
-				.createQuery("select count(i) from MemberInviteEntity i where i.token = :token", Long.class)
-				.setParameter("token", token)
+				.setParameter("value", value)
 				.getSingleResult());
 	}
 
