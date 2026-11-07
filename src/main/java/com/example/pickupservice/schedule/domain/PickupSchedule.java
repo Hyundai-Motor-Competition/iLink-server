@@ -47,13 +47,13 @@ public class PickupSchedule {
 
 	private static void validateWeekdays(Set<DayOfWeek> weekdays) {
 		if (weekdays == null || weekdays.isEmpty()) {
-			throw new InvalidScheduleException("weekdays","1개 이상이어야 합니다");
+			throw new InvalidScheduleException("weekdays", "1개 이상이어야 합니다");
 		}
 	}
 
 	private static void validateTargetPickup(int targetPickup) {
 		if (targetPickup < MIN_TARGET_PICKUP || targetPickup > MAX_TARGET_PICKUP) {
-			throw new InvalidScheduleException("targetPickup","0~60이어야 합니다");
+			throw new InvalidScheduleException("targetPickup", "0~60이어야 합니다");
 		}
 	}
 }

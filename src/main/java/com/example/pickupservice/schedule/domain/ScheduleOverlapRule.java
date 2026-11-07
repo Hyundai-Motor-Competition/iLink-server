@@ -5,6 +5,9 @@ import java.util.List;
 
 public final class ScheduleOverlapRule {
 
+	private ScheduleOverlapRule() {
+	}
+
 	public static List<Long> findOverlapScheduleIds(PickupSchedule candidate, List<PickupSchedule> existingSchedules) {
 		return existingSchedules.stream()
 				.filter(existing -> existing.getChildUserId() == candidate.getChildUserId())

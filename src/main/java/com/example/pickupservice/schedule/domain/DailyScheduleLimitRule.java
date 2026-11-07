@@ -6,6 +6,9 @@ public final class DailyScheduleLimitRule {
 
 	public static final int DAILY_LIMIT = 3;
 
+	private DailyScheduleLimitRule() {
+	}
+
 	public static boolean exceedsLimit(PickupSchedule candidate, List<PickupSchedule> existingSchedules) {
 		return candidate.getWeekdays().stream()
 				.anyMatch(weekday -> existingSchedules.stream()

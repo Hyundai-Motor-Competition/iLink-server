@@ -52,6 +52,7 @@ public interface ScheduleApiDoc {
 			+ "classEndTime · targetPickup · status)")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN")
+	@ApiResponse(responseCode = "404", description = "NOT_FOUND (내 가족의 CHILD가 아님)")
 	ScheduleListResponse listSchedules(@Parameter(hidden = true) AuthPrincipal principal,
 			@Parameter(description = "자녀 userId", required = true) long childId);
 

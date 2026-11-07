@@ -22,7 +22,7 @@ public class KakaoMapSearchAdapter implements SearchAcademyPort {
 
 	private static final String KEYWORD_SEARCH_PATH = "/v2/local/search/keyword.json";
 	private static final String MAP_API_UNAVAILABLE = "MAP_API_UNAVAILABLE";
-	private static final String MAP_API_UNAVAILABLE_MESSAGE = "지도 API를 사용할 수 없습니다.";
+	private static final String MAP_API_UNAVAILABLE_MESSAGE = "지도 검색을 잠시 사용할 수 없습니다";
 
 	private final RestClient restClient;
 	private final String apiKey;
