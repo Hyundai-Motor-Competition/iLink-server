@@ -76,6 +76,7 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	private static final String DOMAIN_CODE_PATH = "/test/common-error/business-domain-code";
 	private static final String COMMON_NOT_FOUND_PATH = "/test/common-error/business-common-not-found";
 	private static final String COMMON_ERROR_CODE_PATH = "/test/common-error/business-common-code/{code}";
+	private static final String INVALID_FIELD_PATH = "/test/common-error/business-invalid-field";
 	private static final String REQUIRED_HEADER_PATH = "/test/common-error/required-header";
 	private static final String JSON_ONLY_PATH = "/test/common-error/json-only";
 	private static final String RESPONSE_STATUS_EXCEPTION_PATH = "/test/common-error/response-status-exception";
@@ -94,6 +95,8 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	private static final String DOMAIN_CODE_MESSAGE = "도메인 규칙에 맞지 않는 요청입니다";
 
 	private static final String VALIDATION_FAILED_MESSAGE = "입력값을 확인해 주세요";
+	private static final String INVALID_FIELD_NAME = "phone";
+	private static final String INVALID_FIELD_REASON = "자녀가 아닌 멤버는 전화번호가 필요합니다";
 	private static final String NAME_BLANK_REASON = "이름을 입력해 주세요";
 	private static final String NAME_LENGTH_REASON = "1~20자여야 합니다";
 	private static final String GRADE_REQUIRED_REASON = "학년을 입력해 주세요";
@@ -318,6 +321,25 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	@DisplayName("서비스가 필드를 지정해 던진 VALIDATION_FAILED는 422 응답의 fields에 그 field와 reason을 담는다")
+	void businessExceptionInvalidFieldReturns422WithThatFieldAndReasonInFields() throws Exception {
+		mockMvc.perform(get(INVALID_FIELD_PATH))
+				.andExpect(validationFailedWithFieldCount(1))
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.message").value(ErrorCode.VALIDATION_FAILED.getMessage()))
+				.andExpect(jsonPath("$.error.fields[0].field").value(INVALID_FIELD_NAME))
+				.andExpect(jsonPath("$.error.fields[0].reason").value(INVALID_FIELD_REASON));
+	}
+
+	@Test
+	@DisplayName("필드를 지정하지 않은 BusinessException.of(ErrorCode.VALIDATION_FAILED)를 던지면 422와 error.code VALIDATION_FAILED · ErrorCode 문구를 돌려주고 error.fields는 지금처럼 채우지 않는다")
+	void businessExceptionOfValidationFailedWithoutFieldKeepsFieldsAbsent() throws Exception {
+		mockMvc.perform(get(COMMON_ERROR_CODE_PATH, ErrorCode.VALIDATION_FAILED.name()))
+				.andExpect(commonError(HttpStatus.UNPROCESSABLE_CONTENT, "VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.message").value(ErrorCode.VALIDATION_FAILED.getMessage()));
+	}
+
+	@Test
 	@DisplayName("공통 오류 코드 ErrorCode.TOO_MANY_REQUESTS는 HTTP 429이고 BusinessException.tooManyRequests(30)을 던지면 429와 error.code TOO_MANY_REQUESTS · error.message ErrorCode.TOO_MANY_REQUESTS 문구 · error.retryAfterSeconds 30을 돌려준다")
 	void tooManyRequestsBusinessExceptionReturns429WithErrorCodeMessageAndRetryAfterSeconds() throws Exception {
 		mockMvc.perform(get(TOO_MANY_REQUESTS_PATH))
@@ -511,6 +533,11 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 		@GetMapping(COMMON_ERROR_CODE_PATH)
 		public String throwCommonErrorCode(@PathVariable("code") ErrorCode code) {
 			throw BusinessException.of(code);
+		}
+
+		@GetMapping(INVALID_FIELD_PATH)
+		public String throwInvalidField() {
+			throw BusinessException.invalidField(INVALID_FIELD_NAME, INVALID_FIELD_REASON);
 		}
 
 	}

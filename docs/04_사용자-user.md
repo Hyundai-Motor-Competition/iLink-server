@@ -5,7 +5,7 @@
 | 항목 | 내용 |
 |---|---|
 | 범위 | 엔티티 Family · User · Vehicle. API FAM-01~03 · FAM-07(가족 멤버), LINK-05(차량 연결 해제), SET-06(합류 안내 방식). 다른 모듈용 in 포트(보호자 · 가족 생성, 차량 등록 · 조회, 멤버 · 가족 조회) |
-| 의존 | 03_공유모듈-shared. auth의 in 포트(멤버 기기 상태 조회, 멤버 해제 때 기기 · 토큰 폐기), pickup의 in 포트(진행 중 픽업 여부). 둘 다 user out 포트로 두고 구현 전에는 테스트 대역으로 검증 |
+| 의존 | 03_공유모듈-shared. auth의 in 포트(멤버 기기 상태 조회, 멤버 해제 때 기기 · 토큰 폐기, LINK-05 차량 기기 폐기), pickup의 in 포트(진행 중 픽업 여부). 둘 다 user out 포트로 두고 구현 전에는 테스트 대역으로 검증 |
 | 진행 | 계층 병렬 |
 
 ## 구조
@@ -51,6 +51,7 @@ user
 | model | VARCHAR(50) | | |
 | plateNumber | VARCHAR(20) | | |
 | unlinkedAt | TIMESTAMPTZ | NULL | 연결 해제 시각 |
+| version | BIGINT | NOT NULL, 기본값 0 | 낙관적 잠금(@Version). 같은 대기 차량에 NEW 승인이 동시에 오면 하나만 성공 |
 
 - VIN 유니크는 연결 중인 행끼리만 건다. schema.sql: `CREATE UNIQUE INDEX IF NOT EXISTS … ON vehicle (vin) WHERE unlinked_at IS NULL`.
 - 연결을 해제해도 행은 지우지 않고 unlinkedAt만 채운다. 같은 차를 다시 연결하면 새 행(새 vehicleId)이 생겨 가족별 픽업 기록이 섞이지 않는다.
@@ -89,7 +90,7 @@ user
 ### 차량
 - AUTH-02(auth)가 차량 기기를 등록할 때 Vehicle 행을 familyId 없이 만든다(RegisterVehicleUseCase).
 - LINK-04 NEW(auth)가 승인되면 Family와 User(GUARDIAN)를 만들고 Vehicle.familyId를 채운다(CreateGuardianUseCase).
-- LINK-05: GUARDIAN만, 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS, 성공하면 unlinkedAt만 채운다. 해제 뒤 같은 VIN은 AUTH-02에서 새 행으로 등록된다.
+- LINK-05: GUARDIAN만, 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS, 성공하면 unlinkedAt을 채우고 그 차량의 살아 있는 기기를 모두 폐기한다(RevokeVehicleDevicesPort → auth RevokeVehicleDevicesUseCase, 사람 결정 2026-11-07). 해제 뒤 같은 VIN은 AUTH-02에서 새 행으로 등록된다.
 - 번호판 마스킹: 뒷자리를 가린다(예: 「12가 ****」).
 
 ### 합류 안내 방식
@@ -126,69 +127,82 @@ long countNonChildMembers(long familyId);                                       
 Optional<Vehicle> loadVehicle(long vehicleId);  Optional<Vehicle> loadLinkedVehicleByVin(String vin);  Optional<Vehicle> loadLinkedVehicleOfFamily(long familyId);  Vehicle saveVehicle(Vehicle vehicle);   // LoadVehiclePort · SaveVehiclePort
 Map<Long, DeviceStatus> loadDeviceStatuses(List<Long> userIds);   // LoadMemberDeviceStatusPort → auth
 void revokeDevicesOf(long userId);                                 // RevokeMemberDevicesPort → auth
+void revokeDevicesOfVehicle(long vehicleId);                       // RevokeVehicleDevicesPort → auth RevokeVehicleDevicesUseCase (LINK-05, 구현 adapter/out/auth/AuthVehicleDeviceAdapter)
 boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);   // CheckActivePickupPort → pickup
 ```
 
 ## 테스트 케이스
-- [ ] [기반] Role은 GUARDIAN · CO_GUARDIAN · DELEGATE · TEACHER · CHILD 다섯 값을 갖는다
-- [ ] [기반] JoinCallMode는 AUTO · GUARDIAN_CONFIRM 두 값을 갖는다
-- [ ] [기반] 새로 만든 Family의 joinCallMode는 AUTO이고 settingsVersion은 0이다
-- [ ] [기반] Family.changeCallMode를 부르면 joinCallMode가 바뀌고 settingsVersion이 1 오른다
-- [ ] [기반] Vehicle.unlink를 부르면 unlinkedAt이 채워지고 vehicleId · vin은 그대로다
-- [ ] [기반] unlinkedAt이 채워진 Vehicle은 연결 중이 아니다
-- [ ] [기반] 이름 규칙은 0자와 21자 이름을 거절하고 1자와 20자 이름을 받는다
-- [ ] [기반] 이름 규칙은 이모지나 제어문자가 든 이름을 거절한다
-- [ ] [기반] 전화번호 규칙은 +821012345678을 받고 01012345678을 거절한다
-- [ ] [기반] 번호판 마스킹은 「12가 3456」을 「12가 ****」로 바꾼다
-- [ ] [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
-- [ ] [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [ ] [기반] FamilyEntity · UserEntity · VehicleEntity가 BaseTimeEntity를 상속하고 UserEntity는 users 테이블에 매핑된다
-- [ ] [기반] 테스트 시드로 가족 1개 · GUARDIAN 1명(김보호) · CHILD 2명(민준 · 서윤) · 연결된 차량 1대(아이오닉 5)를 만든다
-- [ ] [persistence] Family · User · Vehicle을 저장한 뒤 다시 읽으면 도메인 객체의 값이 같다
-- [ ] [persistence] users.phone 컬럼에는 평문이 아닌 암호문이 저장되고 읽으면 원래 번호로 돌아온다
-- [ ] [persistence] 같은 전화번호를 두 번 저장하면 두 암호문이 서로 다르다
-- [ ] [persistence] 서버가 뜨면 schema.sql의 VIN 부분 유니크 인덱스가 vehicle 테이블에 만들어진다
-- [ ] [persistence] unlinkedAt이 빈 같은 VIN 차량 행을 두 개 저장하면 유니크 위반이 난다
-- [ ] [persistence] 같은 VIN이라도 기존 행의 unlinkedAt이 채워져 있으면 새 행이 저장된다
-- [ ] [persistence] loadLinkedVehicleByVin은 unlinkedAt이 빈 행만 찾는다
-- [ ] [persistence] loadLinkedVehicleOfFamily는 그 가족의 연결 중인 차량을 찾는다
-- [ ] [persistence] countNonChildMembers는 CHILD를 뺀 가족 멤버 수를 센다
-- [ ] [서비스] 멤버 등록은 자녀 외 멤버가 이미 5명이면 MEMBER_LIMIT_EXCEEDED로 거절한다
-- [ ] [서비스] 멤버 등록은 자녀 외 멤버가 5명이어도 CHILD는 등록한다
-- [ ] [서비스] CO_GUARDIAN이 CO_GUARDIAN을 등록하려 하면 FORBIDDEN으로 거절한다
-- [ ] [서비스] CHILD가 아닌 멤버를 phone 없이 등록하려 하면 거절한다
-- [ ] [서비스] CHILD는 phone 없이 등록된다
-- [ ] [서비스] 기기 없이 등록한 TEACHER의 deviceStatus는 NONE이다
-- [ ] [서비스] 멤버 수정은 보낸 필드만 바꾸고 보내지 않은 필드는 그대로 둔다
-- [ ] [서비스] CO_GUARDIAN이 멤버의 role을 바꾸려 하면 FORBIDDEN으로 거절한다
-- [ ] [서비스] GUARDIAN이 자기 자신의 role을 바꾸려 하면 거절한다
-- [ ] [서비스] 다른 가족의 userId를 수정하려 하면 NOT_FOUND로 거절한다
-- [ ] [서비스] 멤버 해제는 GUARDIAN 자신을 대상으로 하면 CANNOT_REMOVE_GUARDIAN으로 거절한다
-- [ ] [서비스] 멤버 해제는 진행 중 픽업에 묶인 멤버면 MEMBER_IN_ACTIVE_PICKUP으로 거절한다
-- [ ] [서비스] 멤버 해제가 성공하면 RevokeMemberDevicesPort로 그 멤버의 기기 · 토큰 폐기를 요청한다
-- [ ] [서비스] 가족 조회는 멤버별 deviceStatus를 LoadMemberDeviceStatusPort 결과로 채운다
-- [ ] [서비스] 가족 조회는 연결 중인 차량이 없으면 vehicle을 null로 돌려준다
-- [ ] [서비스] 차량 연결 해제는 진행 중 픽업이 있으면 ACTIVE_PICKUP_EXISTS로 거절한다
-- [ ] [서비스] 차량 연결 해제가 성공하면 unlinkedAt만 채우고 행은 남긴다
-- [ ] [서비스] 합류 안내 방식 변경은 settingsVersion을 1 올린 값을 돌려준다
-- [ ] [서비스] createGuardian은 Family와 role GUARDIAN인 User를 만들고 Vehicle.familyId를 그 가족으로 채운다
-- [ ] [서비스] registerVehicle은 familyId가 빈 Vehicle 행을 만들고 vehicleId를 돌려준다
-- [ ] [web] GET /v1/families/me는 200과 familyId · joinCallMode · vehicle · members[]를 돌려준다
-- [ ] [web] GET /v1/families/me를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] [web] POST /v1/families/me/members는 201과 userId를 돌려준다
-- [ ] [web] POST /v1/families/me/members에 21자 name을 보내면 422 VALIDATION_FAILED와 fields의 name을 돌려준다
-- [ ] [web] POST /v1/families/me/members가 한도를 넘으면 422 MEMBER_LIMIT_EXCEEDED를 돌려준다
-- [ ] [web] PATCH /v1/families/me/members/{userId}는 200과 userId · role · name · phone · deviceStatus를 돌려준다
-- [ ] [web] PATCH /v1/families/me/members/{userId}에 형식이 틀린 phone을 보내면 422를 돌려준다
-- [ ] [web] DELETE /v1/families/me/members/{userId}는 204를 돌려준다
-- [ ] [web] DELETE /v1/families/me/members/{userId}를 CO_GUARDIAN 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] [web] DELETE /v1/families/me/members/{userId}가 진행 중 픽업 멤버면 409 MEMBER_IN_ACTIVE_PICKUP을 돌려준다
-- [ ] [web] DELETE /v1/vehicle-links/{vehicleId}는 204를 돌려준다
-- [ ] [web] DELETE /v1/vehicle-links/{vehicleId}를 CO_GUARDIAN 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] [web] DELETE /v1/vehicle-links/{vehicleId}가 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS를 돌려준다
-- [ ] [web] PUT /v1/families/me/call-mode는 200과 joinCallMode · settingsVersion을 돌려준다
-- [ ] [web] PUT /v1/families/me/call-mode를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] [web] Idempotency-Key는 POST /v1/families/me/members · DELETE /v1/families/me/members/{userId} · DELETE /v1/vehicle-links/{vehicleId}에만 요구된다
+- [x] [기반] Role은 GUARDIAN · CO_GUARDIAN · DELEGATE · TEACHER · CHILD 다섯 값을 갖는다
+- [x] [기반] JoinCallMode는 AUTO · GUARDIAN_CONFIRM 두 값을 갖는다
+- [x] [기반] 새로 만든 Family의 joinCallMode는 AUTO이고 settingsVersion은 0이다
+- [x] [기반] Family.changeCallMode를 부르면 joinCallMode가 바뀌고 settingsVersion이 1 오른다
+- [x] [기반] Vehicle.unlink를 부르면 unlinkedAt이 채워지고 vehicleId · vin은 그대로다
+- [x] [기반] unlinkedAt이 채워진 Vehicle은 연결 중이 아니다
+- [x] [기반] 이름 규칙은 0자와 21자 이름을 거절하고 1자와 20자 이름을 받는다
+- [x] [기반] 이름 규칙은 이모지나 제어문자가 든 이름을 거절한다
+- [x] [기반] 전화번호 규칙은 +821012345678을 받고 01012345678을 거절한다
+- [x] [기반] 번호판 마스킹은 「12가 3456」을 「12가 ****」로 바꾼다
+- [x] [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
+- [x] [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
+- [x] [기반] FamilyEntity · UserEntity · VehicleEntity가 BaseTimeEntity를 상속하고 UserEntity는 users 테이블에 매핑된다
+- [x] [기반] 테스트 시드로 가족 1개 · GUARDIAN 1명(김보호) · CHILD 2명(민준 · 서윤) · 연결된 차량 1대(아이오닉 5)를 만든다
+- [x] [persistence] Family · User · Vehicle을 저장한 뒤 다시 읽으면 도메인 객체의 값이 같다
+- [x] [persistence] users.phone 컬럼에는 평문이 아닌 암호문이 저장되고 읽으면 원래 번호로 돌아온다
+- [x] [persistence] 같은 전화번호를 두 번 저장하면 두 암호문이 서로 다르다
+- [x] [persistence] 서버가 뜨면 schema.sql의 VIN 부분 유니크 인덱스가 vehicle 테이블에 만들어진다
+- [x] [persistence] unlinkedAt이 빈 같은 VIN 차량 행을 두 개 저장하면 유니크 위반이 난다
+- [x] [persistence] 같은 VIN이라도 기존 행의 unlinkedAt이 채워져 있으면 새 행이 저장된다
+- [x] [persistence] loadLinkedVehicleByVin은 unlinkedAt이 빈 행만 찾는다
+- [x] [persistence] loadLinkedVehicleOfFamily는 그 가족의 연결 중인 차량을 찾는다
+- [x] [persistence] countNonChildMembers는 CHILD를 뺀 가족 멤버 수를 센다
+- [x] [서비스] 멤버 등록은 자녀 외 멤버가 이미 5명이면 MEMBER_LIMIT_EXCEEDED로 거절한다
+- [x] [서비스] 멤버 등록은 자녀 외 멤버가 5명이어도 CHILD는 등록한다
+- [x] [서비스] CO_GUARDIAN이 CO_GUARDIAN을 등록하려 하면 FORBIDDEN으로 거절한다
+- [x] [서비스] CHILD가 아닌 멤버를 phone 없이 등록하려 하면 거절한다
+- [x] [서비스] CHILD는 phone 없이 등록된다
+- [x] [서비스] 기기 없이 등록한 TEACHER의 deviceStatus는 NONE이다
+- [x] [서비스] 멤버 수정은 보낸 필드만 바꾸고 보내지 않은 필드는 그대로 둔다
+- [x] [서비스] CO_GUARDIAN이 멤버의 role을 바꾸려 하면 FORBIDDEN으로 거절한다
+- [x] [서비스] GUARDIAN이 자기 자신의 role을 바꾸려 하면 거절한다
+- [x] [서비스] 다른 가족의 userId를 수정하려 하면 NOT_FOUND로 거절한다
+- [x] [서비스] 멤버 해제는 GUARDIAN 자신을 대상으로 하면 CANNOT_REMOVE_GUARDIAN으로 거절한다
+- [x] [서비스] 멤버 해제는 진행 중 픽업에 묶인 멤버면 MEMBER_IN_ACTIVE_PICKUP으로 거절한다
+- [x] [서비스] 멤버 해제가 성공하면 RevokeMemberDevicesPort로 그 멤버의 기기 · 토큰 폐기를 요청한다
+- [x] [서비스] 가족 조회는 멤버별 deviceStatus를 LoadMemberDeviceStatusPort 결과로 채운다
+- [x] [서비스] 가족 조회는 연결 중인 차량이 없으면 vehicle을 null로 돌려준다
+- [x] [서비스] 차량 연결 해제는 진행 중 픽업이 있으면 ACTIVE_PICKUP_EXISTS로 거절한다
+- [x] [서비스] 차량 연결 해제가 성공하면 unlinkedAt만 채우고 행은 남긴다
+- [x] [서비스] 합류 안내 방식 변경은 settingsVersion을 1 올린 값을 돌려준다
+- [x] [서비스] createGuardian은 Family와 role GUARDIAN인 User를 만들고 Vehicle.familyId를 그 가족으로 채운다
+- [x] [서비스] registerVehicle은 familyId가 빈 Vehicle 행을 만들고 vehicleId를 돌려준다
+- [x] [web] GET /v1/families/me는 200과 familyId · joinCallMode · vehicle · members[]를 돌려준다
+- [x] [web] GET /v1/families/me를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] [web] POST /v1/families/me/members는 201과 userId를 돌려준다
+- [x] [web] POST /v1/families/me/members에 21자 name을 보내면 422 VALIDATION_FAILED와 fields의 name을 돌려준다
+- [x] [web] POST /v1/families/me/members가 한도를 넘으면 422 MEMBER_LIMIT_EXCEEDED를 돌려준다
+- [x] [web] PATCH /v1/families/me/members/{userId}는 200과 userId · role · name · phone · deviceStatus를 돌려준다
+- [x] [web] PATCH /v1/families/me/members/{userId}에 형식이 틀린 phone을 보내면 422를 돌려준다
+- [x] [web] DELETE /v1/families/me/members/{userId}는 204를 돌려준다
+- [x] [web] DELETE /v1/families/me/members/{userId}를 CO_GUARDIAN 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] [web] DELETE /v1/families/me/members/{userId}가 진행 중 픽업 멤버면 409 MEMBER_IN_ACTIVE_PICKUP을 돌려준다
+- [x] [web] DELETE /v1/vehicle-links/{vehicleId}는 204를 돌려준다
+- [x] [web] DELETE /v1/vehicle-links/{vehicleId}를 CO_GUARDIAN 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] [web] DELETE /v1/vehicle-links/{vehicleId}가 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS를 돌려준다
+- [x] [web] PUT /v1/families/me/call-mode는 200과 joinCallMode · settingsVersion을 돌려준다
+- [x] [web] PUT /v1/families/me/call-mode를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] [web] Idempotency-Key는 POST /v1/families/me/members · DELETE /v1/families/me/members/{userId} · DELETE /v1/vehicle-links/{vehicleId}에만 요구된다
+- [x] [기반] Family.restore는 familyId · joinCallMode · settingsVersion을 그대로 가진 Family를 만든다
+- [x] [기반] User.create는 userId가 빈 User를 만들고 User.restore는 userId · familyId · role · name · phone을 그대로 가진 User를 만든다
+- [x] [기반] User.changeName · changePhone · changeRole은 그 필드만 바꾸고 나머지는 그대로 둔다
+- [x] [기반] Vehicle.register는 familyId · unlinkedAt이 빈 Vehicle을 만들고 Vehicle.linkTo는 familyId를 채운다
+- [x] [기반] auth · pickup 구현 전 임시 어댑터가 빈으로 등록된다: LoadMemberDeviceStatusPort는 모든 userId에 NONE, RevokeMemberDevicesPort는 아무것도 하지 않음, CheckActivePickupPort는 false
+- [x] [web] POST /v1/families/me/members에 role GUARDIAN을 보내면 422 VALIDATION_FAILED와 fields의 role을 돌려준다
+- [x] [web] 서비스가 필드를 지정해 던진 VALIDATION_FAILED는 422 응답의 fields에 그 field와 reason을 담는다
+- [x] [서비스] 자녀 외 멤버를 phone 없이 등록하거나 GUARDIAN이 자기 role을 바꾸려 할 때의 VALIDATION_FAILED는 fields에 phone · role을 담는다
+- [x] [서비스] 멤버 수정으로 phone 없는 CHILD를 자녀 외 role로 바꾸면 VALIDATION_FAILED로 거절하고 fields에 phone을 담는다
+- [x] [서비스] 멤버 수정으로 CHILD를 자녀 외 role로 바꿀 때 자녀 외 멤버가 이미 5명이면 MEMBER_LIMIT_EXCEEDED로 거절한다
+- [x] [web] PATCH /v1/families/me/members/{userId}에 role GUARDIAN을 보내면 422 VALIDATION_FAILED와 fields의 role을 돌려준다
+- [x] [서비스] createGuardian은 이미 가족에 연결됐거나 연결이 해제된 차량이면 409 VEHICLE_ALREADY_LINKED로 거절하고 아무것도 저장하지 않는다
 
 ## 확인 필요 사항
 
@@ -200,11 +214,11 @@ boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);
 | 멤버 해제 때 User 행 처리 | 소스에 없음. SessionChild · PickupSchedule이 User를 FK로 가리켜 지난 기록이 있는 멤버는 행을 지울 수 없음. 삭제 대신 표시만 하는 방식이 필요한지 정해야 함 |
 | 멤버 해제 때 그 자녀의 일정 · 장소 처리 | 소스에 없음. 그대로 둔다고 가정 |
 | LINK-05를 차량 앱이 부를 수 있는지 | 4.3 표의 사용 화면에 「차량 설정 요약 화면」이 있으나 4.14 호출은 GUARDIAN뿐. 4.14대로 USER 주체 GUARDIAN만 허용 |
-| LINK-05 때 차량 기기 토큰 폐기 | 소스에 없음. 폐기하지 않는다고 가정 |
+| LINK-05 때 차량 기기 토큰 폐기 | 결정됨(사람 결정 2026-11-07). 해제하면 그 차량의 살아 있는 기기를 모두 폐기한다. 해제된 차량 앱은 AUTH-02로 다시 등록한다. 포트도 결정됨: RevokeVehicleDevicesPort → auth RevokeVehicleDevicesUseCase |
 | settingsVersion을 올리는 변경의 범위 | SET-06만 명시됨. 일정(SET-02 · 03) · 장소(SPOT-02 · 03) · 멤버 변경도 올리는지 정해야 함(SET-08 충돌 판단에 영향) |
 | 번호판 마스킹 규칙 | 예시 「12가 ****」뿐. 마지막 숫자 4자리를 *로 바꾼다고 가정 |
 | user ↔ auth 서로 부름 | auth는 User 생성을 user에 요청하고, user는 기기 상태 · 폐기를 auth에 요청. user 쪽은 out 포트로 두고 auth 구현 전에는 테스트 대역으로 검증 |
 | 진행 중 픽업 확인(FAM-07 · LINK-05)을 pickup in 포트로 부르는 것 | pickup이 user보다 뒤에 구현되므로 out 포트 + 테스트 대역으로 먼저 검증 |
 | 포트 · 유스케이스 이름 | 소스 2.2 예시(StartPickupUseCase, LoadSessionPort)의 이름 규칙을 따른 제안 |
-| LINK-04 NEW로 만드는 GUARDIAN의 name | LINK-04 요청에 이름이 없음(05_인증-auth.md에도 기록). 이름을 받을 곳을 정해야 함 |
+| LINK-04 NEW로 만드는 GUARDIAN의 name · phone | name은 결정됨(사람 결정 2026-11-07). LINK-04 요청 name, mode NEW일 때 필수(05_인증-auth.md와 같음). phone은 미정. 요청에 없어 null로 만들고 있어 「자녀 외 phone 필수」 규칙과 어긋남. 보호자 전화번호를 받을 곳을 정해야 함 |
 | Role enum 위치 | 해소: 02에 「common 순수 타입(Role · PrincipalType · LatLng)은 domain에서 써도 된다」 예외를 둠. user/domain은 common.security.Role을 그대로 쓰고 Role enum을 따로 만들지 않음(사람 결정 2026-11-07, 03 확인 필요 사항) |

@@ -73,8 +73,7 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(BusinessException.class)
 	public ResponseEntity<ErrorResponse> handleBusiness(BusinessException exception) {
-		return toJsonResponse(exception.status(),
-				ErrorResponse.of(exception.code(), exception.getMessage(), exception.retryAfterSeconds()));
+		return toJsonResponse(exception.status(), ErrorResponse.from(exception));
 	}
 
 	@ExceptionHandler(AccessDeniedException.class)

@@ -21,6 +21,8 @@ public class PostgisTestcontainersConfiguration {
 	private static final int TEST_POOL_MIN_IDLE = 1;
 	private static final String JWT_SECRET_PROPERTY = "pickup.jwt.secret";
 	private static final int JWT_SECRET_BYTES = 32;
+	private static final String PHONE_KEY_PROPERTY = "pickup.crypto.phone-key";
+	private static final int PHONE_KEY_BYTES = 32;
 	private static final String IDEMPOTENCY_CLEANUP_INTERVAL_PROPERTY = "pickup.idempotency.cleanup-interval";
 	private static final String SCHEDULER_IDLE_INTERVAL = "P1D";
 
@@ -41,8 +43,14 @@ public class PostgisTestcontainersConfiguration {
 
 	@Bean
 	DynamicPropertyRegistrar randomJwtSecretRegistrar() {
-		String secret = randomJwtSecret();
+		String secret = randomBase64(JWT_SECRET_BYTES);
 		return registry -> registry.add(JWT_SECRET_PROPERTY, () -> secret);
+	}
+
+	@Bean
+	DynamicPropertyRegistrar randomPhoneKeyRegistrar() {
+		String key = randomBase64(PHONE_KEY_BYTES);
+		return registry -> registry.add(PHONE_KEY_PROPERTY, () -> key);
 	}
 
 	@Bean
@@ -50,10 +58,10 @@ public class PostgisTestcontainersConfiguration {
 		return registry -> registry.add(IDEMPOTENCY_CLEANUP_INTERVAL_PROPERTY, () -> SCHEDULER_IDLE_INTERVAL);
 	}
 
-	private static String randomJwtSecret() {
-		byte[] secret = new byte[JWT_SECRET_BYTES];
-		new SecureRandom().nextBytes(secret);
-		return Base64.getEncoder().encodeToString(secret);
+	private static String randomBase64(int bytes) {
+		byte[] value = new byte[bytes];
+		new SecureRandom().nextBytes(value);
+		return Base64.getEncoder().encodeToString(value);
 	}
 
 }

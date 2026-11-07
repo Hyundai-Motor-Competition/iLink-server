@@ -39,3 +39,6 @@ out/
 ### Secrets ###
 .env
 *-firebase-adminsdk-*.json
+
+### tdd-guard 세션 보고 산출물 ###
+docs/followup/reports/
