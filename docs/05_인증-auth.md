@@ -151,21 +151,21 @@ void publishDeviceReplaced(List<Long> previousDeviceIds);                   // P
 ```
 
 ## 테스트 케이스
-- [ ] [기반] LinkCode는 발급 시각 + 5분을 expiresAt으로 갖고 status ISSUED로 시작한다
-- [ ] [기반] LinkCode는 expiresAt이 지나면 만료로 판정된다
-- [ ] [기반] MemberInvite는 발급 시각 + 24시간을 expiresAt으로 갖는다
-- [ ] [기반] MemberInvite는 usedAt이 채워지면 사용됨으로 판정된다
-- [ ] [기반] VIN 규칙은 17자 영대문자 · 숫자를 받고 I · O · Q가 들어 있으면 거절한다
-- [ ] [기반] CHILD의 필수 동의는 TERMS · PRIVACY · LOCATION · PUSH다
-- [ ] [기반] 보호자 연결의 필수 동의는 TERMS · PRIVACY이고 MARKETING은 선택이다
-- [ ] [기반] DeviceStatus 판정은 살아 있는 USER 기기가 있으면 CONNECTED를 돌려준다
-- [ ] [기반] DeviceStatus 판정은 기기가 없고 최근 초대가 사용 전 · 만료 전이면 INVITE_PENDING을 돌려준다
-- [ ] [기반] DeviceStatus 판정은 기기가 없고 최근 초대가 만료됐으면 INVITE_EXPIRED를 돌려준다
-- [ ] [기반] DeviceStatus 판정은 기기도 초대도 없으면 NONE을 돌려준다
-- [ ] [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
-- [ ] [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [ ] [기반] VehicleLinkCodeEntity · MemberInviteEntity · DeviceEntity가 BaseTimeEntity를 상속하고 테이블 정의대로 매핑된다
-- [ ] [기반] 테스트 시드로 연결 전 차량 기기 1개와 연결된 차량 기기 1개를 만든다
+- [x] [기반] LinkCode는 발급 시각 + 5분을 expiresAt으로 갖고 status ISSUED로 시작한다
+- [x] [기반] LinkCode는 expiresAt이 지나면 만료로 판정된다
+- [x] [기반] MemberInvite는 발급 시각 + 24시간을 expiresAt으로 갖는다
+- [x] [기반] MemberInvite는 usedAt이 채워지면 사용됨으로 판정된다
+- [x] [기반] VIN 규칙은 17자 영대문자 · 숫자를 받고 I · O · Q가 들어 있으면 거절한다
+- [x] [기반] CHILD의 필수 동의는 TERMS · PRIVACY · LOCATION · PUSH다
+- [x] [기반] 보호자 연결의 필수 동의는 TERMS · PRIVACY이고 MARKETING은 선택이다
+- [x] [기반] DeviceStatus 판정은 살아 있는 USER 기기가 있으면 CONNECTED를 돌려준다
+- [x] [기반] DeviceStatus 판정은 기기가 없고 최근 초대가 사용 전 · 만료 전이면 INVITE_PENDING을 돌려준다
+- [x] [기반] DeviceStatus 판정은 기기가 없고 최근 초대가 만료됐으면 INVITE_EXPIRED를 돌려준다
+- [x] [기반] DeviceStatus 판정은 기기도 초대도 없으면 NONE을 돌려준다
+- [x] [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
+- [x] [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
+- [x] [기반] VehicleLinkCodeEntity · MemberInviteEntity · DeviceEntity가 BaseTimeEntity를 상속하고 테이블 정의대로 매핑된다
+- [x] [기반] 테스트 시드로 연결 전 차량 기기 1개와 연결된 차량 기기 1개를 만든다
 - [ ] [persistence] Device를 refreshTokenHash로 찾는다
 - [ ] [persistence] loadLiveDevices는 revokedAt이 빈 기기만 돌려준다
 - [ ] [persistence] loadLinkCodeByCode는 8자 code로 연결 코드를 찾는다
@@ -241,6 +241,16 @@ void publishDeviceReplaced(List<Long> previousDeviceIds);                   // P
 - [ ] [web] POST /v1/invites/{token}/acceptance는 인증 헤더 없이 201과 userId · familyId · role · accessToken · refreshToken을 돌려준다
 - [ ] [web] POST /v1/invites/{token}/acceptance가 필수 동의 누락이면 422 CONSENT_REQUIRED를 돌려준다
 - [ ] [web] Idempotency-Key는 POST /v1/vehicle-devices · POST /v1/vehicle-links · POST /v1/families/me/members/{userId}/invites · POST /v1/invites/{token}/acceptance에만 요구된다
+- [x] [기반] LinkCode는 mode(NEW · RELINK)와 tokenDeliveredAt을 갖고, 승인하면 mode가 채워지고 USED가 되며 토큰을 내려주면 tokenDeliveredAt이 채워진다
+- [x] [기반] 공통 IntegrationTestSupport는 도메인 시드를 Import하지 않고 시드가 필요한 테스트가 UserSeed · AuthSeed를 직접 Import한다
+- [ ] [서비스] 연결 승인 NEW는 요청의 name으로 GUARDIAN을 만든다
+- [ ] [web] POST /v1/vehicle-links에 mode NEW로 name 없이 보내면 422 VALIDATION_FAILED와 fields의 name을 돌려준다
+- [x] [기반] LinkCode · MemberInvite · Device는 restore로 저장된 값을 그대로 가진 객체를 만든다
+- [x] [기반] LinkCode.expire는 status를 EXPIRED로, MemberInvite.markUsed는 usedAt을, MemberInvite.revoke는 expiresAt을 지금으로 바꾼다
+- [x] [기반] Device.revoke는 revokedAt을, Device.updatePushToken은 pushToken · pushUpdatedAt을, Device.rotateRefreshToken은 refreshTokenHash를 바꾼다
+- [x] [기반] pickup 구현 전 임시 CheckActivePickupPort는 false를 돌려주고, PublishAuthEventPort는 이전 기기 id를 담은 스프링 이벤트를 발행한다
+- [ ] [통합] user의 AuthMemberDeviceAdapter는 auth GetMemberDeviceStatusUseCase 결과를 user DeviceStatus로 바꿔 돌려준다
+- [ ] [통합] user의 RevokeMemberDevicesPort 구현은 auth RevokeMemberDevicesUseCase를 부른다
 
 ## 확인 필요 사항
 

@@ -1,38 +1,23 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-07 18:02 KST · tdd-guard
+- 생성: 2026-11-07 20:02 KST · tdd-guard
 - 설계서: C:/pickup/docs
 - 프로젝트: gradle · C:/pickup
-- 테스트: ● GREEN · 399 passed · 전체 · 1.3s
-- 진행: 공유모듈 57/57 · 사용자 71/71 · 인증 0/90 · 일정 0/55 · 장소 0/43 · 픽업 0/203 · 알림 0/44 · 남은 항목 435/563
-- 현재 도메인: 사용자 (04_사용자-user.md) · 진행 시작: /tdd go
+- 테스트: ● GREEN · 483 passed · 전체 · 36s
+- 진행: 공유모듈 57/57 · 사용자 71/71 · 인증 21/100 · 일정 0/55 · 장소 0/43 · 픽업 0/203 · 알림 0/44 · 남은 항목 424/573
+- 현재 도메인: 인증 (05_인증-auth.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
 
 ## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 완료 · 항목 57/57 · 완료 기준 4/4 · 리뷰 11-07 15:37 조건부 통과 (상 0 · 중 1 · 하 9)
 - 남은 할 일 없음
 
-## 2. 사용자 (user) · 04_사용자-user.md · 진행 중 · 항목 71/71 · 완료 기준 3/4 · 리뷰 11-07 18:02 조건부 통과 (상 1 · 중 7 · 하 11)
+## 2. 사용자 (user) · 04_사용자-user.md · 대기 · 항목 71/71 · 완료 기준 3/4 · 리뷰 11-07 18:02 조건부 통과 (상 1 · 중 7 · 하 11)
 ### 완료 기준
 - [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
 
-## 3. 인증 (auth) · 05_인증-auth.md · 대기 · 항목 0/90 · 완료 기준 0/4
+## 3. 인증 (auth) · 05_인증-auth.md · 진행 중 · 항목 21/100 · 완료 기준 0/4
 ### 테스트 케이스
-- [ ] #1 [기반] LinkCode는 발급 시각 + 5분을 expiresAt으로 갖고 status ISSUED로 시작한다
-- [ ] #2 [기반] LinkCode는 expiresAt이 지나면 만료로 판정된다
-- [ ] #3 [기반] MemberInvite는 발급 시각 + 24시간을 expiresAt으로 갖는다
-- [ ] #4 [기반] MemberInvite는 usedAt이 채워지면 사용됨으로 판정된다
-- [ ] #5 [기반] VIN 규칙은 17자 영대문자 · 숫자를 받고 I · O · Q가 들어 있으면 거절한다
-- [ ] #6 [기반] CHILD의 필수 동의는 TERMS · PRIVACY · LOCATION · PUSH다
-- [ ] #7 [기반] 보호자 연결의 필수 동의는 TERMS · PRIVACY이고 MARKETING은 선택이다
-- [ ] #8 [기반] DeviceStatus 판정은 살아 있는 USER 기기가 있으면 CONNECTED를 돌려준다
-- [ ] #9 [기반] DeviceStatus 판정은 기기가 없고 최근 초대가 사용 전 · 만료 전이면 INVITE_PENDING을 돌려준다
-- [ ] #10 [기반] DeviceStatus 판정은 기기가 없고 최근 초대가 만료됐으면 INVITE_EXPIRED를 돌려준다
-- [ ] #11 [기반] DeviceStatus 판정은 기기도 초대도 없으면 NONE을 돌려준다
-- [ ] #12 [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
-- [ ] #13 [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [ ] #14 [기반] VehicleLinkCodeEntity · MemberInviteEntity · DeviceEntity가 BaseTimeEntity를 상속하고 테이블 정의대로 매핑된다
-- [ ] #15 [기반] 테스트 시드로 연결 전 차량 기기 1개와 연결된 차량 기기 1개를 만든다
 - [ ] #16 [persistence] Device를 refreshTokenHash로 찾는다
 - [ ] #17 [persistence] loadLiveDevices는 revokedAt이 빈 기기만 돌려준다
 - [ ] #18 [persistence] loadLinkCodeByCode는 8자 code로 연결 코드를 찾는다
@@ -108,6 +93,10 @@
 - [ ] #88 [web] POST /v1/invites/{token}/acceptance는 인증 헤더 없이 201과 userId · familyId · role · accessToken · refreshToken을 돌려준다
 - [ ] #89 [web] POST /v1/invites/{token}/acceptance가 필수 동의 누락이면 422 CONSENT_REQUIRED를 돌려준다
 - [ ] #90 [web] Idempotency-Key는 POST /v1/vehicle-devices · POST /v1/vehicle-links · POST /v1/families/me/members/{userId}/invites · POST /v1/invites/{token}/acceptance에만 요구된다
+- [ ] #93 [서비스] 연결 승인 NEW는 요청의 name으로 GUARDIAN을 만든다
+- [ ] #94 [web] POST /v1/vehicle-links에 mode NEW로 name 없이 보내면 422 VALIDATION_FAILED와 fields의 name을 돌려준다
+- [ ] #99 [통합] user의 AuthMemberDeviceAdapter는 auth GetMemberDeviceStatusUseCase 결과를 user DeviceStatus로 바꿔 돌려준다
+- [ ] #100 [통합] user의 RevokeMemberDevicesPort 구현은 auth RevokeMemberDevicesUseCase를 부른다
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
