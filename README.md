@@ -71,6 +71,20 @@ prod는 `ddl-auto: validate`라 서버가 테이블을 만들지 않는다. 그�
 2. `schema.sql`의 인덱스는 `IF NOT EXISTS`라 서버가 뜰 때 자동으로 만들어진다. 미리 실행해도 된다.
 3. 환경 변수 `SPRING_PROFILES_ACTIVE=prod`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`을 넣고 서버를 띄운다.
 
+## dev 서버 · CI/CD (홈서버 Jenkins + k3s)
+
+`main`에 push하면 Jenkins 잡 `ilink-deploy`가 `Jenkinsfile`대로 돈다: `./gradlew test` → `bootJar` → 이미지 `harbor.chisanw.com/ilink/api:{커밋 12자리}` 푸시 → k3s `ilink-dev` 네임스페이스에 배포. 롤아웃이 실패하면 직전 버전으로 되돌린다.
+
+| 항목 | 값 |
+|---|---|
+| 주소 | `https://ilink-api-dev.chisanw.com` (Cloudflare Tunnel → 홈서버 nginx → ingress-nginx) |
+| 매니페스트 | `ops/k8s/dev/api.yaml`(파이프라인이 매번 적용), `postgres.yaml` · `deployer.yaml`(운영자가 한 번 적용) |
+| DB | `ilink-dev`의 StatefulSet `postgres`(`postgis/postgis:17-3.7`), DB · 사용자 `pickup` |
+| 비밀값 | Secret `api`(`DB_PASSWORD` · `JWT_SECRET` · `PHONE_ENCRYPTION_KEY` · `KAKAO_REST_API_KEY`). 홈서버에서 `ilink-secrets`로 편집 · 반영(`ops/scripts/ilink-secrets.sh`) |
+| Jenkins credentials | `ilink-harbor`(Harbor 로봇 계정), `ilink-kubeconfig`(`ilink-deployer` 토큰) |
+
+ConfigMap(비밀이 아닌 환경 변수)을 바꾸려면 `ops/k8s/dev/api.yaml`을 고쳐 `main`에 올린다. 파드가 자동으로 다시 뜬다.
+
 ## 테스트
 
 ```bash

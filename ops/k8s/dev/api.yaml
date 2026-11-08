@@ -1,0 +1,115 @@
+# dev API. Jenkins가 __IMAGE__ · __CONFIG_HASH__를 바꿔 매 배포마다 kubectl apply 한다(main push → 테스트 → Harbor → 여기)
+# 비밀값은 Secret api(DB_PASSWORD · JWT_SECRET · PHONE_ENCRYPTION_KEY · KAKAO_REST_API_KEY), Harbor pull은 Secret harbor-pull.
+# 둘 다 운영자가 서버에서 만들고(ops/scripts/ilink-secrets.sh) 저장소에는 두지 않는다
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api
+  namespace: ilink-dev
+data:
+  SPRING_PROFILES_ACTIVE: dev
+  DB_URL: jdbc:postgresql://postgres:5432/pickup
+  DB_USERNAME: pickup
+  TZ: Asia/Seoul
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: ilink-dev
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: ilink
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0   # 새 파드가 준비된 뒤에 이전 파드를 내린다
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api
+        app.kubernetes.io/part-of: ilink
+      annotations:
+        ilink/config-hash: "__CONFIG_HASH__"   # ConfigMap이 바뀌면 파드를 다시 띄운다
+    spec:
+      imagePullSecrets:
+        - name: harbor-pull
+      securityContext:
+        runAsNonRoot: true
+      terminationGracePeriodSeconds: 40
+      containers:
+        - name: api
+          image: __IMAGE__
+          envFrom:
+            - configMapRef:
+                name: api
+            - secretRef:
+                name: api
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36   # 최대 3분까지 기동을 기다린다
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: ilink-dev
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  namespace: ilink-dev
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"   # 차량 SSE(pickup) 연결을 오래 유지한다
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ilink-api-dev.chisanw.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  name: http

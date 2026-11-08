@@ -50,3 +50,8 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// Dockerfile이 build/libs/app.jar를 이미지에 넣는다
+tasks.named('bootJar') {
+	archiveFileName = 'app.jar'
+}
