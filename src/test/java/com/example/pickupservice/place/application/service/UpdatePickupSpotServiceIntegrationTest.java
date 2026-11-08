@@ -4,6 +4,7 @@ import com.example.pickupservice.common.fixture.IntegrationTestSupport;
 import com.example.pickupservice.place.application.port.in.SpotView;
 import com.example.pickupservice.place.application.port.in.UpdatePickupSpotUseCase;
 import com.example.pickupservice.place.application.port.in.UpdateSpotCommand;
+import com.example.pickupservice.place.fixture.DefaultSpotIndexes;
 import com.example.pickupservice.place.fixture.PlaceSeed;
 import com.example.pickupservice.schedule.fixture.ScheduleSeed;
 import com.example.pickupservice.user.fixture.UserSeed;
@@ -19,7 +20,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 실제 DB(기본 장소 부분 유니크 인덱스 포함)에서 기본 장소 바꾸기가 인덱스와 부딪히지 않는지 본다. */
 @RequiredArgsConstructor
 @Import({UserSeed.class, ScheduleSeed.class, PlaceSeed.class})
 class UpdatePickupSpotServiceIntegrationTest extends IntegrationTestSupport {
@@ -47,7 +47,7 @@ class UpdatePickupSpotServiceIntegrationTest extends IntegrationTestSupport {
 	@Test
 	@DisplayName("시드의 다른 장소를 PATCH isDefault true로 바꾸면 유니크 인덱스와 부딪히지 않고 그 장소만 기본이 되고 이전 기본은 false가 된다")
 	void updateSpotWithIsDefaultTrueSwitchesDefaultWithoutHittingUniqueIndex() {
-		assertThat(DefaultSpotIndexes.of(jdbcTemplate)).as("전제: 기본 장소 부분 유니크 인덱스").hasSize(1);
+		assertThat(DefaultSpotIndexes.partialUniqueOnFamilyAcademy(jdbcTemplate)).as("전제: 기본 장소 부분 유니크 인덱스").hasSize(1);
 
 		SpotView view = updatePickupSpotUseCase.updateSpot(
 				new UpdateSpotCommand(familyId, seeded.otherSpotId(), null, null, null, null, true));

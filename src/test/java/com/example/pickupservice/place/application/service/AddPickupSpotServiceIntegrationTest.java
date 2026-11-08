@@ -6,6 +6,7 @@ import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.place.application.port.in.AddPickupSpotUseCase;
 import com.example.pickupservice.place.application.port.in.AddSpotCommand;
 import com.example.pickupservice.place.application.port.in.SpotCreated;
+import com.example.pickupservice.place.fixture.DefaultSpotIndexes;
 import com.example.pickupservice.place.fixture.PlaceSeed;
 import com.example.pickupservice.schedule.fixture.ScheduleSeed;
 import com.example.pickupservice.user.fixture.UserSeed;
@@ -21,7 +22,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 실제 DB(기본 장소 부분 유니크 인덱스 포함)에서 기본 장소 바꾸기가 인덱스와 부딪히지 않는지 본다. */
 @RequiredArgsConstructor
 @Import({UserSeed.class, ScheduleSeed.class, PlaceSeed.class})
 class AddPickupSpotServiceIntegrationTest extends IntegrationTestSupport {
@@ -53,7 +53,7 @@ class AddPickupSpotServiceIntegrationTest extends IntegrationTestSupport {
 	@Test
 	@DisplayName("기본 장소가 있는 학원에 isDefault true로 장소를 추가하면 유니크 인덱스와 부딪히지 않고 새 장소만 기본이 되고 이전 기본은 false가 된다")
 	void addSpotWithIsDefaultTrueSwitchesDefaultWithoutHittingUniqueIndex() {
-		assertThat(DefaultSpotIndexes.of(jdbcTemplate)).as("전제: 기본 장소 부분 유니크 인덱스").hasSize(1);
+		assertThat(DefaultSpotIndexes.partialUniqueOnFamilyAcademy(jdbcTemplate)).as("전제: 기본 장소 부분 유니크 인덱스").hasSize(1);
 		LatLng point = GeoOffsets.northOf(ACADEMY, 100);
 
 		SpotCreated created = addPickupSpotUseCase.addSpot(new AddSpotCommand(familyId, guardianId, academyId,

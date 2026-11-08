@@ -1,6 +1,7 @@
 package com.example.pickupservice.place.adapter.out.persistence;
 
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
+import com.example.pickupservice.place.fixture.DefaultSpotIndexes;
 import jakarta.persistence.EntityManagerFactory;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
@@ -105,19 +106,8 @@ class PlacePersistenceEntitiesMappingTest extends IntegrationTestSupport {
 	@Test
 	@DisplayName("서버가 뜨면 pickup_spot에 (family_id, academy_id) WHERE is_default 부분 유니크 인덱스가 만들어진다")
 	void pickupSpotHasPartialUniqueIndexOnFamilyAndAcademyWhereIsDefault() {
-		List<String> indexDefinitions = jdbcTemplate.queryForList("""
-				select indexdef
-				from pg_indexes
-				where schemaname = current_schema()
-				  and tablename = 'pickup_spot'
-				""", String.class);
-
-		assertThat(indexDefinitions)
+		assertThat(DefaultSpotIndexes.partialUniqueOnFamilyAcademy(jdbcTemplate))
 				.as("pickup_spot 인덱스 정의")
-				.filteredOn(definition -> definition.startsWith("CREATE UNIQUE INDEX")
-						&& definition.contains("(family_id, academy_id)")
-						&& (definition.endsWith("WHERE is_default")
-								|| definition.endsWith("WHERE (is_default = true)")))
 				.hasSize(1);
 	}
 
