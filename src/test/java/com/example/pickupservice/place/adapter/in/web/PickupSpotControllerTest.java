@@ -208,6 +208,21 @@ class PickupSpotControllerTest extends PlaceWebTestSupport {
 		then(listPickupSpotsUseCase).shouldHaveNoInteractions();
 	}
 
+	@ParameterizedTest
+	@ValueSource(strings = {"abc", "37.5"})
+	@DisplayName("GET /v1/families/me/pickup-spots에 lat,lng 형식이 아닌 near(abc · 37.5)를 보내면 422 VALIDATION_FAILED와 fields의 near를 돌려주고 유스케이스를 부르지 않는다")
+	void listSpotsWithMalformedNearReturns422ValidationFailed(String near) throws Exception {
+		mockMvc.perform(spotsRequest(guardianBearer())
+						.queryParam("near", near)
+						.queryParam("radiusM", "500"))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("near")));
+
+		then(listPickupSpotsUseCase).shouldHaveNoInteractions();
+	}
+
 	@Test
 	@DisplayName("GET /v1/families/me/pickup-spots를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다")
 	void listSpotsWithTeacherTokenReturns403Forbidden() throws Exception {

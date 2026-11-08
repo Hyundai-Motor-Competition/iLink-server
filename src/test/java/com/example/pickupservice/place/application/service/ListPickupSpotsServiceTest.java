@@ -145,6 +145,28 @@ class ListPickupSpotsServiceTest {
 		assertThat(allSpots).extracting(SpotItem::walkMinutes).containsOnlyNulls();
 	}
 
+	@Test
+	@DisplayName("장소 조회는 학원 정보가 없는 학원의 장소도 academyName null로 묶어 돌려준다")
+	void listSpotsGroupsSpotsOfMissingAcademyWithNullAcademyName() {
+		long missingAcademyId = 99L;
+		PickupSpot frontGate = spot(21L, ACADEMY_ID, "정문 앞", "편의점 앞", true);
+		PickupSpot orphanDefault = spot(41L, missingAcademyId, "옛 학원 앞", null, true);
+		PickupSpot orphanOther = spot(42L, missingAcademyId, "옛 학원 옆", null, false);
+		given(loadSpotPort.loadSpots(FAMILY_ID, null)).willReturn(List.of(orphanOther, frontGate, orphanDefault));
+		given(loadAcademyPort.loadAcademy(missingAcademyId)).willReturn(Optional.empty());
+
+		SpotGroups result = listPickupSpotsService.listSpots(new ListSpotsQuery(FAMILY_ID, null, null, null));
+
+		assertThat(result.academies()).extracting(AcademySpots::academyId, AcademySpots::academyName)
+				.containsExactly(
+						tuple(ACADEMY_ID, "해솔영어학원"),
+						tuple(missingAcademyId, null));
+		assertThat(result.academies().get(1).spots()).containsExactly(
+				new SpotItem(41L, "옛 학원 앞", STOP, MEETING, null, true, null),
+				new SpotItem(42L, "옛 학원 옆", STOP, MEETING, null, false, null));
+		verify(loadAcademyPort, times(1)).loadAcademy(missingAcademyId);
+	}
+
 	private static PickupSpot spot(long spotId, long academyId, String name, String memo, boolean isDefault) {
 		return PickupSpot.restore(spotId, FAMILY_ID, academyId, name, memo, STOP, MEETING, isDefault, GUARDIAN_ID);
 	}
