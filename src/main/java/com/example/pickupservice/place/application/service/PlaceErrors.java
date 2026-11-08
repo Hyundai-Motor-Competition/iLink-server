@@ -22,4 +22,9 @@ final class PlaceErrors {
 		return BusinessException.of(HttpStatus.UNPROCESSABLE_CONTENT, "DEFAULT_SPOT_REQUIRED",
 				"다른 장소를 기본 장소로 먼저 지정해야 합니다");
 	}
+
+	static BusinessException defaultSpotConflict() {
+		return BusinessException.of(HttpStatus.CONFLICT, "DEFAULT_SPOT_CONFLICT",
+				"다른 요청이 기본 장소를 먼저 바꿨습니다. 다시 시도해 주세요");
+	}
 }

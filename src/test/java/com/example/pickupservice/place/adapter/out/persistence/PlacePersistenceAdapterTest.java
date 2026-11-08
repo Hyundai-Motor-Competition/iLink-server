@@ -4,6 +4,7 @@ import com.example.pickupservice.common.fixture.GeoOffsets;
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
 import com.example.pickupservice.common.geo.GeoPoints;
 import com.example.pickupservice.common.geo.LatLng;
+import com.example.pickupservice.place.application.port.out.DefaultSpotConflictException;
 import com.example.pickupservice.place.application.port.out.LoadSpotPort;
 import com.example.pickupservice.place.application.port.out.SaveSpotPort;
 import com.example.pickupservice.place.domain.PickupSpot;
@@ -29,6 +30,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 @RequiredArgsConstructor
@@ -281,6 +283,42 @@ class PlacePersistenceAdapterTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	@DisplayName("saveSpot으로 spotId가 있는 장소를 다시 저장하면 새 행을 만들지 않고 그 행의 이름 · 좌표 · isDefault가 바뀐다")
+	void saveSpotWithExistingSpotIdUpdatesThatRowWithoutInsertingNewRow() {
+		long spotId = seeded.defaultSpotId();
+		Integer totalBefore = jdbcTemplate.queryForObject("select count(*) from pickup_spot", Integer.class);
+		Integer familyBefore = jdbcTemplate.queryForObject("select count(*) from pickup_spot where family_id = ?",
+				Integer.class, familyId);
+
+		PickupSpot saved = saveSpotPort.saveSpot(PickupSpot.restore(spotId, familyId, academyId, "새 정문",
+				PlaceSeed.DEFAULT_SPOT_MEMO, SAVED_STOP, SAVED_MEETING, false, guardianId));
+
+		assertThat(saved.getSpotId()).as("돌려받은 spotId").isEqualTo(spotId);
+		Integer totalAfter = jdbcTemplate.queryForObject("select count(*) from pickup_spot", Integer.class);
+		Integer familyAfter = jdbcTemplate.queryForObject("select count(*) from pickup_spot where family_id = ?",
+				Integer.class, familyId);
+		assertThat(totalAfter).as("전체 행 수").isEqualTo(totalBefore);
+		assertThat(familyAfter).as("시드 가족 행 수").isEqualTo(familyBefore).isEqualTo(2);
+		assertThat(countSpotRows(spotId)).as("그 spotId 행 수").isEqualTo(1);
+
+		Map<String, Object> row = jdbcTemplate.queryForMap("""
+				select name, is_default,
+				       st_y(stop_point::geometry) as stop_lat, st_x(stop_point::geometry) as stop_lng,
+				       st_y(meeting_point::geometry) as meeting_lat, st_x(meeting_point::geometry) as meeting_lng
+				from pickup_spot
+				where spot_id = ?
+				""", spotId);
+		assertThat(row.get("name")).isEqualTo("새 정문");
+		assertThat(row.get("is_default")).isEqualTo(false);
+		assertThat((Double) row.get("stop_lat")).as("DB stop_point lat").isCloseTo(SAVED_STOP.lat(), within(SIX_DECIMALS));
+		assertThat((Double) row.get("stop_lng")).as("DB stop_point lng").isCloseTo(SAVED_STOP.lng(), within(SIX_DECIMALS));
+		assertThat((Double) row.get("meeting_lat")).as("DB meeting_point lat")
+				.isCloseTo(SAVED_MEETING.lat(), within(SIX_DECIMALS));
+		assertThat((Double) row.get("meeting_lng")).as("DB meeting_point lng")
+				.isCloseTo(SAVED_MEETING.lng(), within(SIX_DECIMALS));
+	}
+
+	@Test
 	@DisplayName("deleteSpot은 그 장소 행만 지우고 같은 가족 · 학원의 다른 장소는 남긴다")
 	void deleteSpotRemovesOnlyThatSpotAndKeepsOtherSpotsOfSameFamilyAndAcademy() {
 		long otherAcademyId = persistOtherAcademy();
@@ -312,6 +350,46 @@ class PlacePersistenceAdapterTest extends IntegrationTestSupport {
 		Integer after = jdbcTemplate.queryForObject("select count(*) from pickup_spot where family_id = ?",
 				Integer.class, familyId);
 		assertThat(after).as("시드 가족 장소 행 수").isEqualTo(before).isEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("saveSpot으로 기본 장소가 있는 가족 · 학원에 isDefault true 새 장소를 저장하면 DefaultSpotConflictException으로 거절하고 행을 만들지 않는다")
+	void saveSpotRejectsNewSecondDefaultSpotOfSameFamilyAndAcademyWithDefaultSpotConflict() {
+		assertThatThrownBy(() -> saveSpotPort.saveSpot(PickupSpot.create(familyId, academyId, "옆문 앞", null,
+				SAVED_STOP, SAVED_MEETING, true, guardianId)))
+				.isInstanceOf(DefaultSpotConflictException.class);
+
+		assertThat(spotIdsOfFamilyAndAcademy()).as("시드 가족 · 학원 장소")
+				.containsExactlyInAnyOrder(seeded.defaultSpotId(), seeded.otherSpotId());
+		assertThat(defaultSpotIdsOfFamilyAndAcademy()).as("시드 가족 · 학원의 기본 장소")
+				.containsExactly(seeded.defaultSpotId());
+	}
+
+	@Test
+	@DisplayName("saveSpot으로 기본 장소가 있는 가족 · 학원의 다른 장소를 isDefault true로 다시 저장하면 DefaultSpotConflictException으로 거절하고 그 행은 바뀌지 않는다")
+	void saveSpotRejectsPromotingAnotherSpotToSecondDefaultWithDefaultSpotConflict() {
+		PickupSpot promoted = PickupSpot.restore(seeded.otherSpotId(), familyId, academyId, PlaceSeed.OTHER_SPOT_NAME,
+				null, new LatLng(PlaceSeed.OTHER_STOP_LAT, PlaceSeed.OTHER_STOP_LNG),
+				new LatLng(PlaceSeed.OTHER_MEETING_LAT, PlaceSeed.OTHER_MEETING_LNG), true, guardianId);
+
+		assertThatThrownBy(() -> saveSpotPort.saveSpot(promoted))
+				.isInstanceOf(DefaultSpotConflictException.class);
+
+		assertThat(defaultSpotIdsOfFamilyAndAcademy()).as("시드 가족 · 학원의 기본 장소")
+				.containsExactly(seeded.defaultSpotId());
+		assertThat(jdbcTemplate.queryForObject("select is_default from pickup_spot where spot_id = ?", Boolean.class,
+				seeded.otherSpotId())).as("다른 장소 is_default").isFalse();
+	}
+
+	private List<Long> spotIdsOfFamilyAndAcademy() {
+		return jdbcTemplate.queryForList("select spot_id from pickup_spot where family_id = ? and academy_id = ?",
+				Long.class, familyId, academyId);
+	}
+
+	private List<Long> defaultSpotIdsOfFamilyAndAcademy() {
+		return jdbcTemplate.queryForList(
+				"select spot_id from pickup_spot where family_id = ? and academy_id = ? and is_default",
+				Long.class, familyId, academyId);
 	}
 
 	private int countSpotRows(long spotId) {

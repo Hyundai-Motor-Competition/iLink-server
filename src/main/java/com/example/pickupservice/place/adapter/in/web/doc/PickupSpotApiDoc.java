@@ -36,7 +36,8 @@ public interface PickupSpotApiDoc {
 	@ApiResponse(responseCode = "201", description = "spotId · isDefault")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (허용되지 않은 역할)")
-	@ApiResponse(responseCode = "404", description = "NOT_FOUND (학원이 없거나 다른 가족의 학원)")
+	@ApiResponse(responseCode = "404", description = "NOT_FOUND (학원 없음)")
+	@ApiResponse(responseCode = "409", description = "DEFAULT_SPOT_CONFLICT (동시 요청으로 같은 학원의 기본 장소가 부딪힘)")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (academyId · stopPoint · meetingPoint 없음, "
 			+ "name 1~50자, memo 0~200자, Idempotency-Key 없음) · SPOT_TOO_FAR (정차 · 만남 지점이 학원에서 500m 넘음)")
 	AddSpotResponse addSpot(@Parameter(hidden = true) AuthPrincipal principal, AddSpotRequest request);
@@ -46,7 +47,9 @@ public interface PickupSpotApiDoc {
 	@ApiResponse(responseCode = "200", description = "spotId · name · stopPoint · meetingPoint · memo · isDefault")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (허용되지 않은 역할)")
-	@ApiResponse(responseCode = "404", description = "NOT_FOUND (장소가 없거나 다른 가족의 장소)")
+	@ApiResponse(responseCode = "404", description = "NOT_FOUND (장소가 없거나 다른 가족의 장소, "
+			+ "좌표를 바꿀 때 학원 없음)")
+	@ApiResponse(responseCode = "409", description = "DEFAULT_SPOT_CONFLICT (동시 요청으로 같은 학원의 기본 장소가 부딪힘)")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (name 1~50자, memo 0~200자) · "
 			+ "SPOT_TOO_FAR (정차 · 만남 지점이 학원에서 500m 넘음) · "
 			+ "DEFAULT_SPOT_REQUIRED (기본 장소를 isDefault = false로 바꾸려 함)")
@@ -54,7 +57,7 @@ public interface PickupSpotApiDoc {
 			@Parameter(description = "장소 id") long spotId, UpdateSpotRequest request);
 
 	@Operation(summary = "픽업 장소 삭제 (SPOT-03)",
-			description = "GUARDIAN · CO_GUARDIAN. 장소를 soft delete 한다")
+			description = "GUARDIAN · CO_GUARDIAN. 장소 행을 삭제한다")
 	@Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER, required = true, description = "중복 요청 방지 키")
 	@ApiResponse(responseCode = "204", description = "본문 없음")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")

@@ -7,6 +7,7 @@ import com.example.pickupservice.place.application.port.in.SpotView;
 import com.example.pickupservice.place.application.port.in.UpdatePickupSpotUseCase;
 import com.example.pickupservice.place.application.port.in.UpdateSpotCommand;
 import com.example.pickupservice.place.application.port.out.AcademyInfo;
+import com.example.pickupservice.place.application.port.out.DefaultSpotConflictException;
 import com.example.pickupservice.place.application.port.out.DistancePort;
 import com.example.pickupservice.place.application.port.out.LoadAcademyPort;
 import com.example.pickupservice.place.application.port.out.LoadSpotPort;
@@ -36,13 +37,16 @@ public class UpdatePickupSpotService implements UpdatePickupSpotUseCase {
 		requireChangedPointsNearAcademy(current.getAcademyId(), command);
 
 		PickupSpot updated = applyChanges(current, command);
-		if (Boolean.TRUE.equals(command.isDefault())) {
-			demoteOtherDefaults(updated);
+		try {
+			if (Boolean.TRUE.equals(command.isDefault())) {
+				demoteOtherDefaults(updated);
+			}
+			return toView(saveSpotPort.saveSpot(updated));
+		} catch (DefaultSpotConflictException conflict) {
+			throw PlaceErrors.defaultSpotConflict();
 		}
-		return toView(saveSpotPort.saveSpot(updated));
 	}
 
-	/** 보낸(null 아닌) 좌표만 검사한다. 좌표를 안 보냈으면 학원도 읽지 않는다. */
 	private void requireChangedPointsNearAcademy(long academyId, UpdateSpotCommand command) {
 		if (command.stopPoint() == null && command.meetingPoint() == null) {
 			return;

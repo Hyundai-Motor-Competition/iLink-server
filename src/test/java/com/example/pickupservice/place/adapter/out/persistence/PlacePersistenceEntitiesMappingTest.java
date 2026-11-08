@@ -102,6 +102,25 @@ class PlacePersistenceEntitiesMappingTest extends IntegrationTestSupport {
 				.hasSize(1);
 	}
 
+	@Test
+	@DisplayName("서버가 뜨면 pickup_spot에 (family_id, academy_id) WHERE is_default 부분 유니크 인덱스가 만들어진다")
+	void pickupSpotHasPartialUniqueIndexOnFamilyAndAcademyWhereIsDefault() {
+		List<String> indexDefinitions = jdbcTemplate.queryForList("""
+				select indexdef
+				from pg_indexes
+				where schemaname = current_schema()
+				  and tablename = 'pickup_spot'
+				""", String.class);
+
+		assertThat(indexDefinitions)
+				.as("pickup_spot 인덱스 정의")
+				.filteredOn(definition -> definition.startsWith("CREATE UNIQUE INDEX")
+						&& definition.contains("(family_id, academy_id)")
+						&& (definition.endsWith("WHERE is_default")
+								|| definition.endsWith("WHERE (is_default = true)")))
+				.hasSize(1);
+	}
+
 	private Map<String, ColumnType> columnsOf(String tableName) {
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
 				select column_name, data_type, character_maximum_length, is_nullable

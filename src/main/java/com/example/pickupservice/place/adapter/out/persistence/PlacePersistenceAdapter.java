@@ -2,10 +2,13 @@ package com.example.pickupservice.place.adapter.out.persistence;
 
 import com.example.pickupservice.common.geo.GeoPoints;
 import com.example.pickupservice.common.geo.LatLng;
+import com.example.pickupservice.place.application.port.out.DefaultSpotConflictException;
 import com.example.pickupservice.place.application.port.out.LoadSpotPort;
 import com.example.pickupservice.place.application.port.out.SaveSpotPort;
 import com.example.pickupservice.place.domain.PickupSpot;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -14,6 +17,8 @@ import java.util.Optional;
 @Component
 @RequiredArgsConstructor
 class PlacePersistenceAdapter implements LoadSpotPort, SaveSpotPort {
+
+	private static final String DEFAULT_SPOT_INDEX = "uk_pickup_spot_default";
 
 	private final PickupSpotJpaRepository pickupSpotJpaRepository;
 
@@ -46,7 +51,23 @@ class PlacePersistenceAdapter implements LoadSpotPort, SaveSpotPort {
 
 	@Override
 	public PickupSpot saveSpot(PickupSpot spot) {
-		return toDomain(pickupSpotJpaRepository.save(toEntity(spot)));
+		try {
+			return toDomain(pickupSpotJpaRepository.saveAndFlush(toEntity(spot)));
+		} catch (DataIntegrityViolationException violation) {
+			if (isDefaultSpotViolation(violation)) {
+				throw new DefaultSpotConflictException(violation);
+			}
+			throw violation;
+		}
+	}
+
+	private static boolean isDefaultSpotViolation(DataIntegrityViolationException violation) {
+		for (Throwable cause = violation; cause != null; cause = cause.getCause()) {
+			if (cause instanceof ConstraintViolationException constraintViolation) {
+				return DEFAULT_SPOT_INDEX.equalsIgnoreCase(constraintViolation.getConstraintName());
+			}
+		}
+		return false;
 	}
 
 	@Override

@@ -6,6 +6,7 @@ import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.place.application.port.in.SpotView;
 import com.example.pickupservice.place.application.port.in.UpdateSpotCommand;
 import com.example.pickupservice.place.application.port.out.AcademyInfo;
+import com.example.pickupservice.place.application.port.out.DefaultSpotConflictException;
 import com.example.pickupservice.place.application.port.out.DistancePort;
 import com.example.pickupservice.place.application.port.out.LoadAcademyPort;
 import com.example.pickupservice.place.application.port.out.LoadSpotPort;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -24,16 +26,21 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class UpdatePickupSpotServiceTest {
@@ -221,6 +228,47 @@ class UpdatePickupSpotServiceTest {
 	}
 
 	@Test
+	@DisplayName("장소 수정은 isDefault true로 바꾸면 이전 기본 장소 해제를 먼저 저장하고 고친 장소를 나중에 저장한다")
+	void updateSpotWithIsDefaultTrueSavesDemotedPreviousDefaultBeforeTargetSpot() {
+		PickupSpot target = spot(SPOT_ID, FAMILY_ID, "후문", null, NEAR_STOP, NEAR_MEETING, false);
+		PickupSpot previousDefault = spot(PREVIOUS_DEFAULT_SPOT_ID, FAMILY_ID, "정문 앞", null, NEAR_STOP,
+				NEAR_MEETING, true);
+		givenSpot(target);
+		givenAcademyLeniently();
+		given(loadSpotPort.loadSpots(FAMILY_ID, ACADEMY_ID)).willReturn(List.of(previousDefault, target));
+		givenSaveReturnsArgument();
+
+		updatePickupSpotService.updateSpot(new UpdateSpotCommand(FAMILY_ID, SPOT_ID, null, null, null, null, true));
+
+		InOrder inOrder = inOrder(saveSpotPort);
+		inOrder.verify(saveSpotPort).saveSpot(argThat(spot ->
+				Long.valueOf(PREVIOUS_DEFAULT_SPOT_ID).equals(spot.getSpotId()) && !spot.isDefault()));
+		inOrder.verify(saveSpotPort).saveSpot(argThat(spot ->
+				Long.valueOf(SPOT_ID).equals(spot.getSpotId()) && spot.isDefault()));
+		inOrder.verifyNoMoreInteractions();
+	}
+
+	@Test
+	@DisplayName("장소 수정은 저장소가 기본 장소 충돌을 알리면 409 DEFAULT_SPOT_CONFLICT로 거절한다")
+	void updateSpotRejectsWithDefaultSpotConflictWhenSavePortReportsDefaultSpotConflict() {
+		PickupSpot target = spot(SPOT_ID, FAMILY_ID, "후문", null, NEAR_STOP, NEAR_MEETING, false);
+		PickupSpot previousDefault = spot(PREVIOUS_DEFAULT_SPOT_ID, FAMILY_ID, "정문 앞", null, NEAR_STOP,
+				NEAR_MEETING, true);
+		givenSpot(target);
+		givenAcademyLeniently();
+		given(loadSpotPort.loadSpots(FAMILY_ID, ACADEMY_ID)).willReturn(List.of(previousDefault, target));
+		given(saveSpotPort.saveSpot(any(PickupSpot.class))).willThrow(DefaultSpotConflictException.class);
+
+		Throwable thrown = catchThrowable(() -> updatePickupSpotService.updateSpot(
+				new UpdateSpotCommand(FAMILY_ID, SPOT_ID, null, null, null, null, true)));
+
+		assertThat(thrown).isInstanceOf(BusinessException.class);
+		BusinessException exception = (BusinessException) thrown;
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("DEFAULT_SPOT_CONFLICT");
+	}
+
+	@Test
 	@DisplayName("장소 수정은 기본 장소를 isDefault false로 바꾸려 하면 DEFAULT_SPOT_REQUIRED로 거절한다")
 	void updateSpotRejectsWithDefaultSpotRequiredWhenDefaultSpotIsSetToNotDefault() {
 		PickupSpot target = spot(SPOT_ID, FAMILY_ID, "정문 앞", null, NEAR_STOP, NEAR_MEETING, true);
@@ -236,6 +284,25 @@ class UpdatePickupSpotServiceTest {
 		assertThat(exception).isNotNull();
 		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
 		assertThat(exception.code()).isEqualTo("DEFAULT_SPOT_REQUIRED");
+		verify(saveSpotPort, never()).saveSpot(any());
+	}
+
+	@Test
+	@DisplayName("장소 수정은 기본 장소를 isDefault false로 바꾸면서 500m 밖 좌표를 보내도 DEFAULT_SPOT_REQUIRED로 먼저 거절하고 거리 검사를 하지 않는다")
+	void updateSpotRejectsWithDefaultSpotRequiredBeforeDistanceCheckWhenFarPointIsAlsoSent() {
+		givenSpot(spot(SPOT_ID, FAMILY_ID, "정문 앞", null, NEAR_STOP, NEAR_MEETING, true));
+		givenAcademyLeniently();
+		givenOnlyFarPointIsOutside();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> updatePickupSpotService.updateSpot(
+						new UpdateSpotCommand(FAMILY_ID, SPOT_ID, null, FAR_POINT, FAR_POINT, null, false)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		assertThat(exception.code()).isEqualTo("DEFAULT_SPOT_REQUIRED");
+		verifyNoInteractions(distancePort);
+		verify(loadAcademyPort, never()).loadAcademy(anyLong());
 		verify(saveSpotPort, never()).saveSpot(any());
 	}
 

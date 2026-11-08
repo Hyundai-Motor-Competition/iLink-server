@@ -6,6 +6,7 @@ import com.example.pickupservice.place.application.port.in.AddPickupSpotUseCase;
 import com.example.pickupservice.place.application.port.in.AddSpotCommand;
 import com.example.pickupservice.place.application.port.in.SpotCreated;
 import com.example.pickupservice.place.application.port.out.AcademyInfo;
+import com.example.pickupservice.place.application.port.out.DefaultSpotConflictException;
 import com.example.pickupservice.place.application.port.out.DistancePort;
 import com.example.pickupservice.place.application.port.out.LoadAcademyPort;
 import com.example.pickupservice.place.application.port.out.LoadSpotPort;
@@ -40,8 +41,12 @@ public class AddPickupSpotService implements AddPickupSpotUseCase {
 				command.memo(), command.stopPoint(), command.meetingPoint(), command.isDefault(), command.createdBy());
 		PickupSpot newSpot = DefaultSpotRule.applyFirstSpotDefault(candidate, existingSpots);
 
-		PickupSpot saved = saveSpotPort.saveSpot(newSpot);
-		DefaultSpotRule.demotePreviousDefaults(newSpot, existingSpots).forEach(saveSpotPort::saveSpot);
-		return new SpotCreated(saved.getSpotId(), saved.isDefault());
+		try {
+			DefaultSpotRule.demotePreviousDefaults(newSpot, existingSpots).forEach(saveSpotPort::saveSpot);
+			PickupSpot saved = saveSpotPort.saveSpot(newSpot);
+			return new SpotCreated(saved.getSpotId(), saved.isDefault());
+		} catch (DefaultSpotConflictException conflict) {
+			throw PlaceErrors.defaultSpotConflict();
+		}
 	}
 }
