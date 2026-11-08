@@ -1,7 +1,7 @@
 # FOLLOWUP · 장소 (place)
 
-- 생성: 2026-11-08 09:22 KST · tdd-guard
-- 상태: 진행 중 (체크 58/58 · 완료 기준 0/4)
+- 생성: 2026-11-08 09:32 KST · tdd-guard
+- 상태: 완료 (체크 58/58 · 완료 기준 4/4)
 - 테스트: ● GREEN · 1141 passed · 전체 · 66s · cd C:/pickup && ./gradlew.bat test --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321/08c3708…
 - 설계서: C:/pickup/docs/07_장소-place.md
 
@@ -69,33 +69,26 @@
 - 없음
 
 ## 완료 기준 (공통 규칙 문서)
-- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
-- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+- [x] C1 설계서의 테스트 케이스가 모두 GREEN
+- [x] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [x] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 다시 리뷰 필요: 2026-11-08 03:42 KST 리뷰 뒤에 체크 · 추가된 항목 #52, #53, #54, #55, #56, #57, #58
-- 2026-11-08 03:42 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 4 · 하 10 · 리뷰 시점 체크 51/51
-- 리뷰 시점 테스트: ● GREEN · 1127 passed · 전체 · 1.7s · cd C:/pickup && ./gradlew.bat test --rerun --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321…
+- 2026-11-08 09:28 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 2 · 하 6 · 리뷰 시점 체크 58/58
+- 리뷰 시점 테스트: ● GREEN · 1141 passed · 전체 · 1.2s · cd C:/pickup && ./gradlew.bat test --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321/08c3708…
   - 결론: 조건부 통과
-  - [중] SPOT-01 near 형식 오류 → 422 테스트 없음, lat · lng 범위 검사 없음(PickupSpotController.java:104-117, "NaN,NaN" · "91,200" 통과 → PostGIS 오류 500 가능, 미확인) → 항목 추가(형식 오류 422), 범위는 공통 LatLng 후속 과제
-  - [중] Swagger 삭제 설명 「soft delete」가 실제(행 삭제)와 반대 — PickupSpotApiDoc.java:57 → 리팩터링
-  - [중] 08 설계서 L38 「spotId FK → PickupSpot」이 07 · 관례(DB FK 없음)와 어긋남, FOLLOWUP 표 첫 행도 「FK라 못 지움」 → 사람 결정(pickup 시작 전)
-  - [중] 쓰지 않는 loadActiveChildLocation 호출 남음 — ListPickupSpotsService.java:38-39 → note(walkMinutes 결정 때)
-  - [하] academyName null 테스트 없음(ListPickupSpotsService.java:51) → 항목 추가
-  - [하] PATCH 기본 장소 false 거절이 500m 검사보다 먼저인 순서 테스트 없음 → 항목 추가
-  - [하] 기존 장소 saveSpot 갱신(merge) DB 통합 테스트 없음 → 항목 추가
-  - [하] Swagger 404 설명 부정확(PickupSpotApiDoc.java:39 「다른 가족의 학원」, L49 좌표 변경 때 학원 없음 빠짐) → 리팩터링
-  - [하] 기본 장소 유일성 서비스만 — 동시 첫 장소 2개면 기본 2개 · IncorrectResultSize 500(추론) → 사람 결정
-  - [하] 설명 주석 9곳(02 L78) — PickupSpot.java:36, AcademyDistanceCheck.java:6, OwnedSpotLookup.java:8, UpdatePickupSpotService.java:45, ListPickupSpotsService.java:38, UpdateSpotRequest.java:8, ListSpotsQuery.java:3, UpdateSpotCommand.java:5, SpotSummary.java:3 → 리팩터링
-  - [하] 파라미터 많음(PickupSpot.create 8 · restore 9, PickupSpotEntity 생성자 9) → note
-  - [하] SpotResponse 이름 중복(최상위 · PickupSpotsResponse 안) → 리팩터링
-  - [하] 02 L137 schema.sql 설명이 실제 인덱스와 다름 → note
-  - [하] FOLLOWUP 확인 필요 표가 07과 다름 → note
-  - 이전 지적: 삭제 순서 테스트 해소(#50) · 좌표 변경 학원 없음 해소(#51) · near · radiusM 하나만 web에서 막음 해소 · loadActiveChildLocation · 파라미터 남음
-  - 완료 기준: C1 충족(51/51, 1127 passed, place 135) · C2 충족(Swagger 문구 2곳 수정 필요) · C3 사람 확인 필요(주석 규칙 하 9곳) · C4 충족(FOLLOWUP 표 동기화는 note)
-- 이전 리뷰: 2026-11-08 03:25 KST (조건부 통과), 2026-11-08 03:18 KST (조건부 통과)
+  - 이전 지적 해소: near 형식 422(#52) · Swagger soft delete · 404 문구 · academyName null(#53) · PATCH false 순서(#54) · 재저장(#55) · 기본 장소 DB 유일성(#56~#58, 사람 결정) · 설명 주석 9곳 · SpotResponse 이름
+  - [중] 08 설계서 L38 spotId FK 표기와 DB FK 없음 불일치 남음 → 사람 결정(pickup 시작 전)
+  - [중] 쓰지 않는 loadActiveChildLocation 호출 남음, 주석이 지워져 이유가 안 보임 — ListPickupSpotsService.java:38 → note(walkMinutes 정할 때)
+  - [하] FOLLOWUP 확인 필요 표 유일성 행 · 새 2행 미동기화 — docs/followup/place.md:110 → note
+  - [하] web 계층 409 DEFAULT_SPOT_CONFLICT 테스트 없음(공통 처리라 위험 낮음) → note
+  - [하] 실제 동시 요청 시나리오 테스트 없음(어댑터 변환은 PlacePersistenceAdapterTest 2건) → note
+  - [하] 테스트 Javadoc 3곳 — AddPickupSpotServiceIntegrationTest.java:24, UpdatePickupSpotServiceIntegrationTest.java:22, DefaultSpotIndexes.java:7 → 리팩터링
+  - [하] 인덱스 정의 거르는 조건 중복 — DefaultSpotIndexes.java:20-23 · PlacePersistenceEntitiesMappingTest.java:155-161 → 리팩터링
+  - [하] 02 L137 schema.sql 설명 미갱신 · 파라미터 많음 · lat · lng 범위 검사 없음 → note
+  - 완료 기준: C1 충족(58/58, 1141 passed, place 143) · C2 충족(409 · 인덱스 · 저장 순서가 07 · Swagger와 일치) · C3 사람 확인 필요(main 주석 규칙 해소, 테스트 Javadoc 3곳 판단) · C4 충족(FOLLOWUP 표 동기화는 note)
+- 이전 리뷰: 2026-11-08 03:42 KST (조건부 통과), 2026-11-08 03:25 KST (조건부 통과), 2026-11-08 03:18 KST (조건부 통과)
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -107,13 +100,14 @@
 | walkMinutes 계산 방법 | 걷는 속도 · 경로 계산 방법이 소스에 없음. 정해야 함. 지금은 늘 null |
 | 유일한 기본 장소를 PATCH로 isDefault false로 바꾸는 경우 | 결정됨: 남은 장소 수와 상관없이 422 DEFAULT_SPOT_REQUIRED(다른 장소를 기본으로 지정해야 바뀜) |
 | PATCH로 memo 지우기 | null은 「안 보냄」이라 지금은 못 지움. 빈 문자열을 「지움」으로 볼지 정해야 함 |
-| 기본 장소 유일성을 DB로도 막을지 | 소스에는 규칙만 있음. 서비스에서만 지킨다고 가정 |
+| 기본 장소 유일성을 DB로도 막을지 | 결정됨(사람): DB 부분 유니크 인덱스 uk_pickup_spot_default + 동시 요청으로 부딪히면 409 DEFAULT_SPOT_CONFLICT |
+| 배포 전 기존 중복 기본 장소 정리 | 운영 DB에 같은 가족 · 학원의 기본 장소가 두 개 이상 있으면 인덱스 생성이 실패해 서버가 뜨지 않음. 배포 전에 중복을 찾아 하나만 남길지, 남길 기준(최근 수정 · 가장 작은 spotId 등)을 정해야 함 |
+| DEFAULT_SPOT_CONFLICT 공통 오류 표 등록 | 02_공통-규칙-global의 오류 코드 표에 없음. place 문서에만 둔다고 가정 |
 | SPOT-02의 academyId가 가족 일정에 없는 학원인 경우 | 그대로 둠: Academy가 있으면 받고, 없으면 404 |
 | 장소 변경이 settingsVersion을 올리는지 | 04_사용자-user.md와 같은 질문. 올리지 않는다고 가정 |
 | 11/4 기획 수정안(소스 7.1) | 확정되면 학원 출입구를 기본 장소로 쓰고 직접 찍는 장소는 대안 0~2개가 됨 → 「첫 장소가 기본」 규칙이 바뀜 |
 
 ## 다음 단계
-- 도메인 리뷰: /tdd review place (2026-11-08 03:42 KST 리뷰 뒤에 체크 · 추가된 항목 #52, #53, #54, #55, #56, #57, #58)
 - 커밋 · 푸시: /tdd commit (기능별 분할 커밋) · /tdd push (커밋 후 기능 브랜치 푸시)
 - 다음 도메인: 픽업 (08_픽업-pickup.md). 시작: /tdd domain pickup
 
@@ -128,3 +122,4 @@
 - place: SPOT-03 PATCH 오류 칸에 422 DEFAULT_SPOT_REQUIRED(#48)와 404가 설계서 API 표에 없음 — 문서 갱신 필요. PATCH "memo":null 직접 전송은 「안 보냄」으로 처리(지우기 방법 미정)
 - [결정 · 사람] 기본 장소 유일성을 DB 부분 유니크 인덱스로도 막음, 충돌은 장소 전용 409 DEFAULT_SPOT_CONFLICT(팀장: 공통 409 코드가 없어 새 코드). [place 리뷰 note] 08 L38 spotId FK 표기 vs DB FK 없음(pickup 전 결정), lat · lng 범위 검증(공통 LatLng 후속), loadActiveChildLocation 쓰지 않는 호출(walkMinutes 결정 때), 파라미터 많음(PickupSpot.create 8 · restore 9, 엔티티 9), 02 L137 schema.sql 설명 갱신, FOLLOWUP 확인 필요 표 07과 동기화
 - place 운영 위험: dev · prod DB에 같은 가족 · 학원의 기본 장소가 이미 둘 이상이면 서버 시작 때 CREATE UNIQUE INDEX uk_pickup_spot_default가 실패해 서버가 안 뜸 — 배포 전 중복 정리 필요. saveSpot은 저장마다 saveAndFlush(되돌리면 INSERT가 UPDATE보다 먼저 나가 인덱스와 부딪힘, 통합 테스트 2건이 막음)
+- [place 재리뷰 note] web 계층 409 DEFAULT_SPOT_CONFLICT 테스트 없음(공통 처리), 실제 동시 요청 시나리오 테스트 없음, FOLLOWUP 확인 필요 표가 07 L180-182와 다름(유일성 결정 · 배포 전 중복 정리 · DEFAULT_SPOT_CONFLICT 공통 표 등록 여부)
