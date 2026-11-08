@@ -34,18 +34,19 @@ place
 | memo | VARCHAR(200) | NULL | 0~200자 |
 | stopPoint | geography(Point,4326) | GIST | 정차 지점 |
 | meetingPoint | geography(Point,4326) | | 만남 지점(WGS84) |
-| isDefault | BOOLEAN | | 가족 · 학원마다 하나만 true |
+| isDefault | BOOLEAN | 부분 유니크 인덱스 uk_pickup_spot_default (family_id, academy_id) WHERE is_default | 가족 · 학원마다 하나만 true |
 | createdBy | BIGINT | | User 참조(DB FK 제약 없음) |
 
 familyId · academyId · createdBy는 프로젝트 관례대로 DB FK 제약 없이 컬럼만 둔다.
+uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스라 02_공통-규칙-global 관례대로 src/main/resources/schema.sql에 CREATE UNIQUE INDEX IF NOT EXISTS로 적는다.
 
 ## API 명세
 
 | ID | Method · 경로 | 호출 | Idempotency-Key | 요청 → 응답 | 오류 |
 |---|---|---|---|---|---|
 | SPOT-01 | GET /v1/families/me/pickup-spots | GUARDIAN · CO_GUARDIAN · DELEGATE, 차량 앱 | 불필요 | query academyId(선택), near(한 파라미터 "lat,lng" 형식 · radiusM과 함께), radiusM(50~3000 · near와 함께) → 200 academies[](academyId · academyName · spots[](spotId · name · stopPoint · meetingPoint · memo · isDefault · walkMinutes)). 차량 토큰은 토큰의 familyId | 422 VALIDATION_FAILED(near · radiusM 중 하나만, radiusM 50~3000 밖, near 형식 오류) |
-| SPOT-02 | POST /v1/families/me/pickup-spots | GUARDIAN · CO_GUARDIAN | 필요 | academyId, name(1~50자), stopPoint{lat, lng}, meetingPoint{lat, lng}, memo(0~200자, 선택), isDefault(기본 false) → 201 spotId, isDefault | 404 NOT_FOUND(학원 없음), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR |
-| SPOT-03 | PATCH /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 불필요 | name, stopPoint, meetingPoint, memo, isDefault(모두 선택) → 200 spotId · name · stopPoint · meetingPoint · memo · isDefault | 404 NOT_FOUND(다른 가족 · 없는 spotId, 좌표를 바꿀 때 학원 없음), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR, 422 DEFAULT_SPOT_REQUIRED(기본 장소를 isDefault false로) |
+| SPOT-02 | POST /v1/families/me/pickup-spots | GUARDIAN · CO_GUARDIAN | 필요 | academyId, name(1~50자), stopPoint{lat, lng}, meetingPoint{lat, lng}, memo(0~200자, 선택), isDefault(기본 false) → 201 spotId, isDefault | 404 NOT_FOUND(학원 없음), 409 DEFAULT_SPOT_CONFLICT(동시 요청으로 기본 장소가 겹침), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR |
+| SPOT-03 | PATCH /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 불필요 | name, stopPoint, meetingPoint, memo, isDefault(모두 선택) → 200 spotId · name · stopPoint · meetingPoint · memo · isDefault | 404 NOT_FOUND(다른 가족 · 없는 spotId, 좌표를 바꿀 때 학원 없음), 409 DEFAULT_SPOT_CONFLICT(동시 요청으로 기본 장소가 겹침), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR, 422 DEFAULT_SPOT_REQUIRED(기본 장소를 isDefault false로) |
 | SPOT-03 | DELETE /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 필요 | — → 204 | 404 NOT_FOUND, 409 SPOT_IN_USE, 422 DEFAULT_SPOT_REQUIRED |
 
 응답 예시
@@ -66,14 +67,15 @@ familyId · academyId · createdBy는 프로젝트 관례대로 DB FK 제약 없
 - 지도에서 찍은 WGS84 좌표를 geography로 저장한다. createdBy는 호출한 보호자.
 - 정차 지점과 만남 지점을 모두 검사해 하나라도 학원 위치에서 500m를 넘으면 422 SPOT_TOO_FAR(ST_DWithin으로 검사).
 - 가족 · 학원별 첫 장소는 isDefault 값과 상관없이 기본 장소가 된다.
-- isDefault = true로 추가하면 같은 가족 · 학원의 이전 기본 장소는 해제된다.
+- isDefault = true로 추가하면 같은 가족 · 학원의 이전 기본 장소는 해제된다. 이전 기본 장소를 먼저 isDefault false로 저장한 뒤 새 기본 장소를 저장해 uk_pickup_spot_default와 부딪히지 않게 한다.
+- 동시 요청으로 uk_pickup_spot_default가 부딪히면 409 DEFAULT_SPOT_CONFLICT.
 
 ### 수정 · 삭제 (SPOT-03)
 - 다른 가족의 spotId와 없는 spotId는 404 NOT_FOUND.
 - PATCH는 보낸(null 아닌) 필드만 바꾼다. null은 「안 보냄」이라 memo를 지우는 방법은 아직 없다.
 - PATCH로 기본 장소를 isDefault false로 바꾸면 남은 장소 수와 상관없이 422 DEFAULT_SPOT_REQUIRED. 장소가 있는 학원엔 기본 장소가 늘 하나이고, 다른 장소를 기본으로 지정해야 바뀐다. 이 거절은 500m 검사보다 먼저 한다.
 - PATCH는 바꾼 좌표만 500m를 검사해 넘으면 422 SPOT_TOO_FAR. 좌표를 바꿀 때 학원이 없으면 404 NOT_FOUND이고 저장하지 않는다.
-- PATCH로 isDefault = true로 바꾸면 같은 학원의 이전 기본 장소는 해제된다.
+- PATCH로 isDefault = true로 바꾸면 같은 학원의 이전 기본 장소는 해제된다. 추가와 같이 이전 기본 장소를 먼저 해제해 저장한 뒤 이 장소를 저장하고, 동시 요청으로 uk_pickup_spot_default가 부딪히면 409 DEFAULT_SPOT_CONFLICT.
 - DELETE 검사 순서: 404 NOT_FOUND(다른 가족 · 없음) → 409 SPOT_IN_USE(진행 중 세션이 쓰는 장소) → 422 DEFAULT_SPOT_REQUIRED(같은 학원에 다른 장소가 남은 기본 장소. 먼저 다른 장소를 기본으로 지정).
 - 저장소의 deleteSpot은 없는 spotId면 조용히 무시한다(서비스가 먼저 404를 돌려줌).
 - 장소를 고쳐도 진행 중 세션과 지난 결과는 세션의 스냅샷(spotName · stopPoint · meetingPoint)을 쓴다.
@@ -156,6 +158,13 @@ Optional<LatLng> loadActiveChildLocation(long familyId);                        
 - [x] [persistence] deleteSpot은 그 장소 행만 지우고 같은 가족 · 학원의 다른 장소는 남긴다
 - [x] 장소 삭제는 진행 중 세션이 쓰는 기본 장소면 같은 학원에 다른 장소가 남아 있어도 SPOT_IN_USE를 먼저 돌려준다
 - [x] 장소 수정은 좌표를 바꿀 때 학원 정보가 없으면 NOT_FOUND로 거절하고 저장하지 않는다
+- [x] [web] GET /v1/families/me/pickup-spots에 lat,lng 형식이 아닌 near(abc · 37.5)를 보내면 422 VALIDATION_FAILED와 fields의 near를 돌려준다
+- [x] [서비스] 장소 조회는 학원 정보가 없는 학원의 장소도 academyName null로 묶어 돌려준다
+- [x] [서비스] 장소 수정은 기본 장소를 isDefault false로 바꾸면서 500m 밖 좌표를 보내도 DEFAULT_SPOT_REQUIRED로 먼저 거절하고 거리 검사를 하지 않는다
+- [x] [persistence] saveSpot으로 spotId가 있는 장소를 다시 저장하면 새 행을 만들지 않고 그 행의 이름 · 좌표 · isDefault가 바뀐다
+- [x] pickup_spot에 (family_id, academy_id) WHERE is_default 부분 유니크 인덱스가 있어 같은 가족 · 학원에 기본 장소 두 개를 저장할 수 없다
+- [x] 장소 추가 · 수정에서 isDefault true로 지정하면 이전 기본 장소를 먼저 해제한 뒤 저장해 유니크 인덱스와 부딪히지 않는다(실제 DB로 확인)
+- [x] 동시 요청으로 기본 장소 유니크 인덱스가 부딪히면 409 DEFAULT_SPOT_CONFLICT로 거절한다
 
 ## 확인 필요 사항
 
@@ -168,7 +177,9 @@ Optional<LatLng> loadActiveChildLocation(long familyId);                        
 | walkMinutes 계산 방법 | 걷는 속도 · 경로 계산 방법이 소스에 없음. 정해야 함. 지금은 늘 null |
 | 유일한 기본 장소를 PATCH로 isDefault false로 바꾸는 경우 | 결정됨: 남은 장소 수와 상관없이 422 DEFAULT_SPOT_REQUIRED(다른 장소를 기본으로 지정해야 바뀜) |
 | PATCH로 memo 지우기 | null은 「안 보냄」이라 지금은 못 지움. 빈 문자열을 「지움」으로 볼지 정해야 함 |
-| 기본 장소 유일성을 DB로도 막을지 | 소스에는 규칙만 있음. 서비스에서만 지킨다고 가정 |
+| 기본 장소 유일성을 DB로도 막을지 | 결정됨(사람): DB 부분 유니크 인덱스 uk_pickup_spot_default + 동시 요청으로 부딪히면 409 DEFAULT_SPOT_CONFLICT |
+| 배포 전 기존 중복 기본 장소 정리 | 운영 DB에 같은 가족 · 학원의 기본 장소가 두 개 이상 있으면 인덱스 생성이 실패해 서버가 뜨지 않음. 배포 전에 중복을 찾아 하나만 남길지, 남길 기준(최근 수정 · 가장 작은 spotId 등)을 정해야 함 |
+| DEFAULT_SPOT_CONFLICT 공통 오류 표 등록 | 02_공통-규칙-global의 오류 코드 표에 없음. place 문서에만 둔다고 가정 |
 | SPOT-02의 academyId가 가족 일정에 없는 학원인 경우 | 그대로 둠: Academy가 있으면 받고, 없으면 404 |
 | 장소 변경이 settingsVersion을 올리는지 | 04_사용자-user.md와 같은 질문. 올리지 않는다고 가정 |
 | 11/4 기획 수정안(소스 7.1) | 확정되면 학원 출입구를 기본 장소로 쓰고 직접 찍는 장소는 대안 0~2개가 됨 → 「첫 장소가 기본」 규칙이 바뀜 |
