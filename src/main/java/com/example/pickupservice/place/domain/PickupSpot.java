@@ -33,7 +33,6 @@ public class PickupSpot {
 		return new PickupSpot(spotId, familyId, academyId, name, memo, stopPoint, meetingPoint, isDefault, createdBy);
 	}
 
-	/** 같은 가족 · 학원의 다른 장소인지. 자기 자신(같은 spotId)은 false. */
 	public boolean isSiblingOf(PickupSpot other) {
 		if (spotId != null && spotId.equals(other.spotId)) {
 			return false;

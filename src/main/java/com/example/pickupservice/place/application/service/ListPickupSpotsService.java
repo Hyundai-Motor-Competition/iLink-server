@@ -35,7 +35,6 @@ public class ListPickupSpotsService implements ListPickupSpotsUseCase {
 				? loadSpotPort.loadSpotsWithin(query.familyId(), query.academyId(), query.near(), query.radiusM())
 				: loadSpotPort.loadSpots(query.familyId(), query.academyId());
 
-		// 진행 중 세션의 자녀 위치. 걷는 시간 계산 방법이 정해지기 전까지 walkMinutes는 늘 null.
 		checkActivePickupPort.loadActiveChildLocation(query.familyId());
 
 		Map<Long, List<PickupSpot>> byAcademy = spots.stream()

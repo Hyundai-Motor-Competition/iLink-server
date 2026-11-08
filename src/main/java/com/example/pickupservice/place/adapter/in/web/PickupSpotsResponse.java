@@ -16,15 +16,15 @@ public record PickupSpotsResponse(
 		return new PickupSpotsResponse(groups.academies().stream().map(AcademySpotsResponse::from).toList());
 	}
 
-	public record AcademySpotsResponse(long academyId, String academyName, List<SpotResponse> spots) {
+	public record AcademySpotsResponse(long academyId, String academyName, List<SpotItemResponse> spots) {
 
 		static AcademySpotsResponse from(AcademySpots academy) {
 			return new AcademySpotsResponse(academy.academyId(), academy.academyName(),
-					academy.spots().stream().map(SpotResponse::from).toList());
+					academy.spots().stream().map(SpotItemResponse::from).toList());
 		}
 	}
 
-	public record SpotResponse(
+	public record SpotItemResponse(
 			long spotId,
 			String name,
 			LatLng stopPoint,
@@ -34,8 +34,8 @@ public record PickupSpotsResponse(
 			Integer walkMinutes
 	) {
 
-		static SpotResponse from(SpotItem item) {
-			return new SpotResponse(item.spotId(), item.name(), item.stopPoint(), item.meetingPoint(), item.memo(),
+		static SpotItemResponse from(SpotItem item) {
+			return new SpotItemResponse(item.spotId(), item.name(), item.stopPoint(), item.meetingPoint(), item.memo(),
 					item.isDefault(), item.walkMinutes());
 		}
 	}
