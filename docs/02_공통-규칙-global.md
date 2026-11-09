@@ -52,12 +52,12 @@ com.{team}.pickupservice
 │  │  ├─ in
 │  │  │  ├─ web          Controller (doc 인터페이스 구현), 요청 · 응답 DTO(record)
 │  │  │  │  └─ doc       ...ApiDoc (스웨거 어노테이션만 모은 인터페이스, 컨트롤러 1개당 1개)
-│  │  │  ├─ sse          (pickup만) SessionStreamController
+│  │  │  ├─ sse          (pickup만) SessionStreamController, SessionEventStreamListener(SSE 송출 리스너, AFTER_COMMIT), SessionStreamRegistry(연결 보관)
 │  │  │  ├─ scheduler    (pickup · notification) 자동 완료 · 재발송 작업
 │  │  │  └─ event        (notification) FCM 발송 리스너
 │  │  └─ out
 │  │     ├─ persistence  JPA 엔티티, Spring Data 저장소, 도메인 ↔ 엔티티 변환
-│  │     └─ event        도메인 이벤트 발행, SSE 송출 리스너
+│  │     └─ event        도메인 이벤트 발행 (pickup의 SSE 송출 리스너는 리스너가 연결 보관소를 쓰므로 adapter/in/sse에 둔다)
 │  ├─ application
 │  │  ├─ port
 │  │  │  ├─ in           ...UseCase

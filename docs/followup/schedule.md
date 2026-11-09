@@ -1,109 +1,100 @@
 # FOLLOWUP · 일정 (schedule)
 
-- 생성: 2026-11-08 02:05 KST · tdd-guard
-- 상태: 완료 (체크 77/77 · 완료 기준 4/4)
-- 테스트: ● GREEN · 990 passed · 전체 · 1.6s · cd /c/pickup && ./gradlew.bat test --rerun --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321…
-- 설계서: C:/pickup/docs/06_일정-schedule.md
+- 생성: 2026-11-09 17:30 KST · tdd-guard
+- 상태: 진행 중 (체크 77/77 · 완료 기준 0/4)
+- 테스트: ⚠ ERROR · exit 1 · PickupCallControllerTest, PickupOutcomeControllerTest, PickupDataSettingsContro… · 5.5s · .\gradlew.bat test --tests com.example.pickupservice.pickup.adapter.in.web.PickupCallControllerTest --tests com.example.pickupservice.pickup.adapter.in.web.PickupOutcomeControllerTest --tests com.example.pickupservice.pickup.adapter.in.web.PickupDataSettingsControllerTest --tests com.example.pickupservice.pickup.adapter.in.web.PickupSessionControllerTest --tests com.example.pickupservice.pickup.adapter.in.web.PickupStreamControllerTest --tests com.example.pickupservice.pickup.adapter.in.web.PickupSignalControllerTest --tests com.example.pickupservice.pickup.adapter.in.web.PickupIdempotencyKeyTest --console=plain
+- 설계서: C:/ilink/docs/06_일정-schedule.md
 
 ## 완료 항목
-- [x] #1 [기반] PickupSchedule은 학원 출입구가 없으면 DRAFT, 있으면 READY로 만들어진다 ← PickupScheduleTest.학원 출입구가 없으면 PickupSchedule은 DRAFT로 만들어진다
-- [x] #2 [기반] 일정 규칙은 targetPickup이 0~60을 벗어나면 거절한다 ← PickupScheduleTest.[2] targetPickup = 61
-- [x] #3 [기반] 일정 규칙은 weekdays가 비어 있으면 거절한다 ← PickupScheduleTest.일정 규칙은 weekdays가 비어 있으면 422 VALIDATION_FAILED(field weekdays)로 거절한다
+- [x] #1 [기반] PickupSchedule은 학원 출입구가 없으면 DRAFT, 있으면 READY로 만들어진다 ← PickupScheduleTest.PickupSchedule은 학원 출입구가 없으면 DRAFT로 만들어진다
+- [x] #2 [기반] 일정 규칙은 targetPickup이 0~60을 벗어나면 거절한다 ← PickupScheduleTest.일정 규칙은 targetPickup이 0~60을 벗어나면 거절한다
+- [x] #3 [기반] 일정 규칙은 weekdays가 비어 있으면 거절한다 ← PickupScheduleTest.일정 규칙은 weekdays가 비어 있으면 거절한다
 - [x] #4 [기반] 겹침 규칙은 같은 자녀 · 같은 요일 · 같은 classEndTime 일정을 겹침으로 판정한다 ← ScheduleOverlapRuleTest.겹침 규칙은 같은 자녀 · 같은 요일 · 같은 classEndTime 일정을 겹침으로 판정한다
 - [x] #5 [기반] 하루 한도 규칙은 같은 자녀 같은 요일에 네 번째 일정이면 한도 초과로 판정한다 ← DailyScheduleLimitRuleTest.하루 한도 규칙은 같은 자녀 같은 요일에 네 번째 일정이면 한도 초과로 판정한다
 - [x] #6 [기반] targetPickupTime 계산은 classEndTime 18:00 · targetPickup 5에서 18:05를 돌려준다 ← PickupScheduleTest.targetPickupTime 계산은 classEndTime 18:00 · targetPickup 5에서 18:05를 돌려준다
-- [x] #7 [기반] 이름 마스킹은 김보호를 김*호로 바꾼다 ← GuardianNameMaskerTest.이름 마스킹은 김보호를 김*호로 바꾼다
+- [x] #7 [기반] 이름 마스킹은 김보호를 김*호로 바꾼다 ← NameMaskerTest.이름 마스킹은 김보호를 김*호로 바꾼다
 - [x] #8 [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다 ← ScheduleInPortsTest.핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
 - [x] #9 [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다 ← ScheduleOutPortsTest.핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [x] #10 [기반] AcademyEntity · PickupScheduleEntity가 BaseTimeEntity를 상속하고 location · entrance는 geography(Point,4326)로 매핑된다 ← SchedulePersistenceEntitiesTest.AcademyEntity · PickupScheduleEntity는 @Entity이고 BaseTimeEntity를 바로 상속한다
+- [x] #10 [기반] AcademyEntity · PickupScheduleEntity가 BaseTimeEntity를 상속하고 location · entrance는 geography(Point,4326)로 매핑된다 ← SchedulePersistenceEntitiesMappingTest.academy.location · academy.entrance는 타입 Point · SRID 4326인 geography 컬럼으로 만들어진다
 - [x] #11 [기반] 테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다 ← ScheduleSeedTest.테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다
-- [x] #12 [persistence] Academy를 저장하고 읽으면 location · entrance 좌표가 같다 ← SchedulePersistenceAdapterTest.Academy를 저장하고 읽으면 location · entrance 좌표가 같다
-- [x] #13 [persistence] weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다 ← SchedulePersistenceAdapterTest.weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다
-- [x] #14 [persistence] classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다 ← SchedulePersistenceAdapterTest.classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다
-- [x] #15 [persistence] loadSchedulesOfChild는 그 자녀의 일정만 돌려준다 ← SchedulePersistenceAdapterTest.loadSchedulesOfChild는 그 자녀의 일정만 돌려준다
-- [x] #16 [persistence] loadSchedulesOfChildren은 여러 자녀의 일정을 한 번에 돌려준다 ← SchedulePersistenceAdapterTest.loadSchedulesOfChildren은 여러 자녀의 일정을 한 번에 돌려주고 목록에 없는 자녀의 일정은 빼며, 일정 조회 쿼리는 자녀 수와 상관없이 1회다
-- [x] #17 [서비스] 학원 검색은 외부 지도 API 결과를 저장하지 않고 externalPlaceId · name · address · location으로 돌려준다 ← SearchAcademyServiceTest.학원 검색은 외부 지도 API 결과를 저장하지 않고 externalPlaceId · name · address · location으로 돌려준다
-- [x] #18 [서비스] 학원 검색은 외부 지도 API가 실패하면 MAP_API_UNAVAILABLE로 거절한다 ← SearchAcademyServiceTest.학원 검색은 외부 지도 API가 예외로 실패하면 502 MAP_API_UNAVAILABLE로 거절한다
-- [x] #19 [서비스] 일정 등록은 학원을 만들고 scheduleId · academyId · status를 돌려준다 ← CreateScheduleServiceTest.일정 등록은 학원을 만들고 scheduleId · academyId · status를 돌려준다
-- [x] #20 [서비스] 일정 등록은 출입구 없는 학원이면 status DRAFT를 돌려준다 ← CreateScheduleServiceTest.일정 등록은 출입구 없는 학원이면 status DRAFT를 돌려준다
-- [x] #21 [서비스] 일정 등록은 childId가 CHILD가 아니면 NOT_FOUND로 거절한다 ← CreateScheduleServiceTest.일정 등록은 childId가 CHILD가 아니면 NOT_FOUND로 거절한다
-- [x] #22 [서비스] 일정 등록은 다른 가족의 자녀면 NOT_FOUND로 거절한다 ← CreateScheduleServiceTest.일정 등록은 다른 가족의 자녀면 NOT_FOUND로 거절한다
-- [x] #23 [서비스] 일정 등록은 겹치는 일정이 있으면 SCHEDULE_OVERLAP과 겹치는 scheduleId 목록으로 거절한다 ← CreateScheduleServiceTest.일정 등록은 겹치는 일정이 있으면 SCHEDULE_OVERLAP과 겹치는 scheduleId 목록으로 거절한다
-- [x] #24 [서비스] 일정 등록은 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절한다 ← CreateScheduleServiceTest.일정 등록은 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절한다
-- [x] #25 [서비스] 일정 수정은 자기 자신과는 겹침으로 판정하지 않는다 ← UpdateScheduleServiceTest.일정 수정은 자기 자신과는 겹침으로 판정하지 않는다
-- [x] #26 [서비스] 일정 수정은 요일 · 시간 · 학원을 바꾸고 status를 다시 판정한다 ← UpdateScheduleServiceTest.일정 수정은 요일 · 시간 · 학원을 바꾸고 status를 다시 판정한다 (출입구 있는 학원 → 없는 학원이면 DRAFT)
-- [x] #27 [서비스] 설정 요약은 자녀 기기가 CONNECTED가 아니면 missing에 CHILD_DEVICE를 넣는다 ← GetSetupSummaryServiceTest.[1] deviceStatus = INVITE_PENDING
-- [x] #28 [서비스] 설정 요약은 READY 일정이 없으면 missing에 SCHEDULE을 넣는다 ← GetSetupSummaryServiceTest.설정 요약은 일정이 DRAFT뿐이면 missing에 SCHEDULE을 넣는다
-- [x] #29 [서비스] 설정 요약은 일정 학원에 기본 장소가 없으면 missing에 PICKUP_SPOT을 넣는다 ← GetSetupSummaryServiceTest.설정 요약은 일정 학원 중 기본 장소가 없는 학원이 있으면 missing에 PICKUP_SPOT을 넣는다
-- [x] #30 [서비스] 설정 요약은 joinCallMode와 Family.settingsVersion을 담는다 ← GetSetupSummaryServiceTest.설정 요약은 가족의 joinCallMode와 settingsVersion을 담는다
-- [x] #31 [서비스] 설정 완료는 settingsVersion이 다르면 SETTINGS_VERSION_CONFLICT로 거절한다 ← CompleteSetupServiceTest.설정 완료는 settingsVersion이 다르면 409 SETTINGS_VERSION_CONFLICT로 거절한다
-- [x] #32 [서비스] 설정 완료는 missing이 남아 있으면 SETUP_INCOMPLETE로 거절한다 ← CompleteSetupServiceTest.설정 완료는 missing이 남아 있으면 422 SETUP_INCOMPLETE로 거절한다
-- [x] #33 [서비스] 주간 일정은 weekStart가 없으면 한국 날짜 기준 이번 주 월요일부터 7일을 돌려준다 ← GetWeeklyPickupsServiceTest.[1] now = "2026-11-08T16:00:00Z", expectedMonday = "2026-11-09"
-- [x] #34 [서비스] 주간 일정은 요일이 맞는 날짜에만 그 일정을 넣는다 ← GetWeeklyPickupsServiceTest.주간 일정은 요일이 맞는 날짜에만 그 일정을 넣고 하루 안에서는 classEndTime 오름차순이다
-- [x] #35 [서비스] 주간 일정 readiness는 자녀 기기나 기본 장소가 빠지면 startable false와 missing을 돌려준다 ← GetWeeklyPickupsServiceTest.주간 일정 readiness는 기기와 기본 장소가 둘 다 빠지면 missing에 둘 다 넣는다
-- [x] #36 [서비스] 차량용 설정 요약은 GUARDIAN 이름을 가려서 돌려주고 자녀 목록과 joinCallMode를 담는다 ← GetVehicleSettingsSummaryServiceTest.차량용 설정 요약은 GUARDIAN 이름의 가운데 글자를 가려서 돌려준다
-- [x] #37 [서비스] findSchedules는 scheduleId 목록의 일정과 학원 정보를 돌려준다 ← LoadScheduleServiceTest.findSchedules는 scheduleId의 일정 값과 학원 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려준다
-- [x] #38 [web] GET /v1/places/academies는 200과 items[]를 돌려준다 ← ScheduleControllerTest.GET /v1/places/academies는 200과 items[](externalPlaceId · name · address · location{lat, lng})를 돌려준다
-- [x] #39 [web] GET /v1/places/academies에 1자 query를 보내면 422 VALIDATION_FAILED를 돌려준다 ← ScheduleControllerTest.GET /v1/places/academies에 1자 query를 보내면 422 VALIDATION_FAILED와 fields의 query를 돌려주고 유스케이스를 부르지 않는다
-- [x] #40 [web] GET /v1/places/academies가 외부 API 오류면 502 MAP_API_UNAVAILABLE을 돌려준다 ← ScheduleControllerTest.GET /v1/places/academies가 외부 API 오류면 502 MAP_API_UNAVAILABLE을 돌려준다
-- [x] #41 [web] POST /v1/children/{childId}/schedules는 201과 scheduleId · academyId · status를 돌려준다 ← ScheduleControllerTest.POST /v1/children/{childId}/schedules는 201과 scheduleId · academyId · status를 돌려준다
-- [x] #42 [web] POST /v1/children/{childId}/schedules에 targetPickup 61을 보내면 422 VALIDATION_FAILED를 돌려준다 ← ScheduleControllerTest.POST /v1/children/{childId}/schedules에 targetPickup 61을 보내면 422 VALIDATION_FAILED와 fields의 targetPickup을 돌려주고 유스케이스를 부르지 않는다
-- [x] #43 [web] POST /v1/children/{childId}/schedules가 겹치면 409 SCHEDULE_OVERLAP과 overlapScheduleIds를 돌려준다 ← ScheduleControllerTest.POST /v1/children/{childId}/schedules가 겹치면 409 SCHEDULE_OVERLAP과 overlapScheduleIds를 돌려준다
-- [x] #44 [web] POST /v1/children/{childId}/schedules가 하루 한도를 넘으면 422 DAILY_SCHEDULE_LIMIT을 돌려준다 ← ScheduleControllerTest.POST /v1/children/{childId}/schedules가 하루 한도를 넘으면 422 DAILY_SCHEDULE_LIMIT을 돌려준다
-- [x] #45 [web] PUT /v1/schedules/{scheduleId}는 200과 scheduleId · academyId · status를 돌려준다 ← ScheduleControllerTest.PUT /v1/schedules/{scheduleId}는 Idempotency-Key 없이 200과 scheduleId · academyId · status를 돌려준다
-- [x] #46 [web] PUT /v1/schedules/{scheduleId}를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← ScheduleControllerTest.PUT /v1/schedules/{scheduleId}를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [x] #47 [web] GET /v1/children/{childId}/schedules는 200과 items[]를 돌려준다 ← ScheduleControllerTest.GET /v1/children/{childId}/schedules는 200과 items[](scheduleId · academy{academyId, name} · weekdays · classEndTime · targetPickup · status)를 돌려준다
-- [x] #48 [web] GET /v1/children/{childId}/setup-summary는 200과 child · schedules · pickupSpots · joinCallMode · missing · settingsVersion을 돌려준다 ← SetupControllerTest.GET /v1/children/{childId}/setup-summary는 200과 child · schedules · pickupSpots · joinCallMode · missing · settingsVersion을 돌려준다
-- [x] #49 [web] POST /v1/children/{childId}/setup-completion은 200과 syncedToVehicle을 돌려준다 ← SetupControllerTest.POST /v1/children/{childId}/setup-completion은 200과 syncedToVehicle을 돌려준다
-- [x] #50 [web] POST /v1/children/{childId}/setup-completion이 버전 충돌이면 409 SETTINGS_VERSION_CONFLICT를 돌려준다 ← SetupControllerTest.POST /v1/children/{childId}/setup-completion이 버전 충돌이면 409 SETTINGS_VERSION_CONFLICT를 돌려준다
-- [x] #51 [web] POST /v1/children/{childId}/setup-completion이 누락이 있으면 422 SETUP_INCOMPLETE를 돌려준다 ← SetupControllerTest.POST /v1/children/{childId}/setup-completion이 누락이 있으면 422 SETUP_INCOMPLETE를 돌려준다
-- [x] #52 [web] GET /v1/vehicles/me/weekly-pickups는 차량 토큰으로 200과 weekStart · days · readiness를 돌려준다 ← VehicleScheduleControllerTest.GET /v1/vehicles/me/weekly-pickups는 차량 토큰으로 200과 weekStart · days · readiness를 돌려준다
-- [x] #53 [web] GET /v1/vehicles/me/weekly-pickups를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← VehicleScheduleControllerTest.GET /v1/vehicles/me/weekly-pickups를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다
-- [x] #54 [web] GET /v1/vehicles/me/settings-summary는 차량 토큰으로 200과 guardianNameMasked · children · joinCallMode를 돌려준다 ← VehicleScheduleControllerTest.GET /v1/vehicles/me/settings-summary는 차량 토큰으로 200과 guardianNameMasked · children · joinCallMode를 돌려준다
-- [x] #55 [web] Idempotency-Key는 POST /v1/children/{childId}/schedules · POST /v1/children/{childId}/setup-completion에만 요구된다 ← ScheduleIdempotencyKeyTest.Idempotency-Key는 POST /v1/children/{childId}/schedules · POST /v1/children/{childId}/setup-completion에만 요구된다
-- [x] #56 [persistence] 지도 API 어댑터는 카카오 로컬 검색 응답을 externalPlaceId(kakao:{id}) · name · address · location의 AcademyCandidate로 바꾼다 ← KakaoMapSearchAdapterTest.카카오 키워드 검색 응답을 kakao:{id} · 이름 · 도로명 주소 · 위치(y=lat, x=lng)의 AcademyCandidate로 바꾼다
-- [x] #57 [persistence] 지도 API 어댑터는 외부 API 오류 · 시간 초과면 502 MAP_API_UNAVAILABLE로 거절한다 ← KakaoMapSearchAdapterTest.카카오 API 응답 읽기 시간이 초과되면 502 MAP_API_UNAVAILABLE로 거절한다
-- [x] #58 [persistence] place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다 ← ScheduleModuleLinkAdaptersTest.place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다
-- [x] #59 [persistence] LoadMemberDeviceStatusPort 어댑터는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다 ← ScheduleModuleLinkAdaptersTest.LoadMemberDeviceStatusPort는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다: CONNECTED · INVITE_PENDING · INVITE_EXPIRED · NONE
-- [x] #60 [기반] 공통 BusinessException에 overlapScheduleIds를 담아 던지면 오류 응답 error.overlapScheduleIds에 실리고, 담지 않으면 그 키가 응답에 없다 ← GlobalExceptionHandlerTest.컨트롤러가 overlapScheduleIds [801, 802]를 담은 BusinessException.conflictWithOverlap(409 · SCHEDULE_OVERLAP · 메시지 · [801, 802])을 던지면 409와 error.overlapScheduleIds [801, 802]를 돌려주고 error.code · error.message · error.retryAfterSeconds(null) 키는 그대로 있으며 error.fields는 채우지 않는다
-- [x] #61 [서비스] findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려주고 없으면 빈 값을 돌려준다 ← LoadAcademyServiceTest.findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려준다
-- [x] #62 지도 API 어댑터는 200 응답이라도 본문을 읽지 못하거나 좌표가 없거나 숫자가 아니면 502 MAP_API_UNAVAILABLE로 거절한다 ← KakaoMapSearchAdapterTest.카카오 API가 200이라도 본문이 JSON이 아니면 502 MAP_API_UNAVAILABLE로 거절한다
-- [x] #63 saveSchedule로 scheduleId가 있는 일정을 다시 저장하면 새 행을 만들지 않고 그 행의 요일 · 시간 · 학원 · status가 바뀐다 ← SchedulePersistenceAdapterTest.saveSchedule로 scheduleId가 있는 일정을 다시 저장하면 새 행을 만들지 않고 그 행의 요일 · 시간 · 학원 · status가 바뀐다
-- [x] #64 loadSchedule · loadAcademy에 없는 id를 주면 빈 값을 돌려준다 ← SchedulePersistenceAdapterTest.loadSchedule · loadAcademy에 없는 id를 주면 빈 값을 돌려준다
-- [x] #65 [서비스] 일정 목록은 그 자녀의 일정을 scheduleId · 학원(academyId · name) · weekdays · classEndTime · targetPickup · status로 돌려주고, 내 가족의 CHILD가 아니면 NOT_FOUND로 거절한다 ← ListSchedulesServiceTest.일정 목록은 자녀의 일정을 scheduleId · 학원 · weekdays · classEndTime · targetPickup · status로 돌려준다
-- [x] #66 PickupSchedule 검증 실패는 프레임워크와 무관한 도메인 예외(field · reason)로 던지고, 일정 등록 · 수정 서비스는 이를 422 VALIDATION_FAILED(fields)로 바꾼다 ← CreateScheduleServiceTest.일정 등록은 targetPickup 61이면 도메인 예외를 422 VALIDATION_FAILED(fields[targetPickup])로 바꿔 거절한다
-- [x] #67 Academy는 externalPlaceId를 가지며 academy.external_place_id는 유니크로 저장되고, 저장한 학원을 externalPlaceId로 찾을 수 있다 ← SchedulePersistenceAdapterTest.Academy를 저장하면 external_place_id 컬럼에 externalPlaceId가 들어가고 loadAcademy · loadAcademyByExternalPlaceId로 읽으면 같은 학원이 나온다
-- [x] #68 일정 등록 · 수정은 같은 externalPlaceId의 학원이 있으면 새로 만들지 않고 그 academyId를 쓰며 학원 정보는 요청 값으로 갱신한다 ← CreateScheduleServiceTest.일정 등록은 같은 externalPlaceId의 학원이 있으면 새로 만들지 않고 그 academyId로 저장하며 학원 정보는 요청 값으로 갱신하고 그 academyId를 돌려준다
-- [x] #69 주간 일정 readiness는 오늘 일정 중 DRAFT가 있으면 startable false를 돌려준다 ← GetWeeklyPickupsServiceTest.주간 일정 readiness는 오늘 일정 중 DRAFT가 있으면 기기와 기본 장소가 다 있어도 startable false와 빈 missing을 돌려준다
-- [x] #70 일정 등록 · 수정은 같은 학원을 다시 쓸 때 요청의 entrance · phone이 비어 있으면 기존 값을 유지한다 ← CreateScheduleServiceTest.일정 등록은 같은 학원을 다시 쓸 때 요청의 entrance · phone이 비어 있으면 기존 entrance · phone을 유지해 저장하고 status는 READY다
-- [x] #71 같은 externalPlaceId의 새 학원이 동시에 저장되어 유니크가 부딪히면 오류 없이 이미 저장된 그 학원을 다시 읽어 쓴다 ← SchedulePersistenceAdapterTest.같은 externalPlaceId의 학원이 이미 저장된 뒤 academyId 없는 새 학원을 저장하면(동시 등록 유니크 충돌) 오류 없이 이미 저장된 그 학원을 돌려주고 행이 늘지 않으며 같은 트랜잭션에서 계속 읽을 수 있다
-- [x] #72 일정 수정은 자기 자신을 뺀 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절한다 ← UpdateScheduleServiceTest.일정 수정은 자기 자신을 뺀 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절하고 저장하지 않는다
-- [x] #73 loadSchedules는 여러 scheduleId의 일정을 학원과 함께 한 번에 읽어 돌려준다(일정 조회 1회 · 학원 조회 1회) ← SchedulePersistenceAdapterTest.loadSchedules는 여러 scheduleId의 일정을 학원과 함께 한 번에 돌려주고 없는 id는 빼며, SQL은 일정 조회 1회 + 학원 조회 1회 이하다
-- [x] #74 findSchedules는 loadSchedules를 한 번만 불러 받은 순서대로 돌려주고 없는 id는 뺀다 ← LoadScheduleServiceTest.findSchedules는 loadSchedules를 받은 id 목록 그대로 정확히 1번 부르고 loadSchedule은 부르지 않는다
-- [x] #75 joinCallMode는 schedule 자체 enum으로 설정 요약 · 차량용 설정 요약 in 포트와 응답에 담고 user.domain 타입을 import하지 않는다 ← ScheduleModuleImportTest.schedule main 소스 어디에도 user.domain 패키지 문자열(com.example.pickupservice.user.domain)이 없다
-- [x] #76 POST /v1/children/{childId}/schedules · PUT /v1/schedules/{scheduleId}에 101자 externalPlaceId를 보내면 422 VALIDATION_FAILED를 돌려준다 ← ScheduleControllerTest.POST /v1/children/{childId}/schedules에 101자 externalPlaceId를 보내면 422 VALIDATION_FAILED와 fields의 academy.externalPlaceId를 돌려주고 유스케이스를 부르지 않는다
-- [x] #77 일정 수정은 등록과 같이 저장한 학원(기존 출입구 반영) 기준으로 status를 판정한다 ← UpdateScheduleServiceTest.일정 수정은 등록과 같이 저장한 학원(기존 출입구 반영) 기준으로 status를 판정한다 (다른 가족이 먼저 출입구와 함께 저장한 새 학원이면 요청 entrance가 없어도 READY)
+- [x] #12 [persistence] Academy를 저장하고 읽으면 location · entrance 좌표가 같다
+- [x] #13 [persistence] weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다
+- [x] #14 [persistence] classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다
+- [x] #15 [persistence] loadSchedulesOfChild는 그 자녀의 일정만 돌려준다
+- [x] #16 [persistence] loadSchedulesOfChildren은 여러 자녀의 일정을 한 번에 돌려준다
+- [x] #17 [서비스] 학원 검색은 외부 지도 API 결과를 저장하지 않고 externalPlaceId · name · address · location으로 돌려준다
+- [x] #18 [서비스] 학원 검색은 외부 지도 API가 실패하면 MAP_API_UNAVAILABLE로 거절한다
+- [x] #19 [서비스] 일정 등록은 학원을 만들고 scheduleId · academyId · status를 돌려준다
+- [x] #20 [서비스] 일정 등록은 출입구 없는 학원이면 status DRAFT를 돌려준다
+- [x] #21 [서비스] 일정 등록은 childId가 CHILD가 아니면 NOT_FOUND로 거절한다
+- [x] #22 [서비스] 일정 등록은 다른 가족의 자녀면 NOT_FOUND로 거절한다
+- [x] #23 [서비스] 일정 등록은 겹치는 일정이 있으면 SCHEDULE_OVERLAP과 겹치는 scheduleId 목록으로 거절한다
+- [x] #24 [서비스] 일정 등록은 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절한다
+- [x] #25 [서비스] 일정 수정은 자기 자신과는 겹침으로 판정하지 않는다
+- [x] #26 [서비스] 일정 수정은 요일 · 시간 · 학원을 바꾸고 status를 다시 판정한다
+- [x] #27 [서비스] 설정 요약은 자녀 기기가 CONNECTED가 아니면 missing에 CHILD_DEVICE를 넣는다
+- [x] #28 [서비스] 설정 요약은 READY 일정이 없으면 missing에 SCHEDULE을 넣는다
+- [x] #29 [서비스] 설정 요약은 일정 학원에 기본 장소가 없으면 missing에 PICKUP_SPOT을 넣는다
+- [x] #30 [서비스] 설정 요약은 joinCallMode와 Family.settingsVersion을 담는다
+- [x] #31 [서비스] 설정 완료는 settingsVersion이 다르면 SETTINGS_VERSION_CONFLICT로 거절한다
+- [x] #32 [서비스] 설정 완료는 missing이 남아 있으면 SETUP_INCOMPLETE로 거절한다
+- [x] #33 [서비스] 주간 일정은 weekStart가 없으면 한국 날짜 기준 이번 주 월요일부터 7일을 돌려준다
+- [x] #34 [서비스] 주간 일정은 요일이 맞는 날짜에만 그 일정을 넣는다
+- [x] #35 [서비스] 주간 일정 readiness는 자녀 기기나 기본 장소가 빠지면 startable false와 missing을 돌려준다
+- [x] #36 [서비스] 차량용 설정 요약은 GUARDIAN 이름을 가려서 돌려주고 자녀 목록과 joinCallMode를 담는다
+- [x] #37 [서비스] findSchedules는 scheduleId 목록의 일정과 학원 정보를 돌려준다
+- [x] #38 [web] GET /v1/places/academies는 200과 items[]를 돌려준다
+- [x] #39 [web] GET /v1/places/academies에 1자 query를 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] #40 [web] GET /v1/places/academies가 외부 API 오류면 502 MAP_API_UNAVAILABLE을 돌려준다
+- [x] #41 [web] POST /v1/children/{childId}/schedules는 201과 scheduleId · academyId · status를 돌려준다
+- [x] #42 [web] POST /v1/children/{childId}/schedules에 targetPickup 61을 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] #43 [web] POST /v1/children/{childId}/schedules가 겹치면 409 SCHEDULE_OVERLAP과 overlapScheduleIds를 돌려준다
+- [x] #44 [web] POST /v1/children/{childId}/schedules가 하루 한도를 넘으면 422 DAILY_SCHEDULE_LIMIT을 돌려준다
+- [x] #45 [web] PUT /v1/schedules/{scheduleId}는 200과 scheduleId · academyId · status를 돌려준다
+- [x] #46 [web] PUT /v1/schedules/{scheduleId}를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #47 [web] GET /v1/children/{childId}/schedules는 200과 items[]를 돌려준다
+- [x] #48 [web] GET /v1/children/{childId}/setup-summary는 200과 child · schedules · pickupSpots · joinCallMode · missing · settingsVersion을 돌려준다
+- [x] #49 [web] POST /v1/children/{childId}/setup-completion은 200과 syncedToVehicle을 돌려준다
+- [x] #50 [web] POST /v1/children/{childId}/setup-completion이 버전 충돌이면 409 SETTINGS_VERSION_CONFLICT를 돌려준다
+- [x] #51 [web] POST /v1/children/{childId}/setup-completion이 누락이 있으면 422 SETUP_INCOMPLETE를 돌려준다
+- [x] #52 [web] GET /v1/vehicles/me/weekly-pickups는 차량 토큰으로 200과 weekStart · days · readiness를 돌려준다
+- [x] #53 [web] GET /v1/vehicles/me/weekly-pickups를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #54 [web] GET /v1/vehicles/me/settings-summary는 차량 토큰으로 200과 guardianNameMasked · children · joinCallMode를 돌려준다
+- [x] #55 [web] Idempotency-Key는 POST /v1/children/{childId}/schedules · POST /v1/children/{childId}/setup-completion에만 요구된다
+- [x] #56 [persistence] 지도 API 어댑터는 카카오 로컬 검색 응답을 externalPlaceId(kakao:{id}) · name · address · location의 AcademyCandidate로 바꾼다
+- [x] #57 [persistence] 지도 API 어댑터는 외부 API 오류 · 시간 초과면 502 MAP_API_UNAVAILABLE로 거절한다
+- [x] #58 [persistence] place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다
+- [x] #59 [persistence] LoadMemberDeviceStatusPort 어댑터는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다
+- [x] #60 [기반] 공통 BusinessException에 overlapScheduleIds를 담아 던지면 오류 응답 error.overlapScheduleIds에 실리고, 담지 않으면 그 키가 응답에 없다
+- [x] #61 [서비스] findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려주고 없으면 빈 값을 돌려준다
+- [x] #62 지도 API 어댑터는 200 응답이라도 본문을 읽지 못하거나 좌표가 없거나 숫자가 아니면 502 MAP_API_UNAVAILABLE로 거절한다
+- [x] #63 saveSchedule로 scheduleId가 있는 일정을 다시 저장하면 새 행을 만들지 않고 그 행의 요일 · 시간 · 학원 · status가 바뀐다
+- [x] #64 loadSchedule · loadAcademy에 없는 id를 주면 빈 값을 돌려준다
+- [x] #65 [서비스] 일정 목록은 그 자녀의 일정을 scheduleId · 학원(academyId · name) · weekdays · classEndTime · targetPickup · status로 돌려주고, 내 가족의 CHILD가 아니면 NOT_FOUND로 거절한다
+- [x] #66 PickupSchedule 검증 실패는 프레임워크와 무관한 도메인 예외(field · reason)로 던지고, 일정 등록 · 수정 서비스는 이를 422 VALIDATION_FAILED(fields)로 바꾼다
+- [x] #67 Academy는 externalPlaceId를 가지며 academy.external_place_id는 유니크로 저장되고, 저장한 학원을 externalPlaceId로 찾을 수 있다
+- [x] #68 일정 등록 · 수정은 같은 externalPlaceId의 학원이 있으면 새로 만들지 않고 그 academyId를 쓰며 학원 정보는 요청 값으로 갱신한다
+- [x] #69 주간 일정 readiness는 오늘 일정 중 DRAFT가 있으면 startable false를 돌려준다
+- [x] #70 일정 등록 · 수정은 같은 학원을 다시 쓸 때 요청의 entrance · phone이 비어 있으면 기존 값을 유지한다
+- [x] #71 같은 externalPlaceId의 새 학원이 동시에 저장되어 유니크가 부딪히면 오류 없이 이미 저장된 그 학원을 다시 읽어 쓴다
+- [x] #72 일정 수정은 자기 자신을 뺀 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절한다
+- [x] #73 loadSchedules는 여러 scheduleId의 일정을 학원과 함께 한 번에 읽어 돌려준다(일정 조회 1회 · 학원 조회 1회)
+- [x] #74 findSchedules는 loadSchedules를 한 번만 불러 받은 순서대로 돌려주고 없는 id는 뺀다
+- [x] #75 joinCallMode는 schedule 자체 enum으로 설정 요약 · 차량용 설정 요약 in 포트와 응답에 담고 user.domain 타입을 import하지 않는다
+- [x] #76 POST /v1/children/{childId}/schedules · PUT /v1/schedules/{scheduleId}에 101자 externalPlaceId를 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] #77 일정 수정은 등록과 같이 저장한 학원(기존 출입구 반영) 기준으로 status를 판정한다
 
 ## 미완료 항목
 - 없음
 
 ## 완료 기준 (공통 규칙 문서)
-- [x] C1 설계서의 테스트 케이스가 모두 GREEN
-- [x] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [x] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
+- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-08 02:05 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 0 · 하 2 · 리뷰 시점 체크 77/77
-- 리뷰 시점 테스트: ● GREEN · 990 passed · 전체 · 1.6s · cd /c/pickup && ./gradlew.bat test --rerun --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321…
-  - 결론: 조건부 통과
-  - 이전 재리뷰의 하 7건 처리 끝: 1 해소(#77, UpdateScheduleService.java:56-60, 새 테스트가 옛 코드에서 실패하는 단언) · 2 note(06 L257) · 3 해소(사람 결정, 02 L72) · 4 해소(06 L81, ScheduleApiDoc.java:25,38) · 5 해소(06 L85-91 5단계가 코드 순서와 같음) · 6 해소(JoinCallModeFixture 삭제, ScheduleModuleImportTest 이름) · 7 일부 해소(확인 필요 표 동기화, 해소된 메모 5건 · 다른 저장소 메모 5건 남음, note)
-  - 상 · 중 등급 발견 사항 없음. 새 발견 2건(모두 하).
-  - [하] #75 증거 테스트 이름이 바뀐 DisplayName을 따라가지 않음 — docs/followup/schedule.md:83, ScheduleModuleImportTest.java:21 → 증거 이름 갱신(처리함: #75를 새 이름으로 다시 체크)
-  - [하] 수정 서비스가 같은 입력으로 일정을 두 번 만듦(candidate · judged). 동작 문제 없음, 의도가 코드에 덜 드러남 — UpdateScheduleService.java:40,56-60 → 리팩터링(선택, 후속 과제)
-  - 완료 기준: C1 충족(77/77, test --rerun 990 passed) · C2 충족(06 L81 · 검증 순서 표 = 코드, 동시 수정 merge는 후속 과제) · C3 충족(02 L72 예외 반영, 공통 규칙 위반 없음) · C4 충족(06 확인 필요 14행 = FOLLOWUP 표)
-  - 테스트: ./gradlew.bat test --rerun → BUILD SUCCESSFUL, 126 XML, 990 tests 실패 0
-- 이전 리뷰: 2026-11-08 02:05 KST (조건부 통과), 2026-11-08 01:55 KST (조건부 통과), 2026-11-08 01:22 KST (조건부 통과), 2026-11-08 00:43 KST (조건부 통과)
+- 아직 없음. 모든 항목이 체크되면 도메인 리뷰(tdd-guard:domain-reviewer · /tdd review)를 받아 checklist review로 기록해야 도메인이 완료된다.
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -121,13 +112,19 @@
 | 외부 지도 API 공급자 · 키 | 해소: 카카오 로컬 키워드 검색(KakaoMapSearchAdapter), 키는 환경 변수 KAKAO_REST_API_KEY, 연결 2s · 읽기 3s(구조 절) |
 | 일정 변경이 settingsVersion을 올리는지 | 04_사용자-user.md와 같은 질문. 올리지 않는다고 가정 |
 | SET-05 | API 번호가 SET-04 다음 SET-06으로 건너뜀. 빠진 API가 없는지 확인 필요 |
-| schedule ↔ place 서로 부름 | place는 Academy를 참조하고, SET-07 · 09는 place 장소를 읽음. schedule 쪽은 out 포트 + 테스트 대역으로 먼저 검증하고, place 구현 전에는 임시 어댑터(adapter/out/place)가 빈 목록을 돌려줌 |
+| schedule ↔ place 서로 부름 | 해소: place는 Academy를 schedule in 포트 LoadAcademyUseCase.findAcademy로 읽고, SET-07 · 09는 adapter/out/place가 place in 포트 LoadPickupSpotUseCase.findSpots로 실제 장소를 읽음(임시 어댑터는 연동으로 바뀜) |
 
 ## 다음 단계
+- 도메인 리뷰: /tdd review schedule (기록 없음)
 - 커밋 · 푸시: /tdd commit (기능별 분할 커밋) · /tdd push (커밋 후 기능 브랜치 푸시)
 - 다음 도메인: 장소 (07_장소-place.md). 시작: /tdd domain place
 
 ## 후속 과제
+- NameMasker.mask는 1자 · 빈 문자열 · null 이름에서 예외가 난다(repeat(-1) · charAt). User 이름 규칙상 이런 입력이 올 수 있는지 확인하고, 올 수 있으면 규칙을 정해 테스트부터 추가
+- 설계서 06 시그니처의 LoadMemberDeviceStatusPort 반환 타입 표기 DeviceStatus를 실제 쓰는 auth.domain.MemberDeviceStatus로 고쳐야 함(05 인증 L152가 user · schedule용으로 내놓은 타입). 모듈용 record ScheduleInfo · AcademyInfo · SpotSummary 필드도 설계서에 없어 #37 · place 500m 검사 · pickup 연락처 용도로 정함 → 설계서에 반영 필요
+- [기반 리뷰 · 하] (1) #37 findSchedules는 여러 id를 한 번에 읽는 포트가 없어 N+1 조회가 됨 (2) pickup_schedule.child_user_id에 인덱스 없음(loadSchedulesOfChild(ren) 조회 칸) (3) Academy · PickupSchedule.restore의 id 인자가 long으로 user · auth(Long)와 다름 (4) SearchAcademyPort(out)가 in 포트 record AcademyCandidate를 import함 (5) schedule 테스트 헬퍼 중복: PickupScheduleTest 학원 헬퍼 두 쌍, ScheduleOverlapRuleTest · DailyScheduleLimitRuleTest의 academy · newSchedule · savedSchedule, 포트 테스트 리플렉션 헬퍼가 모듈마다 복사됨 (6) ScheduleSeed.clear는 시드 행만 지우므로 lane 테스트가 만든 행은 각 테스트가 지워야 함
+- [사람 결정 2026-11-09] (1) 학원은 가족 안에서 다시 쓴다: Academy에 familyId · externalPlaceId와 (familyId, externalPlaceId) 유니크. 다시 쓸 때 이름 · 주소 · 위치는 요청 값, 출입구 · 대표번호는 값이 있을 때만 바꾸고 출입구가 새로 생기면 가족 일정 status를 다시 판정(이 갱신 규칙은 팀장 가정 — 사람 확인 필요) (2) 409 SCHEDULE_OVERLAP은 error.overlapScheduleIds 키를 더한다. 후속: 03 공유모듈 설계서의 공통 오류 본문 규칙(키 목록)에 「도메인 오류가 추가 키를 더할 수 있음」 반영 필요. 같은 가족이 같은 학원으로 동시에 등록하면 유니크 위반이 날 수 있어 처리 방식(재조회 후 재사용) 결정 필요. 07 place · 08 pickup 설계서의 학원 참조 문구도 이 결정에 맞는지 확인
+- ScheduleErrors의 한국어 메시지 5개(DAILY_SCHEDULE_LIMIT · SETTINGS_VERSION_CONFLICT · SETUP_INCOMPLETE · MAP_API_UNAVAILABLE · SCHEDULE_OVERLAP)는 설계서에 문구가 없어 구현자가 정함 → 문구 확인 필요. 03 공유모듈 설계서 89행(본문 키 목록)과 230~233행 시그니처에 BusinessException.withExtra · extras() 반영 필요
 - [하] 문서 설정 키 접두어 불일치: 08 문서는 `designdot.jwt.secret` · `designdot.admin.*`, 실제 코드는 `designmodu.*`. 06 week-start는 `designmodu.calendar.week-start`로 맞춤(일정 #1, 2026-10-27). 08 문서 표기 정리 필요
 - [하] 일정 2차 중간 리뷰(2026-10-28): ① ArchitectureTest의 applicationDoesNotDependOnAdaptersOrTechnology와 새 applicationUsesOnlyServiceAndTransactionalFromSpring이 spring web · data 부분 중복(둘 다 유지), 02 문서 ArchUnit 예시 코드(189–297행)에 새 규칙 미반영 ② `designmodu.calendar.week-start`가 application.yml에 미기재, 대소문자 구분(sunday → 기동 실패), CalendarConfig 바인딩 전용 테스트 없음 ③ MonthlyScheduleResponse.weekStart Swagger enum 값 의미 설명 누락(02 "enum은 모든 값 의미 나열") ④ archfixture ServiceUsingAutowired의 불필요한 school 참조 ⑤ SchedulePersistenceAdapterTest · ApiDocsTest 일부 중복 단언(실패 위치 좁힘 용도로 유지) ⑥ SchoolPersistenceTestSupport · ExhibitionPersistenceTestSupport region · school · major 헬퍼 중복
 - [하] 일정 도메인 리뷰(2026-10-28) 남은 과제: ① 2차 리뷰 ②의 "sunday → 기동 실패"는 Boot 4.1.1 LenientStringToEnumConverterFactory 때문에 틀렸을 수 있음(실기동 미확인) — CalendarConfig 바인딩 테스트 · application.yml 기재와 함께 확인 ② ApiDocsTest에 UpcomingExhibitionResponse 스키마 속성 이름 "dDay" 단언 없음 ③ GetMonthlyScheduleUseCase(Integer, Integer) → MonthlyScheduleQuery 또는 Optional<YearMonth>로 불변 조건을 유스케이스 입력에 담는 리팩터링 ④ ScheduleControllerTest · ExhibitionControllerTest에 공개 GET 허용 · POST 403 케이스 없음(02 626행) ⑤ SchedulePersistenceAdapterTest 쿼리 수 단언 없음(02 625행, PreparedStatementCounter 재사용) ⑥ GetUpcomingExhibitionsService가 행마다 Period.of 검증 → 잘못된 기간 행이면 GET 400 INVALID_PERIOD(DB CHECK로 위험 낮음) ⑦ ScheduleApiDocs 월간 400 설명에 "숫자 아님" 누락 ⑧ 월간 · 다가오는 조회 EXPLAIN으로 idx_exhibition_start_date_id 사용 확인. 문서 정합(02 패키지 트리 · ArchUnit 예시, 06 의존 표)은 리뷰 직후 반영함
