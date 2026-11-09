@@ -44,6 +44,11 @@ public class BusinessException extends RuntimeException {
 				new Details(retryAfterSeconds, null, null));
 	}
 
+	public static BusinessException tooManyRequests(ErrorCode errorCode, int retryAfterSeconds) {
+		return new BusinessException(StatusCode.from(errorCode), errorCode.getMessage(),
+				new Details(retryAfterSeconds, null, null));
+	}
+
 	public static BusinessException invalidField(String field, String reason) {
 		ErrorCode errorCode = ErrorCode.VALIDATION_FAILED;
 		return new BusinessException(StatusCode.from(errorCode), errorCode.getMessage(),

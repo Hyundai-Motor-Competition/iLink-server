@@ -77,6 +77,7 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	private static final String UNHANDLED_EXCEPTION_PATH = "/test/common-error/unhandled-exception";
 	private static final String UNMAPPED_PATH = "/test/common-error/no-such-endpoint";
 	private static final String TOO_MANY_REQUESTS_PATH = "/test/common-error/business-too-many-requests";
+	private static final String RESEND_TOO_SOON_PATH = "/test/common-error/business-resend-too-soon";
 	private static final String DOMAIN_CODE_PATH = "/test/common-error/business-domain-code";
 	private static final String COMMON_NOT_FOUND_PATH = "/test/common-error/business-common-not-found";
 	private static final String COMMON_ERROR_CODE_PATH = "/test/common-error/business-common-code/{code}";
@@ -403,6 +404,18 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	@DisplayName("컨트롤러가 BusinessException.tooManyRequests(ErrorCode.RESEND_TOO_SOON, 30)을 던지면 429와 JSON 본문의 error.code RESEND_TOO_SOON · error.message 「잠시 뒤에 다시 보내 주세요」 · error.retryAfterSeconds 30을 돌려주고 error.fields는 채우지 않는다")
+	void resendTooSoonBusinessExceptionReturns429WithCodeMessageAndRetryAfterSeconds() throws Exception {
+		mockMvc.perform(get(RESEND_TOO_SOON_PATH))
+				.andExpect(status().isTooManyRequests())
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+				.andExpect(jsonPath("$.error.code").value("RESEND_TOO_SOON"))
+				.andExpect(jsonPath("$.error.message").value("잠시 뒤에 다시 보내 주세요"))
+				.andExpect(jsonPath("$.error.retryAfterSeconds").value(RETRY_AFTER_SECONDS))
+				.andExpect(jsonPath("$.error.fields").doesNotExist());
+	}
+
+	@Test
 	@DisplayName("필수 요청 헤더 X-Test-Header를 빼고 부르면 500이 아니라 400과 JSON 본문의 error.code INVALID_REQUEST · error.message · error.retryAfterSeconds(null) 키를 돌려주고 error.fields는 채우지 않는다")
 	void missingRequiredHeaderReturns400WithInvalidRequestError() throws Exception {
 		mockMvc.perform(get(REQUIRED_HEADER_PATH))
@@ -660,6 +673,11 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 		@GetMapping(TOO_MANY_REQUESTS_PATH)
 		public String throwTooManyRequests() {
 			throw BusinessException.tooManyRequests(RETRY_AFTER_SECONDS);
+		}
+
+		@GetMapping(RESEND_TOO_SOON_PATH)
+		public String throwResendTooSoon() {
+			throw BusinessException.tooManyRequests(ErrorCode.RESEND_TOO_SOON, RETRY_AFTER_SECONDS);
 		}
 
 		@GetMapping(DOMAIN_CODE_PATH)

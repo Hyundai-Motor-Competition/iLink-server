@@ -90,6 +90,18 @@ class BusinessExceptionTest {
 	}
 
 	@Test
+	@DisplayName("tooManyRequests(ErrorCode.RESEND_TOO_SOON, 30)로 만든 예외는 status 429 · code RESEND_TOO_SOON · 메시지 「잠시 뒤에 다시 보내 주세요」 · retryAfterSeconds 30 · fields null이다")
+	void tooManyRequestsWithResendTooSoonCarriesCodeAndRetryAfterSeconds() {
+		BusinessException exception = BusinessException.tooManyRequests(ErrorCode.RESEND_TOO_SOON, 30);
+
+		assertThat(exception.status()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+		assertThat(exception.code()).isEqualTo("RESEND_TOO_SOON");
+		assertThat(exception.getMessage()).isEqualTo("잠시 뒤에 다시 보내 주세요");
+		assertThat(exception.retryAfterSeconds()).isEqualTo(30);
+		assertThat(exception.fields()).isNull();
+	}
+
+	@Test
 	@DisplayName("stateVersionConflict(세션 뷰)로 만든 예외는 status 409 · code STATE_VERSION_CONFLICT · 비어 있지 않은 메시지 · session에 넘긴 세션 뷰 그대로 · details 비어 있음 · retryAfterSeconds null · fields null이다")
 	void stateVersionConflictCarriesSessionView() {
 		Object latestSessionView = new Object();

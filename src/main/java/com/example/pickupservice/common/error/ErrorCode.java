@@ -20,6 +20,7 @@ public enum ErrorCode {
 	VEHICLE_ALREADY_LINKED(HttpStatus.CONFLICT, "이미 보호자가 연결된 차량입니다"),
 	VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_CONTENT, "입력값을 확인해 주세요"),
 	TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 시도해 주세요"),
+	RESEND_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS, "잠시 뒤에 다시 보내 주세요"),
 	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다");
 
 	private final HttpStatus status;
