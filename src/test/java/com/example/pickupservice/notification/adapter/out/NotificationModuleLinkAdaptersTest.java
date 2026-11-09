@@ -1,5 +1,6 @@
 package com.example.pickupservice.notification.adapter.out;
 
+import com.example.pickupservice.auth.application.port.in.LoadPushTargetByDeviceUseCase;
 import com.example.pickupservice.auth.application.port.in.LoadPushTargetUseCase;
 import com.example.pickupservice.auth.application.port.in.PushTarget;
 import com.example.pickupservice.auth.domain.Platform;
@@ -43,6 +44,8 @@ class NotificationModuleLinkAdaptersTest {
 	@Mock
 	private LoadPushTargetUseCase loadPushTargetUseCase;
 	@Mock
+	private LoadPushTargetByDeviceUseCase loadPushTargetByDeviceUseCase;
+	@Mock
 	private LoadMemberUseCase loadMemberUseCase;
 	@Mock
 	private CallProgressUseCase callProgressUseCase;
@@ -57,7 +60,7 @@ class NotificationModuleLinkAdaptersTest {
 				new PushTarget(GUARDIAN_ID, 901L, Platform.ANDROID, "guardian-token"),
 				new PushTarget(CHILD_ID, CHILD_DEVICE_ID, Platform.ANDROID, "child-token"));
 		when(loadPushTargetUseCase.findPushTargets(userIds)).thenReturn(targets);
-		NotificationPushTargetAdapter adapter = new NotificationPushTargetAdapter(loadPushTargetUseCase);
+		NotificationPushTargetAdapter adapter = new NotificationPushTargetAdapter(loadPushTargetUseCase, loadPushTargetByDeviceUseCase);
 
 		List<PushTarget> result = adapter.loadPushTargets(userIds);
 
@@ -69,27 +72,27 @@ class NotificationModuleLinkAdaptersTest {
 	@DisplayName("LoadPushTargetPort.loadPushTargets는 auth가 빈 목록을 주면 빈 목록을 돌려준다")
 	void loadPushTargetsReturnsEmptyListWhenAuthReturnsEmpty() {
 		when(loadPushTargetUseCase.findPushTargets(List.of(MISSING_USER_ID))).thenReturn(List.of());
-		NotificationPushTargetAdapter adapter = new NotificationPushTargetAdapter(loadPushTargetUseCase);
+		NotificationPushTargetAdapter adapter = new NotificationPushTargetAdapter(loadPushTargetUseCase, loadPushTargetByDeviceUseCase);
 
 		assertThat(adapter.loadPushTargets(List.of(MISSING_USER_ID))).isNotNull().isEmpty();
 	}
 
 	@Test
-	@DisplayName("LoadPushTargetPort.loadPushTarget은 auth LoadPushTargetUseCase.findPushTargetByDeviceId에 위임해 결과를 그대로 돌려준다")
+	@DisplayName("LoadPushTargetPort.loadPushTarget은 auth LoadPushTargetByDeviceUseCase.findPushTargetByDeviceId에 위임해 결과를 그대로 돌려준다")
 	void loadPushTargetDelegatesToAuthFindPushTargetByDeviceId() {
 		PushTarget target = new PushTarget(CHILD_ID, CHILD_DEVICE_ID, Platform.ANDROID, "child-token");
-		when(loadPushTargetUseCase.findPushTargetByDeviceId(CHILD_DEVICE_ID)).thenReturn(Optional.of(target));
-		NotificationPushTargetAdapter adapter = new NotificationPushTargetAdapter(loadPushTargetUseCase);
+		when(loadPushTargetByDeviceUseCase.findPushTargetByDeviceId(CHILD_DEVICE_ID)).thenReturn(Optional.of(target));
+		NotificationPushTargetAdapter adapter = new NotificationPushTargetAdapter(loadPushTargetUseCase, loadPushTargetByDeviceUseCase);
 
 		assertThat(adapter.loadPushTarget(CHILD_DEVICE_ID)).contains(target);
-		verify(loadPushTargetUseCase).findPushTargetByDeviceId(CHILD_DEVICE_ID);
+		verify(loadPushTargetByDeviceUseCase).findPushTargetByDeviceId(CHILD_DEVICE_ID);
 	}
 
 	@Test
 	@DisplayName("LoadPushTargetPort.loadPushTarget은 auth가 빈 값을 주면 빈 값을 돌려준다")
 	void loadPushTargetReturnsEmptyWhenAuthReturnsEmpty() {
-		when(loadPushTargetUseCase.findPushTargetByDeviceId(CHILD_DEVICE_ID)).thenReturn(Optional.empty());
-		NotificationPushTargetAdapter adapter = new NotificationPushTargetAdapter(loadPushTargetUseCase);
+		when(loadPushTargetByDeviceUseCase.findPushTargetByDeviceId(CHILD_DEVICE_ID)).thenReturn(Optional.empty());
+		NotificationPushTargetAdapter adapter = new NotificationPushTargetAdapter(loadPushTargetUseCase, loadPushTargetByDeviceUseCase);
 
 		assertThat(adapter.loadPushTarget(CHILD_DEVICE_ID)).isNotNull().isEmpty();
 	}

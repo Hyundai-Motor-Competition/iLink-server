@@ -1,5 +1,6 @@
 package com.example.pickupservice.auth.application.service;
 
+import com.example.pickupservice.auth.application.port.in.LoadPushTargetByDeviceUseCase;
 import com.example.pickupservice.auth.application.port.in.LoadPushTargetUseCase;
 import com.example.pickupservice.auth.application.port.in.PushTarget;
 import com.example.pickupservice.auth.application.port.out.LoadDevicePort;
@@ -14,7 +15,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-public class LoadPushTargetService implements LoadPushTargetUseCase {
+public class LoadPushTargetService implements LoadPushTargetUseCase, LoadPushTargetByDeviceUseCase {
 
 	private final LoadDevicePort loadDevicePort;
 

@@ -1,5 +1,6 @@
 package com.example.pickupservice.notification.adapter.out.auth;
 
+import com.example.pickupservice.auth.application.port.in.LoadPushTargetByDeviceUseCase;
 import com.example.pickupservice.auth.application.port.in.LoadPushTargetUseCase;
 import com.example.pickupservice.auth.application.port.in.PushTarget;
 import com.example.pickupservice.notification.application.port.out.LoadPushTargetPort;
@@ -14,6 +15,7 @@ import java.util.Optional;
 public class NotificationPushTargetAdapter implements LoadPushTargetPort {
 
 	private final LoadPushTargetUseCase loadPushTargetUseCase;
+	private final LoadPushTargetByDeviceUseCase loadPushTargetByDeviceUseCase;
 
 	@Override
 	public List<PushTarget> loadPushTargets(List<Long> userIds) {
@@ -22,6 +24,6 @@ public class NotificationPushTargetAdapter implements LoadPushTargetPort {
 
 	@Override
 	public Optional<PushTarget> loadPushTarget(long deviceId) {
-		return loadPushTargetUseCase.findPushTargetByDeviceId(deviceId);
+		return loadPushTargetByDeviceUseCase.findPushTargetByDeviceId(deviceId);
 	}
 }

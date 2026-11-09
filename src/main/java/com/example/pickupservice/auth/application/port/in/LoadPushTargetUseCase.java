@@ -5,6 +5,4 @@ import java.util.List;
 public interface LoadPushTargetUseCase {
 
 	List<PushTarget> findPushTargets(List<Long> userIds);
-
-	java.util.Optional<PushTarget> findPushTargetByDeviceId(long deviceId);
 }
