@@ -39,11 +39,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.List;
 
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonError;
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonErrorKeys;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.aMapWithSize;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.blankOrNullString;
 import static org.hamcrest.Matchers.contains;
@@ -86,6 +88,26 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	private static final String RESPONSE_STATUS_WITHOUT_REASON_PATH = "/test/common-error/response-status-exception-without-reason";
 	private static final String DOC_VALIDATED_ID_PATH = "/test/common-error/doc-validated/{id}";
 	private static final String DOC_VALIDATED_SIZE_PATH = "/test/common-error/doc-validated-size";
+	private static final String GUARD_UNMET_PATH = "/test/common-error/business-detail-unmet";
+	private static final String SETUP_INCOMPLETE_PATH = "/test/common-error/business-detail-missing";
+	private static final String HELP_TOO_SOON_PATH = "/test/common-error/business-detail-next-allowed-at";
+	private static final String STATE_VERSION_CONFLICT_PATH = "/test/common-error/business-state-version-conflict";
+	private static final String IDEMPOTENCY_KEY_REUSED_PATH = "/test/common-error/business-common-code/IDEMPOTENCY_KEY_REUSED";
+	private static final String SECURED_PATH = "/v1/pickup-sessions/1";
+
+	private static final String GUARD_UNMET_CODE = "CALL_GUARD_UNMET";
+	private static final String GUARD_UNMET_MESSAGE = "합류 안내를 보낼 수 있는 조건이 아닙니다";
+	private static final String SETUP_INCOMPLETE_CODE = "SETUP_INCOMPLETE";
+	private static final String SETUP_INCOMPLETE_MESSAGE = "픽업 준비가 끝나지 않았습니다";
+	private static final String HELP_TOO_SOON_CODE = "HELP_REQUEST_TOO_SOON";
+	private static final String HELP_TOO_SOON_MESSAGE = "잠시 후 다시 요청해 주세요";
+	private static final Instant NEXT_ALLOWED_AT_UTC = Instant.parse("2026-11-05T09:10:00Z");
+	private static final String NEXT_ALLOWED_AT_KST = "2026-11-05T18:10:00+09:00";
+	private static final String STATE_VERSION_CONFLICT_CODE = "STATE_VERSION_CONFLICT";
+	private static final long LATEST_SESSION_ID = 42L;
+	private static final int LATEST_STATE_VERSION = 7;
+	private static final String LATEST_SESSION_STATUS = "ACTIVE";
+	private static final String LATEST_VEHICLE_PHASE = "DRIVING";
 
 	private static final long MAX_PAGE_SIZE = 50;
 	private static final String SIZE_MAX_REASON = "size는 50 이하여야 합니다";
@@ -449,6 +471,94 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 				.andExpect(content().string(String.valueOf(MAX_PAGE_SIZE)));
 	}
 
+	@Test
+	@DisplayName("컨트롤러가 BusinessException.of(422 · CALL_GUARD_UNMET · 메시지).withDetail(unmet, [G2, G4])를 던지면 422와 error.unmet [G2, G4]를 돌려주고 error.code · error.message · error.retryAfterSeconds(null)는 그대로이며 unmet은 본문 최상위가 아니라 error 안에만 있다")
+	void businessExceptionWithUnmetDetailReturnsUnmetArrayInsideError() throws Exception {
+		mockMvc.perform(get(GUARD_UNMET_PATH))
+				.andExpect(commonError(HttpStatus.UNPROCESSABLE_CONTENT, GUARD_UNMET_CODE))
+				.andExpect(jsonPath("$.error.message").value(GUARD_UNMET_MESSAGE))
+				.andExpect(jsonPath("$.error.unmet", contains("G2", "G4")))
+				.andExpect(jsonPath("$.unmet").doesNotExist())
+				.andExpect(jsonPath("$", not(hasKey("session"))));
+	}
+
+	@Test
+	@DisplayName("컨트롤러가 BusinessException.of(422 · SETUP_INCOMPLETE · 메시지).withDetail(missing, [PICKUP_SPOT])를 던지면 422와 error.missing [PICKUP_SPOT]을 돌려주고 error에는 code · message · retryAfterSeconds · missing 네 키만 있다")
+	void businessExceptionWithMissingDetailReturnsMissingArrayInsideError() throws Exception {
+		mockMvc.perform(get(SETUP_INCOMPLETE_PATH))
+				.andExpect(commonError(HttpStatus.UNPROCESSABLE_CONTENT, SETUP_INCOMPLETE_CODE))
+				.andExpect(jsonPath("$.error.message").value(SETUP_INCOMPLETE_MESSAGE))
+				.andExpect(jsonPath("$.error.missing", contains("PICKUP_SPOT")))
+				.andExpect(jsonPath("$.error", aMapWithSize(4)));
+	}
+
+	@Test
+	@DisplayName("컨트롤러가 BusinessException.of(429 · HELP_REQUEST_TOO_SOON · 메시지).withDetail(nextAllowedAt, UTC Instant 2026-11-05T09:10:00Z)를 던지면 429와 error.nextAllowedAt을 한국 시각 문자열 2026-11-05T18:10:00+09:00으로 돌려준다")
+	void businessExceptionWithInstantDetailReturnsKstOffsetString() throws Exception {
+		mockMvc.perform(get(HELP_TOO_SOON_PATH))
+				.andExpect(commonError(HttpStatus.TOO_MANY_REQUESTS, HELP_TOO_SOON_CODE))
+				.andExpect(jsonPath("$.error.message").value(HELP_TOO_SOON_MESSAGE))
+				.andExpect(jsonPath("$.error.nextAllowedAt").value(NEXT_ALLOWED_AT_KST));
+	}
+
+	@Test
+	@DisplayName("컨트롤러가 BusinessException.stateVersionConflict(최신 세션 뷰)를 던지면 409와 본문 최상위에 error와 session 두 키를 돌려주고 session에는 세션 뷰(sessionId 42 · stateVersion 7 · status.session ACTIVE · status.vehicle DRIVING)가, error에는 code STATE_VERSION_CONFLICT · message · retryAfterSeconds(null) 세 키만 있다")
+	void stateVersionConflictReturns409WithLatestSessionViewBesideError() throws Exception {
+		mockMvc.perform(get(STATE_VERSION_CONFLICT_PATH))
+				.andExpect(commonError(HttpStatus.CONFLICT, STATE_VERSION_CONFLICT_CODE))
+				.andExpect(jsonPath("$", aMapWithSize(2)))
+				.andExpect(jsonPath("$", allOf(hasKey("error"), hasKey("session"))))
+				.andExpect(jsonPath("$.error", aMapWithSize(3)))
+				.andExpect(jsonPath("$.session.sessionId").value(LATEST_SESSION_ID))
+				.andExpect(jsonPath("$.session.stateVersion").value(LATEST_STATE_VERSION))
+				.andExpect(jsonPath("$.session.status.session").value(LATEST_SESSION_STATUS))
+				.andExpect(jsonPath("$.session.status.vehicle").value(LATEST_VEHICLE_PHASE));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@ValueSource(strings = {TOO_MANY_REQUESTS_PATH, DOMAIN_CODE_PATH, OVERLAP_PATH, INVALID_FIELD_PATH,
+			IDEMPOTENCY_KEY_REUSED_PATH, GUARD_UNMET_PATH, UNHANDLED_EXCEPTION_PATH, UNMAPPED_PATH})
+	@DisplayName("STATE_VERSION_CONFLICT가 아닌 오류 응답 본문의 최상위에는 error 키 하나만 있고 session 키는 null 값으로도 나오지 않는다")
+	void nonStateVersionConflictErrorBodyHasOnlyErrorKeyWithoutSession(String path) throws Exception {
+		mockMvc.perform(get(path))
+				.andExpect(jsonPath("$", aMapWithSize(1)))
+				.andExpect(jsonPath("$", hasKey("error")))
+				.andExpect(jsonPath("$", not(hasKey("session"))));
+	}
+
+	@Test
+	@DisplayName("추가 키를 넣지 않은 BusinessException.of(409 · SOME_DOMAIN_CODE · 메시지)의 응답 error에는 code · message · retryAfterSeconds 세 키만 있다")
+	void businessExceptionWithoutDetailsHasOnlyThreeCommonErrorKeys() throws Exception {
+		mockMvc.perform(get(DOMAIN_CODE_PATH))
+				.andExpect(commonError(HttpStatus.CONFLICT, DOMAIN_CODE))
+				.andExpect(jsonPath("$.error", aMapWithSize(3)));
+	}
+
+	@Test
+	@DisplayName("conflictWithOverlap(409 · SCHEDULE_OVERLAP · 메시지 · [801, 802]) 응답의 error에는 지금처럼 code · message · retryAfterSeconds · overlapScheduleIds 네 키만 있다")
+	void overlapErrorBodyHasExactlyCommonKeysAndOverlapScheduleIds() throws Exception {
+		mockMvc.perform(get(OVERLAP_PATH))
+				.andExpect(commonError(HttpStatus.CONFLICT, OVERLAP_CODE))
+				.andExpect(jsonPath("$.error", allOf(aMapWithSize(4), hasKey("overlapScheduleIds"))));
+	}
+
+	@Test
+	@DisplayName("서비스가 필드를 지정해 던진 VALIDATION_FAILED 응답의 error에는 지금처럼 code · message · retryAfterSeconds · fields 네 키만 있다")
+	void invalidFieldErrorBodyHasExactlyCommonKeysAndFields() throws Exception {
+		mockMvc.perform(get(INVALID_FIELD_PATH))
+				.andExpect(validationFailedWithFieldCount(1))
+				.andExpect(jsonPath("$.error", allOf(aMapWithSize(4), hasKey("fields"))));
+	}
+
+	@Test
+	@DisplayName("토큰 없이 인증이 필요한 경로를 부르면 필터 단계(ErrorResponseWriter)의 401 본문은 지금처럼 최상위에 error 하나만 있고 error에는 code UNAUTHORIZED · message · retryAfterSeconds(null) 세 키만 있다")
+	void filterStageUnauthorizedBodyKeepsCommonShapeWithoutSession() throws Exception {
+		mockMvc.perform(get(SECURED_PATH))
+				.andExpect(commonError(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED"))
+				.andExpect(jsonPath("$", aMapWithSize(1)))
+				.andExpect(jsonPath("$.error", aMapWithSize(3)));
+	}
+
 	private static MockHttpServletRequestBuilder withJsonBody(MockHttpServletRequestBuilder request, String body) {
 		return request.contentType(MediaType.APPLICATION_JSON).content(body);
 	}
@@ -463,6 +573,12 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	}
 
 	record JsonBodyRequest(String name) {
+	}
+
+	record SessionViewStub(long sessionId, int stateVersion, SessionStatusStub status) {
+	}
+
+	record SessionStatusStub(String session, String vehicle) {
 	}
 
 	record ValidatedBodyRequest(
@@ -570,6 +686,30 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 		public String throwOverlap() {
 			throw BusinessException.conflictWithOverlap(HttpStatus.CONFLICT, OVERLAP_CODE, OVERLAP_MESSAGE,
 					List.of(OVERLAP_SCHEDULE_ID_1, OVERLAP_SCHEDULE_ID_2));
+		}
+
+		@GetMapping(GUARD_UNMET_PATH)
+		public String throwGuardUnmet() {
+			throw BusinessException.of(HttpStatus.UNPROCESSABLE_CONTENT, GUARD_UNMET_CODE, GUARD_UNMET_MESSAGE)
+					.withDetail("unmet", List.of("G2", "G4"));
+		}
+
+		@GetMapping(SETUP_INCOMPLETE_PATH)
+		public String throwSetupIncomplete() {
+			throw BusinessException.of(HttpStatus.UNPROCESSABLE_CONTENT, SETUP_INCOMPLETE_CODE, SETUP_INCOMPLETE_MESSAGE)
+					.withDetail("missing", List.of("PICKUP_SPOT"));
+		}
+
+		@GetMapping(HELP_TOO_SOON_PATH)
+		public String throwHelpTooSoon() {
+			throw BusinessException.of(HttpStatus.TOO_MANY_REQUESTS, HELP_TOO_SOON_CODE, HELP_TOO_SOON_MESSAGE)
+					.withDetail("nextAllowedAt", NEXT_ALLOWED_AT_UTC);
+		}
+
+		@GetMapping(STATE_VERSION_CONFLICT_PATH)
+		public String throwStateVersionConflict() {
+			throw BusinessException.stateVersionConflict(new SessionViewStub(LATEST_SESSION_ID, LATEST_STATE_VERSION,
+					new SessionStatusStub(LATEST_SESSION_STATUS, LATEST_VEHICLE_PHASE)));
 		}
 
 	}

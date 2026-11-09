@@ -3,15 +3,23 @@ package com.example.pickupservice.common.error;
 import com.example.pickupservice.common.error.ErrorResponse.FieldError;
 import org.springframework.http.HttpStatus;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class BusinessException extends RuntimeException {
+
+	private static final Set<String> RESERVED_DETAIL_KEYS = Set.of("code", "message", "retryAfterSeconds", "fields");
 
 	private final HttpStatus status;
 	private final String code;
 	private final Integer retryAfterSeconds;
 	private final List<FieldError> fields;
 	private final List<Long> overlapScheduleIds;
+	private final Map<String, Object> details = new LinkedHashMap<>();
+	private Object session;
 
 	private BusinessException(StatusCode statusCode, String message, Details details) {
 		super(message);
@@ -46,6 +54,28 @@ public class BusinessException extends RuntimeException {
 			List<Long> overlapScheduleIds) {
 		return new BusinessException(new StatusCode(status, code), message,
 				new Details(null, null, List.copyOf(overlapScheduleIds)));
+	}
+
+	public static BusinessException stateVersionConflict(Object session) {
+		BusinessException exception = of(ErrorCode.STATE_VERSION_CONFLICT);
+		exception.session = session;
+		return exception;
+	}
+
+	public BusinessException withDetail(String key, Object value) {
+		if (RESERVED_DETAIL_KEYS.contains(key)) {
+			throw new IllegalArgumentException("공통 오류 키는 추가 키로 쓸 수 없습니다: " + key);
+		}
+		details.put(key, value);
+		return this;
+	}
+
+	public Map<String, Object> details() {
+		return Collections.unmodifiableMap(details);
+	}
+
+	public Object session() {
+		return session;
 	}
 
 	public List<Long> overlapScheduleIds() {
