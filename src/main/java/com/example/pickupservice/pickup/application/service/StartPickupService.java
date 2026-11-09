@@ -89,9 +89,9 @@ public class StartPickupService implements StartPickupUseCase {
 		Instant now = clock.instant();
 		SessionEvent event = sessionEventPort.append(session.getSessionId(), SESSION_STARTED,
 				session.getStateVersion(), now, Map.of());
-		publishSessionEventPort.publish(SessionEventMessages.of(event, receiverUserIds));
-		recordNotificationPort.recordNotifications(
+		List<Long> notificationIds = recordNotificationPort.recordNotifications(
 				new NotificationRequest(session.getSessionId(), null, SESSION_STARTED, receiverUserIds));
+		publishSessionEventPort.publish(SessionEventMessages.of(event, receiverUserIds, notificationIds));
 		return new StartPickupResult(true, sessionViewAssembler.assemble(session, command.principal(),
 				loadFamilyPort.loadFamily(familyId), members, loadCallPort.loadLatestCall(session.getSessionId()), now));
 	}

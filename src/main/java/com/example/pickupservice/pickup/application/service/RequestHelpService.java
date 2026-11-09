@@ -59,9 +59,9 @@ public class RequestHelpService implements RequestHelpUseCase {
 		SessionEvent event = sessionEventPort.append(session.getSessionId(), HELP_REQUESTED,
 				session.getStateVersion(), now, Map.of("childUserId", childUserId, "type", command.type()));
 		List<Long> guardianIds = SessionReceivers.guardians(loadFamilyPort.loadMembers(session.getFamilyId()));
-		publishSessionEventPort.publish(SessionEventMessages.of(event, guardianIds));
-		recordNotificationPort.recordNotifications(
+		List<Long> notificationIds = recordNotificationPort.recordNotifications(
 				new NotificationRequest(session.getSessionId(), null, HELP_NOTIFICATION, guardianIds));
+		publishSessionEventPort.publish(SessionEventMessages.of(event, guardianIds, notificationIds));
 		return new HelpRequestResult(decision.nextAllowedAt());
 	}
 

@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -73,12 +74,12 @@ public class CallEngine {
 	public Call createCall(PickupSession session, CallTriggerType triggerType, Instant now) {
 		long sessionId = session.getSessionId();
 		Call call = saveCallPort.saveCall(newCall(sessionId, triggerType, session.getSpotVersion()));
-		recordNotificationPort.recordNotifications(new NotificationRequest(sessionId, call.getCallId(),
-				CALL_NOTIFICATION, SessionReceivers.sessionChildren(session)));
+		List<Long> notificationIds = recordNotificationPort.recordNotifications(new NotificationRequest(sessionId,
+				call.getCallId(), CALL_NOTIFICATION, SessionReceivers.sessionChildren(session)));
 		SessionEvent event = sessionEventPort.append(sessionId, CALL_TRIGGERED, session.getStateVersion(), now,
 				Map.of("callId", call.getCallId(), "trigger", triggerType.name()));
 		publishSessionEventPort.publish(SessionEventMessages.of(event,
-				SessionReceivers.guardians(loadFamilyPort.loadMembers(session.getFamilyId()))));
+				SessionReceivers.guardians(loadFamilyPort.loadMembers(session.getFamilyId())), notificationIds));
 		return call;
 	}
 

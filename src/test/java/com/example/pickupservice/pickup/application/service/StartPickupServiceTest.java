@@ -70,6 +70,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class StartPickupServiceTest {
@@ -534,6 +535,24 @@ class StartPickupServiceTest {
 		assertThat(request.callId()).isNull();
 		assertThat(request.type()).isEqualTo("SESSION_STARTED");
 		assertThat(request.receiverUserIds()).containsExactlyInAnyOrder(GUARDIAN_ID, MINJUN_ID, SEOYUN_ID);
+	}
+
+	@Test
+	@DisplayName("픽업 시작은 알림 기록이 돌려준 notificationId 목록을 알림 기록 뒤에 발행하는 SESSION_STARTED payload의 notificationIds에 담는다")
+	void startPublishesSessionStartedWithRecordedNotificationIds() {
+		givenNewSessionSaved();
+		givenEventAppended();
+		when(recordNotificationPort.recordNotifications(any(NotificationRequest.class)))
+				.thenReturn(List.of(7001L, 7002L, 7003L));
+
+		startPickupService.start(command(TODAY_KST));
+
+		InOrder inOrder = inOrder(recordNotificationPort, publishSessionEventPort);
+		inOrder.verify(recordNotificationPort).recordNotifications(any(NotificationRequest.class));
+		ArgumentCaptor<SessionEventMessage> publishedCaptor = ArgumentCaptor.forClass(SessionEventMessage.class);
+		inOrder.verify(publishSessionEventPort).publish(publishedCaptor.capture());
+		assertThat(publishedCaptor.getValue().type()).isEqualTo("SESSION_STARTED");
+		assertThat(publishedCaptor.getValue().payload()).containsEntry("notificationIds", List.of(7001L, 7002L, 7003L));
 	}
 
 	@Test

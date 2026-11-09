@@ -66,6 +66,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 // SIG-03 준비 시간 추가: 자녀 주체가 자기 준비 시간을 늘린다. 요청에 stateVersion이 없어 버전 확인은 하지 않는다
 @ExtendWith(MockitoExtension.class)
@@ -224,8 +225,27 @@ class ExtendPrepTimeServiceTest {
 		assertThat(message.seq()).isEqualTo(appended.getSeq());
 		assertThat(message.stateVersion()).isEqualTo(STATE_VERSION + 1);
 		assertThat(message.occurredAt()).isEqualTo(NOW);
-		assertThat(message.payload()).isEqualTo(appended.getPayload());
+		// 발행 payload에는 알림 기록이 돌려준 notificationIds가 더해져서 isEqualTo 대신 containsAllEntriesOf로 바꿨다
+		assertThat(message.payload()).containsAllEntriesOf(appended.getPayload());
 		assertThat(message.receiverUserIds()).containsExactly(GUARDIAN_ID);
+	}
+
+	@Test
+	@DisplayName("준비 시간 추가는 알림 기록이 돌려준 notificationId 목록을 알림 기록 뒤에 발행하는 PREP_TIME_EXTENDED payload의 notificationIds에 담고 저장하는 이벤트 payload에는 넣지 않는다")
+	void extendPublishesPrepTimeExtendedWithRecordedNotificationIds() {
+		givenLockedSession(waitingSession(0, null));
+		when(recordNotificationPort.recordNotifications(any(NotificationRequest.class)))
+				.thenReturn(List.of(7001L, 7002L));
+
+		extendPrepTimeService.extend(minjunCommand(5));
+
+		InOrder inOrder = inOrder(recordNotificationPort, publishSessionEventPort);
+		inOrder.verify(recordNotificationPort).recordNotifications(any(NotificationRequest.class));
+		inOrder.verify(publishSessionEventPort).publish(any(SessionEventMessage.class));
+		SessionEventMessage message = publishedMessageOf("PREP_TIME_EXTENDED");
+		assertThat(message.payload()).containsEntry("notificationIds", List.of(7001L, 7002L))
+				.containsAllEntriesOf(appendedEventOf("PREP_TIME_EXTENDED").getPayload());
+		assertThat(appendedEventOf("PREP_TIME_EXTENDED").getPayload()).doesNotContainKey("notificationIds");
 	}
 
 	@Test

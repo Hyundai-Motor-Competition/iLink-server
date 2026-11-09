@@ -58,6 +58,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.inOrder;
@@ -65,6 +66,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ConfirmRouteServiceTest {
@@ -240,6 +242,24 @@ class ConfirmRouteServiceTest {
 		assertThat(message.stateVersion()).isEqualTo(FIRST_STATE_VERSION + 1);
 		assertThat(message.occurredAt()).isEqualTo(NOW);
 		assertThat(message.receiverUserIds()).containsExactly(GUARDIAN_ID);
+	}
+
+	@Test
+	@DisplayName("첫 경로 확정은 알림 기록이 돌려준 notificationId 목록을 알림 기록 뒤에 발행하는 DEPARTURE_NOTICE_SENT payload의 notificationIds에 담고 저장하는 이벤트 payload에는 넣지 않는다")
+	void firstConfirmRoutePublishesDepartureNoticeSentWithRecordedNotificationIds() {
+		givenLockedSession(beforeFirstConfirm());
+		when(recordNotificationPort.recordNotifications(any(NotificationRequest.class)))
+				.thenReturn(List.of(7001L, 7002L));
+
+		confirmRouteService.confirmRoute(command(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION));
+
+		InOrder inOrder = inOrder(recordNotificationPort, publishSessionEventPort);
+		inOrder.verify(recordNotificationPort).recordNotifications(any(NotificationRequest.class));
+		inOrder.verify(publishSessionEventPort)
+				.publish(argThat(message -> "DEPARTURE_NOTICE_SENT".equals(message.type())));
+		SessionEventMessage message = publishedMessageOf("DEPARTURE_NOTICE_SENT");
+		assertThat(message.payload()).containsEntry("notificationIds", List.of(7001L, 7002L));
+		assertThat(appendedEventOf("DEPARTURE_NOTICE_SENT").getPayload()).doesNotContainKey("notificationIds");
 	}
 
 	@Test

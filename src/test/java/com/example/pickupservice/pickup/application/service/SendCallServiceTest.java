@@ -66,6 +66,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SendCallServiceTest {
@@ -352,8 +353,28 @@ class SendCallServiceTest {
 		assertThat(message.seq()).isEqualTo(appended.getSeq());
 		assertThat(message.stateVersion()).isEqualTo(STATE_VERSION);
 		assertThat(message.occurredAt()).isEqualTo(NOW);
-		assertThat(message.payload()).isEqualTo(appended.getPayload());
+		// 발행 payload에는 알림 기록이 돌려준 notificationIds가 더해져서 isEqualTo 대신 containsAllEntriesOf로 바꿨다
+		assertThat(message.payload()).containsAllEntriesOf(appended.getPayload());
 		assertThat(message.receiverUserIds()).containsExactly(GUARDIAN_ID);
+	}
+
+	@Test
+	@DisplayName("합류 안내 보내기는 알림 기록이 돌려준 notificationId 목록을 알림 기록 뒤에 발행하는 CALL_TRIGGERED payload의 notificationIds에 담고 저장하는 이벤트 payload에는 넣지 않는다")
+	void sendPublishesCallTriggeredWithRecordedNotificationIds() {
+		givenLockedSession(readyForManualCall().build());
+		when(recordNotificationPort.recordNotifications(any(NotificationRequest.class)))
+				.thenReturn(List.of(7001L, 7002L));
+
+		sendCallService.send(command());
+
+		InOrder inOrder = inOrder(recordNotificationPort, publishSessionEventPort);
+		inOrder.verify(recordNotificationPort).recordNotifications(any(NotificationRequest.class));
+		inOrder.verify(publishSessionEventPort).publish(any(SessionEventMessage.class));
+		SessionEventMessage message = publishedMessageOf("CALL_TRIGGERED");
+		assertThat(message.payload())
+				.containsEntry("callId", NEW_CALL_ID)
+				.containsEntry("notificationIds", List.of(7001L, 7002L));
+		assertThat(appendedEventOf("CALL_TRIGGERED").getPayload()).doesNotContainKey("notificationIds");
 	}
 
 	private void givenJoinCallMode(JoinCallMode mode) {

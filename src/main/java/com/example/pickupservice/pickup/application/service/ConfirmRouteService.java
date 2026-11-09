@@ -64,9 +64,11 @@ public class ConfirmRouteService implements ConfirmRouteUseCase {
 		List<MemberInfo> members = loadFamilyPort.loadMembers(familyId);
 		publish(append(session, SPOT_CONFIRMED, now), SessionReceivers.guardiansAndSessionChildren(session, members));
 		if (firstConfirm) {
-			publish(append(session, DEPARTURE_NOTICE_SENT, now), SessionReceivers.guardians(members));
-			recordNotificationPort.recordNotifications(new NotificationRequest(session.getSessionId(), null,
-					DEPARTURE_NOTIFICATION, SessionReceivers.sessionChildren(session)));
+			List<Long> notificationIds = recordNotificationPort.recordNotifications(
+					new NotificationRequest(session.getSessionId(), null, DEPARTURE_NOTIFICATION,
+							SessionReceivers.sessionChildren(session)));
+			publishSessionEventPort.publish(SessionEventMessages.of(append(session, DEPARTURE_NOTICE_SENT, now),
+					SessionReceivers.guardians(members), notificationIds));
 		}
 		return sessionAccess.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
 				members, loadCallPort.loadLatestCall(session.getSessionId()), now);

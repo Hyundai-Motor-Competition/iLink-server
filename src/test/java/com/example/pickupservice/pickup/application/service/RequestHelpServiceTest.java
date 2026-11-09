@@ -34,6 +34,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -58,10 +59,12 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 // SIG-05 도움 요청: 자녀 주체가 보낸다. 세션 상태를 바꾸지 않아 세션 저장 포트를 받지 않고 지금 stateVersion으로 이벤트를 남긴다
 @ExtendWith(MockitoExtension.class)
@@ -155,8 +158,28 @@ class RequestHelpServiceTest {
 		assertThat(message.seq()).isEqualTo(appended.getSeq());
 		assertThat(message.stateVersion()).isEqualTo(STATE_VERSION);
 		assertThat(message.occurredAt()).isEqualTo(NOW);
-		assertThat(message.payload()).containsOnly(entry("childUserId", MINJUN_ID), entry("type", "CANT_FIND_CAR"));
+		// 발행 payload에는 알림 기록이 돌려준 notificationIds가 더해져서 containsOnly 대신 containsEntry로 바꿨다
+		assertThat(message.payload()).containsEntry("childUserId", MINJUN_ID).containsEntry("type", "CANT_FIND_CAR");
 		assertThat(message.receiverUserIds()).containsExactly(GUARDIAN_ID);
+	}
+
+	@Test
+	@DisplayName("도움 요청은 알림 기록이 돌려준 notificationId 목록을 알림 기록 뒤에 발행하는 HELP_REQUESTED payload의 notificationIds에 담고 저장하는 이벤트 payload에는 넣지 않는다")
+	void requestPublishesHelpRequestedWithRecordedNotificationIds() {
+		when(recordNotificationPort.recordNotifications(any(NotificationRequest.class)))
+				.thenReturn(List.of(7001L, 7002L));
+
+		requestHelpService.request(command(MINJUN_ID, "NEED_HELP"));
+
+		InOrder inOrder = inOrder(recordNotificationPort, publishSessionEventPort);
+		inOrder.verify(recordNotificationPort).recordNotifications(any(NotificationRequest.class));
+		inOrder.verify(publishSessionEventPort).publish(any(SessionEventMessage.class));
+		SessionEventMessage message = publishedMessageOf("HELP_REQUESTED");
+		assertThat(message.payload())
+				.containsEntry("childUserId", MINJUN_ID)
+				.containsEntry("type", "NEED_HELP")
+				.containsEntry("notificationIds", List.of(7001L, 7002L));
+		assertThat(appendedEventOf("HELP_REQUESTED").getPayload()).doesNotContainKey("notificationIds");
 	}
 
 	@Test

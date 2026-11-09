@@ -66,9 +66,9 @@ public class ExtendPrepTimeService implements ExtendPrepTimeUseCase {
 						"extraPrepMinutes", child.getExtraPrepMinutes(),
 						"callNotBefore", TimeUtils.toKst(child.getCallNotBefore())));
 		List<Long> guardianIds = SessionReceivers.guardians(loadFamilyPort.loadMembers(session.getFamilyId()));
-		publishSessionEventPort.publish(SessionEventMessages.of(event, guardianIds));
-		recordNotificationPort.recordNotifications(
+		List<Long> notificationIds = recordNotificationPort.recordNotifications(
 				new NotificationRequest(session.getSessionId(), null, PREP_EXTENDED_NOTIFICATION, guardianIds));
+		publishSessionEventPort.publish(SessionEventMessages.of(event, guardianIds, notificationIds));
 		return new PrepExtensionResult(child.getExtraPrepMinutes(), child.getCallNotBefore());
 	}
 

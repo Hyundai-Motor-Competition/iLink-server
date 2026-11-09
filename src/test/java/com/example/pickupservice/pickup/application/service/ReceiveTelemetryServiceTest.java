@@ -300,7 +300,8 @@ class ReceiveTelemetryServiceTest {
 		assertThat(message.seq()).isEqualTo(appended.getSeq());
 		assertThat(message.stateVersion()).isEqualTo(STATE_VERSION);
 		assertThat(message.occurredAt()).isEqualTo(NOW);
-		assertThat(message.payload()).isEqualTo(appended.getPayload());
+		// 발행 payload에는 알림 기록이 돌려준 notificationIds가 더해져서 isEqualTo 대신 containsAllEntriesOf로 바꿨다
+		assertThat(message.payload()).containsAllEntriesOf(appended.getPayload());
 		assertThat(message.receiverUserIds()).containsExactly(GUARDIAN_ID);
 	}
 
