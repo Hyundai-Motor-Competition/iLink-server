@@ -10,4 +10,6 @@ public interface LoadPushTargetPort {
 	List<PushTarget> loadPushTargets(List<Long> userIds);
 
 	Optional<PushTarget> loadPushTarget(long deviceId);
+
+	Optional<PushTarget> loadPushTargetIncludingRevoked(long deviceId);
 }

@@ -9,6 +9,7 @@ import com.example.pickupservice.notification.application.port.in.NotificationVi
 import com.example.pickupservice.notification.application.port.out.LoadMemberNamePort;
 import com.example.pickupservice.notification.application.port.out.LoadNotificationPort;
 import com.example.pickupservice.notification.application.port.out.LoadPushTargetPort;
+import com.example.pickupservice.notification.application.port.out.LoadSessionFamilyPort;
 import com.example.pickupservice.notification.domain.Notification;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,7 +29,7 @@ public class ListNotificationsService implements ListNotificationsUseCase {
 	private final LoadNotificationPort loadNotificationPort;
 	private final LoadPushTargetPort loadPushTargetPort;
 	private final LoadMemberNamePort loadMemberNamePort;
-	private final com.example.pickupservice.notification.application.port.out.LoadSessionFamilyPort loadSessionFamilyPort;
+	private final LoadSessionFamilyPort loadSessionFamilyPort;
 
 	@Override
 	@Transactional(readOnly = true)
@@ -41,7 +42,7 @@ public class ListNotificationsService implements ListNotificationsUseCase {
 		Map<Long, Long> userIdByDevice = new HashMap<>();
 		for (Notification row : rows) {
 			if (!userIdByDevice.containsKey(row.getDeviceId())) {
-				Optional<PushTarget> target = loadPushTargetPort.loadPushTarget(row.getDeviceId());
+				Optional<PushTarget> target = loadPushTargetPort.loadPushTargetIncludingRevoked(row.getDeviceId());
 				target.ifPresent(t -> userIdByDevice.put(row.getDeviceId(), t.userId()));
 			}
 		}

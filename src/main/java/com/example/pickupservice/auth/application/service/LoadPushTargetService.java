@@ -21,6 +21,12 @@ public class LoadPushTargetService implements LoadPushTargetUseCase, LoadPushTar
 
 	@Override
 	@Transactional(readOnly = true)
+	public Optional<PushTarget> findLivePushTargetByDeviceId(long deviceId) {
+		return toPushTarget(loadDevicePort.loadDevice(deviceId).filter(Device::isLive));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
 	public List<PushTarget> findPushTargets(List<Long> userIds) {
 		return userIds.stream()
 				.flatMap(userId -> loadDevicePort.loadLiveDevices(OwnerType.USER, userId).stream())
@@ -34,10 +40,13 @@ public class LoadPushTargetService implements LoadPushTargetUseCase, LoadPushTar
 	@Override
 	@Transactional(readOnly = true)
 	public Optional<PushTarget> findPushTargetByDeviceId(long deviceId) {
-		return loadDevicePort.loadDevice(deviceId)
-				.filter(device -> device.getOwnerType() == OwnerType.USER)
-				.filter(device -> device.getPushToken() != null && !device.getPushToken().isEmpty())
-				.map(device -> new PushTarget(device.getOwnerId(), device.getDeviceId(), device.getPlatform(),
-						device.getPushToken()));
+		return toPushTarget(loadDevicePort.loadDevice(deviceId));
+	}
+
+	private Optional<PushTarget> toPushTarget(Optional<Device> device) {
+		return device
+				.filter(d -> d.getOwnerType() == OwnerType.USER)
+				.filter(d -> d.getPushToken() != null && !d.getPushToken().isEmpty())
+				.map(d -> new PushTarget(d.getOwnerId(), d.getDeviceId(), d.getPlatform(), d.getPushToken()));
 	}
 }

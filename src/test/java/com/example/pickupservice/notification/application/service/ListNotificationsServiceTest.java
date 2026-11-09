@@ -103,9 +103,9 @@ class ListNotificationsServiceTest {
 		Notification resent = Notification.restore(7003L, SESSION_ID, CALL_ID, "CALL", CHILD_DEVICE_ID, SECOND_SENT_AT,
 				null, null);
 		when(loadNotificationPort.loadBySession(SESSION_ID)).thenReturn(List.of(first, guardianRow, resent));
-		when(loadPushTargetPort.loadPushTarget(CHILD_DEVICE_ID))
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(CHILD_DEVICE_ID))
 				.thenReturn(Optional.of(new PushTarget(CHILD_USER_ID, CHILD_DEVICE_ID, Platform.ANDROID, "t1")));
-		when(loadPushTargetPort.loadPushTarget(GUARDIAN_DEVICE_ID))
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(GUARDIAN_DEVICE_ID))
 				.thenReturn(Optional.of(new PushTarget(GUARDIAN_USER_ID, GUARDIAN_DEVICE_ID, Platform.IOS, "t2")));
 		when(loadMemberNamePort.loadNames(anyList()))
 				.thenReturn(Map.of(CHILD_USER_ID, "지우", GUARDIAN_USER_ID, "엄마"));
@@ -135,6 +135,23 @@ class ListNotificationsServiceTest {
 		assertThat(view3.receiverName()).isEqualTo("지우");
 		assertThat(view3.sentAt()).isEqualTo(SECOND_SENT_AT);
 		assertThat(view3.attempt()).isEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("알림 이력의 받는 사람 이름은 폐기된 기기도 찾는 폐기 포함 조회로 채우고 살아 있는 기기만 보는 조회는 쓰지 않는다")
+	void listFillsReceiverNameOfRevokedDeviceWithRevokedInclusiveLookupOnly() {
+		Notification row = Notification.restore(7001L, SESSION_ID, CALL_ID, "CALL", CHILD_DEVICE_ID, FIRST_SENT_AT,
+				DELIVERED_AT, null);
+		when(loadNotificationPort.loadBySession(SESSION_ID)).thenReturn(List.of(row));
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(CHILD_DEVICE_ID))
+				.thenReturn(Optional.of(new PushTarget(CHILD_USER_ID, CHILD_DEVICE_ID, Platform.ANDROID, "t1")));
+		when(loadMemberNamePort.loadNames(anyList())).thenReturn(Map.of(CHILD_USER_ID, "지우"));
+
+		List<NotificationView> views = service.list(new NotificationListQuery(principal(), SESSION_ID));
+
+		assertThat(views).hasSize(1);
+		assertThat(views.get(0).receiverName()).isEqualTo("지우");
+		verify(loadPushTargetPort, never()).loadPushTarget(anyLong());
 	}
 
 	private static AuthPrincipal principal() {

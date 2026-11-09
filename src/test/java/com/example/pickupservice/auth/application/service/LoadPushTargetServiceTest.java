@@ -109,6 +109,55 @@ class LoadPushTargetServiceTest {
 		assertThat(loadPushTargetService.findPushTargetByDeviceId(999L)).isNotNull().isEmpty();
 	}
 
+	@Test
+	@DisplayName("findLivePushTargetByDeviceId는 폐기된 USER 기기면 pushToken이 있어도 빈 값을 돌려준다")
+	void findLivePushTargetByDeviceIdReturnsEmptyForRevokedDevice() {
+		when(loadDevicePort.loadDevice(804L)).thenReturn(Optional.of(
+				userDevice(804L, CHILD_ID, Platform.IOS, "fcm-revoked", EARLIER)));
+
+		assertThat(loadPushTargetService.findLivePushTargetByDeviceId(804L)).isNotNull().isEmpty();
+	}
+
+	@Test
+	@DisplayName("findLivePushTargetByDeviceId는 폐기되지 않고 pushToken이 있는 USER 기기를 PushTarget으로 돌려준다")
+	void findLivePushTargetByDeviceIdReturnsLiveUserDevice() {
+		when(loadDevicePort.loadDevice(801L)).thenReturn(Optional.of(
+				userDevice(801L, CHILD_ID, Platform.ANDROID, "fcm-child", null)));
+
+		assertThat(loadPushTargetService.findLivePushTargetByDeviceId(801L))
+				.contains(new PushTarget(CHILD_ID, 801L, Platform.ANDROID, "fcm-child"));
+	}
+
+	@Test
+	@DisplayName("findLivePushTargetByDeviceId는 pushToken이 null이거나 빈 기기면 빈 값을 돌려준다")
+	void findLivePushTargetByDeviceIdReturnsEmptyWhenPushTokenMissing() {
+		when(loadDevicePort.loadDevice(802L)).thenReturn(Optional.of(
+				userDevice(802L, CHILD_ID, Platform.ANDROID, null, null)));
+		when(loadDevicePort.loadDevice(803L)).thenReturn(Optional.of(
+				userDevice(803L, CHILD_ID, Platform.IOS, "", null)));
+
+		assertThat(loadPushTargetService.findLivePushTargetByDeviceId(802L)).isNotNull().isEmpty();
+		assertThat(loadPushTargetService.findLivePushTargetByDeviceId(803L)).isNotNull().isEmpty();
+	}
+
+	@Test
+	@DisplayName("findLivePushTargetByDeviceId는 VEHICLE 기기면 살아 있고 pushToken이 있어도 빈 값을 돌려준다")
+	void findLivePushTargetByDeviceIdReturnsEmptyForVehicleDevice() {
+		when(loadDevicePort.loadDevice(901L)).thenReturn(Optional.of(
+				Device.restore(901L, OwnerType.VEHICLE, 55L, Platform.ANDROID, "fcm-vehicle", EARLIER, "d".repeat(64),
+						null)));
+
+		assertThat(loadPushTargetService.findLivePushTargetByDeviceId(901L)).isNotNull().isEmpty();
+	}
+
+	@Test
+	@DisplayName("findLivePushTargetByDeviceId는 없는 기기 id면 빈 값을 돌려준다")
+	void findLivePushTargetByDeviceIdReturnsEmptyForMissingDevice() {
+		when(loadDevicePort.loadDevice(999L)).thenReturn(Optional.empty());
+
+		assertThat(loadPushTargetService.findLivePushTargetByDeviceId(999L)).isNotNull().isEmpty();
+	}
+
 	private static Device userDevice(long deviceId, long userId, Platform platform, String pushToken,
 			Instant revokedAt) {
 		Instant pushUpdatedAt = pushToken == null ? null : EARLIER;

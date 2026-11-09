@@ -20,7 +20,7 @@ public class NotifyDeviceReplacedService implements NotifyDeviceReplacedUseCase 
 	@Override
 	public void notifyDeviceReplaced(List<Long> previousDeviceIds) {
 		for (Long deviceId : previousDeviceIds) {
-			loadPushTargetPort.loadPushTarget(deviceId).ifPresent(target ->
+			loadPushTargetPort.loadPushTargetIncludingRevoked(deviceId).ifPresent(target ->
 					sendPushPort.send(new PushMessage(
 							target,
 							"다른 기기에서 로그인했어요",

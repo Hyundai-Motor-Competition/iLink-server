@@ -24,6 +24,11 @@ public class NotificationPushTargetAdapter implements LoadPushTargetPort {
 
 	@Override
 	public Optional<PushTarget> loadPushTarget(long deviceId) {
+		return loadPushTargetByDeviceUseCase.findLivePushTargetByDeviceId(deviceId);
+	}
+
+	@Override
+	public Optional<PushTarget> loadPushTargetIncludingRevoked(long deviceId) {
 		return loadPushTargetByDeviceUseCase.findPushTargetByDeviceId(deviceId);
 	}
 }

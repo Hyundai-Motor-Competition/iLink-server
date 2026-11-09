@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -51,7 +52,7 @@ class NotifyDeviceReplacedServiceTest {
 	@DisplayName("RELINK 이전 기기 이벤트를 받으면 이전 기기의 pushToken으로 「다른 기기에서 로그인했어요」를 보낸다")
 	void sendsDeviceReplacedPushToPreviousDevicePushToken() {
 		PushTarget target = target(DEVICE_A, "token-a");
-		when(loadPushTargetPort.loadPushTarget(DEVICE_A)).thenReturn(Optional.of(target));
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(DEVICE_A)).thenReturn(Optional.of(target));
 
 		service.notifyDeviceReplaced(List.of(DEVICE_A));
 
@@ -67,8 +68,8 @@ class NotifyDeviceReplacedServiceTest {
 	@Test
 	@DisplayName("RELINK 이전 기기가 여러 대면 기기마다 한 번씩 보낸다")
 	void sendsOnePushPerPreviousDevice() {
-		when(loadPushTargetPort.loadPushTarget(DEVICE_A)).thenReturn(Optional.of(target(DEVICE_A, "token-a")));
-		when(loadPushTargetPort.loadPushTarget(DEVICE_B)).thenReturn(Optional.of(target(DEVICE_B, "token-b")));
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(DEVICE_A)).thenReturn(Optional.of(target(DEVICE_A, "token-a")));
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(DEVICE_B)).thenReturn(Optional.of(target(DEVICE_B, "token-b")));
 
 		service.notifyDeviceReplaced(List.of(DEVICE_A, DEVICE_B));
 
@@ -82,8 +83,8 @@ class NotifyDeviceReplacedServiceTest {
 	@Test
 	@DisplayName("RELINK 이전 기기의 푸시 대상을 못 찾으면 그 기기는 건너뛰고 나머지에는 보낸다")
 	void skipsDeviceWithoutPushTargetAndSendsToTheRest() {
-		when(loadPushTargetPort.loadPushTarget(DEVICE_A)).thenReturn(Optional.empty());
-		when(loadPushTargetPort.loadPushTarget(DEVICE_B)).thenReturn(Optional.of(target(DEVICE_B, "token-b")));
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(DEVICE_A)).thenReturn(Optional.empty());
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(DEVICE_B)).thenReturn(Optional.of(target(DEVICE_B, "token-b")));
 
 		service.notifyDeviceReplaced(List.of(DEVICE_A, DEVICE_B));
 
@@ -95,8 +96,8 @@ class NotifyDeviceReplacedServiceTest {
 	@Test
 	@DisplayName("RELINK 이전 기기 푸시가 한 대 실패해도 나머지 기기에는 계속 보낸다")
 	void continuesWithNextDeviceWhenSendFails() {
-		when(loadPushTargetPort.loadPushTarget(DEVICE_A)).thenReturn(Optional.of(target(DEVICE_A, "token-a")));
-		when(loadPushTargetPort.loadPushTarget(DEVICE_B)).thenReturn(Optional.of(target(DEVICE_B, "token-b")));
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(DEVICE_A)).thenReturn(Optional.of(target(DEVICE_A, "token-a")));
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(DEVICE_B)).thenReturn(Optional.of(target(DEVICE_B, "token-b")));
 		when(sendPushPort.send(any(PushMessage.class))).thenReturn(false, true);
 
 		service.notifyDeviceReplaced(List.of(DEVICE_A, DEVICE_B));
@@ -115,12 +116,23 @@ class NotifyDeviceReplacedServiceTest {
 	@Test
 	@DisplayName("RELINK 이전 기기 푸시를 못 찾으면 보내지 않는다")
 	void doesNotSendWhenNoDeviceHasPushTarget() {
-		when(loadPushTargetPort.loadPushTarget(DEVICE_A)).thenReturn(Optional.empty());
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(DEVICE_A)).thenReturn(Optional.empty());
 
 		service.notifyDeviceReplaced(List.of(DEVICE_A));
 
-		verify(loadPushTargetPort).loadPushTarget(DEVICE_A);
+		verify(loadPushTargetPort).loadPushTargetIncludingRevoked(DEVICE_A);
 		verify(sendPushPort, never()).send(any(PushMessage.class));
+	}
+
+	@Test
+	@DisplayName("RELINK 이전 기기 푸시는 폐기된 기기의 토큰을 써야 하므로 폐기 포함 조회만 쓰고 살아 있는 기기만 보는 조회는 쓰지 않는다")
+	void usesRevokedInclusiveLookupOnly() {
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(DEVICE_A)).thenReturn(Optional.of(target(DEVICE_A, "token-a")));
+
+		service.notifyDeviceReplaced(List.of(DEVICE_A));
+
+		verify(sendPushPort).send(any(PushMessage.class));
+		verify(loadPushTargetPort, never()).loadPushTarget(anyLong());
 	}
 
 	@Test
