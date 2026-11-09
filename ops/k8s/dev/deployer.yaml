@@ -1,0 +1,51 @@
+# Jenkins 배포용 ServiceAccount. ilink-dev 네임스페이스의 api 배포에 필요한 권한만 준다(Secret · DB 접근 없음)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ilink-deployer
+  namespace: ilink-dev
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ilink-deployer-token
+  namespace: ilink-dev
+  annotations:
+    kubernetes.io/service-account.name: ilink-deployer
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ilink-deployer
+  namespace: ilink-dev
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps", "services"]
+    verbs: ["get", "list", "create", "update", "patch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ilink-deployer
+  namespace: ilink-dev
+subjects:
+  - kind: ServiceAccount
+    name: ilink-deployer
+    namespace: ilink-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ilink-deployer
