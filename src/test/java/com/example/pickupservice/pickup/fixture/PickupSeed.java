@@ -50,7 +50,7 @@ public class PickupSeed {
 					place.defaultSpotId(), SPOT_NAME, GeoPoints.toPoint(STOP_LAT, STOP_LNG),
 					GeoPoints.toPoint(MEETING_LAT, MEETING_LNG), today, SessionStatus.ACTIVE, VehiclePhase.ROUTING,
 					SpotStatus.SELECTED, STATE_VERSION, 0, 0, null, false, null, null, null, null, null, null, null,
-					null, null, null));
+					null, null, null, null));
 			long sessionId = session.getSessionId();
 			SessionChildEntity minjun = persist(waitingChild(sessionId, user.minjunId(), schedule.scheduleId()));
 			SessionChildEntity seoyun = persist(waitingChild(sessionId, user.seoyunId(),

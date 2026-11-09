@@ -143,7 +143,7 @@ class FindActiveSessionServiceTest {
 		return PickupSession.restore(sessionId, VEHICLE_ID, FAMILY_ID, 21L, "정문 앞",
 				new LatLng(37.501400, 127.039950), new LatLng(37.501301, 127.039901), TODAY_KST, status,
 				VehiclePhase.ROUTING, SpotStatus.SELECTED, stateVersion, 0, 0, null, false, null, null, null, null,
-				null, null, null, null, null, null, List.of(children));
+				null, null, null, null, null, null, null, List.of(children));
 	}
 
 	private static SessionChild child(long childUserId, long scheduleId) {

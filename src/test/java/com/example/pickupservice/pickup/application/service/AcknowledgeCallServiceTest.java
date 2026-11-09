@@ -356,7 +356,7 @@ class AcknowledgeCallServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.APPROACHING,
 				SpotStatus.CONFIRMED, STATE_VERSION, SPOT_VERSION, 2, SPOT_VERSION, false,
-				NOW.plus(Duration.ofMinutes(2)), 500, NOW.minusSeconds(5), null, null, null, null, null, null, null,
+				NOW.plus(Duration.ofMinutes(2)), 500, NOW.minusSeconds(5), null, null, null, null, null, null, null, null,
 				children);
 	}
 

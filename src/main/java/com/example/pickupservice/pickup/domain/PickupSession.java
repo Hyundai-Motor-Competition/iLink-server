@@ -38,6 +38,7 @@ public class PickupSession {
 	private BoardingDoor boardingDoor;
 	private IncidentType incidentType;
 	private String incidentCause;
+	private Long incidentChildUserId;
 	private Instant incidentOpenedAt;
 	private Instant incidentResolvedAt;
 	private List<SessionChild> children;
@@ -49,7 +50,7 @@ public class PickupSession {
 				.toList();
 		return new PickupSession(null, vehicleId, familyId, spot.spotId(), spot.name(), spot.stopPoint(),
 				spot.meetingPoint(), date, SessionStatus.ACTIVE, VehiclePhase.ROUTING, SpotStatus.SELECTED, 0, 0, 0,
-				null, false, null, null, null, null, null, null, null, null, null, null, children);
+				null, false, null, null, null, null, null, null, null, null, null, null, null, children);
 	}
 
 	public static PickupSession restore(Long sessionId, long vehicleId, long familyId, long spotId, String spotName,
@@ -57,12 +58,27 @@ public class PickupSession {
 			VehiclePhase vehiclePhase, SpotStatus spotStatus, int stateVersion, int spotVersion, int routeVersion,
 			Integer routeSpotVersion, boolean callHeld, Instant etaAt, Integer remainingMeters, Instant etaUpdatedAt,
 			Instant boardingDetectedAt, Instant boardingCancelableUntil, BoardingDoor boardingDoor,
-			IncidentType incidentType, String incidentCause, Instant incidentOpenedAt, Instant incidentResolvedAt,
-			List<SessionChild> children) {
+			IncidentType incidentType, String incidentCause, Long incidentChildUserId, Instant incidentOpenedAt,
+			Instant incidentResolvedAt, List<SessionChild> children) {
 		return new PickupSession(sessionId, vehicleId, familyId, spotId, spotName, stopPoint, meetingPoint, date,
 				sessionStatus, vehiclePhase, spotStatus, stateVersion, spotVersion, routeVersion, routeSpotVersion,
 				callHeld, etaAt, remainingMeters, etaUpdatedAt, boardingDetectedAt, boardingCancelableUntil,
-				boardingDoor, incidentType, incidentCause, incidentOpenedAt, incidentResolvedAt, children);
+				boardingDoor, incidentType, incidentCause, incidentChildUserId, incidentOpenedAt, incidentResolvedAt,
+				children);
+	}
+
+	public void openIncident(IncidentType type, long childUserId, Instant now) {
+		childOf(childUserId);
+		rejectIfFinished();
+		if (hasOpenIncident()) {
+			throw new PickupRuleException(PickupViolation.INCIDENT_ALREADY_OPEN);
+		}
+		sessionStatus = SessionStatus.ON_HOLD;
+		incidentType = type;
+		incidentOpenedAt = now;
+		incidentResolvedAt = null;
+		raiseStateVersion();
+		incidentChildUserId = childUserId;
 	}
 
 	public Instant boardedAtOf(long childUserId) {
@@ -113,18 +129,6 @@ public class PickupSession {
 		}
 		children.forEach(SessionChild::clearLocation);
 		sessionStatus = SessionStatus.COMPLETED;
-		raiseStateVersion();
-	}
-
-	public void openIncident(IncidentType type, Instant now) {
-		rejectIfFinished();
-		if (hasOpenIncident()) {
-			throw new PickupRuleException(PickupViolation.INCIDENT_ALREADY_OPEN);
-		}
-		sessionStatus = SessionStatus.ON_HOLD;
-		incidentType = type;
-		incidentOpenedAt = now;
-		incidentResolvedAt = null;
 		raiseStateVersion();
 	}
 
@@ -243,8 +247,12 @@ public class PickupSession {
 		return incidentOpenedAt != null && incidentResolvedAt == null;
 	}
 
+	public boolean isFinished() {
+		return sessionStatus == SessionStatus.COMPLETED || sessionStatus == SessionStatus.CANCELLED;
+	}
+
 	private void rejectIfFinished() {
-		if (sessionStatus == SessionStatus.COMPLETED || sessionStatus == SessionStatus.CANCELLED) {
+		if (isFinished()) {
 			throw new PickupRuleException(PickupViolation.SESSION_ALREADY_FINISHED);
 		}
 	}

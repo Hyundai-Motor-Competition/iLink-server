@@ -150,7 +150,7 @@ class GetOutcomeServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT, MEETING_POINT,
 				SESSION_DATE_KST, SessionStatus.COMPLETED, VehiclePhase.STOPPED, SpotStatus.CONFIRMED, 15, 0, 1, 0,
 				false, PREDICTED_STOP_AT, 0, ACTUAL_STOP_AT.minusSeconds(5), ACTUAL_STOP_AT.plusSeconds(20),
-				ACTUAL_STOP_AT.plusSeconds(30), BoardingDoor.REAR_RIGHT, null, null, null, null, children);
+				ACTUAL_STOP_AT.plusSeconds(30), BoardingDoor.REAR_RIGHT, null, null, null, null, null, children);
 	}
 
 	private static SessionQuery query(long guardianId, long familyId) {

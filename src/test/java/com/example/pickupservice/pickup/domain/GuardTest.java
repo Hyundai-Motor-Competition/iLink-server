@@ -174,7 +174,7 @@ class GuardTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT,
 				MEETING_POINT, TODAY, sessionStatus, VehiclePhase.APPROACHING, spotStatus, STATE_VERSION, SPOT_VERSION,
 				ROUTE_VERSION, routeSpotVersion, false, etaAt, remainingMeters, etaUpdatedAt, null, null, null, null,
-				null, null, null, children);
+				null, null, null, null, children);
 	}
 
 	private static List<SessionChild> readyChildren() {

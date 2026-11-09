@@ -36,11 +36,13 @@ class SessionEventTest {
 	}
 
 	@Test
-	@DisplayName("SessionEventType은 설계서 「실시간 이벤트 19종」 표의 이름 19개를 표 순서대로 갖는다")
-	void sessionEventTypeHasNineteenNamesFromDesignTable() {
+	@DisplayName("SessionEventType은 이름 21개(19종 + SESSION_HELD · SESSION_RESUMED)를 enum 선언 순서대로 갖는다")
+	void sessionEventTypeHasTwentyOneNamesFromDesignTable() {
 		assertThat(Arrays.stream(SessionEventType.values()).map(Enum::name))
 				.containsExactly(
 						"SESSION_STARTED",
+						"SESSION_HELD",
+						"SESSION_RESUMED",
 						"SESSION_COMPLETED",
 						"SESSION_CANCELLED",
 						"INCIDENT_OPENED",

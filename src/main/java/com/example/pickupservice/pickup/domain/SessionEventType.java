@@ -2,6 +2,8 @@ package com.example.pickupservice.pickup.domain;
 
 public enum SessionEventType {
 	SESSION_STARTED,
+	SESSION_HELD,
+	SESSION_RESUMED,
 	SESSION_COMPLETED,
 	SESSION_CANCELLED,
 	INCIDENT_OPENED,

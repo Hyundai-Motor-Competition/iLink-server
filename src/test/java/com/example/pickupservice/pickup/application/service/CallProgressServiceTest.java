@@ -411,7 +411,7 @@ class CallProgressServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.APPROACHING,
 				SpotStatus.CONFIRMED, stateVersion, SPOT_VERSION, ROUTE_VERSION, SPOT_VERSION, false,
-				etaUpdatedAt.plusSeconds(170), 1500, etaUpdatedAt, null, null, null, null, null, null, null,
+				etaUpdatedAt.plusSeconds(170), 1500, etaUpdatedAt, null, null, null, null, null, null, null, null,
 				children);
 	}
 

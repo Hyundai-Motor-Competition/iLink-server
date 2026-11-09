@@ -123,7 +123,7 @@ class PickupHistoryPersistenceAdapterTest extends IntegrationTestSupport {
 					seeded.spotId(), PickupSeed.SPOT_NAME, GeoPoints.toPoint(PickupSeed.STOP_LAT, PickupSeed.STOP_LNG),
 					GeoPoints.toPoint(PickupSeed.MEETING_LAT, PickupSeed.MEETING_LNG), date, status,
 					VehiclePhase.ROUTING, SpotStatus.SELECTED, 0, 0, 0, null, false, null, null, null, null, null,
-					null, null, null, null, null);
+					null, null, null, null, null, null);
 			entityManager.persist(session);
 			for (ChildSchedule child : children) {
 				entityManager.persist(new SessionChildEntity(null, session.getSessionId(), child.childUserId(),

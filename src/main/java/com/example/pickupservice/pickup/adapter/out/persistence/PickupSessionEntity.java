@@ -107,6 +107,8 @@ public class PickupSessionEntity extends BaseTimeEntity {
 	@Column(length = 100)
 	private String incidentCause;
 
+	private Long incidentChildUserId;
+
 	private Instant incidentOpenedAt;
 
 	private Instant incidentResolvedAt;
@@ -116,7 +118,7 @@ public class PickupSessionEntity extends BaseTimeEntity {
 			SpotStatus spotStatus, int stateVersion, int spotVersion, int routeVersion, Integer routeSpotVersion,
 			boolean callHeld, Instant etaAt, Integer remainingMeters, Instant etaUpdatedAt, Instant boardingDetectedAt,
 			Instant boardingCancelableUntil, BoardingDoor boardingDoor, IncidentType incidentType,
-			String incidentCause, Instant incidentOpenedAt, Instant incidentResolvedAt) {
+			String incidentCause, Long incidentChildUserId, Instant incidentOpenedAt, Instant incidentResolvedAt) {
 		this.sessionId = sessionId;
 		this.vehicleId = vehicleId;
 		this.familyId = familyId;
@@ -141,6 +143,7 @@ public class PickupSessionEntity extends BaseTimeEntity {
 		this.boardingDoor = boardingDoor;
 		this.incidentType = incidentType;
 		this.incidentCause = incidentCause;
+		this.incidentChildUserId = incidentChildUserId;
 		this.incidentOpenedAt = incidentOpenedAt;
 		this.incidentResolvedAt = incidentResolvedAt;
 	}

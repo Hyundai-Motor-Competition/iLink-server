@@ -261,7 +261,7 @@ class CallPersistenceAdapterTest extends IntegrationTestSupport {
 					PickupSeed.SPOT_NAME, GeoPoints.toPoint(PickupSeed.STOP_LAT, PickupSeed.STOP_LNG),
 					GeoPoints.toPoint(PickupSeed.MEETING_LAT, PickupSeed.MEETING_LNG), seeded.date().minusDays(1),
 					status, VehiclePhase.ROUTING, SpotStatus.SELECTED, 0, 0, 0, null, false, null, null, null, null,
-					null, null, null, null, null, null);
+					null, null, null, null, null, null, null);
 			entityManager.persist(session);
 			entityManager.flush();
 			return session.getSessionId();

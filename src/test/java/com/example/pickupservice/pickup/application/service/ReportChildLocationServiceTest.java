@@ -220,7 +220,7 @@ class ReportChildLocationServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, status, VehiclePhase.APPROACHING,
 				SpotStatus.CONFIRMED, STATE_VERSION, 0, 1, 0, false, NOW.plus(Duration.ofMinutes(2)), 600,
-				NOW.minusSeconds(10), null, null, null, null, null, null, null, children);
+				NOW.minusSeconds(10), null, null, null, null, null, null, null, null, children);
 	}
 
 	private static ChildLocationCommand minjunCommand() {

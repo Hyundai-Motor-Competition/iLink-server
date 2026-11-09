@@ -169,7 +169,7 @@ class GetContactsServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.ROUTING,
 				SpotStatus.SELECTED, 0, 0, 0, null, false, null, null, null, null, null, null, null, null, null,
-				null, children);
+				null, null, children);
 	}
 
 }

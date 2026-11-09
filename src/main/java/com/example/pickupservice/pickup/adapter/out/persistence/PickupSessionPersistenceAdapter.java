@@ -95,7 +95,8 @@ class PickupSessionPersistenceAdapter implements LoadSessionPort, SaveSessionPor
 				entity.getRouteVersion(), entity.getRouteSpotVersion(), entity.isCallHeld(), entity.getEtaAt(),
 				entity.getRemainingMeters(), entity.getEtaUpdatedAt(), entity.getBoardingDetectedAt(),
 				entity.getBoardingCancelableUntil(), entity.getBoardingDoor(), entity.getIncidentType(),
-				entity.getIncidentCause(), entity.getIncidentOpenedAt(), entity.getIncidentResolvedAt(),
+				entity.getIncidentCause(), entity.getIncidentChildUserId(), entity.getIncidentOpenedAt(),
+				entity.getIncidentResolvedAt(),
 				children.stream().map(PickupSessionPersistenceAdapter::toDomain).toList());
 	}
 
@@ -116,7 +117,7 @@ class PickupSessionPersistenceAdapter implements LoadSessionPort, SaveSessionPor
 				session.getRouteSpotVersion(), session.isCallHeld(), session.getEtaAt(), session.getRemainingMeters(),
 				session.getEtaUpdatedAt(), session.getBoardingDetectedAt(), session.getBoardingCancelableUntil(),
 				session.getBoardingDoor(), session.getIncidentType(), session.getIncidentCause(),
-				session.getIncidentOpenedAt(), session.getIncidentResolvedAt());
+				session.getIncidentChildUserId(), session.getIncidentOpenedAt(), session.getIncidentResolvedAt());
 	}
 
 	private static SessionChildEntity toEntity(Long sessionId, SessionChild child) {

@@ -59,7 +59,7 @@ class PickupPersistenceEntitiesMappingTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("pickup_session 테이블은 설계서 컬럼 26개(family_id BIGINT NOT NULL · spot_name VARCHAR(50) · date DATE · 상태 3개 VARCHAR(20) · 버전 3개 INT · call_held BOOLEAN, route_spot_version INT · ETA · 탑승 · incident 칸 NULL)와 created_at · updated_at만 갖는다")
+	@DisplayName("pickup_session 테이블은 설계서 컬럼 27개(incident_child_user_id BIGINT NULL 포함,family_id BIGINT NOT NULL · spot_name VARCHAR(50) · date DATE · 상태 3개 VARCHAR(20) · 버전 3개 INT · call_held BOOLEAN, route_spot_version INT · ETA · 탑승 · incident 칸 NULL)와 created_at · updated_at만 갖는다")
 	void pickupSessionTableHasDesignColumns() {
 		assertThat(columnsOf("pickup_session")).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
 				Map.entry("session_id", new ColumnType(BIGINT, null, NOT_NULL)),
@@ -86,6 +86,7 @@ class PickupPersistenceEntitiesMappingTest extends IntegrationTestSupport {
 				Map.entry("boarding_door", new ColumnType(VARCHAR, 20, NULLABLE)),
 				Map.entry("incident_type", new ColumnType(VARCHAR, 30, NULLABLE)),
 				Map.entry("incident_cause", new ColumnType(VARCHAR, 100, NULLABLE)),
+				Map.entry("incident_child_user_id", new ColumnType(BIGINT, null, NULLABLE)),
 				Map.entry("incident_opened_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE)),
 				Map.entry("incident_resolved_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE)),
 				Map.entry("created_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL)),

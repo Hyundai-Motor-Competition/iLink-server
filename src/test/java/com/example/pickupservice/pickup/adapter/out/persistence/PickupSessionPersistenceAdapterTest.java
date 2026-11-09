@@ -124,7 +124,7 @@ class PickupSessionPersistenceAdapterTest extends IntegrationTestSupport {
 				seeded.otherSpotId(), SNAPSHOT_SPOT_NAME, SNAPSHOT_STOP, SNAPSHOT_MEETING, seeded.date(),
 				SessionStatus.ON_HOLD, VehiclePhase.STOPPED, SpotStatus.CONFIRMED, 7, 2, 3, 2, true,
 				T0.plusSeconds(720), 350, T0.plusSeconds(600), T0.plusSeconds(900), T0.plusSeconds(910),
-				BoardingDoor.REAR_RIGHT, IncidentType.CHILD_NOT_ON_BOARD, "자녀가 차에 타지 않음", T0.plusSeconds(960),
+				BoardingDoor.REAR_RIGHT, IncidentType.CHILD_NOT_ON_BOARD, "자녀가 차에 타지 않음", null, T0.plusSeconds(960),
 				T0.plusSeconds(1200), List.of(minjun, seoyun));
 
 		PickupSession saved = saveSessionPort.save(toSave);
@@ -186,6 +186,28 @@ class PickupSessionPersistenceAdapterTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	@DisplayName("탑승 예외 대상 자녀(incidentChildUserId)는 pickup_session.incident_child_user_id에 저장되고 load로 읽으면 같은 값이다")
+	void incidentChildUserIdIsStoredInIncidentChildUserIdColumnAndLoaded() {
+		SessionChild minjun = SessionChild.restore(null, seeded.minjunId(), seeded.minjunScheduleId(),
+				ChildPhase.MEETING, 0, null, null, null, T0.plusSeconds(300), null);
+		PickupSession toSave = PickupSession.restore(null, seeded.vehicleId(), seeded.familyId(),
+				seeded.otherSpotId(), SNAPSHOT_SPOT_NAME, SNAPSHOT_STOP, SNAPSHOT_MEETING, seeded.date(),
+				SessionStatus.ON_HOLD, VehiclePhase.STOPPED, SpotStatus.CONFIRMED, 7, 0, 1, 0, false,
+				T0.plusSeconds(720), 0, T0.plusSeconds(600), T0.plusSeconds(900), T0.plusSeconds(910),
+				BoardingDoor.REAR_RIGHT, IncidentType.CHILD_NOT_ON_BOARD, null, seeded.minjunId(), T0.plusSeconds(960),
+				null, List.of(minjun));
+
+		PickupSession saved = saveSessionPort.save(toSave);
+
+		assertThat(jdbcTemplate.queryForObject("select incident_child_user_id from pickup_session where session_id = ?",
+				Long.class, saved.getSessionId())).isEqualTo(seeded.minjunId());
+		PickupSession loaded = loadSessionPort.load(saved.getSessionId()).orElseThrow();
+		assertThat(loaded.getIncidentChildUserId()).isEqualTo(seeded.minjunId());
+		assertThat(loaded.getIncidentType()).isEqualTo(IncidentType.CHILD_NOT_ON_BOARD);
+		assertThat(loaded.getIncidentOpenedAt()).isEqualTo(T0.plusSeconds(960));
+	}
+
+	@Test
 	@DisplayName("sessionId가 있는 세션을 다시 저장하면 새 세션 · 세션 자녀 행을 만들지 않고 그 행의 stateVersion · callHeld · childPhase · lastLat · lastLng가 바뀐다")
 	void resavingExistingSessionUpdatesRowsWithoutInsertingNewRows() {
 		PickupSession session = seededSession(SessionStatus.ACTIVE);
@@ -229,7 +251,7 @@ class PickupSessionPersistenceAdapterTest extends IntegrationTestSupport {
 		PickupSession seededWithDuplicate = PickupSession.restore(seeded.sessionId(), seeded.vehicleId(),
 				seeded.familyId(), seeded.spotId(), PickupSeed.SPOT_NAME, SEED_STOP, SEED_MEETING, seeded.date(),
 				SessionStatus.ACTIVE, VehiclePhase.ROUTING, SpotStatus.SELECTED, PickupSeed.STATE_VERSION, 0, 0, null,
-				false, null, null, null, null, null, null, null, null, null, null, List.of(
+				false, null, null, null, null, null, null, null, null, null, null, null, List.of(
 						seededChild(seeded.minjunSessionChildId(), seeded.minjunId(), seeded.minjunScheduleId()),
 						seededChild(seeded.seoyunSessionChildId(), seeded.seoyunId(), seeded.seoyunScheduleId()),
 						SessionChild.waiting(seeded.minjunId(), seeded.seoyunScheduleId())));
@@ -508,7 +530,7 @@ class PickupSessionPersistenceAdapterTest extends IntegrationTestSupport {
 		return PickupSession.restore(seeded.sessionId(), seeded.vehicleId(), seeded.familyId(), seeded.spotId(),
 				PickupSeed.SPOT_NAME, SEED_STOP, SEED_MEETING, seeded.date(), status, VehiclePhase.ROUTING,
 				SpotStatus.SELECTED, PickupSeed.STATE_VERSION, 0, 0, null, false, null, null, null, null, null, null,
-				null, null, null, null, List.of(
+				null, null, null, null, null, List.of(
 						seededChild(seeded.minjunSessionChildId(), seeded.minjunId(), seeded.minjunScheduleId()),
 						seededChild(seeded.seoyunSessionChildId(), seeded.seoyunId(), seeded.seoyunScheduleId())));
 	}
@@ -535,7 +557,7 @@ class PickupSessionPersistenceAdapterTest extends IntegrationTestSupport {
 					PickupSeed.SPOT_NAME, GeoPoints.toPoint(PickupSeed.STOP_LAT, PickupSeed.STOP_LNG),
 					GeoPoints.toPoint(PickupSeed.MEETING_LAT, PickupSeed.MEETING_LNG), date, status,
 					VehiclePhase.ROUTING, SpotStatus.SELECTED, 0, 0, 0, null, false, null, null, null, null, null,
-					null, null, null, null, null);
+					null, null, null, null, null, null);
 			entityManager.persist(session);
 			for (ChildSchedule child : children) {
 				entityManager.persist(new SessionChildEntity(null, session.getSessionId(), child.childUserId(),

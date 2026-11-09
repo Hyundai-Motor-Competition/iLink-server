@@ -115,7 +115,7 @@ class PickupSessionTest {
 
 		PickupSession session = PickupSession.restore(1L, VEHICLE_ID, storedFamilyId, SPOT_ID, SPOT_NAME, STOP_POINT,
 				MEETING_POINT, TODAY, SessionStatus.ACTIVE, VehiclePhase.APPROACHING, SpotStatus.CONFIRMED,
-				RESTORED_STATE_VERSION, 1, 1, null, false, null, null, null, null, null, null, null, null, null, null,
+				RESTORED_STATE_VERSION, 1, 1, null, false, null, null, null, null, null, null, null, null, null, null, null,
 				List.of());
 
 		assertThat(session.getFamilyId()).isEqualTo(storedFamilyId);
@@ -389,7 +389,7 @@ class PickupSessionTest {
 		PickupSession session = PickupSession.restore(1L, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT,
 				MEETING_POINT, TODAY, SessionStatus.ACTIVE, VehiclePhase.APPROACHING, SpotStatus.CONFIRMED,
 				RESTORED_STATE_VERSION, spotVersion, 4, routeSpotVersion, true, LAST_ETA_AT, LAST_REMAINING_METERS,
-				LAST_OBSERVED_AT, null, null, null, null, null, null, null, List.of(child));
+				LAST_OBSERVED_AT, null, null, null, null, null, null, null, null, List.of(child));
 
 		assertThat(session.getSessionId()).isEqualTo(1L);
 		assertThat(session.getVehicleId()).isEqualTo(VEHICLE_ID);
@@ -516,7 +516,7 @@ class PickupSessionTest {
 		PickupSession session = PickupSession.restore(1L, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT,
 				MEETING_POINT, TODAY, SessionStatus.ACTIVE, VehiclePhase.STOPPED, SpotStatus.CONFIRMED,
 				RESTORED_STATE_VERSION, 3, 4, 2, true, LAST_ETA_AT, LAST_REMAINING_METERS, LAST_OBSERVED_AT, DOOR_AT,
-				cancelableUntil, BoardingDoor.REAR_LEFT, null, null, null, null, List.of(child));
+				cancelableUntil, BoardingDoor.REAR_LEFT, null, null, null, null, null, List.of(child));
 
 		assertThat(session.getSessionId()).isEqualTo(1L);
 		assertThat(session.getVehiclePhase()).isEqualTo(VehiclePhase.STOPPED);
@@ -691,7 +691,7 @@ class PickupSessionTest {
 	void openIncidentChangesSessionToOnHoldAndFillsIncidentTypeAndOpenedAt() {
 		PickupSession session = restoreSession(VehiclePhase.STOPPED, ChildPhase.CALLED);
 
-		session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, INCIDENT_AT);
+		session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, FIRST_CHILD_ID, INCIDENT_AT);
 
 		assertThat(session.getSessionStatus()).isEqualTo(SessionStatus.ON_HOLD);
 		assertThat(session.getIncidentType()).isEqualTo(IncidentType.CHILD_NOT_ON_BOARD);
@@ -700,11 +700,66 @@ class PickupSessionTest {
 	}
 
 	@Test
+	@DisplayName("openIncident는 대상 자녀를 받아 incidentChildUserId에 저장하고 ON_HOLD · incidentType · incidentOpenedAt도 채운다")
+	void openIncidentWithChildUserIdStoresIncidentChildUserId() {
+		PickupSession session = restoreSession(VehiclePhase.STOPPED, ChildPhase.CALLED);
+
+		session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, FIRST_CHILD_ID, INCIDENT_AT);
+
+		assertThat(session.getIncidentChildUserId()).isEqualTo(FIRST_CHILD_ID);
+		assertThat(session.getSessionStatus()).isEqualTo(SessionStatus.ON_HOLD);
+		assertThat(session.getIncidentType()).isEqualTo(IncidentType.CHILD_NOT_ON_BOARD);
+		assertThat(session.getIncidentOpenedAt()).isEqualTo(INCIDENT_AT);
+		assertThat(session.getStateVersion()).isEqualTo(RESTORED_STATE_VERSION + 1);
+	}
+
+	@Test
+	@DisplayName("열린 예외가 있는 세션에 대상 자녀를 받는 openIncident를 부르면 INCIDENT_ALREADY_OPEN으로 거절되고 incidentChildUserId는 그대로다")
+	void openIncidentWithChildUserIdWhenIncidentAlreadyOpenKeepsFirstChild() {
+		PickupSession session = restoreSession(VehiclePhase.STOPPED, ChildPhase.CALLED);
+		session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, FIRST_CHILD_ID, INCIDENT_AT);
+
+		assertThatThrownBy(() -> session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, SECOND_CHILD_ID,
+				INCIDENT_AT.plusSeconds(30)))
+				.isInstanceOfSatisfying(PickupRuleException.class,
+						e -> assertThat(e.violation()).isEqualTo(PickupViolation.INCIDENT_ALREADY_OPEN));
+		assertThat(session.getIncidentChildUserId()).isEqualTo(FIRST_CHILD_ID);
+	}
+
+	@Test
+	@DisplayName("대상 자녀를 받는 openIncident는 세션에 없는 childUserId면 CHILD_NOT_IN_SESSION으로 거절되고 sessionStatus · incident 칸 · stateVersion은 그대로다")
+	void openIncidentWithUnknownChildIsRejectedWithChildNotInSession() {
+		PickupSession session = restoreSession(VehiclePhase.STOPPED, ChildPhase.CALLED);
+
+		assertThatThrownBy(() -> session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, UNKNOWN_CHILD_ID, INCIDENT_AT))
+				.isInstanceOfSatisfying(PickupRuleException.class,
+						e -> assertThat(e.violation()).isEqualTo(PickupViolation.CHILD_NOT_IN_SESSION));
+		assertThat(session.getSessionStatus()).isEqualTo(SessionStatus.ACTIVE);
+		assertThat(session.getIncidentType()).isNull();
+		assertThat(session.getIncidentOpenedAt()).isNull();
+		assertThat(session.getIncidentChildUserId()).isNull();
+		assertThat(session.getStateVersion()).isEqualTo(RESTORED_STATE_VERSION);
+	}
+
+	@Test
+	@DisplayName("restore는 incidentChildUserId를 그대로 복원한다")
+	void restoreKeepsIncidentChildUserId() {
+		PickupSession session = PickupSession.restore(1L, 10L, 20L, 30L, "정문 앞", new LatLng(37.5014, 127.03995),
+				new LatLng(37.501301, 127.039901), LocalDate.of(2026, 11, 9), SessionStatus.ON_HOLD,
+				VehiclePhase.STOPPED, SpotStatus.CONFIRMED, 5, 0, 1, 0, false, null, null, null, null, null, null,
+				IncidentType.CHILD_NOT_ON_BOARD, null, FIRST_CHILD_ID, INCIDENT_AT, null, List.of());
+
+		assertThat(session.getIncidentChildUserId()).isEqualTo(FIRST_CHILD_ID);
+		assertThat(session.getIncidentType()).isEqualTo(IncidentType.CHILD_NOT_ON_BOARD);
+		assertThat(session.getIncidentOpenedAt()).isEqualTo(INCIDENT_AT);
+	}
+
+	@Test
 	@DisplayName("openIncident는 예외를 열면 stateVersion을 1 올린다")
 	void openIncidentRaisesStateVersionByOne() {
 		PickupSession session = restoreSession(VehiclePhase.STOPPED, ChildPhase.CALLED);
 
-		session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, INCIDENT_AT);
+		session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, FIRST_CHILD_ID, INCIDENT_AT);
 
 		assertThat(session.getStateVersion()).isEqualTo(RESTORED_STATE_VERSION + 1);
 	}
@@ -713,10 +768,11 @@ class PickupSessionTest {
 	@DisplayName("열린 예외가 있는 세션에 openIncident를 부르면 INCIDENT_ALREADY_OPEN으로 거절되고 sessionStatus · incidentType · incidentOpenedAt · stateVersion은 그대로다")
 	void openIncidentWhenIncidentAlreadyOpenIsRejectedWithIncidentAlreadyOpen() {
 		PickupSession session = restoreSession(VehiclePhase.STOPPED, ChildPhase.CALLED);
-		session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, INCIDENT_AT);
+		session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, FIRST_CHILD_ID, INCIDENT_AT);
 		int before = session.getStateVersion();
 
-		assertThatThrownBy(() -> session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, INCIDENT_AT.plusSeconds(30)))
+		assertThatThrownBy(() -> session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, FIRST_CHILD_ID,
+				INCIDENT_AT.plusSeconds(30)))
 				.isInstanceOfSatisfying(PickupRuleException.class,
 						e -> assertThat(e.violation()).isEqualTo(PickupViolation.INCIDENT_ALREADY_OPEN));
 		assertThat(session.getSessionStatus()).isEqualTo(SessionStatus.ON_HOLD);
@@ -1005,7 +1061,7 @@ class PickupSessionTest {
 		session.releaseHold(RELEASE_AT);
 		Instant reopenedAt = RELEASE_AT.plusSeconds(60);
 
-		session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, reopenedAt);
+		session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, FIRST_CHILD_ID, reopenedAt);
 
 		assertThat(session.getSessionStatus()).isEqualTo(SessionStatus.ON_HOLD);
 		assertThat(session.getIncidentOpenedAt()).isEqualTo(reopenedAt);
@@ -1041,7 +1097,8 @@ class PickupSessionTest {
 		actions.put("complete", session -> session.complete(BoardingMethod.MANUAL, List.of(), COMPLETE_AT));
 		actions.put("detectBoarding",
 				session -> session.detectBoarding(BoardingDoor.REAR_RIGHT, DOOR_AT, true, CANCEL_WINDOW));
-		actions.put("openIncident", session -> session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, INCIDENT_AT));
+		actions.put("openIncident",
+				session -> session.openIncident(IncidentType.CHILD_NOT_ON_BOARD, FIRST_CHILD_ID, INCIDENT_AT));
 		return Stream.of(SessionStatus.COMPLETED, SessionStatus.CANCELLED)
 				.flatMap(finished -> actions.entrySet().stream()
 						.map(action -> Arguments.of(finished, action.getKey(), action.getValue())));
@@ -1088,7 +1145,7 @@ class PickupSessionTest {
 			int stateVersion, int spotVersion, List<SessionChild> children) {
 		return PickupSession.restore(1L, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT, MEETING_POINT, TODAY,
 				sessionStatus, vehiclePhase, SpotStatus.CONFIRMED, stateVersion, spotVersion, 1, null, false, null,
-				null, null, null, null, null, null, null, null, null, children);
+				null, null, null, null, null, null, null, null, null, null, children);
 	}
 
 	private static PickupSession restoreWith(SessionStatus sessionStatus, VehiclePhase vehiclePhase, boolean callHeld,
@@ -1097,7 +1154,7 @@ class PickupSessionTest {
 		SessionChild second = child(42L, SECOND_CHILD_ID, SECOND_SCHEDULE_ID, ChildPhase.CALLED, null);
 		return PickupSession.restore(1L, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT, MEETING_POINT, TODAY,
 				sessionStatus, vehiclePhase, SpotStatus.CONFIRMED, RESTORED_STATE_VERSION, 1, 1, null, callHeld,
-				null, null, null, null, null, null, incidentType, null, incidentOpenedAt, incidentResolvedAt,
+				null, null, null, null, null, null, incidentType, null, null, incidentOpenedAt, incidentResolvedAt,
 				List.of(first, second));
 	}
 
@@ -1105,7 +1162,7 @@ class PickupSessionTest {
 		return PickupSession.restore(1L, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT, MEETING_POINT, TODAY,
 				SessionStatus.ACTIVE, VehiclePhase.APPROACHING, SpotStatus.CONFIRMED, RESTORED_STATE_VERSION, 1, 1,
 				null, false, LAST_ETA_AT, LAST_REMAINING_METERS, LAST_OBSERVED_AT, null, null, null, null, null, null,
-				null, List.of());
+				null, null, List.of());
 	}
 
 	private static SessionChild child(long sessionChildId, long childUserId, long scheduleId, ChildPhase childPhase,
