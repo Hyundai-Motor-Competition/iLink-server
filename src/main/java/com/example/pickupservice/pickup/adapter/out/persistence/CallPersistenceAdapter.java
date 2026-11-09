@@ -4,9 +4,11 @@ import com.example.pickupservice.pickup.application.port.out.LoadCallPort;
 import com.example.pickupservice.pickup.application.port.out.SaveCallPort;
 import com.example.pickupservice.pickup.domain.Call;
 import com.example.pickupservice.pickup.domain.CallStatus;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -16,10 +18,18 @@ import java.util.Optional;
 class CallPersistenceAdapter implements LoadCallPort, SaveCallPort {
 
 	private final CallJpaRepository callJpaRepository;
+	private final EntityManager entityManager;
 
 	@Override
 	public Optional<Call> loadCall(long callId) {
-		return callJpaRepository.findById(callId).map(CallPersistenceAdapter::toDomain);
+		return callJpaRepository.findById(callId).map(this::refreshed).map(CallPersistenceAdapter::toDomain);
+	}
+
+	private CallEntity refreshed(CallEntity entity) {
+		if (TransactionSynchronizationManager.isActualTransactionActive() && entityManager.contains(entity)) {
+			entityManager.refresh(entity);
+		}
+		return entity;
 	}
 
 	@Override
