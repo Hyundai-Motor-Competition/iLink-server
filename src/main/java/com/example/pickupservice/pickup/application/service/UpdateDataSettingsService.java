@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// OUT-04 보호자 데이터 설정 변경(learningConsent, retentionDays 90)
 @Service
 @Transactional
 @RequiredArgsConstructor

@@ -26,7 +26,6 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 
-// 합류 호출 판정(SIG-01 · CALL-01 DELETE)과 호출 생성(판정 6단계, CALL-02 MANUAL도 같이 쓴다)
 @Component
 @RequiredArgsConstructor
 public class CallEngine {
@@ -43,7 +42,6 @@ public class CallEngine {
 	private final PickupProperties pickupProperties;
 	private final Clock clock;
 
-	// 판정 1~5단계를 모두 통과하면 6단계로 호출을 만든다
 	public void triggerIfReady(PickupSession session, int navEtaSeconds, int remainingMeters) {
 		if (session.getSessionStatus() != SessionStatus.ACTIVE || session.isCallHeld()) {
 			return;
@@ -72,7 +70,6 @@ public class CallEngine {
 		return new Guard(pickupProperties.etaValidFor()).evaluate(session, now);
 	}
 
-	// 판정 6단계: Call 저장 → CALL 알림 기록 요청 → CALL_TRIGGERED 저장 · 보호자에게 발행
 	public Call createCall(PickupSession session, CallTriggerType triggerType, Instant now) {
 		long sessionId = session.getSessionId();
 		Call call = saveCallPort.saveCall(newCall(sessionId, triggerType, session.getSpotVersion()));
@@ -85,7 +82,6 @@ public class CallEngine {
 		return call;
 	}
 
-	// 가장 최근 호출이 철회됐으면 그 호출을 prevCallId로 잇는다
 	private Call newCall(long sessionId, CallTriggerType triggerType, int spotVersion) {
 		Optional<Call> revoked = loadCallPort.loadLatestCall(sessionId)
 				.filter(latest -> latest.getStatus() == CallStatus.REVOKED);

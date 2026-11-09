@@ -18,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
-// SIG-04 자녀 위치: 위치는 실시간 이벤트 19종에 없어 저장 · 발행하지 않고 stateVersion도 올리지 않는다
 @Service
 @Transactional
 @RequiredArgsConstructor

@@ -69,6 +69,7 @@ class RevokeCallServiceTest {
 
 	// 한국 시간 2026-11-09(월) 18:11
 	private static final Instant NOW = Instant.parse("2026-11-09T09:11:00Z");
+	private static final SessionViewAssembler ASSEMBLER = new SessionViewAssembler(PickupProperties.defaults());
 	private static final LocalDate TODAY_KST = LocalDate.of(2026, 11, 9);
 
 	private static final long SESSION_ID = 501L;
@@ -128,7 +129,7 @@ class RevokeCallServiceTest {
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, clock);
+		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, clock);
 		revokeCallService = new RevokeCallService(loadCallPort, saveCallPort, loadSessionPort, saveSessionPort,
 				loadFamilyPort, sessionEventPort, publishSessionEventPort, sessionAccess, clock);
 		lenient().when(loadFamilyPort.loadFamily(FAMILY_ID))
@@ -286,7 +287,7 @@ class RevokeCallServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.APPROACHING,
 				SpotStatus.CONFIRMED, STATE_VERSION, SPOT_VERSION, 2, SPOT_VERSION, false,
-				NOW.plus(Duration.ofMinutes(1)), 300, NOW.minusSeconds(10), null, null, null, null, null, null, null,
+				NOW.plus(Duration.ofMinutes(1)), 300, NOW.minusSeconds(10), null, null, null, null, null, null, null, null,
 				children);
 	}
 

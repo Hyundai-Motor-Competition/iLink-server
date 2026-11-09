@@ -36,7 +36,6 @@ public class CallProgressService implements CallProgressUseCase {
 	private final SessionEventPort sessionEventPort;
 	private final PublishSessionEventPort publishSessionEventPort;
 
-	// 철회된 호출에 늦게 온 발송 결과는 버린다
 	@Override
 	public void markCallSent(long callId, Instant sentAt) {
 		Call first = loadCall(callId);
@@ -57,7 +56,6 @@ public class CallProgressService implements CallProgressUseCase {
 				Map.of("callId", call.getCallId(), "trigger", call.getTriggerType().name())));
 	}
 
-	// 자녀 상태가 바뀌지 않아 stateVersion은 그대로다
 	@Override
 	public void markCallDelivered(long callId, Instant deliveredAt) {
 		Call first = loadCall(callId);

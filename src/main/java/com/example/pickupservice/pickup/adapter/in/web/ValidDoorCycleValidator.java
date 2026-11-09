@@ -22,7 +22,6 @@ public class ValidDoorCycleValidator implements ConstraintValidator<ValidDoorCyc
 		return false;
 	}
 
-	// Set.of는 null을 넣어 contains를 부르면 NullPointerException을 던진다
 	private static boolean isPassengerDoor(String door) {
 		return door != null && PASSENGER_DOORS.contains(door);
 	}

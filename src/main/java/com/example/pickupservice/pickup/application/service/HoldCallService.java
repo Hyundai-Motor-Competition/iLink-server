@@ -17,7 +17,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 
-// CALL-01 호출 보류(PUT) · 보류 해제(DELETE)
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -78,7 +77,7 @@ public class HoldCallService implements HoldCallUseCase {
 	private SessionView view(PickupSession session, CallHoldCommand command) {
 		Instant now = clock.instant();
 		long familyId = session.getFamilyId();
-		return SessionViewAssembler.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
+		return sessionAccess.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
 				loadFamilyPort.loadMembers(familyId), loadCallPort.loadLatestCall(session.getSessionId()), now);
 	}
 

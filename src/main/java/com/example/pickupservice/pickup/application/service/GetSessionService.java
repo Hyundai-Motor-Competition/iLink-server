@@ -21,6 +21,7 @@ public class GetSessionService implements GetSessionUseCase {
 	private final LoadSessionPort loadSessionPort;
 	private final LoadFamilyPort loadFamilyPort;
 	private final LoadCallPort loadCallPort;
+	private final SessionViewAssembler sessionViewAssembler;
 	private final Clock clock;
 
 	@Override
@@ -28,7 +29,7 @@ public class GetSessionService implements GetSessionUseCase {
 		PickupSession session = loadSessionPort.load(query.sessionId()).orElseThrow(PickupErrors::notFound);
 		SessionAccess.requireVisible(session, query.principal());
 		long familyId = session.getFamilyId();
-		return SessionViewAssembler.assemble(session, query.principal(), loadFamilyPort.loadFamily(familyId),
+		return sessionViewAssembler.assemble(session, query.principal(), loadFamilyPort.loadFamily(familyId),
 				loadFamilyPort.loadMembers(familyId), loadCallPort.loadLatestCall(session.getSessionId()),
 				clock.instant());
 	}

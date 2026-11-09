@@ -28,7 +28,6 @@ class SessionEventPersistenceAdapter implements SessionEventPort {
 	private final PickupSessionJpaRepository pickupSessionJpaRepository;
 	private final JsonMapper jsonMapper;
 
-	/** 세션 행을 잠근 뒤 그 세션의 마지막 seq + 1(없으면 1)로 저장한다. 동시 append가 같은 seq를 매기지 않게 한다. */
 	@Override
 	@Transactional
 	public SessionEvent append(long sessionId, String type, int stateVersion, Instant at, Map<String, Object> payload) {
@@ -49,7 +48,6 @@ class SessionEventPersistenceAdapter implements SessionEventPort {
 		return new SessionEventPage(items, rows.size() > limit);
 	}
 
-	/** 그 세션의 HELP_REQUESTED를 seq 큰 것부터 보며 payload childUserId가 같은 첫 건을 돌려준다. */
 	@Override
 	public Optional<SessionEvent> loadLastHelpRequest(long sessionId, long childUserId) {
 		return sessionEventJpaRepository

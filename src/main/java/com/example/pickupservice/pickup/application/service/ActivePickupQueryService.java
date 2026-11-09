@@ -11,7 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.Optional;
 
-// 다른 모듈(auth · user · place)이 진행 중(ACTIVE · ON_HOLD) 픽업을 확인한다
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor

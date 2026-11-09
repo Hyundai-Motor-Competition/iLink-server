@@ -70,6 +70,7 @@ class HoldCallServiceTest {
 
 	// 한국 시간 2026-11-09(월) 18:09
 	private static final Instant NOW = Instant.parse("2026-11-09T09:09:00Z");
+	private static final SessionViewAssembler ASSEMBLER = new SessionViewAssembler(PickupProperties.defaults());
 	private static final LocalDate TODAY_KST = LocalDate.of(2026, 11, 9);
 
 	// 마지막 SIG-01은 10초 전에 왔다(G4 ETA 유효 1분 안)
@@ -132,7 +133,7 @@ class HoldCallServiceTest {
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, clock);
+		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, clock);
 		CallEngine callEngine = new CallEngine(loadCallPort, saveCallPort, loadFamilyPort, sessionEventPort,
 				publishSessionEventPort, recordNotificationPort, PROPERTIES, clock);
 		holdCallService = new HoldCallService(loadSessionPort, saveSessionPort, loadCallPort, loadFamilyPort,
@@ -352,7 +353,7 @@ class HoldCallServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.APPROACHING,
 				SpotStatus.CONFIRMED, STATE_VERSION, SPOT_VERSION, ROUTE_VERSION, SPOT_VERSION, callHeld, etaAt,
-				remainingMeters, etaUpdatedAt, null, null, null, null, null, null, null, children);
+				remainingMeters, etaUpdatedAt, null, null, null, null, null, null, null, null, children);
 	}
 
 	private static Call previousCall(CallStatus status) {

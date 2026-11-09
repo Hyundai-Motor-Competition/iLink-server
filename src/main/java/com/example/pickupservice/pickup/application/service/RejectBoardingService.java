@@ -42,11 +42,10 @@ public class RejectBoardingService implements RejectBoardingUseCase {
 		rejectBoarding(locked, childUserId, now);
 		PickupSession session = saveSessionPort.save(locked);
 		long familyId = session.getFamilyId();
-		return SessionViewAssembler.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
+		return sessionAccess.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
 				loadFamilyPort.loadMembers(familyId), loadCallPort.loadLatestCall(session.getSessionId()), now);
 	}
 
-	// childUserId가 없으면 세션 자녀가 1명일 때만 그 자녀로 본다
 	private static long targetChildOf(PickupSession session, Long childUserId) {
 		if (childUserId != null) {
 			return childUserId;

@@ -67,7 +67,7 @@ public class CancelSessionService implements CancelSessionUseCase {
 		List<MemberInfo> members = loadFamilyPort.loadMembers(familyId);
 		List<Long> receiverUserIds = SessionReceivers.guardiansAndSessionChildren(session, members);
 		events.forEach(event -> publishSessionEventPort.publish(SessionEventMessages.of(event, receiverUserIds)));
-		return SessionViewAssembler.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
+		return sessionAccess.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
 				members, loadCallPort.loadLatestCall(session.getSessionId()), now);
 	}
 

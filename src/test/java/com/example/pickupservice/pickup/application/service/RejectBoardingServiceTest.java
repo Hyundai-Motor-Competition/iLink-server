@@ -50,6 +50,7 @@ class RejectBoardingServiceTest {
 
 	// 한국 시간 2026-11-09(월) 18:11:55. 3초 전 문이 열려 탑승 인식, 취소 창은 7초 남음
 	private static final Instant NOW = Instant.parse("2026-11-09T09:11:55Z");
+	private static final SessionViewAssembler ASSEMBLER = new SessionViewAssembler(PickupProperties.defaults());
 	private static final Instant BOARDING_DETECTED_AT = NOW.minusSeconds(3);
 	private static final Instant BOARDING_CANCELABLE_UNTIL = BOARDING_DETECTED_AT.plusSeconds(10);
 	private static final LocalDate TODAY_KST = LocalDate.of(2026, 11, 9);
@@ -85,7 +86,7 @@ class RejectBoardingServiceTest {
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, clock);
+		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, clock);
 		rejectBoardingService = new RejectBoardingService(loadSessionPort, saveSessionPort, loadFamilyPort,
 				loadCallPort, sessionAccess, clock);
 		lenient().when(loadFamilyPort.loadFamily(FAMILY_ID))
@@ -152,7 +153,7 @@ class RejectBoardingServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, SPOT_ID, "해솔영어학원 정문 앞", STOP_POINT,
 				MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.STOPPED, SpotStatus.CONFIRMED,
 				STATE_VERSION, 0, 1, 0, false, NOW.minusSeconds(10), 0, NOW.minusSeconds(5), BOARDING_DETECTED_AT,
-				BOARDING_CANCELABLE_UNTIL, BoardingDoor.REAR_RIGHT, null, null, null, null, children);
+				BOARDING_CANCELABLE_UNTIL, BoardingDoor.REAR_RIGHT, null, null, null, null, null, children);
 	}
 
 	private static RejectBoardingCommand command(Long childUserId) {

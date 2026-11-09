@@ -8,6 +8,7 @@ import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.pickup.application.port.in.CallGuardView;
 import com.example.pickupservice.pickup.application.port.in.ChildLocationView;
 import com.example.pickupservice.pickup.application.port.in.SessionChildView;
+import com.example.pickupservice.pickup.application.port.in.SessionIncidentView;
 import com.example.pickupservice.pickup.application.port.in.SessionQuery;
 import com.example.pickupservice.pickup.application.port.in.SessionSpotView;
 import com.example.pickupservice.pickup.application.port.in.SessionView;
@@ -15,6 +16,7 @@ import com.example.pickupservice.pickup.application.port.out.LoadCallPort;
 import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
 import com.example.pickupservice.pickup.application.port.out.LoadSessionPort;
 import com.example.pickupservice.pickup.domain.ChildPhase;
+import com.example.pickupservice.pickup.domain.IncidentType;
 import com.example.pickupservice.pickup.domain.PickupSession;
 import com.example.pickupservice.pickup.domain.SessionChild;
 import com.example.pickupservice.pickup.domain.SessionStatus;
@@ -75,6 +77,7 @@ class GetSessionServiceTest {
 	private static final Instant ETA_AT = NOW.plusSeconds(720);
 	private static final Instant ETA_UPDATED_AT = NOW.minusSeconds(5);
 	private static final int REMAINING_METERS = 4200;
+	private static final Instant INCIDENT_OPENED_AT = NOW.minusSeconds(40);
 
 	private static final LatLng MINJUN_LOCATION = new LatLng(37.501100, 127.039500);
 	private static final Instant MINJUN_LOCATED_AT = NOW.minusSeconds(10);
@@ -104,7 +107,7 @@ class GetSessionServiceTest {
 	@BeforeEach
 	void setUp() {
 		getSessionService = new GetSessionService(loadSessionPort, loadFamilyPort, loadCallPort,
-				Clock.fixed(NOW, ZoneOffset.UTC));
+				new SessionViewAssembler(PickupProperties.defaults()), Clock.fixed(NOW, ZoneOffset.UTC));
 		lenient().when(loadFamilyPort.loadFamily(FAMILY_ID))
 				.thenReturn(new FamilyInfo(FAMILY_ID, JoinCallMode.AUTO, 1));
 		lenient().when(loadFamilyPort.loadMembers(FAMILY_ID)).thenReturn(List.of(
@@ -207,6 +210,49 @@ class GetSessionServiceTest {
 		SessionView view = getSessionService.getSession(new SessionQuery(vehicle(), SESSION_ID));
 
 		assertThat(view.spot()).isEqualTo(new SessionSpotView(SPOT_ID, SPOT_NAME, SPOT_VERSION, true));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("vehicleAndGuardians")
+	@DisplayName("세션 조회는 열린 예외가 있으면 incident에 type · childUserId · openedAt을 채워 돌려준다")
+	void getSessionFillsIncidentForOpenIncident(AuthPrincipal principal) {
+		givenSession(sessionWithIncident(null));
+
+		SessionView view = getSessionService.getSession(new SessionQuery(principal, SESSION_ID));
+
+		assertThat(view.incident())
+				.isEqualTo(new SessionIncidentView("CHILD_NOT_ON_BOARD", MINJUN_ID, INCIDENT_OPENED_AT));
+	}
+
+	@Test
+	@DisplayName("세션 조회는 자녀 주체에게도 열린 예외의 incident를 채워 돌려준다")
+	void getSessionFillsIncidentForChildPrincipal() {
+		givenSession(sessionWithIncident(null));
+
+		SessionView view = getSessionService.getSession(new SessionQuery(child(SEOYUN_ID), SESSION_ID));
+
+		assertThat(view.incident())
+				.isEqualTo(new SessionIncidentView("CHILD_NOT_ON_BOARD", MINJUN_ID, INCIDENT_OPENED_AT));
+	}
+
+	@Test
+	@DisplayName("세션 조회는 예외가 없으면 incident를 null로 돌려준다")
+	void getSessionReturnsNullIncidentWithoutIncident() {
+		givenSession(beforeRouteConfirmed());
+
+		SessionView view = getSessionService.getSession(new SessionQuery(vehicle(), SESSION_ID));
+
+		assertThat(view.incident()).isNull();
+	}
+
+	@Test
+	@DisplayName("세션 조회는 예외가 해소됐으면(incidentResolvedAt 있음) incident를 null로 돌려준다")
+	void getSessionReturnsNullIncidentWhenIncidentResolved() {
+		givenSession(sessionWithIncident(INCIDENT_OPENED_AT.plusSeconds(60)));
+
+		SessionView view = getSessionService.getSession(new SessionQuery(vehicle(), SESSION_ID));
+
+		assertThat(view.incident()).isNull();
 	}
 
 	@ParameterizedTest(name = "{0}")
@@ -318,12 +364,25 @@ class GetSessionServiceTest {
 						null, null));
 	}
 
+	// 민준이 타지 않아 예외가 열린 ON_HOLD 세션. incidentResolvedAt이 null이면 열린 예외
+	private static PickupSession sessionWithIncident(Instant incidentResolvedAt) {
+		List<SessionChild> children = List.of(
+				SessionChild.restore(null, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.MEETING, 0, null, null, null,
+						null, null),
+				SessionChild.restore(null, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.MEETING, 0, null, null, null,
+						null, null));
+		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT,
+				MEETING_POINT, TODAY_KST, SessionStatus.ON_HOLD, VehiclePhase.STOPPED, SpotStatus.CONFIRMED, 8,
+				SPOT_VERSION, 1, SPOT_VERSION, false, ETA_AT, REMAINING_METERS, ETA_UPDATED_AT, null, null, null,
+				IncidentType.CHILD_NOT_ON_BOARD, null, MINJUN_ID, INCIDENT_OPENED_AT, incidentResolvedAt, children);
+	}
+
 	private static PickupSession session(VehiclePhase vehiclePhase, SpotStatus spotStatus, int stateVersion,
 			int routeVersion, Integer routeSpotVersion, SessionChild... children) {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT,
 				MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, vehiclePhase, spotStatus, stateVersion,
 				SPOT_VERSION, routeVersion, routeSpotVersion, false, ETA_AT, REMAINING_METERS, ETA_UPDATED_AT, null,
-				null, null, null, null, null, null, List.of(children));
+				null, null, null, null, null, null, null, List.of(children));
 	}
 
 }

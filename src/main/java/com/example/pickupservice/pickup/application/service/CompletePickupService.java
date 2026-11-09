@@ -19,7 +19,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 
-// SES-11 탑승 완료(IMMEDIATE · MANUAL)
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -52,7 +51,7 @@ public class CompletePickupService implements CompletePickupUseCase {
 		long familyId = session.getFamilyId();
 		List<MemberInfo> members = loadFamilyPort.loadMembers(familyId);
 		pickupCompletion.record(session, method, now, members);
-		return SessionViewAssembler.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
+		return sessionAccess.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
 				members, loadCallPort.loadLatestCall(session.getSessionId()), now);
 	}
 

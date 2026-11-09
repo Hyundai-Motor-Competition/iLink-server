@@ -72,6 +72,7 @@ class SendCallServiceTest {
 
 	// 한국 시간 2026-11-09(월) 18:09
 	private static final Instant NOW = Instant.parse("2026-11-09T09:09:00Z");
+	private static final SessionViewAssembler ASSEMBLER = new SessionViewAssembler(PickupProperties.defaults());
 	private static final LocalDate TODAY_KST = LocalDate.of(2026, 11, 9);
 
 	private static final long SESSION_ID = 501L;
@@ -129,7 +130,7 @@ class SendCallServiceTest {
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, clock);
+		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, clock);
 		CallEngine callEngine = new CallEngine(loadCallPort, saveCallPort, loadFamilyPort, sessionEventPort,
 				publishSessionEventPort, recordNotificationPort, PROPERTIES, clock);
 		sendCallService = new SendCallService(loadSessionPort, loadCallPort, loadFamilyPort, sessionAccess,
@@ -474,7 +475,7 @@ class SendCallServiceTest {
 			return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 					FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, sessionStatus, VehiclePhase.APPROACHING,
 					spotStatus, STATE_VERSION, SPOT_VERSION, ROUTE_VERSION, routeSpotVersion, false,
-					NOW.plus(Duration.ofMinutes(10)), 4200, etaUpdatedAt, null, null, null, null, null, null, null,
+					NOW.plus(Duration.ofMinutes(10)), 4200, etaUpdatedAt, null, null, null, null, null, null, null, null,
 					children);
 		}
 

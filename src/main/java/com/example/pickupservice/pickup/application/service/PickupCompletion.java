@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-// SES-11 완료와 10초 자동 완료가 함께 쓰는 완료 기록: PickupOutcome 저장 → SESSION_COMPLETED 저장 · 보호자와 세션 자녀에게 발행
 @Component
 @RequiredArgsConstructor
 public class PickupCompletion {
@@ -38,7 +37,6 @@ public class PickupCompletion {
 				SessionEventMessages.of(event, SessionReceivers.guardiansAndSessionChildren(completed, members)));
 	}
 
-	// actualStopAt은 첫 VEHICLE_STOPPED의 occurredAt, predictedStopAt은 그 payload의 값(DB에서 읽으면 문자열)
 	private PickupOutcome outcome(long sessionId, Instant now, BoardingMethod method) {
 		Optional<SessionEvent> stopped = sessionEventPort.loadFirst(sessionId, VEHICLE_STOPPED);
 		Instant actualStopAt = stopped.map(SessionEvent::getOccurredAt).orElse(null);

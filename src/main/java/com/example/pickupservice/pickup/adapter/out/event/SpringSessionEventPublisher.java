@@ -6,7 +6,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
-// SessionEventMessage를 그대로 스프링 이벤트로 발행한다. 커밋 뒤 전달은 받는 쪽 @TransactionalEventListener(AFTER_COMMIT)가 맡는다
 @Component
 @RequiredArgsConstructor
 class SpringSessionEventPublisher implements PublishSessionEventPort {

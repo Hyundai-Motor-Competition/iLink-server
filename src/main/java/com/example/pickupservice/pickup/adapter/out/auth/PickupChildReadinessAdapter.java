@@ -23,7 +23,6 @@ class PickupChildReadinessAdapter implements LoadChildReadinessPort {
 		return getMemberDeviceStatusUseCase.getDeviceStatuses(userIds);
 	}
 
-	// auth 위치 동의 저장 전 임시 동작: 위치 동의가 있다고 본다
 	@Override
 	public boolean hasLocationConsent(long childUserId) {
 		return true;

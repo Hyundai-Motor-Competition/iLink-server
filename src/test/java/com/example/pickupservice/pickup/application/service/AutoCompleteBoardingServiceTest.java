@@ -28,6 +28,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -83,8 +84,8 @@ class AutoCompleteBoardingServiceTest {
 	private static final long EVENT_ID_BASE = 9000L;
 
 	// 정차 직전 마지막 ETA 18:12:00, 실제 정차 18:12:40(SIG-02 STOPPED occurredAt). DB payload의 시각은 문자열
-	private static final String PREDICTED_STOP_AT_JSON = "2026-11-09T09:12:00Z";
-	private static final Instant PREDICTED_STOP_AT = Instant.parse(PREDICTED_STOP_AT_JSON);
+	private static final String PREDICTED_STOP_AT_JSON = "2026-11-09T18:12:00+09:00";
+	private static final Instant PREDICTED_STOP_AT = Instant.parse("2026-11-09T09:12:00Z");
 	private static final Instant STOPPED_AT = Instant.parse("2026-11-09T09:12:40Z");
 	private static final int STATE_VERSION_AT_STOP = 13;
 	private static final long VEHICLE_STOPPED_SEQ = 12L;
@@ -121,7 +122,7 @@ class AutoCompleteBoardingServiceTest {
 		PickupCompletion pickupCompletion = new PickupCompletion(saveOutcomePort, sessionEventPort,
 				publishSessionEventPort);
 		autoCompleteBoardingService = new AutoCompleteBoardingService(loadSessionPort, saveSessionPort,
-				loadFamilyPort, pickupCompletion);
+				loadFamilyPort, pickupCompletion, TransactionOperations.withoutTransaction());
 		lenient().when(loadFamilyPort.loadMembers(FAMILY_ID)).thenReturn(List.of(
 				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1234-5678"),
 				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", null),
@@ -332,7 +333,7 @@ class AutoCompleteBoardingServiceTest {
 		return PickupSession.restore(sessionId, vehicleId, familyId, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, status, VehiclePhase.STOPPED,
 				SpotStatus.CONFIRMED, stateVersion, SPOT_VERSION, 2, SPOT_VERSION, false, PREDICTED_STOP_AT, 0,
-				STOPPED_AT, DOOR_AT, CANCELABLE_UNTIL, BoardingDoor.REAR_RIGHT, null, null, null, null, children);
+				STOPPED_AT, DOOR_AT, CANCELABLE_UNTIL, BoardingDoor.REAR_RIGHT, null, null, null, null, null, children);
 	}
 
 	private static SessionEvent vehicleStopped(long sessionId) {

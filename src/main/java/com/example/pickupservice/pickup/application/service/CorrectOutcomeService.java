@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
-// OUT-03 결과 정정: actualStopAt은 두고 정정값만 기록, correctedStopAt은 세션 날짜(한국) 안
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -36,7 +35,6 @@ public class CorrectOutcomeService implements CorrectOutcomeUseCase {
 		SessionAccess.requireVisible(session, command.principal());
 		PickupOutcome outcome = loadOutcomePort.loadOutcome(session.getSessionId())
 				.orElseThrow(PickupErrors::notFound);
-		// 한국 00:00 이상 다음 날 00:00 미만
 		if (!LocalDate.ofInstant(command.correctedStopAt(), SEOUL).equals(session.getDate())) {
 			throw BusinessException.invalidField("correctedStopAt", "세션 날짜(한국 시간) 안이어야 합니다");
 		}

@@ -64,6 +64,7 @@ class CompletePickupServiceTest {
 
 	// 한국 시간 2026-11-09(월) 18:13:25 — 18:13:20 뒷문 탑승 인식 뒤 취소 창(10초) 안
 	private static final Instant NOW = Instant.parse("2026-11-09T09:13:25Z");
+	private static final SessionViewAssembler ASSEMBLER = new SessionViewAssembler(PickupProperties.defaults());
 	private static final LocalDate TODAY_KST = LocalDate.of(2026, 11, 9);
 
 	private static final long SESSION_ID = 501L;
@@ -84,8 +85,8 @@ class CompletePickupServiceTest {
 
 	// 정차 직전 마지막 ETA 18:12:00, 실제 정차 18:12:40(SIG-02 STOPPED occurredAt)
 	// DB에서 읽은 payload는 JSON이라 시각이 ISO-8601 문자열로 온다
-	private static final String PREDICTED_STOP_AT_JSON = "2026-11-09T09:12:00Z";
-	private static final Instant PREDICTED_STOP_AT = Instant.parse(PREDICTED_STOP_AT_JSON);
+	private static final String PREDICTED_STOP_AT_JSON = "2026-11-09T18:12:00+09:00";
+	private static final Instant PREDICTED_STOP_AT = Instant.parse("2026-11-09T09:12:00Z");
 	private static final Instant STOPPED_AT = Instant.parse("2026-11-09T09:12:40Z");
 	private static final int STATE_VERSION_AT_STOP = 13;
 	private static final long VEHICLE_STOPPED_SEQ = 12L;
@@ -127,7 +128,7 @@ class CompletePickupServiceTest {
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, clock);
+		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, clock);
 		PickupCompletion pickupCompletion = new PickupCompletion(saveOutcomePort, sessionEventPort,
 				publishSessionEventPort);
 		completePickupService = new CompletePickupService(loadSessionPort, saveSessionPort, loadFamilyPort,
@@ -265,6 +266,18 @@ class CompletePickupServiceTest {
 	}
 
 	@Test
+	@DisplayName("탑승 완료는 VEHICLE_STOPPED payload의 predictedStopAt이 +09:00 문자열(18:12:00+09:00)이어도 같은 시각(UTC 09:12:00)으로 읽어 PickupOutcome.predictedStopAt에 저장한다")
+	void completeReadsKstOffsetPredictedStopAtFromPayload() {
+		givenLockedSession(doorBoardedSession());
+		lenient().when(sessionEventPort.loadFirst(SESSION_ID, "VEHICLE_STOPPED"))
+				.thenReturn(Optional.of(vehicleStopped(Map.of("predictedStopAt", "2026-11-09T18:12:00+09:00"))));
+
+		completePickupService.complete(command("IMMEDIATE", List.of()));
+
+		assertThat(savedOutcome().getPredictedStopAt()).isEqualTo(Instant.parse("2026-11-09T09:12:00Z"));
+	}
+
+	@Test
 	@DisplayName("탑승 완료는 VEHICLE_STOPPED payload의 predictedStopAt이 비어 있으면(정차 때 ETA 없음) predictedStopAt은 비우고 actualStopAt은 occurredAt으로 저장한다")
 	void completeWithoutPredictedStopAtInPayloadSavesOnlyActualStopAt() {
 		givenLockedSession(doorBoardedSession());
@@ -359,7 +372,7 @@ class CompletePickupServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, vehiclePhase,
 				SpotStatus.CONFIRMED, STATE_VERSION, SPOT_VERSION, 2, SPOT_VERSION, false, PREDICTED_STOP_AT, 0,
-				STOPPED_AT, boardingDetectedAt, cancelableUntil, door, null, null, null, null, children);
+				STOPPED_AT, boardingDetectedAt, cancelableUntil, door, null, null, null, null, null, children);
 	}
 
 	private static SessionEvent vehicleStopped(Map<String, Object> payload) {

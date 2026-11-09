@@ -51,6 +51,7 @@ class SessionAccessTest {
 	// 한국 시간 2026-11-09(월) 17:00
 	private static final Instant NOW = Instant.parse("2026-11-09T08:00:00Z");
 	private static final LocalDate TODAY_KST = LocalDate.of(2026, 11, 9);
+	private static final SessionViewAssembler ASSEMBLER = new SessionViewAssembler(PickupProperties.defaults());
 
 	private static final long SESSION_ID = 501L;
 	private static final long FAMILY_ID = 12L;
@@ -108,7 +109,7 @@ class SessionAccessTest {
 
 	@BeforeEach
 	void setUp() {
-		sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, Clock.fixed(NOW, ZoneOffset.UTC));
+		sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, Clock.fixed(NOW, ZoneOffset.UTC));
 		lenient().when(loadFamilyPort.loadFamily(FAMILY_ID)).thenReturn(FAMILY);
 		lenient().when(loadFamilyPort.loadMembers(FAMILY_ID)).thenReturn(MEMBERS);
 		lenient().when(loadCallPort.loadLatestCall(SESSION_ID)).thenReturn(Optional.of(SENT_CALL));
@@ -130,7 +131,7 @@ class SessionAccessTest {
 		assertThat(exception.session()).isInstanceOfSatisfying(SessionView.class, latest -> {
 			assertThat(latest.stateVersion()).isEqualTo(SERVER_STATE_VERSION);
 			assertThat(latest.status().call()).isEqualTo("SENT");
-			assertThat(latest).isEqualTo(SessionViewAssembler.assemble(session, vehicle(), FAMILY, MEMBERS,
+			assertThat(latest).isEqualTo(ASSEMBLER.assemble(session, vehicle(), FAMILY, MEMBERS,
 					Optional.of(SENT_CALL), NOW));
 		});
 	}
@@ -203,7 +204,7 @@ class SessionAccessTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT,
 				MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.APPROACHING, SpotStatus.CONFIRMED,
 				SERVER_STATE_VERSION, SPOT_VERSION, 1, SPOT_VERSION, false, ETA_AT, REMAINING_METERS,
-				ETA_UPDATED_AT, null, null, null, null, null, null, null, List.of(
+				ETA_UPDATED_AT, null, null, null, null, null, null, null, null, List.of(
 						SessionChild.restore(null, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.CALLED, 0, null,
 								MINJUN_LOCATION, MINJUN_LOCATED_AT, null, null),
 						SessionChild.restore(null, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.CALLED, 0, null,

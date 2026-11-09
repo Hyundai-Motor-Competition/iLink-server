@@ -63,6 +63,7 @@ class CancelSessionServiceTest {
 
 	// 한국 시간 2026-11-09(월) 17:50
 	private static final Instant NOW = Instant.parse("2026-11-09T08:50:00Z");
+	private static final SessionViewAssembler ASSEMBLER = new SessionViewAssembler(PickupProperties.defaults());
 	private static final LocalDate TODAY_KST = LocalDate.of(2026, 11, 9);
 
 	private static final long SESSION_ID = 501L;
@@ -116,7 +117,7 @@ class CancelSessionServiceTest {
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, clock);
+		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, clock);
 		cancelSessionService = new CancelSessionService(loadSessionPort, saveSessionPort, loadFamilyPort,
 				loadCallPort, saveCallPort, sessionEventPort, publishSessionEventPort, sessionAccess, clock);
 		lenient().when(loadFamilyPort.loadFamily(FAMILY_ID))
@@ -280,7 +281,7 @@ class CancelSessionServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.APPROACHING,
 				SpotStatus.CONFIRMED, STATE_VERSION, 0, 1, 0, false, NOW.plus(Duration.ofMinutes(2)), 600,
-				NOW.minusSeconds(10), null, null, null, null, null, null, null, children);
+				NOW.minusSeconds(10), null, null, null, null, null, null, null, null, children);
 	}
 
 	private static Call sentCall() {

@@ -25,7 +25,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-// CALL-03 호출 철회
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -68,7 +67,7 @@ public class RevokeCallService implements RevokeCallUseCase {
 		List<MemberInfo> members = loadFamilyPort.loadMembers(familyId);
 		publishSessionEventPort.publish(
 				SessionEventMessages.of(event, SessionReceivers.guardiansAndSessionChildren(session, members)));
-		return SessionViewAssembler.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
+		return sessionAccess.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
 				members, loadCallPort.loadLatestCall(session.getSessionId()), now);
 	}
 

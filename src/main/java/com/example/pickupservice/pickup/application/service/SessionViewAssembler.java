@@ -10,6 +10,7 @@ import com.example.pickupservice.pickup.application.port.in.SessionBoardingView;
 import com.example.pickupservice.pickup.application.port.in.SessionCallView;
 import com.example.pickupservice.pickup.application.port.in.SessionChildView;
 import com.example.pickupservice.pickup.application.port.in.SessionEtaView;
+import com.example.pickupservice.pickup.application.port.in.SessionIncidentView;
 import com.example.pickupservice.pickup.application.port.in.SessionRouteView;
 import com.example.pickupservice.pickup.application.port.in.SessionSpotView;
 import com.example.pickupservice.pickup.application.port.in.SessionStatusView;
@@ -23,6 +24,8 @@ import com.example.pickupservice.pickup.domain.SessionChild;
 import com.example.pickupservice.user.application.port.in.FamilyInfo;
 import com.example.pickupservice.user.application.port.in.MemberInfo;
 
+import org.springframework.stereotype.Component;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -31,17 +34,20 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-public final class SessionViewAssembler {
+@Component
+public class SessionViewAssembler {
 
-	private static final PickupProperties DEFAULTS = PickupProperties.defaults();
-	private static final Duration ETA_VALID_FOR = DEFAULTS.etaValidFor();
-	private static final Duration CALL_BEFORE_ETA = DEFAULTS.callTriggerEta();
 	private static final String NO_CALL = "NONE";
 
-	private SessionViewAssembler() {
+	private final Duration etaValidFor;
+	private final Duration callBeforeEta;
+
+	public SessionViewAssembler(PickupProperties pickupProperties) {
+		this.etaValidFor = pickupProperties.etaValidFor();
+		this.callBeforeEta = pickupProperties.callTriggerEta();
 	}
 
-	public static SessionView assemble(PickupSession session, AuthPrincipal viewer, FamilyInfo family,
+	public SessionView assemble(PickupSession session, AuthPrincipal viewer, FamilyInfo family,
 			List<MemberInfo> members, Optional<Call> latestCall, Instant now) {
 		boolean childViewer = isChild(viewer);
 		return new SessionView(
@@ -54,14 +60,21 @@ public final class SessionViewAssembler {
 				childViewer ? childrenForChild(session, members, viewer.id()) : children(session, members),
 				new SessionRouteView(session.getRouteVersion(), session.getRemainingMeters()),
 				boarding(session),
-				null);
+				incident(session));
+	}
+
+	private static SessionIncidentView incident(PickupSession session) {
+		if (session.getIncidentOpenedAt() == null || session.getIncidentResolvedAt() != null) {
+			return null;
+		}
+		return new SessionIncidentView(session.getIncidentType().name(), session.getIncidentChildUserId(),
+				session.getIncidentOpenedAt());
 	}
 
 	private static boolean isChild(AuthPrincipal viewer) {
 		return viewer.type() == PrincipalType.USER && viewer.role() == Role.CHILD;
 	}
 
-	// 첫 경로 확정(SES-04) 때 자녀에게 출발 알림이 가므로, 그 뒤로는 장소를 다시 숨기지 않는다
 	private static boolean isRouteConfirmed(PickupSession session) {
 		return session.getRouteVersion() > 0;
 	}
@@ -78,18 +91,18 @@ public final class SessionViewAssembler {
 		return new SessionSpotView(session.getSpotId(), session.getSpotName(), session.getSpotVersion(), locked);
 	}
 
-	private static SessionEtaView eta(PickupSession session, Instant now) {
+	private SessionEtaView eta(PickupSession session, Instant now) {
 		Instant etaAt = session.getEtaAt();
 		Integer remainingSeconds = etaAt == null
 				? null
 				: (int) Math.max(0, Duration.between(now, etaAt).toSeconds());
 		return new SessionEtaView(etaAt, remainingSeconds, session.getEtaUpdatedAt(),
-				session.isEtaStale(now, ETA_VALID_FOR));
+				session.isEtaStale(now, etaValidFor));
 	}
 
-	private static SessionCallView call(PickupSession session, FamilyInfo family, Optional<Call> latestCall,
+	private SessionCallView call(PickupSession session, FamilyInfo family, Optional<Call> latestCall,
 			Instant now) {
-		GuardResult guard = new Guard(ETA_VALID_FOR).evaluate(session, now);
+		GuardResult guard = new Guard(etaValidFor).evaluate(session, now);
 		CallGuardView guardView = new CallGuardView(guard.met(),
 				guard.unmet().stream().map(Enum::name).toList());
 		CallProgressView progress = latestCall
@@ -100,11 +113,11 @@ public final class SessionViewAssembler {
 				session.isCallHeld(), scheduledAt(session), guardView, progress);
 	}
 
-	private static Instant scheduledAt(PickupSession session) {
+	private Instant scheduledAt(PickupSession session) {
 		if (session.getEtaAt() == null) {
 			return null;
 		}
-		Instant beforeEta = session.getEtaAt().minus(CALL_BEFORE_ETA);
+		Instant beforeEta = session.getEtaAt().minus(callBeforeEta);
 		return session.getChildren().stream()
 				.map(SessionChild::getCallNotBefore)
 				.filter(Objects::nonNull)
@@ -120,7 +133,6 @@ public final class SessionViewAssembler {
 				.toList();
 	}
 
-	// 자녀에게는 자기 항목만, 위치는 빼고 준다
 	private static List<SessionChildView> childrenForChild(PickupSession session, List<MemberInfo> members,
 			long childUserId) {
 		Map<Long, String> names = namesOf(members);

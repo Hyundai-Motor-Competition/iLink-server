@@ -20,7 +20,6 @@ public class GetOutcomeService implements GetOutcomeUseCase {
 	private final LoadSessionPort loadSessionPort;
 	private final LoadOutcomePort loadOutcomePort;
 
-	// 볼 수 없는 세션이거나 결과가 아직 없으면(완료 전) NOT_FOUND
 	@Override
 	public OutcomeView getOutcome(SessionQuery query) {
 		PickupSession session = loadSessionPort.load(query.sessionId())
@@ -31,7 +30,6 @@ public class GetOutcomeService implements GetOutcomeUseCase {
 		return outcomeView(session, outcome);
 	}
 
-	// OUT-02 · OUT-03이 같은 모양으로 돌려준다
 	static OutcomeView outcomeView(PickupSession session, PickupOutcome outcome) {
 		return new OutcomeView(session.getSessionId(), outcome.getCompletedAt(), session.getSpotName(),
 				outcome.getBoardingMethod() == null ? null : outcome.getBoardingMethod().name(),
@@ -39,7 +37,6 @@ public class GetOutcomeService implements GetOutcomeUseCase {
 				correctionOf(outcome));
 	}
 
-	// 정정이 없으면 status · correctedStopAt 모두 null
 	private static CorrectionView correctionOf(PickupOutcome outcome) {
 		String status = outcome.getCorrectionStatus() == null ? null : outcome.getCorrectionStatus().name();
 		return new CorrectionView(status, outcome.getCorrectedStopAt());

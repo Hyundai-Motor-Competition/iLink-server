@@ -20,7 +20,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-// SES-10 연락처: 가족 멤버 전화번호와 학원 대표번호
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -46,7 +45,6 @@ public class GetContactsService implements GetContactsUseCase {
 		return contacts;
 	}
 
-	// 세션 자녀 일정의 학원을 academyId로 한 번씩만
 	private List<ContactResult> academyContacts(PickupSession session) {
 		List<Long> scheduleIds = session.getChildren().stream()
 				.map(SessionChild::getScheduleId)

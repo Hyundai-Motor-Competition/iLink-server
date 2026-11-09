@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// SES-09 이벤트 목록(SES-08 이어 받기에도 쓴다)
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor

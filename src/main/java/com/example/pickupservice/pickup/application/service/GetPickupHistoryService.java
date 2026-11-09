@@ -21,7 +21,6 @@ public class GetPickupHistoryService implements GetPickupHistoryUseCase {
 	private final LoadHistoryPort loadHistoryPort;
 	private final LoadFamilyPort loadFamilyPort;
 
-	// 주체 가족의 자녀가 아니면 NOT_FOUND. 범위는 한국 날짜로 그 달 1일 ~ 말일
 	@Override
 	public List<HistoryItem> history(HistoryQuery query) {
 		boolean familyChild = loadFamilyPort.loadMember(query.childId())

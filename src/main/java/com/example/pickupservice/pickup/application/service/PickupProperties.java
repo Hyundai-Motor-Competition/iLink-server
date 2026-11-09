@@ -4,7 +4,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
 
-// 설계서 「서버 기준값」
 @ConfigurationProperties("pickup.session")
 public record PickupProperties(
 		Duration etaValidFor,

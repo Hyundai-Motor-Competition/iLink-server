@@ -24,7 +24,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 
-// CALL-04 자녀의 「확인했어요」
 @Service
 @Transactional
 @RequiredArgsConstructor

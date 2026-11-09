@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 
-// CALL-02 보호자 확인형 「합류 안내 보내기」
 @Service
 @Transactional
 @RequiredArgsConstructor
