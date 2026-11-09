@@ -25,6 +25,8 @@ pickup:
       queue-capacity: 100
   idempotency:
     cleanup-interval: PT1H
+  sse:
+    ping-interval: PT30S
   jwt:
     access-ttl: PT30M
   invite:
