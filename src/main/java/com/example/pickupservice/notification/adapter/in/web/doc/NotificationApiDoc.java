@@ -37,6 +37,8 @@ public interface NotificationApiDoc {
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (TEACHER · CHILD 토큰)")
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (알림이 없거나 다른 가족의 것)")
+	@ApiResponse(responseCode = "409", description = "SESSION_ALREADY_FINISHED (이미 끝난 세션) · "
+			+ "CALL_ALREADY_REVOKED (이미 철회된 호출)")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (Idempotency-Key 없음)")
 	@ApiResponse(responseCode = "429", description = "RESEND_TOO_SOON (1분 안에 다시 보냄, retryAfterSeconds 포함)")
 	ResendResponse resend(@Parameter(hidden = true) AuthPrincipal principal, long notificationId);
