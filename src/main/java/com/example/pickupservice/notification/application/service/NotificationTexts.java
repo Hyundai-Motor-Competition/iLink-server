@@ -11,6 +11,11 @@ final class NotificationTexts {
 			"PREP_EXTENDED", new String[] {"준비 시간 연장", "준비 시간이 늘어났어요"},
 			"HELP", new String[] {"도움 요청", "도움이 필요해요"});
 
+	private static final Map<String, String> HELP_BODIES = Map.of(
+			"NEED_HELP", "도움이 필요해요",
+			"CANT_FIND_CAR", "차를 못 찾고 있어요",
+			"CONTACT_PARENT", "연락해 달라고 해요");
+
 	private NotificationTexts() {
 	}
 
@@ -22,5 +27,13 @@ final class NotificationTexts {
 	static String body(String type) {
 		String[] text = TEXTS.get(type);
 		return text == null ? null : text[1];
+	}
+
+	static String body(String type, String helpType) {
+		if (!"HELP".equals(type) || helpType == null) {
+			return body(type);
+		}
+		String helpBody = HELP_BODIES.get(helpType);
+		return helpBody == null ? body(type) : helpBody;
 	}
 }

@@ -14,6 +14,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -78,8 +80,8 @@ class DispatchSessionEventServiceTest {
 				null, null, null);
 		PushTarget phone = target(GUARDIAN_ID, PHONE_DEVICE_ID, "token-phone");
 		PushTarget tablet = target(GUARDIAN_ID, TABLET_DEVICE_ID, "token-tablet");
-		when(loadNotificationPort.loadPending(SESSION_ID, "SESSION_STARTED", null))
-				.thenReturn(List.of(succeeded, failed));
+		when(loadNotificationPort.load(7001L)).thenReturn(Optional.of(succeeded));
+		when(loadNotificationPort.load(7002L)).thenReturn(Optional.of(failed));
 		when(loadPushTargetPort.loadPushTarget(PHONE_DEVICE_ID)).thenReturn(Optional.of(phone));
 		when(loadPushTargetPort.loadPushTarget(TABLET_DEVICE_ID)).thenReturn(Optional.of(tablet));
 		when(sendPushPort.send(any(PushMessage.class))).thenAnswer(invocation -> {
@@ -88,7 +90,7 @@ class DispatchSessionEventServiceTest {
 		});
 		when(saveNotificationPort.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		service.dispatch(rowEvent());
+		service.dispatch(rowEvent(7001L, 7002L));
 
 		assertThat(succeeded.getSentAt()).isEqualTo(NOW);
 		assertThat(failed.getSentAt()).isNull();
@@ -102,8 +104,8 @@ class DispatchSessionEventServiceTest {
 				null, null, null);
 		Notification otherRow = Notification.restore(7002L, SESSION_ID, null, "SESSION_STARTED", TABLET_DEVICE_ID,
 				null, null, null);
-		when(loadNotificationPort.loadPending(SESSION_ID, "SESSION_STARTED", null))
-				.thenReturn(List.of(row, otherRow));
+		when(loadNotificationPort.load(7001L)).thenReturn(Optional.of(row));
+		when(loadNotificationPort.load(7002L)).thenReturn(Optional.of(otherRow));
 		when(loadPushTargetPort.loadPushTarget(PHONE_DEVICE_ID))
 				.thenReturn(Optional.of(target(GUARDIAN_ID, PHONE_DEVICE_ID, "token-phone")));
 		when(loadPushTargetPort.loadPushTarget(TABLET_DEVICE_ID))
@@ -111,7 +113,7 @@ class DispatchSessionEventServiceTest {
 		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
 		when(saveNotificationPort.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		service.dispatch(rowEvent());
+		service.dispatch(rowEvent(7001L, 7002L));
 
 		ArgumentCaptor<PushMessage> captor = ArgumentCaptor.forClass(PushMessage.class);
 		verify(sendPushPort, times(2)).send(captor.capture());
@@ -199,13 +201,13 @@ class DispatchSessionEventServiceTest {
 		when(loadPushTargetPort.loadPushTargets(List.of(GUARDIAN_ID))).thenReturn(List.of(guardianPhone, vehicle));
 		Notification vehicleRow = Notification.restore(7003L, SESSION_ID, null, "SESSION_STARTED", vehicleDeviceId,
 				null, null, null);
-		when(loadNotificationPort.loadPending(SESSION_ID, "SESSION_STARTED", null)).thenReturn(List.of(vehicleRow));
+		when(loadNotificationPort.load(7003L)).thenReturn(Optional.of(vehicleRow));
 		when(loadPushTargetPort.loadPushTarget(vehicleDeviceId)).thenReturn(Optional.of(vehicle));
 		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
 
 		service.dispatch(new SessionEventMessage(SESSION_ID, EVENT_ID, SEQ, "VEHICLE_STOPPED", STATE_VERSION,
 				OCCURRED_AT, Map.of("spotId", 77), List.of(GUARDIAN_ID)));
-		service.dispatch(rowEvent());
+		service.dispatch(rowEvent(7003L));
 
 		ArgumentCaptor<PushMessage> captor = ArgumentCaptor.forClass(PushMessage.class);
 		verify(sendPushPort, times(1)).send(captor.capture());
@@ -218,13 +220,13 @@ class DispatchSessionEventServiceTest {
 	void marksCallSentWhenCallPushSucceeds() {
 		long callId = 5001L;
 		Notification row = Notification.restore(7101L, SESSION_ID, callId, "CALL", PHONE_DEVICE_ID, null, null, null);
-		when(loadNotificationPort.loadPending(SESSION_ID, "CALL", callId)).thenReturn(List.of(row));
+		when(loadNotificationPort.load(7101L)).thenReturn(Optional.of(row));
 		when(loadPushTargetPort.loadPushTarget(PHONE_DEVICE_ID))
 				.thenReturn(Optional.of(target(GUARDIAN_ID, PHONE_DEVICE_ID, "token-phone")));
 		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
 		when(saveNotificationPort.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		service.dispatch(callEvent(callId));
+		service.dispatch(callEvent(callId, 7101L));
 
 		verify(callProgressPort).markCallSent(callId, NOW);
 	}
@@ -234,24 +236,154 @@ class DispatchSessionEventServiceTest {
 	void doesNotMarkCallSentWhenCallPushFails() {
 		long callId = 5001L;
 		Notification row = Notification.restore(7101L, SESSION_ID, callId, "CALL", PHONE_DEVICE_ID, null, null, null);
-		when(loadNotificationPort.loadPending(SESSION_ID, "CALL", callId)).thenReturn(List.of(row));
+		when(loadNotificationPort.load(7101L)).thenReturn(Optional.of(row));
 		when(loadPushTargetPort.loadPushTarget(PHONE_DEVICE_ID))
 				.thenReturn(Optional.of(target(GUARDIAN_ID, PHONE_DEVICE_ID, "token-phone")));
 		when(sendPushPort.send(any(PushMessage.class))).thenReturn(false);
 
-		service.dispatch(callEvent(callId));
+		service.dispatch(callEvent(callId, 7101L));
 
 		verify(callProgressPort, never()).markCallSent(anyLong(), any(Instant.class));
 	}
 
-	private static SessionEventMessage callEvent(long callId) {
-		return new SessionEventMessage(SESSION_ID, EVENT_ID, SEQ, "CALL_TRIGGERED", STATE_VERSION, OCCURRED_AT,
-				Map.of("callId", callId), List.of(GUARDIAN_ID));
+	@Test
+	@DisplayName("발송 리스너는 폐기된 기기(살아 있는 기기 조회가 빈 값)의 행에는 푸시를 보내지 않고 sentAt도 채우지 않으며 폐기 포함 조회를 쓰지 않는다")
+	void doesNotSendPushToRevokedDeviceRow() {
+		Notification revokedRow = Notification.restore(7001L, SESSION_ID, null, "SESSION_STARTED", PHONE_DEVICE_ID,
+				null, null, null);
+		Notification liveRow = Notification.restore(7002L, SESSION_ID, null, "SESSION_STARTED", TABLET_DEVICE_ID,
+				null, null, null);
+		when(loadNotificationPort.load(7001L)).thenReturn(Optional.of(revokedRow));
+		when(loadNotificationPort.load(7002L)).thenReturn(Optional.of(liveRow));
+		when(loadPushTargetPort.loadPushTarget(PHONE_DEVICE_ID)).thenReturn(Optional.empty());
+		when(loadPushTargetPort.loadPushTarget(TABLET_DEVICE_ID))
+				.thenReturn(Optional.of(target(GUARDIAN_ID, TABLET_DEVICE_ID, "token-tablet")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
+		when(saveNotificationPort.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		service.dispatch(rowEvent(7001L, 7002L));
+
+		ArgumentCaptor<PushMessage> captor = ArgumentCaptor.forClass(PushMessage.class);
+		verify(sendPushPort, times(1)).send(captor.capture());
+		assertThat(captor.getValue().target().deviceId()).isEqualTo(TABLET_DEVICE_ID);
+		assertThat(revokedRow.getSentAt()).isNull();
+		verify(loadPushTargetPort, never()).loadPushTargetIncludingRevoked(anyLong());
 	}
 
-	private static SessionEventMessage rowEvent() {
+	@ParameterizedTest(name = "{0} -> {1}")
+	@CsvSource({
+			"NEED_HELP, 도움이 필요해요",
+			"CANT_FIND_CAR, 차를 못 찾고 있어요",
+			"CONTACT_PARENT, 연락해 달라고 해요"})
+	@DisplayName("발송 리스너는 HELP_REQUESTED 행 알림 본문을 payload의 type(NEED_HELP · CANT_FIND_CAR · CONTACT_PARENT)에 맞는 08 SIG-05 문구로 보낸다")
+	void sendsHelpBodyMatchingPayloadType(String helpType, String expectedBody) {
+		Notification row = Notification.restore(7201L, SESSION_ID, null, "HELP", PHONE_DEVICE_ID, null, null, null);
+		when(loadNotificationPort.load(7201L)).thenReturn(Optional.of(row));
+		when(loadPushTargetPort.loadPushTarget(PHONE_DEVICE_ID))
+				.thenReturn(Optional.of(target(GUARDIAN_ID, PHONE_DEVICE_ID, "token-phone")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
+		when(saveNotificationPort.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		service.dispatch(new SessionEventMessage(SESSION_ID, EVENT_ID, SEQ, "HELP_REQUESTED", STATE_VERSION,
+				OCCURRED_AT, Map.of("childUserId", 41L, "type", helpType, "notificationIds", List.of(7201L)),
+				List.of(GUARDIAN_ID)));
+
+		ArgumentCaptor<PushMessage> captor = ArgumentCaptor.forClass(PushMessage.class);
+		verify(sendPushPort).send(captor.capture());
+		assertThat(captor.getValue().body()).isEqualTo(expectedBody);
+		assertThat(captor.getValue().title()).isEqualTo("도움 요청");
+	}
+
+	@Test
+	@DisplayName("발송 리스너는 이벤트 payload의 notificationIds에 든 행만 읽어 보내고 같은 세션 · type의 옛 실패 행은 읽지도 보내지도 않으며 loadPending을 쓰지 않는다")
+	void sendsOnlyRowsListedInNotificationIdsAndIgnoresOldFailedRowsOfSameType() {
+		Notification newRow = Notification.restore(7001L, SESSION_ID, null, "SESSION_STARTED", PHONE_DEVICE_ID,
+				null, null, null);
+		when(loadNotificationPort.load(7001L)).thenReturn(Optional.of(newRow));
+		when(loadPushTargetPort.loadPushTarget(PHONE_DEVICE_ID))
+				.thenReturn(Optional.of(target(GUARDIAN_ID, PHONE_DEVICE_ID, "token-phone")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
+		when(saveNotificationPort.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		// 7000번은 같은 세션 · type의 옛 실패 행(sentAt 비어 있음)이지만 이벤트 notificationIds에 없다
+		service.dispatch(rowEvent(7001L));
+
+		ArgumentCaptor<PushMessage> captor = ArgumentCaptor.forClass(PushMessage.class);
+		verify(sendPushPort, times(1)).send(captor.capture());
+		assertThat(captor.getValue().data()).containsEntry("notificationId", "7001");
+		verify(loadNotificationPort).load(7001L);
+		verify(loadNotificationPort, never()).load(7000L);
+		verify(loadNotificationPort, never()).loadPending(anyLong(), any(), any());
+		verify(loadPushTargetPort, never()).loadPushTarget(TABLET_DEVICE_ID);
+		verify(saveNotificationPort, times(1)).save(newRow);
+		assertThat(newRow.getSentAt()).isEqualTo(NOW);
+	}
+
+	@Test
+	@DisplayName("발송 리스너는 notificationIds에 든 행이라도 이미 sentAt이 찬 행은 다시 보내지 않고 저장하지 않으며 CALL이면 markCallSent도 부르지 않는다")
+	void skipsRowsThatAlreadyHaveSentAt() {
+		long callId = 5001L;
+		Instant earlier = Instant.parse("2026-11-09T00:59:40Z");
+		Notification alreadySent = Notification.restore(7101L, SESSION_ID, callId, "CALL", PHONE_DEVICE_ID, earlier,
+				null, null);
+		when(loadNotificationPort.load(7101L)).thenReturn(Optional.of(alreadySent));
+
+		service.dispatch(callEvent(callId, 7101L));
+
+		verify(sendPushPort, never()).send(any(PushMessage.class));
+		verify(saveNotificationPort, never()).save(any(Notification.class));
+		verify(callProgressPort, never()).markCallSent(anyLong(), any(Instant.class));
+		assertThat(alreadySent.getSentAt()).isEqualTo(earlier);
+	}
+
+	@Test
+	@DisplayName("발송 리스너는 notificationIds 가운데 이미 보낸 행과 없는 행은 건너뛰고 나머지 미발송 행만 보낸다")
+	void sendsOnlyUnsentExistingRowsAmongNotificationIds() {
+		Notification alreadySent = Notification.restore(7001L, SESSION_ID, null, "SESSION_STARTED", PHONE_DEVICE_ID,
+				Instant.parse("2026-11-09T00:59:40Z"), null, null);
+		Notification unsent = Notification.restore(7003L, SESSION_ID, null, "SESSION_STARTED", TABLET_DEVICE_ID,
+				null, null, null);
+		when(loadNotificationPort.load(7001L)).thenReturn(Optional.of(alreadySent));
+		when(loadNotificationPort.load(7002L)).thenReturn(Optional.empty());
+		when(loadNotificationPort.load(7003L)).thenReturn(Optional.of(unsent));
+		when(loadPushTargetPort.loadPushTarget(TABLET_DEVICE_ID))
+				.thenReturn(Optional.of(target(GUARDIAN_ID, TABLET_DEVICE_ID, "token-tablet")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
+		when(saveNotificationPort.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		service.dispatch(rowEvent(7001L, 7002L, 7003L));
+
+		ArgumentCaptor<PushMessage> captor = ArgumentCaptor.forClass(PushMessage.class);
+		verify(sendPushPort, times(1)).send(captor.capture());
+		assertThat(captor.getValue().target().deviceId()).isEqualTo(TABLET_DEVICE_ID);
+		assertThat(captor.getValue().data()).containsEntry("notificationId", "7003");
+		verify(saveNotificationPort, times(1)).save(unsent);
+		verify(loadPushTargetPort, never()).loadPushTarget(PHONE_DEVICE_ID);
+	}
+
+	@Test
+	@DisplayName("발송 리스너는 notificationIds가 빈 목록이면 행을 읽지 않고 아무것도 보내지 않으며 데이터 메시지도 보내지 않는다")
+	void sendsNothingWhenNotificationIdsIsEmpty() {
+		service.dispatch(rowEvent());
+
+		verifyNoInteractions(sendPushPort, saveNotificationPort, callProgressPort);
+		verify(loadNotificationPort, never()).load(anyLong());
+		verify(loadNotificationPort, never()).loadPending(anyLong(), any(), any());
+		verify(loadPushTargetPort, never()).loadPushTargets(any());
+	}
+
+	private static SessionEventMessage callEvent(long callId, long... notificationIds) {
+		return new SessionEventMessage(SESSION_ID, EVENT_ID, SEQ, "CALL_TRIGGERED", STATE_VERSION, OCCURRED_AT,
+				Map.of("callId", callId, "notificationIds", idList(notificationIds)), List.of(GUARDIAN_ID));
+	}
+
+	private static SessionEventMessage rowEvent(long... notificationIds) {
 		return new SessionEventMessage(SESSION_ID, EVENT_ID, SEQ, "SESSION_STARTED", STATE_VERSION, OCCURRED_AT,
-				Map.of("stage", "STARTED"), List.of(GUARDIAN_ID));
+				Map.of("stage", "STARTED", "notificationIds", idList(notificationIds)), List.of(GUARDIAN_ID));
+	}
+
+	private static List<Long> idList(long... ids) {
+		return java.util.Arrays.stream(ids).boxed().toList();
 	}
 
 	private static PushTarget target(long userId, long deviceId, String pushToken) {

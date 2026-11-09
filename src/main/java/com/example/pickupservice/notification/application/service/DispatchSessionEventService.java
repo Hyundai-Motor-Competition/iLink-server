@@ -18,6 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Clock;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -60,9 +61,13 @@ public class DispatchSessionEventService implements DispatchSessionEventUseCase 
 	private void dispatchRows(SessionEventMessage message, String notificationType) {
 		Long callId = extractCallId(message.payload());
 		String title = NotificationTexts.title(notificationType);
-		String body = NotificationTexts.body(notificationType);
+		String body = NotificationTexts.body(notificationType, extractHelpType(message.payload()));
 		boolean anySent = false;
-		for (Notification row : loadNotificationPort.loadPending(message.sessionId(), notificationType, callId)) {
+		for (Long notificationId : extractNotificationIds(message.payload())) {
+			Notification row = loadNotificationPort.load(notificationId).orElse(null);
+			if (row == null || row.getSentAt() != null) {
+				continue;
+			}
 			Optional<PushTarget> target = loadPushTargetPort.loadPushTarget(row.getDeviceId());
 			if (target.isEmpty() || target.get().platform() == Platform.VEHICLE) {
 				continue;
@@ -97,6 +102,23 @@ public class DispatchSessionEventService implements DispatchSessionEventUseCase 
 	private static Long extractCallId(Map<String, Object> payload) {
 		if (payload != null && payload.get("callId") instanceof Number number) {
 			return number.longValue();
+		}
+		return null;
+	}
+
+	private static List<Long> extractNotificationIds(Map<String, Object> payload) {
+		if (payload != null && payload.get("notificationIds") instanceof List<?> ids) {
+			return ids.stream()
+					.filter(Number.class::isInstance)
+					.map(id -> ((Number) id).longValue())
+					.toList();
+		}
+		return List.of();
+	}
+
+	private static String extractHelpType(Map<String, Object> payload) {
+		if (payload != null && payload.get("type") instanceof String type) {
+			return type;
 		}
 		return null;
 	}
