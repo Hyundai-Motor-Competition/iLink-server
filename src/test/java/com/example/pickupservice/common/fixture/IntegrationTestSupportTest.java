@@ -30,8 +30,8 @@ class IntegrationTestSupportTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("공통 테스트 기반 클래스를 상속한 테스트는 PostGIS 3 확장이 켜진 PostgreSQL 17 컨테이너에 붙는다")
-	void connectsToPostgresql17ContainerWithPostgis3() {
+	@DisplayName("공통 테스트 기반 클래스를 상속한 테스트는 PostGIS 3 확장이 켜진 PostgreSQL 17 서버에 붙는다")
+	void connectsToPostgresql17ServerWithPostgis3() {
 		String serverVersion = jdbcTemplate.queryForObject("show server_version", String.class);
 		String postgisVersion = jdbcTemplate.queryForObject("select postgis_lib_version()", String.class);
 

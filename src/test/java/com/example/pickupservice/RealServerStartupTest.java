@@ -1,6 +1,6 @@
 package com.example.pickupservice;
 
-import com.example.pickupservice.common.fixture.PostgisTestcontainersConfiguration;
+import com.example.pickupservice.common.fixture.TestPostgisConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("dev")
-@Import(PostgisTestcontainersConfiguration.class)
+@Import(TestPostgisConfiguration.class)
 class RealServerStartupTest {
 
 	private final RestClient restClient;

@@ -1,6 +1,6 @@
 package com.example.pickupservice.common.time;
 
-import com.example.pickupservice.common.fixture.PostgisTestcontainersConfiguration;
+import com.example.pickupservice.common.fixture.TestPostgisConfiguration;
 import com.zaxxer.hikari.HikariDataSource;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(TimeZoneConfigTest.SeoulDefaultTimeZoneBeforeServerStartExtension.class)
 @SpringBootTest
 @ActiveProfiles("dev")
-@Import(PostgisTestcontainersConfiguration.class)
+@Import(TestPostgisConfiguration.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
 @RequiredArgsConstructor
 class TimeZoneConfigTest {
