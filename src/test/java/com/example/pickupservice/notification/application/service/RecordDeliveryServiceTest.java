@@ -22,13 +22,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +44,9 @@ class RecordDeliveryServiceTest {
 	private static final long CHILD_USER_ID = 21L;
 	private static final long CHILD_DEVICE_ID = 902L;
 	private static final long OTHER_USER_ID = 22L;
+	private static final long OTHER_DEVICE_ID = 903L;
+	private static final long OTHER_ROW_ID = 7002L;
+	private static final long PREVIOUS_CALL_ID = 2999L;
 	private static final Instant SENT_AT = Instant.parse("2026-11-09T06:00:00Z");
 	private static final Instant FIRST_RECEIVED_AT = Instant.parse("2026-11-09T06:00:05Z");
 	private static final Instant SECOND_RECEIVED_AT = Instant.parse("2026-11-09T06:00:40Z");
@@ -103,6 +109,62 @@ class RecordDeliveryServiceTest {
 	}
 
 	@Test
+	@DisplayName("같은 호출의 다른 기기 CALL 행이 이미 수신됐으면 이 행이 첫 수신이어도 markCallDelivered를 다시 부르지 않고 이 행의 deliveredAt은 채워 저장한다")
+	void doesNotMarkCallDeliveredAgainWhenOtherDeviceRowOfSameCallWasAlreadyDelivered() {
+		Notification notification = notification("CALL", CALL_ID, null);
+		Notification otherDeviceRow = row(OTHER_ROW_ID, OTHER_DEVICE_ID, "CALL", CALL_ID, FIRST_RECEIVED_AT);
+		givenOwnedNotification(notification);
+		givenSessionRows(notification, otherDeviceRow);
+
+		service.recordDelivery(command(CHILD_USER_ID, SECOND_RECEIVED_AT));
+
+		assertThat(notification.getDeliveredAt()).isEqualTo(SECOND_RECEIVED_AT);
+		verify(saveNotificationPort).save(notification);
+		verify(callProgressPort, never()).markCallDelivered(anyLong(), any());
+	}
+
+	@Test
+	@DisplayName("같은 호출의 앞선 행(재발송 전 행)이 이미 수신됐으면 재발송 행의 첫 수신은 markCallDelivered를 다시 부르지 않는다")
+	void doesNotMarkCallDeliveredAgainWhenEarlierAttemptRowOfSameCallWasAlreadyDelivered() {
+		Notification resent = notification("CALL", CALL_ID, null);
+		Notification earlierAttempt = row(OTHER_ROW_ID, CHILD_DEVICE_ID, "CALL", CALL_ID, FIRST_RECEIVED_AT);
+		givenOwnedNotification(resent);
+		givenSessionRows(earlierAttempt, resent);
+
+		service.recordDelivery(command(CHILD_USER_ID, SECOND_RECEIVED_AT));
+
+		assertThat(resent.getDeliveredAt()).isEqualTo(SECOND_RECEIVED_AT);
+		verify(callProgressPort, never()).markCallDelivered(anyLong(), any());
+	}
+
+	@Test
+	@DisplayName("같은 호출의 다른 CALL 행이 아직 수신 전이면 이 행의 첫 수신에서 markCallDelivered를 한 번 부른다")
+	void marksCallDeliveredWhenOtherRowsOfSameCallAreStillUndelivered() {
+		Notification notification = notification("CALL", CALL_ID, null);
+		Notification otherDeviceRow = row(OTHER_ROW_ID, OTHER_DEVICE_ID, "CALL", CALL_ID, null);
+		givenOwnedNotification(notification);
+		givenSessionRows(notification, otherDeviceRow);
+
+		service.recordDelivery(command(CHILD_USER_ID, FIRST_RECEIVED_AT));
+
+		verify(callProgressPort, times(1)).markCallDelivered(CALL_ID, FIRST_RECEIVED_AT);
+	}
+
+	@Test
+	@DisplayName("다른 호출(callId)의 CALL 행이나 CALL이 아닌 행이 수신됐어도 이 호출의 첫 수신은 markCallDelivered를 부른다")
+	void marksCallDeliveredWhenOnlyOtherCallsOrOtherTypesWereDelivered() {
+		Notification notification = notification("CALL", CALL_ID, null);
+		Notification previousCallRow = row(OTHER_ROW_ID, CHILD_DEVICE_ID, "CALL", PREVIOUS_CALL_ID, FIRST_RECEIVED_AT);
+		Notification arrivedRow = row(OTHER_ROW_ID + 1, CHILD_DEVICE_ID, "ARRIVED", null, FIRST_RECEIVED_AT);
+		givenOwnedNotification(notification);
+		givenSessionRows(previousCallRow, arrivedRow, notification);
+
+		service.recordDelivery(command(CHILD_USER_ID, SECOND_RECEIVED_AT));
+
+		verify(callProgressPort).markCallDelivered(CALL_ID, SECOND_RECEIVED_AT);
+	}
+
+	@Test
 	@DisplayName("CALL이 아닌 알림의 첫 수신 확인은 markCallDelivered를 부르지 않는다")
 	void firstDeliveryOfNonCallNotificationDoesNotMarkCallDelivered() {
 		Notification notification = notification("ARRIVED", null, null);
@@ -119,7 +181,7 @@ class RecordDeliveryServiceTest {
 	void rejectsReceiptForOthersDeviceWithNotFound() {
 		Notification notification = notification("CALL", CALL_ID, null);
 		when(loadNotificationPort.load(NOTIFICATION_ID)).thenReturn(Optional.of(notification));
-		when(loadPushTargetPort.loadPushTarget(CHILD_DEVICE_ID))
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(CHILD_DEVICE_ID))
 				.thenReturn(Optional.of(new PushTarget(CHILD_USER_ID, CHILD_DEVICE_ID, Platform.ANDROID, "fcm-token")));
 
 		assertThatThrownBy(() -> service.recordDelivery(command(OTHER_USER_ID, FIRST_RECEIVED_AT)))
@@ -129,6 +191,19 @@ class RecordDeliveryServiceTest {
 		assertThat(notification.getDeliveredAt()).isNull();
 		verify(saveNotificationPort, never()).save(any());
 		verify(callProgressPort, never()).markCallDelivered(anyLong(), any());
+	}
+
+	@Test
+	@DisplayName("수신 확인의 주인 확인은 폐기된 기기도 찾는 폐기 포함 조회를 쓰고 살아 있는 기기만 보는 조회는 쓰지 않는다")
+	void ownerCheckUsesRevokedInclusiveLookupOnly() {
+		Notification notification = notification("CALL", CALL_ID, null);
+		givenOwnedNotification(notification);
+
+		service.recordDelivery(command(CHILD_USER_ID, FIRST_RECEIVED_AT));
+
+		assertThat(notification.getDeliveredAt()).isEqualTo(FIRST_RECEIVED_AT);
+		verify(loadPushTargetPort).loadPushTargetIncludingRevoked(CHILD_DEVICE_ID);
+		verify(loadPushTargetPort, never()).loadPushTarget(anyLong());
 	}
 
 	@Test
@@ -146,9 +221,19 @@ class RecordDeliveryServiceTest {
 
 	private void givenOwnedNotification(Notification notification) {
 		when(loadNotificationPort.load(NOTIFICATION_ID)).thenReturn(Optional.of(notification));
-		when(loadPushTargetPort.loadPushTarget(CHILD_DEVICE_ID))
+		when(loadPushTargetPort.loadPushTargetIncludingRevoked(CHILD_DEVICE_ID))
 				.thenReturn(Optional.of(new PushTarget(CHILD_USER_ID, CHILD_DEVICE_ID, Platform.ANDROID, "fcm-token")));
 		when(saveNotificationPort.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+	}
+
+	// 같은 세션의 알림 행 목록(구현이 loadBySession으로 읽는다고 보고 준비. 안 읽는 테스트가 있어도 실패하지 않게 lenient)
+	private void givenSessionRows(Notification... rows) {
+		lenient().when(loadNotificationPort.loadBySession(SESSION_ID)).thenReturn(List.of(rows));
+	}
+
+	private static Notification row(long notificationId, long deviceId, String type, Long callId,
+			Instant deliveredAt) {
+		return Notification.restore(notificationId, SESSION_ID, callId, type, deviceId, SENT_AT, deliveredAt, null);
 	}
 
 	private static Notification notification(String type, Long callId, Instant deliveredAt) {

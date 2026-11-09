@@ -12,24 +12,20 @@ import com.example.pickupservice.notification.application.port.out.LoadNotificat
 import com.example.pickupservice.notification.application.port.out.LoadPushTargetPort;
 import com.example.pickupservice.notification.application.port.out.SaveNotificationPort;
 import com.example.pickupservice.notification.domain.Notification;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
+
 @Service
+@RequiredArgsConstructor
 public class RecordDeliveryService implements RecordDeliveryUseCase {
 
 	private final LoadNotificationPort loadNotificationPort;
 	private final SaveNotificationPort saveNotificationPort;
 	private final LoadPushTargetPort loadPushTargetPort;
 	private final CallProgressPort callProgressPort;
-
-	public RecordDeliveryService(LoadNotificationPort loadNotificationPort, SaveNotificationPort saveNotificationPort,
-			LoadPushTargetPort loadPushTargetPort, CallProgressPort callProgressPort) {
-		this.loadNotificationPort = loadNotificationPort;
-		this.saveNotificationPort = saveNotificationPort;
-		this.loadPushTargetPort = loadPushTargetPort;
-		this.callProgressPort = callProgressPort;
-	}
 
 	@Override
 	@Transactional
@@ -39,19 +35,28 @@ public class RecordDeliveryService implements RecordDeliveryUseCase {
 		requireOwner(command.principal(), notification);
 
 		boolean first = notification.getDeliveredAt() == null;
+		boolean markCall = first && "CALL".equals(notification.getType()) && notification.getCallId() != null
+				&& !isCallDeliveredInSession(notification);
 		notification.markDelivered(command.receivedAt());
 		saveNotificationPort.save(notification);
 
-		if (first && "CALL".equals(notification.getType()) && notification.getCallId() != null) {
+		if (markCall) {
 			callProgressPort.markCallDelivered(notification.getCallId(), command.receivedAt());
 		}
+	}
+
+	private boolean isCallDeliveredInSession(Notification notification) {
+		return loadNotificationPort.loadBySession(notification.getSessionId()).stream()
+				.anyMatch(row -> row.getDeliveredAt() != null
+						&& "CALL".equals(row.getType())
+						&& Objects.equals(row.getCallId(), notification.getCallId()));
 	}
 
 	private void requireOwner(AuthPrincipal principal, Notification notification) {
 		if (principal.type() != PrincipalType.USER) {
 			throw BusinessException.of(ErrorCode.NOT_FOUND);
 		}
-		PushTarget target = loadPushTargetPort.loadPushTarget(notification.getDeviceId())
+		PushTarget target = loadPushTargetPort.loadPushTargetIncludingRevoked(notification.getDeviceId())
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
 		if (target.userId() != principal.id()) {
 			throw BusinessException.of(ErrorCode.NOT_FOUND);
