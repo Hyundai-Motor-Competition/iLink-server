@@ -26,7 +26,7 @@ common
 └─ persistence     BaseTimeEntity
 src/main/resources/schema.sql: idempotency_key 유니크 인덱스(04의 VIN 부분 유니크 인덱스도 이 파일에 더함)
 src/main/resources/application.yml: logging.pattern.correlation(모든 로그 줄에 [requestId]), spring.datasource.hikari.data-source-properties.logServerErrorDetail=false(PostgreSQL 오류 상세 숨김), springdoc 끔(dev에서 켬)
-src/test: 공통 테스트 픽스처(Testcontainers PostGIS 기반 클래스 · PostgisTestcontainersConfiguration, AccessTokenFixture: 테스트 토큰)
+src/test: 공통 테스트 픽스처(PostGIS 기반 클래스 · TestPostgisConfiguration · TestPostgis(EmbeddedPostgis: Windows 내장 서버, PostgisContainer: Testcontainers), AccessTokenFixture: 테스트 토큰)
 ```
 
 테스트 케이스의 「요청 로깅 AOP」는 위 logging 패키지(RequestIdFilter + RequestLoggingInterceptor)를 말한다. 체크된 문장이라 이름을 그대로 둔다.
@@ -200,7 +200,7 @@ common에는 엔드포인트가 없다. 아래 부품이 모든 도메인의 API
 - SchedulingConfig: @Scheduled 작업을 켠다. 서버 1대 전제.
 
 ### 테스트 픽스처
-- 공통 테스트 기반 클래스는 Testcontainers postgis/postgis 컨테이너 하나를 모든 테스트가 같이 쓴다.
+- 공통 테스트 기반 클래스는 PostgreSQL 17 + PostGIS 3 서버 하나(JVM당 1개, DB pickup_test)를 모든 테스트가 같이 쓴다. Windows는 내장 서버(EmbeddedPostgis, Docker 없음), 그 밖의 OS는 Testcontainers postgis/postgis:17-3.7 컨테이너(PostgisContainer)다. TestPostgis가 OS로 고르고 pickup.test.db로 강제한다.
 - AccessTokenFixture는 서버와 같은 키 · 클레임 이름으로 VEHICLE · USER access 토큰(exp 30분)을 만든다. 만료 토큰 테스트는 만료 시각을 Nimbus 여유 60초보다 더 과거로 둔다.
 - 스케줄러 테스트 격리: 공통 테스트 설정에서 pickup.idempotency.cleanup-interval을 아주 길게(예: P1D) 둔다. 04~09의 자동 완료 · 재발송 스케줄러도 같은 방식으로 둔다(팀장 결정).
 - prod 프로필 테스트는 ddl-auto를 update로 덮어쓴다(테스트 전용 엔티티 때문에 validate를 쓸 수 없음).

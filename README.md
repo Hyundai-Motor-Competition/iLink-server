@@ -15,13 +15,15 @@
 | springdoc-openapi | 3.2.0 |
 | Firebase Admin SDK | 9.11.0 |
 | Lombok | 1.18.48 |
-| Testcontainers | 2.0.5 |
+| Testcontainers (테스트용, Windows가 아닌 OS) | 2.0.5 |
+| embedded-postgres (zonky, 테스트용, Windows) | 2.2.2 + 바이너리 BOM 17.11.0 (PostgreSQL 17.11) |
+| PostGIS Windows 묶음 (테스트용, Windows) | 3.6.2 (`postgis-bundle-pg17-3.6.2x64.zip`, OSGeo) |
 | JUnit Jupiter | 6.0.3 (Spring Boot 4 기본) |
 
 ## 준비물
 
 - JDK 21
-- Docker (테스트와 dev DB에 필요)
+- Docker: dev DB와 Windows가 아닌 OS(Linux CI 등)의 테스트에 필요. Windows 테스트에는 필요 없다
 
 ## 환경 변수
 
@@ -61,7 +63,7 @@ PowerShell:
 $env:SPRING_PROFILES_ACTIVE="dev"; $env:DB_PASSWORD="<비밀번호>"; $env:JWT_SECRET="<Base64 키>"; .\gradlew.bat bootRun
 ```
 
-DB를 따로 띄우지 않고 Testcontainers PostGIS로 실행: `./gradlew bootTestRun` (dev 프로필로 뜬다)
+DB를 따로 띄우지 않고 테스트 DB로 실행: `./gradlew bootTestRun` (dev 프로필로 뜬다. 테스트와 같은 규칙으로 Windows는 내장 PostgreSQL 17 + PostGIS, 그 밖의 OS는 Testcontainers. 끄면 데이터가 지워진다)
 
 ## 운영(prod) 배포 순서
 
@@ -73,7 +75,7 @@ prod는 `ddl-auto: validate`라 서버가 테이블을 만들지 않는다. 그�
 
 ## dev 서버 · CI/CD (홈서버 Jenkins + k3s)
 
-`main`에 push하면 Jenkins 잡 `ilink-deploy`가 `Jenkinsfile`대로 돈다: `./gradlew test` → `bootJar` → 이미지 `harbor.chisanw.com/ilink/api:{커밋 12자리}` 푸시 → k3s `ilink-dev` 네임스페이스에 배포. 롤아웃이 실패하면 직전 버전으로 되돌린다.
+`main`에 push하면 Jenkins 잡 `ilink-deploy`가 `Jenkinsfile`대로 돈다: `./gradlew test`(Linux 에이전트라 테스트 DB는 Testcontainers) → `bootJar` → 이미지 `harbor.chisanw.com/ilink/api:{커밋 12자리}` 푸시 → k3s `ilink-dev` 네임스페이스에 배포. 롤아웃이 실패하면 직전 버전으로 되돌린다.
 
 | 항목 | 값 |
 |---|---|
@@ -91,7 +93,18 @@ ConfigMap(비밀이 아닌 환경 변수)을 바꾸려면 `ops/k8s/dev/api.yaml`
 ./gradlew test
 ```
 
-DB가 닿는 테스트는 공통 기반 클래스 `common.fixture.IntegrationTestSupport`를 상속한다. 이 클래스가 `@SpringBootTest` · `@ActiveProfiles("dev")` · `PostgisTestcontainersConfiguration`(`postgis/postgis:17-3.7` 컨테이너, 실행마다 임의 `pickup.jwt.secret`) · `AccessTokenFixture`(테스트용 access 토큰)를 묶는다.
+DB가 닿는 테스트는 공통 기반 클래스 `common.fixture.IntegrationTestSupport`를 상속한다. 이 클래스가 `@SpringBootTest` · `@ActiveProfiles("dev")` · `TestPostgisConfiguration`(PostgreSQL 17 + PostGIS 3의 DB `pickup_test`, 실행마다 임의 `pickup.jwt.secret`) · `AccessTokenFixture`(테스트용 access 토큰)를 묶는다.
+
+테스트 DB 방식은 OS로 정해진다. 설치할 것은 없다.
+
+| 방식 | 언제 | 내용 |
+|---|---|---|
+| `embedded` | Windows(기본) | Docker 없이 로컬 프로세스. PostgreSQL은 Maven Central의 `io.zonky.test:embedded-postgres` 바이너리(17.11)로 처음 쓸 때 `%TEMP%\pickup-embedded-pg\postgis-<버전>\PG-<해시>`에 풀린다. PostGIS는 Gradle이 `download.osgeo.org/postgis/windows/pg17/`에서 Windows 묶음을 받아(Gradle 캐시) `build/postgis-bundle`에 풀고, 시스템 속성 `pickup.test.postgis-dir`로 넘긴다. 서버(`common.fixture.EmbeddedPostgis`)는 JVM당 1개, 빈 포트, `locale=C` · UTF8, `max_connections=200`. 데이터 폴더 `%TEMP%\epg<숫자>`는 JVM이 끝나면 지운다 |
+| `testcontainers` | 그 밖의 OS(기본, Linux CI 포함) | `postgis/postgis:17-3.7` 컨테이너(`common.fixture.PostgisContainer`). Docker가 있어야 한다. Windows용 묶음은 받지 않는다 |
+
+강제로 고르기: `./gradlew test -Ppickup.test.db=embedded` 또는 `-Ppickup.test.db=testcontainers` (기본 `auto`). Gradle이 고른 값을 시스템 속성 `pickup.test.db`로 테스트 JVM에 넘긴다. `embedded`는 Windows x64에서만 돈다(PostGIS 바이너리를 Windows 묶음으로만 받기 때문). IDE에서 Windows 테스트를 돌릴 때도 Gradle로 실행해야 `pickup.test.postgis-dir`가 넘어간다.
+
+내장 서버의 PostGIS는 3.6.2로 컨테이너(3.7)와 마이너 버전이 다르다. OSGeo의 PostgreSQL 17용 Windows 묶음 최신이 3.6.2다.
 
 ## 상태 확인 · API 문서
 
