@@ -12,6 +12,9 @@ pickup:
     secret: ${JWT_SECRET}
   crypto:
     phone-key: ${PHONE_ENCRYPTION_KEY}
+  fcm:
+    project-id: ${FCM_PROJECT_ID:}
+    credentials-path: ${FCM_CREDENTIALS_PATH:}
 
 logging:
   level:
