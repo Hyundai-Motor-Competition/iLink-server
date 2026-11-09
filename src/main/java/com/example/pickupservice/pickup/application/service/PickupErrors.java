@@ -51,8 +51,7 @@ public final class PickupErrors {
 	}
 
 	public static BusinessException sessionAlreadyFinished() {
-		return BusinessException.of(HttpStatus.CONFLICT, "SESSION_ALREADY_FINISHED",
-				"이미 끝난 픽업입니다");
+		return BusinessException.of(ErrorCode.SESSION_ALREADY_FINISHED);
 	}
 
 	public static BusinessException vehicleNotStopped() {
@@ -103,8 +102,7 @@ public final class PickupErrors {
 	}
 
 	public static BusinessException callAlreadyRevoked() {
-		return BusinessException.of(HttpStatus.CONFLICT, "CALL_ALREADY_REVOKED",
-				"이미 철회된 합류 호출입니다");
+		return BusinessException.of(ErrorCode.CALL_ALREADY_REVOKED);
 	}
 
 	public static BusinessException childNotCalled() {
