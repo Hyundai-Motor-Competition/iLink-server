@@ -4,11 +4,13 @@ import com.example.pickupservice.auth.application.port.out.CheckActivePickupPort
 import com.example.pickupservice.auth.application.port.out.DeviceReplacedEvent;
 import com.example.pickupservice.auth.application.port.out.PublishAuthEventPort;
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
+import com.example.pickupservice.pickup.application.port.in.ActivePickupQueryUseCase;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 
@@ -16,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @RecordApplicationEvents
 @RequiredArgsConstructor
@@ -25,13 +29,13 @@ class AuthModuleLinkAdaptersTest extends IntegrationTestSupport {
 
 	private final ApplicationContext applicationContext;
 
-	@Test
-	@DisplayName("pickup 구현 전 임시 CheckActivePickupPort는 false를 돌려주고, PublishAuthEventPort는 이전 기기 id를 담은 스프링 이벤트를 발행한다")
-	void temporaryActivePickupPortReturnsFalseAndPublishPortPublishesDeviceReplacedEvent(ApplicationEvents applicationEvents) {
-		CheckActivePickupPort activePickupPort = onlyBeanOf(CheckActivePickupPort.class);
-		PublishAuthEventPort publishPort = onlyBeanOf(PublishAuthEventPort.class);
+	@MockitoBean
+	private ActivePickupQueryUseCase activePickupQueryUseCase;
 
-		assertThat(activePickupPort.hasActivePickup(77L)).isFalse();
+	@Test
+	@DisplayName("PublishAuthEventPort는 이전 기기 id를 담은 스프링 이벤트를 발행한다")
+	void publishPortPublishesDeviceReplacedEvent(ApplicationEvents applicationEvents) {
+		PublishAuthEventPort publishPort = onlyBeanOf(PublishAuthEventPort.class);
 
 		publishPort.publishDeviceReplaced(List.of(1L, 2L));
 
@@ -52,13 +56,16 @@ class AuthModuleLinkAdaptersTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("auth의 CheckActivePickupPort는 어떤 vehicleId에도 false를 돌려준다")
-	void activePickupPortAlwaysReturnsFalse() {
+	@DisplayName("auth의 CheckActivePickupPort.hasActivePickup은 pickup ActivePickupQueryUseCase.hasActivePickup 결과를 그대로 돌려준다")
+	void activePickupPortDelegatesHasActivePickupToPickupUseCase() {
 		CheckActivePickupPort activePickupPort = onlyBeanOf(CheckActivePickupPort.class);
+		given(activePickupQueryUseCase.hasActivePickup(77L)).willReturn(true);
+		given(activePickupQueryUseCase.hasActivePickup(78L)).willReturn(false);
 
-		assertThat(activePickupPort.hasActivePickup(1L)).isFalse();
-		assertThat(activePickupPort.hasActivePickup(77L)).isFalse();
-		assertThat(activePickupPort.hasActivePickup(9_999_999L)).isFalse();
+		assertThat(activePickupPort.hasActivePickup(77L)).isTrue();
+		assertThat(activePickupPort.hasActivePickup(78L)).isFalse();
+		verify(activePickupQueryUseCase).hasActivePickup(77L);
+		verify(activePickupQueryUseCase).hasActivePickup(78L);
 	}
 
 	@Test
