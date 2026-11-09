@@ -90,6 +90,11 @@ class StartPickupServiceTest {
 	private static final long SPOT_ID = 21L;
 	private static final long OTHER_ACADEMY_SPOT_ID = 22L;
 	private static final long OTHER_SCHEDULE_ID = 901L;
+	private static final long MINJUN_SECOND_SCHEDULE_ID = 803L;
+	private static final long UNKNOWN_SCHEDULE_ID = 999L;
+	private static final long OTHER_FAMILY_ID = 99L;
+	private static final long OTHER_FAMILY_CHILD_ID = 44L;
+	private static final long OTHER_FAMILY_SCHEDULE_ID = 950L;
 	private static final long EXISTING_SESSION_ID = 501L;
 	private static final long NEW_SESSION_ID = 601L;
 	private static final long NEW_EVENT_ID = 9001L;
@@ -155,6 +160,15 @@ class StartPickupServiceTest {
 				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1234-5678"),
 				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", null),
 				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", null)));
+		// 일정의 자녀가 principal 가족 멤버인지 loadMembers · loadMember 어느 쪽으로 봐도 같은 답이 나오게 둔다
+		lenient().when(loadFamilyPort.loadMember(GUARDIAN_ID)).thenReturn(Optional.of(
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1234-5678")));
+		lenient().when(loadFamilyPort.loadMember(MINJUN_ID)).thenReturn(Optional.of(
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", null)));
+		lenient().when(loadFamilyPort.loadMember(SEOYUN_ID)).thenReturn(Optional.of(
+				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", null)));
+		lenient().when(loadFamilyPort.loadMember(OTHER_FAMILY_CHILD_ID)).thenReturn(Optional.of(
+				new MemberInfo(OTHER_FAMILY_CHILD_ID, OTHER_FAMILY_ID, Role.CHILD, "지후", null)));
 		lenient().when(loadSessionPort.loadActiveByVehicle(VEHICLE_ID)).thenReturn(Optional.empty());
 		lenient().when(loadSessionPort.loadActiveByFamily(FAMILY_ID)).thenReturn(Optional.empty());
 	}
@@ -232,6 +246,74 @@ class StartPickupServiceTest {
 
 		BusinessException exception = catchThrowableOfType(BusinessException.class,
 				() -> startPickupService.start(command(TODAY_KST)));
+
+		assertRejected(exception, "SCHEDULES_NOT_GROUPABLE");
+		assertNothingStarted();
+	}
+
+	@Test
+	@DisplayName("픽업 시작은 다른 가족 자녀의 scheduleId가 섞이면 NOT_FOUND로 거절하고 아무것도 저장 · 발행하지 않는다")
+	void startRejectsScheduleOfOtherFamilyChildWithNotFound() {
+		givenSchedules(
+				schedule(MINJUN_SCHEDULE_ID, MINJUN_ID, ACADEMY, CLASS_END_TIME, TARGET_PICKUP),
+				schedule(OTHER_FAMILY_SCHEDULE_ID, OTHER_FAMILY_CHILD_ID, ACADEMY, CLASS_END_TIME, TARGET_PICKUP));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> startPickupService.start(command(TODAY_KST, List.of(MINJUN_SCHEDULE_ID, OTHER_FAMILY_SCHEDULE_ID))));
+
+		assertRejected(exception, HttpStatus.NOT_FOUND, "NOT_FOUND");
+		assertNothingStarted();
+	}
+
+	@Test
+	@DisplayName("픽업 시작은 오늘 요일이 아닌 일정이 섞이면 SCHEDULES_NOT_GROUPABLE로 거절하고 아무것도 저장 · 발행하지 않는다")
+	void startRejectsScheduleNotOnTodayWeekdayWithSchedulesNotGroupable() {
+		// 오늘은 월요일. 서윤의 일정은 화요일만이다
+		givenSchedules(
+				schedule(MINJUN_SCHEDULE_ID, MINJUN_ID, ACADEMY, CLASS_END_TIME, TARGET_PICKUP),
+				schedule(SEOYUN_SCHEDULE_ID, SEOYUN_ID, ACADEMY, Set.of(DayOfWeek.TUESDAY), CLASS_END_TIME,
+						TARGET_PICKUP));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> startPickupService.start(command(TODAY_KST)));
+
+		assertRejected(exception, "SCHEDULES_NOT_GROUPABLE");
+		assertNothingStarted();
+	}
+
+	@Test
+	@DisplayName("픽업 시작은 없는 scheduleId가 섞여 일부 일정만 찾아지면 NOT_FOUND로 거절하고 아무것도 저장 · 발행하지 않는다")
+	void startRejectsUnknownScheduleIdAmongFoundOnesWithNotFound() {
+		givenSchedules(schedule(MINJUN_SCHEDULE_ID, MINJUN_ID, ACADEMY, CLASS_END_TIME, TARGET_PICKUP));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> startPickupService.start(command(TODAY_KST, List.of(MINJUN_SCHEDULE_ID, UNKNOWN_SCHEDULE_ID))));
+
+		assertRejected(exception, HttpStatus.NOT_FOUND, "NOT_FOUND");
+		assertNothingStarted();
+	}
+
+	@Test
+	@DisplayName("픽업 시작은 요청한 scheduleId가 모두 없으면 NOT_FOUND로 거절하고 아무것도 저장 · 발행하지 않는다")
+	void startRejectsAllUnknownScheduleIdsWithNotFound() {
+		givenSchedules();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> startPickupService.start(command(TODAY_KST, List.of(UNKNOWN_SCHEDULE_ID))));
+
+		assertRejected(exception, HttpStatus.NOT_FOUND, "NOT_FOUND");
+		assertNothingStarted();
+	}
+
+	@Test
+	@DisplayName("픽업 시작은 같은 자녀의 일정이 2개 섞이면 SCHEDULES_NOT_GROUPABLE로 거절하고 아무것도 저장 · 발행하지 않는다")
+	void startRejectsTwoSchedulesOfSameChildWithSchedulesNotGroupable() {
+		givenSchedules(
+				schedule(MINJUN_SCHEDULE_ID, MINJUN_ID, ACADEMY, CLASS_END_TIME, TARGET_PICKUP),
+				schedule(MINJUN_SECOND_SCHEDULE_ID, MINJUN_ID, ACADEMY, CLASS_END_TIME, TARGET_PICKUP));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> startPickupService.start(command(TODAY_KST, List.of(MINJUN_SCHEDULE_ID, MINJUN_SECOND_SCHEDULE_ID))));
 
 		assertRejected(exception, "SCHEDULES_NOT_GROUPABLE");
 		assertNothingStarted();
@@ -500,13 +582,13 @@ class StartPickupServiceTest {
 				session.getRouteSpotVersion(), session.isCallHeld(), session.getEtaAt(), session.getRemainingMeters(),
 				session.getEtaUpdatedAt(), session.getBoardingDetectedAt(), session.getBoardingCancelableUntil(),
 				session.getBoardingDoor(), session.getIncidentType(), session.getIncidentCause(),
-				session.getIncidentOpenedAt(), session.getIncidentResolvedAt(), session.getChildren());
+				session.getIncidentChildUserId(), session.getIncidentOpenedAt(), session.getIncidentResolvedAt(), session.getChildren());
 	}
 
 	private StartPickupService newService(Clock clock) {
 		return new StartPickupService(loadSchedulePort, loadSpotPort, loadChildReadinessPort, loadFamilyPort,
 				loadSessionPort, saveSessionPort, loadCallPort, sessionEventPort, publishSessionEventPort,
-				recordNotificationPort, clock);
+				recordNotificationPort, new SessionViewAssembler(PickupProperties.defaults()), clock);
 	}
 
 	private void givenSchedules(ScheduleInfo... schedules) {
@@ -530,7 +612,7 @@ class StartPickupServiceTest {
 		return PickupSession.restore(sessionId, VEHICLE_ID, FAMILY_ID, SPOT_ID, "정문 앞",
 				new LatLng(37.501400, 127.039950), new LatLng(37.501301, 127.039901), date, SessionStatus.ACTIVE,
 				VehiclePhase.ROUTING, SpotStatus.SELECTED, stateVersion, 0, 0, null, false, null, null, null, null,
-				null, null, null, null, null, null, List.of(children));
+				null, null, null, null, null, null, null, List.of(children));
 	}
 
 	private static SessionChild waitingChild(long sessionChildId, long childUserId, long scheduleId) {
@@ -546,6 +628,12 @@ class StartPickupServiceTest {
 	private static ScheduleInfo schedule(long scheduleId, long childUserId, AcademyInfo academy,
 			LocalTime classEndTime, int targetPickup, ScheduleStatus status) {
 		return new ScheduleInfo(scheduleId, childUserId, academy, WEEKDAYS, classEndTime, targetPickup, status);
+	}
+
+	private static ScheduleInfo schedule(long scheduleId, long childUserId, AcademyInfo academy,
+			Set<DayOfWeek> weekdays, LocalTime classEndTime, int targetPickup) {
+		return new ScheduleInfo(scheduleId, childUserId, academy, weekdays, classEndTime, targetPickup,
+				ScheduleStatus.READY);
 	}
 
 	private static SpotInfo spot(long spotId, long academyId, String name) {

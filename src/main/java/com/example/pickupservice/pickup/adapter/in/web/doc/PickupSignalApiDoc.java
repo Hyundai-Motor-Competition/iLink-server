@@ -51,6 +51,8 @@ public interface PickupSignalApiDoc {
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (자녀 토큰이 아님)")
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (세션이 없거나 다른 가족의 것)")
+	@ApiResponse(responseCode = "409", description = "CALL_ALREADY_SENT (합류 안내를 이미 받음) · "
+			+ "SESSION_ALREADY_FINISHED (이미 완료 · 취소된 세션)")
 	@ApiResponse(responseCode = "422", description = "PREP_EXTENSION_LIMIT (누적 15분 초과) · "
 			+ "VALIDATION_FAILED (Idempotency-Key 없음 · 입력값 오류)")
 	ResponseEntity<PrepExtensionResponse> extendPrepTime(@Parameter(hidden = true) AuthPrincipal principal,
@@ -64,6 +66,8 @@ public interface PickupSignalApiDoc {
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (자녀 토큰이 아님) · "
 			+ "LOCATION_CONSENT_REQUIRED (위치 동의 없음)")
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (세션이 없거나 다른 가족의 것)")
+	@ApiResponse(responseCode = "409", description = "SESSION_ALREADY_FINISHED (이미 완료 · 취소된 세션) · "
+			+ "CHILD_NOT_CALLED (합류 호출을 받은 자녀가 아님)")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (입력값 오류)")
 	ResponseEntity<Void> reportChildLocation(@Parameter(hidden = true) AuthPrincipal principal,
 			long sessionId, ChildLocationRequest request);
@@ -75,6 +79,7 @@ public interface PickupSignalApiDoc {
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (자녀 토큰이 아님)")
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (세션이 없거나 다른 가족의 것)")
+	@ApiResponse(responseCode = "409", description = "SESSION_ALREADY_FINISHED (이미 완료 · 취소된 세션)")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (Idempotency-Key 없음 · 입력값 오류)")
 	@ApiResponse(responseCode = "429", description = "HELP_REQUEST_TOO_SOON (error.nextAllowedAt 함께)")
 	ResponseEntity<HelpRequestResponse> requestHelp(@Parameter(hidden = true) AuthPrincipal principal,

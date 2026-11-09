@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -70,6 +71,7 @@ class ChangeSpotServiceTest {
 
 	// 한국 시간 2026-11-09(월) 17:40
 	private static final Instant NOW = Instant.parse("2026-11-09T08:40:00Z");
+	private static final SessionViewAssembler ASSEMBLER = new SessionViewAssembler(PickupProperties.defaults());
 	private static final LocalDate TODAY_KST = LocalDate.of(2026, 11, 9);
 
 	private static final long SESSION_ID = 501L;
@@ -125,7 +127,7 @@ class ChangeSpotServiceTest {
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, clock);
+		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, clock);
 		changeSpotService = new ChangeSpotService(loadSessionPort, loadSpotPort, saveSessionPort, loadFamilyPort,
 				loadCallPort, sessionEventPort, publishSessionEventPort, sessionAccess, clock);
 		lenient().when(loadSpotPort.loadSpot(FRONT_GATE_SPOT_ID)).thenReturn(Optional.of(
@@ -169,6 +171,27 @@ class ChangeSpotServiceTest {
 		assertThat(exception).isNotNull();
 		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
 		assertThat(exception.code()).isEqualTo("CALL_ALREADY_SENT");
+		verifyNoInteractions(saveSessionPort, sessionEventPort, publishSessionEventPort);
+	}
+
+	@ParameterizedTest(name = "요청 spotVersion {0} · 서버 0")
+	@ValueSource(ints = {1, 2})
+	@DisplayName("장소 변경은 stateVersion이 같아도 요청 spotVersion이 서버와 다르면 STATE_VERSION_CONFLICT와 최신 세션 뷰로 거절하고 아무것도 저장 · 발행하지 않는다")
+	void changeSpotRejectsDifferentSpotVersionWithConflictAndLatestView(int requestedSpotVersion) {
+		givenLockedSession(confirmedFrontGate(waitingChildren()));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> changeSpotService.changeSpot(command(BACK_GATE_SPOT_ID, STATE_VERSION, requestedSpotVersion)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("STATE_VERSION_CONFLICT");
+		assertThat(exception.session()).isInstanceOfSatisfying(SessionView.class, latest -> {
+			assertThat(latest.sessionId()).isEqualTo(SESSION_ID);
+			assertThat(latest.stateVersion()).isEqualTo(STATE_VERSION);
+			assertThat(latest.spot().spotId()).isEqualTo(FRONT_GATE_SPOT_ID);
+			assertThat(latest.spot().spotVersion()).isEqualTo(SPOT_VERSION);
+		});
 		verifyNoInteractions(saveSessionPort, sessionEventPort, publishSessionEventPort);
 	}
 
@@ -239,6 +262,21 @@ class ChangeSpotServiceTest {
 		assertThat(view.spot().spotId()).isEqualTo(BACK_GATE_SPOT_ID);
 	}
 
+	@ParameterizedTest(name = "세션 {0}")
+	@EnumSource(value = SessionStatus.class, names = {"COMPLETED", "CANCELLED"})
+	@DisplayName("장소 변경은 끝난(COMPLETED · CANCELLED) 세션이면 SESSION_ALREADY_FINISHED로 거절하고 아무것도 저장 · 발행하지 않는다")
+	void changeSpotRejectsFinishedSessionWithSessionAlreadyFinished(SessionStatus finishedStatus) {
+		givenLockedSession(finishedFrontGate(finishedStatus));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> changeSpotService.changeSpot(command(BACK_GATE_SPOT_ID)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("SESSION_ALREADY_FINISHED");
+		verifyNoInteractions(saveSessionPort, sessionEventPort, publishSessionEventPort);
+	}
+
 	private void givenLockedSession(PickupSession session) {
 		lenient().when(loadSessionPort.loadForUpdate(SESSION_ID)).thenReturn(Optional.of(session));
 		lenient().when(loadSessionPort.load(SESSION_ID)).thenReturn(Optional.of(session));
@@ -277,8 +315,17 @@ class ChangeSpotServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.APPROACHING,
 				SpotStatus.CONFIRMED, STATE_VERSION, SPOT_VERSION, 1, SPOT_VERSION, false,
-				NOW.plus(Duration.ofMinutes(4)), 1200, NOW.minusSeconds(10), null, null, null, null, null, null, null,
+				NOW.plus(Duration.ofMinutes(4)), 1200, NOW.minusSeconds(10), null, null, null, null, null, null, null, null,
 				children);
+	}
+
+	// 정문으로 확정한 뒤 끝난(완료 · 취소) 세션. stateVersion · spotVersion은 요청과 같다
+	private static PickupSession finishedFrontGate(SessionStatus finishedStatus) {
+		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
+				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, finishedStatus, VehiclePhase.APPROACHING,
+				SpotStatus.CONFIRMED, STATE_VERSION, SPOT_VERSION, 1, SPOT_VERSION, false,
+				NOW.plus(Duration.ofMinutes(4)), 1200, NOW.minusSeconds(10), null, null, null, null, null, null, null, null,
+				waitingChildren());
 	}
 
 	private static List<SessionChild> waitingChildren() {
@@ -313,8 +360,12 @@ class ChangeSpotServiceTest {
 	}
 
 	private static ChangeSpotCommand command(long spotId) {
+		return command(spotId, STATE_VERSION, SPOT_VERSION);
+	}
+
+	private static ChangeSpotCommand command(long spotId, int stateVersion, int spotVersion) {
 		AuthPrincipal vehicle = new AuthPrincipal(PrincipalType.VEHICLE, VEHICLE_ID, FAMILY_ID, null);
-		return new ChangeSpotCommand(vehicle, SESSION_ID, spotId, STATE_VERSION, SPOT_VERSION);
+		return new ChangeSpotCommand(vehicle, SESSION_ID, spotId, stateVersion, spotVersion);
 	}
 
 }

@@ -5,6 +5,7 @@ import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
+import com.example.pickupservice.common.time.TimeUtils;
 import com.example.pickupservice.pickup.application.port.in.VehicleEventCommand;
 import com.example.pickupservice.pickup.application.port.out.LoadCallPort;
 import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
@@ -52,6 +53,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -230,7 +232,26 @@ class ReceiveVehicleEventServiceTest {
 		receiveVehicleEventService.receive(command("STOPPED", STOPPED_AT, null));
 
 		assertThat(appendedEvents).hasSize(1);
-		assertThat(appendedEvents.get(0).getPayload()).containsEntry("predictedStopAt", PREDICTED_STOP_AT);
+		assertThat(appendedEvents.get(0).getPayload())
+				.containsEntry("predictedStopAt", TimeUtils.toKst(PREDICTED_STOP_AT));
+	}
+
+	@Test
+	@DisplayName("VEHICLE_STOPPED payload의 predictedStopAt은 저장 · 발행 모두 TimeUtils.toKst와 같은 +09:00 문자열이다")
+	void stoppedPayloadPredictedStopAtIsKstOffsetString() {
+		givenLockedSession(approachingSession(PREDICTED_STOP_AT));
+
+		receiveVehicleEventService.receive(command("STOPPED", STOPPED_AT, null));
+
+		Object appended = appendedEvents.get(0).getPayload().get("predictedStopAt");
+		assertThat(appended).isEqualTo(TimeUtils.toKst(PREDICTED_STOP_AT)).isEqualTo("2026-11-09T17:51:30+09:00");
+		ArgumentCaptor<SessionEventMessage> captor = ArgumentCaptor.forClass(SessionEventMessage.class);
+		verify(publishSessionEventPort, atLeastOnce()).publish(captor.capture());
+		SessionEventMessage published = captor.getAllValues().stream()
+				.filter(message -> "VEHICLE_STOPPED".equals(message.type()))
+				.findFirst()
+				.orElseThrow();
+		assertThat(published.payload().get("predictedStopAt")).isEqualTo("2026-11-09T17:51:30+09:00");
 	}
 
 	@Test
@@ -302,6 +323,45 @@ class ReceiveVehicleEventServiceTest {
 	}
 
 	// #107 DOOR_CYCLE 탑승 후보
+
+	@Test
+	@DisplayName("완료(COMPLETED)된 세션에 온 DOOR_CYCLE은 오류 없이 무시하고 eventId는 처리한 것으로 남기며 세션 저장 · 이벤트 저장 · 발행을 하지 않는다")
+	void doorCycleOnCompletedSessionIsIgnoredButEventIdIsMarkedProcessed() {
+		PickupSession completed = completedSession();
+		givenLockedSession(completed);
+		givenLiveCall(call(CallStatus.ACKNOWLEDGED));
+		int stateVersionBefore = completed.getStateVersion();
+
+		assertThatCode(() -> receiveVehicleEventService.receive(command("DOOR_CYCLE", DOOR_AT.plusSeconds(60), "REAR_RIGHT")))
+				.doesNotThrowAnyException();
+
+		verify(processedVehicleEventPort).markProcessed(SESSION_ID, EVENT_ID);
+		verify(saveSessionPort, never()).save(any());
+		verify(sessionEventPort, never()).append(anyLong(), anyString(), anyInt(), any(), any());
+		verify(publishSessionEventPort, never()).publish(any());
+		assertThat(completed.getSessionStatus()).isEqualTo(SessionStatus.COMPLETED);
+		assertThat(completed.getStateVersion()).isEqualTo(stateVersionBefore);
+	}
+
+	@Test
+	@DisplayName("취소(CANCELLED)된 세션에 온 DOOR_CYCLE은 오류 없이 무시하고 eventId는 처리한 것으로 남기며 세션 저장 · 이벤트 저장 · 발행을 하지 않는다")
+	void doorCycleOnCancelledSessionIsIgnoredButEventIdIsMarkedProcessed() {
+		PickupSession cancelled = session(SessionStatus.CANCELLED, VehiclePhase.STOPPED, PREDICTED_STOP_AT,
+				calledChildren());
+		givenLockedSession(cancelled);
+		givenLiveCall(call(CallStatus.ACKNOWLEDGED));
+		int stateVersionBefore = cancelled.getStateVersion();
+
+		assertThatCode(() -> receiveVehicleEventService.receive(command("DOOR_CYCLE", DOOR_AT, "REAR_RIGHT")))
+				.doesNotThrowAnyException();
+
+		verify(processedVehicleEventPort).markProcessed(SESSION_ID, EVENT_ID);
+		verify(saveSessionPort, never()).save(any());
+		verify(sessionEventPort, never()).append(anyLong(), anyString(), anyInt(), any(), any());
+		verify(publishSessionEventPort, never()).publish(any());
+		assertThat(cancelled.getSessionStatus()).isEqualTo(SessionStatus.CANCELLED);
+		assertThat(cancelled.getStateVersion()).isEqualTo(stateVersionBefore);
+	}
 
 	@ParameterizedTest(name = "호출 {0}")
 	@EnumSource(value = CallStatus.class, names = {"SENT", "DELIVERED", "ACKNOWLEDGED"})
@@ -456,7 +516,7 @@ class ReceiveVehicleEventServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, status, phase, SpotStatus.CONFIRMED, STATE_VERSION,
 				0, 1, 0, false, etaAt, etaAt == null ? null : 40, etaAt == null ? null : ETA_UPDATED_AT, null, null,
-				null, null, null, null, null, children);
+				null, null, null, null, null, null, children);
 	}
 
 	// 문 열림으로 두 자녀가 탔고 취소 창이 지나 자동 완료된 세션(차량은 아직 정차 중)
@@ -469,7 +529,7 @@ class ReceiveVehicleEventServiceTest {
 		PickupSession session = PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.STOPPED,
 				SpotStatus.CONFIRMED, STATE_VERSION, 0, 1, 0, false, PREDICTED_STOP_AT, 40, ETA_UPDATED_AT, DOOR_AT,
-				DOOR_AT.plus(CANCEL_WINDOW), BoardingDoor.REAR_RIGHT, null, null, null, null, boarded);
+				DOOR_AT.plus(CANCEL_WINDOW), BoardingDoor.REAR_RIGHT, null, null, null, null, null, boarded);
 		session.complete(BoardingMethod.DOOR, List.of(), DOOR_AT.plus(CANCEL_WINDOW).plusSeconds(1));
 		return session;
 	}

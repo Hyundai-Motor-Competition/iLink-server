@@ -5,6 +5,7 @@ import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
+import com.example.pickupservice.common.time.TimeUtils;
 import com.example.pickupservice.pickup.application.port.in.ExtendPrepTimeCommand;
 import com.example.pickupservice.pickup.application.port.in.PrepExtensionResult;
 import com.example.pickupservice.pickup.application.port.out.LoadCallPort;
@@ -34,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -227,6 +229,19 @@ class ExtendPrepTimeServiceTest {
 	}
 
 	@Test
+	@DisplayName("PREP_TIME_EXTENDED payload의 callNotBefore는 저장 · 발행 모두 TimeUtils.toKst와 같은 +09:00 문자열이다")
+	void prepTimeExtendedPayloadCallNotBeforeIsKstOffsetString() {
+		givenLockedSession(waitingSession(0, null));
+
+		extendPrepTimeService.extend(minjunCommand(5));
+
+		String expected = TimeUtils.toKst(Instant.parse("2026-11-09T09:14:00Z"));
+		assertThat(expected).isEqualTo("2026-11-09T18:14:00+09:00");
+		assertThat(appendedEventOf("PREP_TIME_EXTENDED").getPayload()).containsEntry("callNotBefore", expected);
+		assertThat(publishedMessageOf("PREP_TIME_EXTENDED").payload()).containsEntry("callNotBefore", expected);
+	}
+
+	@Test
 	@DisplayName("준비 시간 추가는 보호자에게 PREP_EXTENDED 알림 기록을 한 번 요청한다 — 호출 전이라 callId는 null")
 	void extendRequestsPrepExtendedNotificationForGuardian() {
 		givenLockedSession(waitingSession(0, null));
@@ -251,6 +266,21 @@ class ExtendPrepTimeServiceTest {
 
 		assertThat(result.extraPrepMinutes()).isEqualTo(15);
 		assertThat(result.callNotBefore()).isEqualTo(Instant.parse("2026-11-09T09:24:00Z"));
+	}
+
+	@ParameterizedTest(name = "세션 {0}")
+	@EnumSource(value = SessionStatus.class, names = {"COMPLETED", "CANCELLED"})
+	@DisplayName("준비 시간 추가는 끝난(COMPLETED · CANCELLED) 세션이면 SESSION_ALREADY_FINISHED로 거절한다 — 409를 주고 세션 · 이벤트 저장, 발행, 알림 기록 요청을 하지 않는다")
+	void extendRejectsFinishedSessionWithSessionAlreadyFinished(SessionStatus finishedStatus) {
+		givenLockedSession(finishedWaitingSession(finishedStatus));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> extendPrepTimeService.extend(minjunCommand(5)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("SESSION_ALREADY_FINISHED");
+		verifyNoInteractions(saveSessionPort, sessionEventPort, publishSessionEventPort, recordNotificationPort);
 	}
 
 	// 세션을 바꾸는 요청이므로 행 잠금(loadForUpdate)으로 읽는다(설계서 「세션 행 잠금 범위」)
@@ -317,11 +347,24 @@ class ExtendPrepTimeServiceTest {
 						null, null)));
 	}
 
+	// 호출 전 두 자녀가 기다리다 끝난(완료 · 취소) 세션
+	private static PickupSession finishedWaitingSession(SessionStatus finishedStatus) {
+		return session(finishedStatus, List.of(
+				SessionChild.restore(7001L, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.WAITING, 0, null, null, null,
+						null, null),
+				SessionChild.restore(7002L, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.WAITING, 0, null, null, null,
+						null, null)));
+	}
+
 	private static PickupSession session(List<SessionChild> children) {
+		return session(SessionStatus.ACTIVE, children);
+	}
+
+	private static PickupSession session(SessionStatus status, List<SessionChild> children) {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
-				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.APPROACHING,
+				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, status, VehiclePhase.APPROACHING,
 				SpotStatus.CONFIRMED, STATE_VERSION, 0, 1, 0, false, NOW.plus(Duration.ofMinutes(4)), 1500,
-				NOW.minusSeconds(10), null, null, null, null, null, null, null, children);
+				NOW.minusSeconds(10), null, null, null, null, null, null, null, null, children);
 	}
 
 	private static ExtendPrepTimeCommand minjunCommand(int minutes) {

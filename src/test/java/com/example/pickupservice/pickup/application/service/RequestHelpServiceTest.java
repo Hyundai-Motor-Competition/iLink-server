@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -220,6 +221,22 @@ class RequestHelpServiceTest {
 		verify(recordNotificationPort).recordNotifications(any(NotificationRequest.class));
 	}
 
+	@ParameterizedTest(name = "세션 {0}")
+	@EnumSource(value = SessionStatus.class, names = {"COMPLETED", "CANCELLED"})
+	@DisplayName("도움 요청은 끝난(COMPLETED · CANCELLED) 세션이면 409 SESSION_ALREADY_FINISHED로 거절하고 이벤트 저장 · 발행 · 알림 기록 요청을 하지 않는다")
+	void requestRejectsFinishedSessionWithSessionAlreadyFinished(SessionStatus finishedStatus) {
+		lenient().when(loadSessionPort.loadForUpdate(SESSION_ID)).thenReturn(Optional.of(finishedSession(finishedStatus)));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> requestHelpService.request(command(MINJUN_ID, "NEED_HELP")));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("SESSION_ALREADY_FINISHED");
+		verify(sessionEventPort, never()).append(anyLong(), anyString(), anyInt(), any(), any());
+		verifyNoInteractions(publishSessionEventPort, recordNotificationPort);
+	}
+
 	// loadLastHelpRequest는 그 아이(payload childUserId)의 마지막 HELP_REQUESTED만 돌려준다
 	private void givenLastHelpRequest(long childUserId, Instant requestedAt) {
 		SessionEvent last = SessionEvent.restore(EVENT_ID_BASE + LAST_SEQ, SESSION_ID, LAST_SEQ,
@@ -248,10 +265,15 @@ class RequestHelpServiceTest {
 
 	// 합류 안내를 받고 두 자녀가 차로 오는 중인 세션(「차를 못 찾고 있어요」가 나올 수 있는 때)
 	private static PickupSession calledSession() {
+		return finishedSession(SessionStatus.ACTIVE);
+	}
+
+	// calledSession과 같은 세션을 주어진 상태로(끝난 상태 포함) 만든다
+	private static PickupSession finishedSession(SessionStatus status) {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
-				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.STOPPED,
+				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, status, VehiclePhase.STOPPED,
 				SpotStatus.CONFIRMED, STATE_VERSION, 0, 1, 0, false, NOW.minusSeconds(20), 0,
-				NOW.minusSeconds(5), null, null, null, null, null, null, null, List.of(
+				NOW.minusSeconds(5), null, null, null, null, null, null, null, null, List.of(
 						SessionChild.restore(7001L, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.CALLED, 0, null, null,
 								null, null, null),
 						SessionChild.restore(7002L, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.CALLED, 0, null, null,

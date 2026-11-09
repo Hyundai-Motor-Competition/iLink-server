@@ -33,6 +33,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -69,6 +71,7 @@ class ConfirmRouteServiceTest {
 
 	// 한국 시간 2026-11-09(월) 17:30
 	private static final Instant NOW = Instant.parse("2026-11-09T08:30:00Z");
+	private static final SessionViewAssembler ASSEMBLER = new SessionViewAssembler(PickupProperties.defaults());
 	private static final LocalDate TODAY_KST = LocalDate.of(2026, 11, 9);
 
 	private static final long SESSION_ID = 501L;
@@ -132,7 +135,7 @@ class ConfirmRouteServiceTest {
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, clock);
+		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, clock);
 		confirmRouteService = new ConfirmRouteService(loadSessionPort, loadSpotPort, saveSessionPort, loadFamilyPort,
 				loadCallPort, sessionEventPort, publishSessionEventPort, recordNotificationPort, sessionAccess,
 				clock);
@@ -341,6 +344,21 @@ class ConfirmRouteServiceTest {
 		verifyNoInteractions(saveSessionPort, sessionEventPort, publishSessionEventPort, recordNotificationPort);
 	}
 
+	@ParameterizedTest(name = "세션 {0}")
+	@EnumSource(value = SessionStatus.class, names = {"COMPLETED", "CANCELLED"})
+	@DisplayName("경로 확정은 끝난(COMPLETED · CANCELLED) 세션이면 SESSION_ALREADY_FINISHED로 거절하고 저장 · 알림 기록 요청 · 발행을 하지 않는다")
+	void confirmRouteRejectsFinishedSessionWithSessionAlreadyFinished(SessionStatus finishedStatus) {
+		givenLockedSession(finishedBeforeFirstConfirm(finishedStatus));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> confirmRouteService.confirmRoute(command(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("SESSION_ALREADY_FINISHED");
+		verifyNoInteractions(saveSessionPort, sessionEventPort, publishSessionEventPort, recordNotificationPort);
+	}
+
 	private void givenLockedSession(PickupSession session) {
 		lenient().when(loadSessionPort.loadForUpdate(SESSION_ID)).thenReturn(Optional.of(session));
 	}
@@ -354,7 +372,7 @@ class ConfirmRouteServiceTest {
 		assertThat(exception.session()).isInstanceOfSatisfying(SessionView.class, latest -> {
 			assertThat(latest.stateVersion()).isEqualTo(serverSession.getStateVersion());
 			assertThat(latest.status().spot()).isEqualTo(SpotStatus.SELECTED);
-			assertThat(latest).isEqualTo(SessionViewAssembler.assemble(serverSession, vehicle(VEHICLE_ID),
+			assertThat(latest).isEqualTo(ASSEMBLER.assemble(serverSession, vehicle(VEHICLE_ID),
 					new FamilyInfo(FAMILY_ID, JoinCallMode.AUTO, 0), familyMembers(), Optional.empty(), NOW));
 		});
 	}
@@ -397,14 +415,22 @@ class ConfirmRouteServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.ROUTING,
 				SpotStatus.SELECTED, FIRST_STATE_VERSION, 0, 0, null, false, NOW.plus(Duration.ofMinutes(12)), 4200,
-				NOW.minusSeconds(10), null, null, null, null, null, null, null, waitingChildren());
+				NOW.minusSeconds(10), null, null, null, null, null, null, null, null, waitingChildren());
+	}
+
+	// 경로를 한 번도 확정하지 못한 채 끝난(완료 · 취소) 세션
+	private static PickupSession finishedBeforeFirstConfirm(SessionStatus finishedStatus) {
+		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
+				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, finishedStatus, VehiclePhase.ROUTING,
+				SpotStatus.SELECTED, FIRST_STATE_VERSION, 0, 0, null, false, NOW.plus(Duration.ofMinutes(12)), 4200,
+				NOW.minusSeconds(10), null, null, null, null, null, null, null, null, waitingChildren());
 	}
 
 	private static PickupSession afterSpotChanged() {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, BACK_GATE_SPOT_ID, "후문 앞",
 				BACK_STOP_POINT, BACK_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.ROUTING,
 				SpotStatus.SELECTED, CHANGED_STATE_VERSION, 1, 1, 0, false, NOW.plus(Duration.ofMinutes(9)), 3100,
-				NOW.minusSeconds(10), null, null, null, null, null, null, null, waitingChildren());
+				NOW.minusSeconds(10), null, null, null, null, null, null, null, null, waitingChildren());
 	}
 
 	private static List<SessionChild> waitingChildren() {

@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +62,7 @@ public class StartPickupService implements StartPickupUseCase {
 	private final SessionEventPort sessionEventPort;
 	private final PublishSessionEventPort publishSessionEventPort;
 	private final RecordNotificationPort recordNotificationPort;
+	private final SessionViewAssembler sessionViewAssembler;
 	private final Clock clock;
 
 	@Override
@@ -69,9 +71,11 @@ public class StartPickupService implements StartPickupUseCase {
 			throw PickupErrors.notToday();
 		}
 		List<ScheduleInfo> schedules = loadSchedulePort.loadSchedules(command.scheduleIds());
+		long familyId = command.principal().familyId();
+		requireAllFoundInFamily(schedules, command, familyId);
+		requireOnePerChildOnToday(schedules, command.date());
 		long academyId = singleAcademyId(schedules);
 		requireSameTargetPickupTime(schedules);
-		long familyId = command.principal().familyId();
 		Optional<SpotInfo> defaultSpot = loadSpotPort.loadDefaultSpot(familyId, academyId);
 		requireSetupComplete(schedules, defaultSpot);
 		Optional<PickupSession> activeSession = loadSessionPort.loadActiveByVehicle(command.principal().id());
@@ -88,8 +92,31 @@ public class StartPickupService implements StartPickupUseCase {
 		publishSessionEventPort.publish(SessionEventMessages.of(event, receiverUserIds));
 		recordNotificationPort.recordNotifications(
 				new NotificationRequest(session.getSessionId(), null, SESSION_STARTED, receiverUserIds));
-		return new StartPickupResult(true, SessionViewAssembler.assemble(session, command.principal(),
+		return new StartPickupResult(true, sessionViewAssembler.assemble(session, command.principal(),
 				loadFamilyPort.loadFamily(familyId), members, loadCallPort.loadLatestCall(session.getSessionId()), now));
+	}
+
+	private void requireAllFoundInFamily(List<ScheduleInfo> schedules, StartPickupCommand command, long familyId) {
+		if (schedules.size() < Set.copyOf(command.scheduleIds()).size()) {
+			throw PickupErrors.notFound();
+		}
+		boolean allInFamily = schedules.stream()
+				.map(ScheduleInfo::childUserId)
+				.distinct()
+				.allMatch(childUserId -> loadFamilyPort.loadMember(childUserId)
+						.filter(member -> member.familyId() == familyId)
+						.isPresent());
+		if (!allInFamily) {
+			throw PickupErrors.notFound();
+		}
+	}
+
+	private static void requireOnePerChildOnToday(List<ScheduleInfo> schedules, LocalDate date) {
+		boolean allToday = schedules.stream().allMatch(schedule -> schedule.weekdays().contains(date.getDayOfWeek()));
+		long distinctChildren = schedules.stream().map(ScheduleInfo::childUserId).distinct().count();
+		if (!allToday || distinctChildren != schedules.size()) {
+			throw PickupErrors.schedulesNotGroupable();
+		}
 	}
 
 	private static SpotSnapshot snapshotOf(SpotInfo spot) {
@@ -142,7 +169,7 @@ public class StartPickupService implements StartPickupUseCase {
 
 	private SessionView viewOf(PickupSession session, AuthPrincipal viewer) {
 		long familyId = session.getFamilyId();
-		return SessionViewAssembler.assemble(session, viewer, loadFamilyPort.loadFamily(familyId),
+		return sessionViewAssembler.assemble(session, viewer, loadFamilyPort.loadFamily(familyId),
 				loadFamilyPort.loadMembers(familyId), loadCallPort.loadLatestCall(session.getSessionId()),
 				clock.instant());
 	}

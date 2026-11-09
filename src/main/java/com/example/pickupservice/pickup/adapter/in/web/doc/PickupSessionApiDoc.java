@@ -62,7 +62,8 @@ public interface PickupSessionApiDoc {
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (차량 토큰이 아님)")
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (세션이 없거나 다른 가족의 것)")
-	@ApiResponse(responseCode = "409", description = "STATE_VERSION_CONFLICT (stateVersion이 다름, 최신 session 함께)")
+	@ApiResponse(responseCode = "409", description = "STATE_VERSION_CONFLICT (stateVersion이 다르거나 spotId가 세션 장소와 다름, "
+			+ "최신 session 함께) · SESSION_ALREADY_FINISHED (이미 완료 · 취소된 세션)")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (Idempotency-Key 없음) · "
 			+ "SPOT_NOT_SAVED (가족이 저장한 장소가 아님)")
 	ResponseEntity<SessionViewResponse> confirmRoute(@Parameter(hidden = true) AuthPrincipal principal,
@@ -77,7 +78,8 @@ public interface PickupSessionApiDoc {
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (DELEGATE · TEACHER · CHILD 토큰)")
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (세션이 없거나 다른 가족의 것)")
 	@ApiResponse(responseCode = "409", description = "CHILD_ALREADY_MOVING (자녀가 이동 중) · "
-			+ "CALL_ALREADY_SENT (합류 안내를 이미 보냄, 먼저 철회) · STATE_VERSION_CONFLICT (최신 SessionView 함께)")
+			+ "CALL_ALREADY_SENT (합류 안내를 이미 보냄, 먼저 철회) · STATE_VERSION_CONFLICT (최신 SessionView 함께) · "
+			+ "SESSION_ALREADY_FINISHED (이미 완료 · 취소된 세션)")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (Idempotency-Key 없음 · 입력값 오류)")
 	ResponseEntity<SessionViewResponse> changeSpot(@Parameter(hidden = true) AuthPrincipal principal,
 			long sessionId, ChangeSpotRequest request);
@@ -176,7 +178,7 @@ public interface PickupSessionApiDoc {
 	@ApiResponse(responseCode = "200", description = "SessionView (status.session ON_HOLD, incident 채워짐)")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (차량 토큰이 아님)")
-	@ApiResponse(responseCode = "404", description = "NOT_FOUND (세션이 없거나 다른 가족의 것)")
+	@ApiResponse(responseCode = "404", description = "NOT_FOUND (세션이 없거나 다른 가족의 것, 세션에 없는 childUserId)")
 	@ApiResponse(responseCode = "409", description = "INCIDENT_ALREADY_OPEN (이미 열린 예외가 있음) · "
 			+ "SESSION_ALREADY_FINISHED (이미 완료 · 취소된 세션) · STATE_VERSION_CONFLICT (최신 SessionView 함께)")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (Idempotency-Key 없음 · 입력값 오류)")

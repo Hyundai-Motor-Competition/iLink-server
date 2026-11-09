@@ -23,7 +23,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-// SIG-05 도움 요청: 세션 상태를 바꾸지 않아 세션을 저장하지 않고 stateVersion도 올리지 않는다
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -45,6 +44,9 @@ public class RequestHelpService implements RequestHelpUseCase {
 		PickupSession session = loadSessionPort.loadForUpdate(command.sessionId())
 				.orElseThrow(PickupErrors::notFound);
 		SessionAccess.requireVisible(session, command.principal());
+		if (session.isFinished()) {
+			throw PickupErrors.sessionAlreadyFinished();
+		}
 		long childUserId = command.principal().id();
 		Instant now = clock.instant();
 		HelpRequestDecision decision = HelpRequestRule.decide(

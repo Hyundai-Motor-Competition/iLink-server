@@ -51,6 +51,9 @@ public class ConfirmRouteService implements ConfirmRouteUseCase {
 				.orElseThrow(PickupErrors::notFound);
 		SessionAccess.requireVisible(locked, command.principal());
 		sessionAccess.requireStateVersion(locked, command.stateVersion(), command.principal());
+		if (locked.isFinished()) {
+			throw PickupErrors.sessionAlreadyFinished();
+		}
 		requireSavedByFamily(command.spotId(), locked.getFamilyId());
 		requireSessionSpot(locked, command);
 		boolean firstConfirm = locked.getRouteVersion() == 0;
@@ -65,7 +68,7 @@ public class ConfirmRouteService implements ConfirmRouteUseCase {
 			recordNotificationPort.recordNotifications(new NotificationRequest(session.getSessionId(), null,
 					DEPARTURE_NOTIFICATION, SessionReceivers.sessionChildren(session)));
 		}
-		return SessionViewAssembler.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
+		return sessionAccess.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
 				members, loadCallPort.loadLatestCall(session.getSessionId()), now);
 	}
 
@@ -78,7 +81,6 @@ public class ConfirmRouteService implements ConfirmRouteUseCase {
 		}
 	}
 
-	// 세션의 지금 장소와 다른 spotId면 STATE_VERSION_CONFLICT와 요청 차량 기준 최신 세션 뷰
 	private void requireSessionSpot(PickupSession locked, ConfirmRouteCommand command) {
 		if (command.spotId() != locked.getSpotId()) {
 			throw PickupErrors.stateVersionConflict(sessionAccess.latestView(locked, command.principal()));

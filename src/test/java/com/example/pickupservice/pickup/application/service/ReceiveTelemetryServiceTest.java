@@ -4,6 +4,7 @@ import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
+import com.example.pickupservice.common.time.TimeUtils;
 import com.example.pickupservice.pickup.application.port.in.CallGuardView;
 import com.example.pickupservice.pickup.application.port.in.TelemetryCommand;
 import com.example.pickupservice.pickup.application.port.out.LoadCallPort;
@@ -188,6 +189,19 @@ class ReceiveTelemetryServiceTest {
 		assertThat(message.stateVersion()).isEqualTo(STATE_VERSION);
 		assertThat(message.occurredAt()).isEqualTo(OBSERVED_AT);
 		assertThat(message.receiverUserIds()).isEmpty();
+	}
+
+	@Test
+	@DisplayName("ETA_UPDATED payload의 etaAt은 TimeUtils.toKst와 같은 +09:00 문자열이다")
+	void etaUpdatedPayloadEtaAtIsKstOffsetString() {
+		givenLockedSession(readyForCall().build());
+
+		receiveTelemetryService.receive(farFromSpot());
+
+		SessionEventMessage message = publishedMessageOf("ETA_UPDATED");
+		assertThat(message.payload().get("etaAt"))
+				.isEqualTo(TimeUtils.toKst(OBSERVED_AT.plusSeconds(600)))
+				.isEqualTo("2026-11-09T18:18:58+09:00");
 	}
 
 	@Test
@@ -450,6 +464,24 @@ class ReceiveTelemetryServiceTest {
 		assertThat(session.getRemainingMeters()).isEqualTo(PREVIOUS_REMAINING_METERS);
 	}
 
+	@ParameterizedTest(name = "세션 {0}")
+	@EnumSource(value = SessionStatus.class, names = {"COMPLETED", "CANCELLED"})
+	@DisplayName("끝난(COMPLETED · CANCELLED) 세션의 차량 ETA 수신은 오류 없이 무시해 ETA를 저장하지 않고 ETA_UPDATED를 발행하지 않으며 트리거를 만족해도 호출을 만들지 않는다")
+	void telemetryOnFinishedSessionIsIgnored(SessionStatus finished) {
+		PickupSession session = readyForCall().sessionStatus(finished).build();
+		givenLockedSession(session);
+
+		// 직전 SIG-01보다 새로 잰 값이고 ETA 170초 · 650m라 트리거는 맞는다
+		receiveTelemetryService.receive(etaWithin3MinutesAndWithin700Meters());
+
+		verify(saveSessionPort, never()).save(any());
+		verify(publishSessionEventPort, never()).publish(any());
+		assertNoCallCreated();
+		assertThat(session.getEtaUpdatedAt()).isEqualTo(PREVIOUS_OBSERVED_AT);
+		assertThat(session.getEtaAt()).isEqualTo(PREVIOUS_OBSERVED_AT.plusSeconds(PREVIOUS_NAV_ETA_SECONDS));
+		assertThat(session.getRemainingMeters()).isEqualTo(PREVIOUS_REMAINING_METERS);
+	}
+
 	// ── 준비 ──
 
 	private void givenLockedSession(PickupSession session) {
@@ -539,7 +571,7 @@ class ReceiveTelemetryServiceTest {
 			return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 					FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, sessionStatus, VehiclePhase.APPROACHING,
 					spotStatus, STATE_VERSION, spotVersion, ROUTE_VERSION, routeSpotVersion, callHeld, etaAt,
-					remainingMeters, etaUpdatedAt, null, null, null, null, null, null, null, children);
+					remainingMeters, etaUpdatedAt, null, null, null, null, null, null, null, null, children);
 		}
 	}
 
@@ -582,7 +614,7 @@ class ReceiveTelemetryServiceTest {
 	// 저장된 세션을 차량이 SES-03으로 볼 때의 call.guard
 	private CallGuardView guardViewOf(PickupSession session) {
 		AuthPrincipal vehicle = new AuthPrincipal(PrincipalType.VEHICLE, VEHICLE_ID, FAMILY_ID, null);
-		return SessionViewAssembler.assemble(session, vehicle, new FamilyInfo(FAMILY_ID, JoinCallMode.AUTO, 0),
+		return new SessionViewAssembler(PROPERTIES).assemble(session, vehicle, new FamilyInfo(FAMILY_ID, JoinCallMode.AUTO, 0),
 				List.of(), Optional.empty(), clock.instant()).call().guard();
 	}
 

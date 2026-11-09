@@ -48,6 +48,12 @@ public class ChangeSpotService implements ChangeSpotUseCase {
 				.orElseThrow(PickupErrors::notFound);
 		SessionAccess.requireVisible(locked, command.principal());
 		sessionAccess.requireStateVersion(locked, command.stateVersion(), command.principal());
+		if (locked.isFinished()) {
+			throw PickupErrors.sessionAlreadyFinished();
+		}
+		if (locked.getSpotVersion() != command.spotVersion()) {
+			throw PickupErrors.stateVersionConflict(sessionAccess.latestView(locked, command.principal()));
+		}
 		SpotSnapshot spot = savedSpotOf(command.spotId(), locked.getFamilyId());
 		changeSpot(locked, spot);
 		if (loadCallPort.loadLiveCall(locked.getSessionId()).isPresent()) {
@@ -61,7 +67,7 @@ public class ChangeSpotService implements ChangeSpotUseCase {
 				session.getStateVersion(), now, Map.of());
 		publishSessionEventPort.publish(
 				SessionEventMessages.of(event, SessionReceivers.guardiansAndSessionChildren(session, members)));
-		return SessionViewAssembler.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
+		return sessionAccess.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
 				members, loadCallPort.loadLatestCall(session.getSessionId()), now);
 	}
 

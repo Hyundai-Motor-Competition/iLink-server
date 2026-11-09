@@ -1,5 +1,6 @@
 package com.example.pickupservice.pickup.application.service;
 
+import com.example.pickupservice.common.time.TimeUtils;
 import com.example.pickupservice.pickup.application.port.in.ExtendPrepTimeCommand;
 import com.example.pickupservice.pickup.application.port.in.ExtendPrepTimeUseCase;
 import com.example.pickupservice.pickup.application.port.in.PrepExtensionResult;
@@ -25,7 +26,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-// SIG-03 준비 시간 추가
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -49,6 +49,9 @@ public class ExtendPrepTimeService implements ExtendPrepTimeUseCase {
 		PickupSession locked = loadSessionPort.loadForUpdate(command.sessionId())
 				.orElseThrow(PickupErrors::notFound);
 		SessionAccess.requireVisible(locked, command.principal());
+		if (locked.isFinished()) {
+			throw PickupErrors.sessionAlreadyFinished();
+		}
 		if (loadCallPort.loadLiveCall(locked.getSessionId()).isPresent()) {
 			throw PickupErrors.callAlreadySent();
 		}
@@ -61,7 +64,7 @@ public class ExtendPrepTimeService implements ExtendPrepTimeUseCase {
 				session.getStateVersion(), now, Map.of(
 						"childUserId", childUserId,
 						"extraPrepMinutes", child.getExtraPrepMinutes(),
-						"callNotBefore", child.getCallNotBefore()));
+						"callNotBefore", TimeUtils.toKst(child.getCallNotBefore())));
 		List<Long> guardianIds = SessionReceivers.guardians(loadFamilyPort.loadMembers(session.getFamilyId()));
 		publishSessionEventPort.publish(SessionEventMessages.of(event, guardianIds));
 		recordNotificationPort.recordNotifications(

@@ -1,5 +1,6 @@
 package com.example.pickupservice.pickup.application.service;
 
+import com.example.pickupservice.common.time.TimeUtils;
 import com.example.pickupservice.pickup.application.port.in.ReceiveTelemetryUseCase;
 import com.example.pickupservice.pickup.application.port.in.TelemetryCommand;
 import com.example.pickupservice.pickup.application.port.out.LoadSessionPort;
@@ -8,6 +9,7 @@ import com.example.pickupservice.pickup.application.port.out.SaveSessionPort;
 import com.example.pickupservice.pickup.application.port.out.SessionEventMessage;
 import com.example.pickupservice.pickup.domain.PickupSession;
 import com.example.pickupservice.pickup.domain.SessionEventType;
+import com.example.pickupservice.pickup.domain.SessionStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,10 @@ public class ReceiveTelemetryService implements ReceiveTelemetryUseCase {
 		PickupSession locked = loadSessionPort.loadForUpdate(command.sessionId())
 				.orElseThrow(PickupErrors::notFound);
 		SessionAccess.requireVisible(locked, command.principal());
+		if (locked.getSessionStatus() == SessionStatus.COMPLETED
+				|| locked.getSessionStatus() == SessionStatus.CANCELLED) {
+			return;
+		}
 		if (isOlderThanLatest(locked, command.observedAt())) {
 			return;
 		}
@@ -42,15 +48,13 @@ public class ReceiveTelemetryService implements ReceiveTelemetryUseCase {
 		callEngine.triggerIfReady(session, command.navEtaSeconds(), command.remainingMeters());
 	}
 
-	// 이미 반영한 값보다 먼저 잰 값이 늦게 오면 버린다
 	private static boolean isOlderThanLatest(PickupSession session, Instant observedAt) {
 		Instant etaUpdatedAt = session.getEtaUpdatedAt();
 		return etaUpdatedAt != null && observedAt.isBefore(etaUpdatedAt);
 	}
 
-	// ETA_UPDATED는 저장하지 않아 eventId · seq가 없고 차량 SSE로만 간다
 	private void publishEtaUpdated(PickupSession session, Instant observedAt) {
-		Map<String, Object> payload = Map.of("etaAt", session.getEtaAt(),
+		Map<String, Object> payload = Map.of("etaAt", TimeUtils.toKst(session.getEtaAt()),
 				"remainingMeters", session.getRemainingMeters());
 		publishSessionEventPort.publish(new SessionEventMessage(session.getSessionId(), null, null, ETA_UPDATED,
 				session.getStateVersion(), observedAt, payload, List.of()));
