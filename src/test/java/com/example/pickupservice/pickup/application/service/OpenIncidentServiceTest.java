@@ -1,10 +1,13 @@
 package com.example.pickupservice.pickup.application.service;
 
+import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.pickup.application.port.in.OpenIncidentCommand;
+import com.example.pickupservice.pickup.application.port.in.SessionIncidentView;
+import com.example.pickupservice.pickup.application.port.in.SessionView;
 import com.example.pickupservice.pickup.application.port.out.LoadCallPort;
 import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
 import com.example.pickupservice.pickup.application.port.out.LoadSessionPort;
@@ -32,6 +35,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -44,6 +48,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -51,12 +56,14 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class OpenIncidentServiceTest {
 
 	// 한국 시간 2026-11-09(월) 18:12:10. 탑승 인식 뒤 민준이 타지 않은 것을 확인한 상황
 	private static final Instant NOW = Instant.parse("2026-11-09T09:12:10Z");
+	private static final SessionViewAssembler ASSEMBLER = new SessionViewAssembler(PickupProperties.defaults());
 	private static final Instant BOARDING_DETECTED_AT = NOW.minusSeconds(15);
 	private static final LocalDate TODAY_KST = LocalDate.of(2026, 11, 9);
 
@@ -66,6 +73,8 @@ class OpenIncidentServiceTest {
 	private static final long GUARDIAN_ID = 31L;
 	private static final long MINJUN_ID = 33L;
 	private static final long SEOYUN_ID = 34L;
+	// 같은 가족이지만 이 세션에 없는 자녀
+	private static final long OUTSIDE_CHILD_ID = 35L;
 	private static final long MINJUN_SCHEDULE_ID = 801L;
 	private static final long SEOYUN_SCHEDULE_ID = 802L;
 	private static final long SPOT_ID = 21L;
@@ -102,7 +111,7 @@ class OpenIncidentServiceTest {
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, clock);
+		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, clock);
 		openIncidentService = new OpenIncidentService(loadSessionPort, saveSessionPort, loadFamilyPort, loadCallPort,
 				sessionEventPort, publishSessionEventPort, sessionAccess, clock);
 		lenient().when(loadFamilyPort.loadFamily(FAMILY_ID))
@@ -159,6 +168,23 @@ class OpenIncidentServiceTest {
 	}
 
 	@Test
+	@DisplayName("탑승 예외는 대상 자녀를 세션의 incidentChildUserId로 저장한다")
+	void openIncidentSavesIncidentChildUserIdOnSession() {
+		openIncidentService.openIncident(command());
+
+		PickupSession saved = savedSession();
+		assertThat(saved.getIncidentChildUserId()).isEqualTo(MINJUN_ID);
+	}
+
+	@Test
+	@DisplayName("탑승 예외는 돌려주는 세션 뷰의 incident에 type · childUserId · openedAt을 채운다")
+	void openIncidentReturnsViewWithIncidentFilled() {
+		SessionView view = openIncidentService.openIncident(command());
+
+		assertThat(view.incident()).isEqualTo(new SessionIncidentView("CHILD_NOT_ON_BOARD", MINJUN_ID, NOW));
+	}
+
+	@Test
 	@DisplayName("탑승 예외는 저장한 INCIDENT_OPENED를 append가 준 eventId · seq로 보호자와 세션 자녀에게 발행한다")
 	void openIncidentPublishesIncidentOpenedToGuardianAndChildren() {
 		openIncidentService.openIncident(command());
@@ -178,6 +204,18 @@ class OpenIncidentServiceTest {
 		assertThat(message.receiverUserIds()).containsExactlyInAnyOrder(GUARDIAN_ID, MINJUN_ID, SEOYUN_ID);
 	}
 
+	@Test
+	@DisplayName("탑승 예외는 childUserId가 세션 자녀가 아니면(같은 가족 자녀여도) NOT_FOUND로 거절하고 아무것도 저장 · 발행하지 않는다")
+	void openIncidentRejectsChildNotInSessionWithNotFound() {
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> openIncidentService.openIncident(command(OUTSIDE_CHILD_ID)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
+		assertThat(exception.code()).isEqualTo("NOT_FOUND");
+		verifyNoInteractions(saveSessionPort, sessionEventPort, publishSessionEventPort);
+	}
+
 	private PickupSession savedSession() {
 		ArgumentCaptor<PickupSession> captor = ArgumentCaptor.forClass(PickupSession.class);
 		verify(saveSessionPort, atLeastOnce()).save(captor.capture());
@@ -194,12 +232,16 @@ class OpenIncidentServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, SPOT_ID, "해솔영어학원 정문 앞", STOP_POINT,
 				MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.STOPPED, SpotStatus.CONFIRMED,
 				STATE_VERSION, 0, 1, 0, false, NOW.minusSeconds(30), 0, NOW.minusSeconds(5), BOARDING_DETECTED_AT,
-				BOARDING_DETECTED_AT.plusSeconds(10), BoardingDoor.REAR_RIGHT, null, null, null, null, children);
+				BOARDING_DETECTED_AT.plusSeconds(10), BoardingDoor.REAR_RIGHT, null, null, null, null, null, children);
 	}
 
 	private static OpenIncidentCommand command() {
+		return command(MINJUN_ID);
+	}
+
+	private static OpenIncidentCommand command(long childUserId) {
 		AuthPrincipal vehicle = new AuthPrincipal(PrincipalType.VEHICLE, VEHICLE_ID, FAMILY_ID, null);
-		return new OpenIncidentCommand(vehicle, SESSION_ID, "CHILD_NOT_ON_BOARD", MINJUN_ID, STATE_VERSION);
+		return new OpenIncidentCommand(vehicle, SESSION_ID, "CHILD_NOT_ON_BOARD", childUserId, STATE_VERSION);
 	}
 
 }

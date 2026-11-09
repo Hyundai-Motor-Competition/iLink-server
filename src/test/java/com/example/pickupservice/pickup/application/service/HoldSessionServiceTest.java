@@ -10,11 +10,16 @@ import com.example.pickupservice.pickup.application.port.in.SessionView;
 import com.example.pickupservice.pickup.application.port.out.LoadCallPort;
 import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
 import com.example.pickupservice.pickup.application.port.out.LoadSessionPort;
+import com.example.pickupservice.pickup.application.port.out.PublishSessionEventPort;
 import com.example.pickupservice.pickup.application.port.out.SaveSessionPort;
+import com.example.pickupservice.pickup.application.port.out.SessionEventMessage;
+import com.example.pickupservice.pickup.application.port.out.SessionEventPort;
 import com.example.pickupservice.pickup.domain.ChildPhase;
 import com.example.pickupservice.pickup.domain.IncidentType;
 import com.example.pickupservice.pickup.domain.PickupSession;
 import com.example.pickupservice.pickup.domain.SessionChild;
+import com.example.pickupservice.pickup.domain.SessionEvent;
+import com.example.pickupservice.pickup.domain.SessionEventType;
 import com.example.pickupservice.pickup.domain.SessionStatus;
 import com.example.pickupservice.pickup.domain.SpotStatus;
 import com.example.pickupservice.pickup.domain.VehiclePhase;
@@ -35,12 +40,19 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -51,6 +63,7 @@ class HoldSessionServiceTest {
 
 	// 한국 시간 2026-11-09(월) 17:50
 	private static final Instant NOW = Instant.parse("2026-11-09T08:50:00Z");
+	private static final SessionViewAssembler ASSEMBLER = new SessionViewAssembler(PickupProperties.defaults());
 	private static final LocalDate TODAY_KST = LocalDate.of(2026, 11, 9);
 
 	private static final long SESSION_ID = 501L;
@@ -72,6 +85,11 @@ class HoldSessionServiceTest {
 	private static final LatLng FRONT_STOP_POINT = new LatLng(37.501400, 127.039950);
 	private static final LatLng FRONT_MEETING_POINT = new LatLng(37.501301, 127.039901);
 	private static final Instant INCIDENT_OPENED_AT = NOW.minus(Duration.ofMinutes(3));
+	private static final long LAST_SEQ = 20L;
+	private static final long EVENT_ID_BASE = 9000L;
+	/** session()의 etaAt(지금 + 6분) - etaUpdatedAt(지금 - 10초) = 저장된 ETA 기준 남은 초 */
+	private static final int STORED_NAV_ETA_SECONDS = 370;
+	private static final int STORED_REMAINING_METERS = 2400;
 
 	@Mock
 	private LoadSessionPort loadSessionPort;
@@ -85,14 +103,36 @@ class HoldSessionServiceTest {
 	@Mock
 	private LoadFamilyPort loadFamilyPort;
 
+	@Mock
+	private SessionEventPort sessionEventPort;
+
+	@Mock
+	private PublishSessionEventPort publishSessionEventPort;
+
+	@Mock
+	private CallEngine callEngine;
+
 	private HoldSessionService holdSessionService;
+
+	private final AtomicLong nextSeq = new AtomicLong(LAST_SEQ);
+	private final List<SessionEvent> appendedEvents = new ArrayList<>();
 
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, clock);
+		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, clock);
 		holdSessionService = new HoldSessionService(loadSessionPort, saveSessionPort, loadCallPort, loadFamilyPort,
-				sessionAccess, clock);
+				sessionAccess, clock, sessionEventPort, publishSessionEventPort, callEngine);
+		lenient().when(sessionEventPort.append(anyLong(), anyString(), anyInt(), any(Instant.class), any()))
+				.thenAnswer(invocation -> {
+					long seq = nextSeq.incrementAndGet();
+					SessionEvent event = SessionEvent.restore(EVENT_ID_BASE + seq, invocation.<Long>getArgument(0), seq,
+							SessionEventType.valueOf(invocation.<String>getArgument(1)),
+							invocation.<Integer>getArgument(2), invocation.<Instant>getArgument(3),
+							invocation.getArgument(4));
+					appendedEvents.add(event);
+					return event;
+				});
 		lenient().when(loadFamilyPort.loadFamily(FAMILY_ID)).thenReturn(family());
 		lenient().when(loadFamilyPort.loadMembers(FAMILY_ID)).thenReturn(familyMembers());
 		lenient().when(loadCallPort.loadLatestCall(SESSION_ID)).thenReturn(Optional.empty());
@@ -126,7 +166,7 @@ class HoldSessionServiceTest {
 		assertThat(view.sessionId()).isEqualTo(SESSION_ID);
 		assertThat(view.stateVersion()).isEqualTo(STATE_VERSION + 1);
 		assertThat(view.status().session()).isEqualTo(SessionStatus.ON_HOLD);
-		assertThat(view).isEqualTo(SessionViewAssembler.assemble(saved, delegate(), family(), familyMembers(),
+		assertThat(view).isEqualTo(ASSEMBLER.assemble(saved, delegate(), family(), familyMembers(),
 				Optional.empty(), NOW));
 	}
 
@@ -144,7 +184,7 @@ class HoldSessionServiceTest {
 		assertThat(saved.getStateVersion()).isEqualTo(STATE_VERSION + 1);
 		assertThat(view.stateVersion()).isEqualTo(STATE_VERSION + 1);
 		assertThat(view.status().session()).isEqualTo(SessionStatus.ACTIVE);
-		assertThat(view).isEqualTo(SessionViewAssembler.assemble(saved, vehicle(), family(), familyMembers(),
+		assertThat(view).isEqualTo(ASSEMBLER.assemble(saved, vehicle(), family(), familyMembers(),
 				Optional.empty(), NOW));
 	}
 
@@ -253,6 +293,121 @@ class HoldSessionServiceTest {
 		verifyNoInteractions(saveSessionPort);
 	}
 
+	@Test
+	@DisplayName("세션 보류는 SESSION_HELD를 저장한 세션의 stateVersion · 지금 시각으로 한 번 저장한다")
+	void holdAppendsSessionHeldWithSavedStateVersion() {
+		givenLockedSession(session(SessionStatus.ACTIVE));
+
+		holdSessionService.hold(new HoldCommand(guardian(), SESSION_ID, STATE_VERSION, HOLD_REASON));
+
+		PickupSession saved = savedSession();
+		assertThat(appendedEvents).hasSize(1);
+		SessionEvent appended = appendedEvents.get(0);
+		assertThat(appended.getSessionId()).isEqualTo(SESSION_ID);
+		assertThat(appended.getType()).isEqualTo(SessionEventType.SESSION_HELD);
+		assertThat(appended.getStateVersion()).isEqualTo(saved.getStateVersion()).isEqualTo(STATE_VERSION + 1);
+		assertThat(appended.getOccurredAt()).isEqualTo(NOW);
+	}
+
+	@Test
+	@DisplayName("세션 보류는 저장한 SESSION_HELD를 append가 준 eventId · seq로 보호자(GUARDIAN · DELEGATE)에게 발행한다")
+	void holdPublishesSessionHeldToGuardians() {
+		givenLockedSession(session(SessionStatus.ACTIVE));
+
+		holdSessionService.hold(new HoldCommand(guardian(), SESSION_ID, STATE_VERSION, HOLD_REASON));
+
+		SessionEventMessage message = publishedMessage();
+		SessionEvent appended = appendedEvents.get(0);
+		assertThat(message.type()).isEqualTo("SESSION_HELD");
+		assertThat(message.sessionId()).isEqualTo(SESSION_ID);
+		assertThat(message.eventId()).isEqualTo(appended.getEventId());
+		assertThat(message.seq()).isEqualTo(appended.getSeq());
+		assertThat(message.stateVersion()).isEqualTo(appended.getStateVersion());
+		assertThat(message.occurredAt()).isEqualTo(NOW);
+		assertThat(message.receiverUserIds()).contains(GUARDIAN_ID, DELEGATE_ID);
+	}
+
+	@Test
+	@DisplayName("세션 보류는 호출 판정을 다시 돌리지 않는다")
+	void holdDoesNotTriggerCallEngine() {
+		givenLockedSession(session(SessionStatus.ACTIVE));
+
+		holdSessionService.hold(new HoldCommand(guardian(), SESSION_ID, STATE_VERSION, HOLD_REASON));
+
+		verifyNoInteractions(callEngine);
+	}
+
+	@Test
+	@DisplayName("보류 해제는 SESSION_RESUMED를 저장한 세션의 stateVersion · 지금 시각으로 한 번 저장한다")
+	void releaseHoldAppendsSessionResumedWithSavedStateVersion() {
+		givenLockedSession(session(SessionStatus.ON_HOLD));
+
+		holdSessionService.releaseHold(new HoldCommand(vehicle(), SESSION_ID, STATE_VERSION, null));
+
+		PickupSession saved = savedSession();
+		assertThat(appendedEvents).hasSize(1);
+		SessionEvent appended = appendedEvents.get(0);
+		assertThat(appended.getSessionId()).isEqualTo(SESSION_ID);
+		assertThat(appended.getType()).isEqualTo(SessionEventType.SESSION_RESUMED);
+		assertThat(appended.getStateVersion()).isEqualTo(saved.getStateVersion()).isEqualTo(STATE_VERSION + 1);
+		assertThat(appended.getOccurredAt()).isEqualTo(NOW);
+	}
+
+	@Test
+	@DisplayName("보류 해제는 저장한 SESSION_RESUMED를 append가 준 eventId · seq로 보호자(GUARDIAN · DELEGATE)에게 발행한다")
+	void releaseHoldPublishesSessionResumedToGuardians() {
+		givenLockedSession(session(SessionStatus.ON_HOLD));
+
+		holdSessionService.releaseHold(new HoldCommand(vehicle(), SESSION_ID, STATE_VERSION, null));
+
+		SessionEventMessage message = publishedMessage();
+		SessionEvent appended = appendedEvents.get(0);
+		assertThat(message.type()).isEqualTo("SESSION_RESUMED");
+		assertThat(message.eventId()).isEqualTo(appended.getEventId());
+		assertThat(message.seq()).isEqualTo(appended.getSeq());
+		assertThat(message.stateVersion()).isEqualTo(appended.getStateVersion());
+		assertThat(message.receiverUserIds()).contains(GUARDIAN_ID, DELEGATE_ID);
+	}
+
+	@Test
+	@DisplayName("보류 해제는 저장한 세션과 저장된 ETA(etaAt - etaUpdatedAt 초 · remainingMeters)로 호출 판정 triggerIfReady를 한 번 다시 돌린다")
+	void releaseHoldRunsCallDecisionAgainWithStoredEta() {
+		givenLockedSession(session(SessionStatus.ON_HOLD));
+
+		holdSessionService.releaseHold(new HoldCommand(vehicle(), SESSION_ID, STATE_VERSION, null));
+
+		PickupSession saved = savedSession();
+		verify(callEngine).triggerIfReady(same(saved), eq(STORED_NAV_ETA_SECONDS), eq(STORED_REMAINING_METERS));
+	}
+
+	@Test
+	@DisplayName("보류 해제는 요청 stateVersion이 서버와 다르면 이벤트를 저장 · 발행하지 않고 호출 판정도 돌리지 않는다")
+	void releaseHoldRejectedByStaleStateVersionDoesNotAppendPublishOrTrigger() {
+		givenLockedSession(session(SessionStatus.ON_HOLD));
+
+		catchThrowableOfType(BusinessException.class,
+				() -> holdSessionService.releaseHold(new HoldCommand(guardian(), SESSION_ID, STATE_VERSION + 1, null)));
+
+		verifyNoInteractions(sessionEventPort, publishSessionEventPort, callEngine);
+	}
+
+	@Test
+	@DisplayName("세션 보류는 취소된 세션이면 이벤트를 저장 · 발행하지 않는다")
+	void holdRejectedBecauseFinishedDoesNotAppendOrPublish() {
+		givenLockedSession(session(SessionStatus.CANCELLED));
+
+		catchThrowableOfType(BusinessException.class,
+				() -> holdSessionService.hold(new HoldCommand(guardian(), SESSION_ID, STATE_VERSION, HOLD_REASON)));
+
+		verifyNoInteractions(sessionEventPort, publishSessionEventPort);
+	}
+
+	private SessionEventMessage publishedMessage() {
+		ArgumentCaptor<SessionEventMessage> captor = ArgumentCaptor.forClass(SessionEventMessage.class);
+		verify(publishSessionEventPort).publish(captor.capture());
+		return captor.getValue();
+	}
+
 	private void givenLockedSession(PickupSession session) {
 		lenient().when(loadSessionPort.loadForUpdate(SESSION_ID)).thenReturn(Optional.of(session));
 	}
@@ -305,7 +460,7 @@ class HoldSessionServiceTest {
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, status, VehiclePhase.APPROACHING,
 				SpotStatus.CONFIRMED, STATE_VERSION, 0, 1, 0, false, NOW.plus(Duration.ofMinutes(6)), 2400,
-				NOW.minusSeconds(10), null, null, null, incidentType, null, incidentOpenedAt, null, children);
+				NOW.minusSeconds(10), null, null, null, incidentType, null, null, incidentOpenedAt, null, children);
 	}
 
 }

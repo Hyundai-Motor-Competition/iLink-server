@@ -48,7 +48,7 @@ public class OpenIncidentService implements OpenIncidentUseCase {
 		sessionAccess.requireStateVersion(locked, command.stateVersion(), command.principal());
 		IncidentType type = IncidentType.valueOf(command.type());
 		Instant now = clock.instant();
-		openIncident(locked, type, now);
+		openIncident(locked, type, command.childUserId(), now);
 		PickupSession session = saveSessionPort.save(locked);
 		SessionEvent event = sessionEventPort.append(session.getSessionId(), INCIDENT_OPENED,
 				session.getStateVersion(), now, Map.of("type", type.name(), "childUserId", command.childUserId()));
@@ -56,13 +56,13 @@ public class OpenIncidentService implements OpenIncidentUseCase {
 		List<MemberInfo> members = loadFamilyPort.loadMembers(familyId);
 		publishSessionEventPort.publish(
 				SessionEventMessages.of(event, SessionReceivers.guardiansAndSessionChildren(session, members)));
-		return SessionViewAssembler.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
+		return sessionAccess.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
 				members, loadCallPort.loadLatestCall(session.getSessionId()), now);
 	}
 
-	private static void openIncident(PickupSession session, IncidentType type, Instant now) {
+	private static void openIncident(PickupSession session, IncidentType type, long childUserId, Instant now) {
 		try {
-			session.openIncident(type, now);
+			session.openIncident(type, childUserId, now);
 		} catch (PickupRuleException exception) {
 			throw PickupErrors.from(exception);
 		}
