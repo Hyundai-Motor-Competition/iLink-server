@@ -1,6 +1,7 @@
 # dev API. Jenkins가 __IMAGE__ · __CONFIG_HASH__를 바꿔 매 배포마다 kubectl apply 한다(main push → 테스트 → Harbor → 여기)
 # 비밀값은 Secret api(DB_PASSWORD · JWT_SECRET · PHONE_ENCRYPTION_KEY · KAKAO_REST_API_KEY), Harbor pull은 Secret harbor-pull.
-# 둘 다 운영자가 서버에서 만들고(ops/scripts/ilink-secrets.sh) 저장소에는 두지 않는다
+# FCM 서비스 계정 키는 Secret fcm(service-account.json)을 파일로 붙인다.
+# 셋 다 운영자가 서버에서 만들고(ops/scripts/ilink-secrets.sh, kubectl create secret generic fcm) 저장소에는 두지 않는다
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,6 +12,8 @@ data:
   DB_URL: jdbc:postgresql://postgres:5432/pickup
   DB_USERNAME: pickup
   TZ: Asia/Seoul
+  FCM_PROJECT_ID: ilink-dev-d6624
+  FCM_CREDENTIALS_PATH: /etc/pickup/fcm/service-account.json
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -43,7 +46,13 @@ spec:
         - name: harbor-pull
       securityContext:
         runAsNonRoot: true
+        fsGroup: 10001   # Secret fcm 파일(0440)을 앱 사용자(uid 10001)가 읽도록 그룹을 맞춘다
       terminationGracePeriodSeconds: 40
+      volumes:
+        - name: fcm
+          secret:
+            secretName: fcm
+            defaultMode: 0440
       containers:
         - name: api
           image: __IMAGE__
@@ -52,6 +61,10 @@ spec:
                 name: api
             - secretRef:
                 name: api
+          volumeMounts:
+            - name: fcm
+              mountPath: /etc/pickup/fcm
+              readOnly: true
           ports:
             - name: http
               containerPort: 8080
