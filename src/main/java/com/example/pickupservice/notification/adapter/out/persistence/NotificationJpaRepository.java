@@ -20,8 +20,9 @@ interface NotificationJpaRepository extends JpaRepository<NotificationEntity, Lo
 	List<NotificationEntity> findBySessionIdAndTypeAndCallIdIsNullAndSentAtIsNull(Long sessionId, String type);
 
 	@Query("select n from NotificationEntity n "
-			+ "where (n.sentAt is null or n.deliveredAt is null) "
-			+ "and coalesce(n.sentAt, n.createdAt) <= :threshold")
-	List<NotificationEntity> findResendTargets(@Param("threshold") Instant threshold);
+			+ "where ((n.sentAt is null or n.deliveredAt is null) or n.type = 'CALL') "
+			+ "and coalesce(n.sentAt, n.createdAt) <= :threshold "
+			+ "and n.createdAt >= :cutoff")
+	List<NotificationEntity> findResendTargets(@Param("threshold") Instant threshold, @Param("cutoff") Instant cutoff);
 
 }

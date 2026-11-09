@@ -38,7 +38,7 @@ class NotificationPersistenceAdapter implements LoadNotificationPort, SaveNotifi
 
 	@Override
 	public List<Notification> loadResendTargets(Instant now) {
-		return notificationJpaRepository.findResendTargets(now.minusSeconds(60)).stream()
+		return notificationJpaRepository.findResendTargets(now.minusSeconds(60), now.minusSeconds(24 * 60 * 60)).stream()
 				.map(NotificationPersistenceAdapter::toDomain)
 				.toList();
 	}
@@ -57,7 +57,7 @@ class NotificationPersistenceAdapter implements LoadNotificationPort, SaveNotifi
 	private static Notification toDomain(NotificationEntity entity) {
 		return Notification.restore(entity.getNotificationId(), entity.getSessionId(), entity.getCallId(),
 				entity.getType(), entity.getDeviceId(), entity.getSentAt(), entity.getDeliveredAt(),
-				entity.getOpenedAt());
+				entity.getOpenedAt(), entity.getCreatedAt());
 	}
 
 	@Override
