@@ -5,6 +5,7 @@ import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.notification.application.port.out.CallProgressPort;
 import com.example.pickupservice.notification.application.port.out.LoadNotificationPort;
 import com.example.pickupservice.notification.application.port.out.LoadPushTargetPort;
+import com.example.pickupservice.notification.application.port.out.LoadResendGuardPort;
 import com.example.pickupservice.notification.application.port.out.PushMessage;
 import com.example.pickupservice.notification.application.port.out.SaveNotificationPort;
 import com.example.pickupservice.notification.application.port.out.SendPushPort;
@@ -25,6 +26,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -59,12 +61,221 @@ class ResendUndeliveredServiceTest {
 	@Mock
 	private CallProgressPort callProgressPort;
 
+	@Mock
+	private LoadResendGuardPort loadResendGuardPort;
+
 	private ResendUndeliveredService service;
 
 	@BeforeEach
 	void setUp() {
 		service = new ResendUndeliveredService(loadNotificationPort, saveNotificationPort, sendPushPort,
-				loadPushTargetPort, callProgressPort, Clock.fixed(NOW, ZoneOffset.UTC));
+				loadPushTargetPort, callProgressPort, loadResendGuardPort, Clock.fixed(NOW, ZoneOffset.UTC));
+	}
+
+	// ── #51 묶음 전체의 마지막 행 기준 ──
+
+	@Test
+	@DisplayName("재발송 작업은 묶음 전체의 마지막 행이 1분 안에 보낸 것이면(그 행은 대상이 아니어도) 오래된 대상 행이 있어도 보내지 않는다")
+	void doesNotResendWhenLastRowOfWholeGroupWasSentWithinOneMinute() {
+		Notification old = row(FIRST_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID, SENT_AT, null);
+		Notification recent = row(SECOND_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID, NOW.minusSeconds(30), null);
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(old));
+		when(loadNotificationPort.loadBySession(SESSION_ID)).thenReturn(List.of(old, recent));
+		lenient().when(loadNotificationPort.countAttempts(any(Notification.class))).thenReturn(2);
+
+		int sent = service.resendUndelivered(NOW);
+
+		assertThat(sent).isZero();
+		verify(sendPushPort, never()).send(any());
+		verify(saveNotificationPort, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("재발송 작업은 묶음 전체의 마지막 행이 정확히 60초 전에 보낸 것이면 다시 보낸다")
+	void resendsWhenLastRowOfWholeGroupWasSentExactlyOneMinuteAgo() {
+		Notification old = row(FIRST_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID, SENT_AT, null);
+		Notification last = row(SECOND_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID, NOW.minusSeconds(60), null);
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(old));
+		when(loadNotificationPort.loadBySession(SESSION_ID)).thenReturn(List.of(old, last));
+		when(loadNotificationPort.countAttempts(any(Notification.class))).thenReturn(2);
+		givenSaveAssignsNewId();
+		when(loadPushTargetPort.loadPushTarget(GUARDIAN_DEVICE_ID)).thenReturn(
+				Optional.of(new PushTarget(GUARDIAN_USER_ID, GUARDIAN_DEVICE_ID, Platform.ANDROID, "fcm-token")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
+
+		int sent = service.resendUndelivered(NOW);
+
+		assertThat(sent).isEqualTo(1);
+		verify(sendPushPort, times(1)).send(any(PushMessage.class));
+	}
+
+	@Test
+	@DisplayName("재발송 작업은 CALL이 아닌 알림의 묶음에 수신된(deliveredAt) 행이 하나라도 있으면 마지막 행이 수신 전이어도 보내지 않는다")
+	void doesNotResendNonCallWhenAnyRowOfGroupWasDelivered() {
+		Notification deliveredFirst = row(FIRST_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID, SENT_AT,
+				Instant.parse("2026-11-09T06:01:00Z"));
+		Notification undeliveredLast = row(SECOND_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID,
+				Instant.parse("2026-11-09T06:05:00Z"), null);
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(undeliveredLast));
+		when(loadNotificationPort.loadBySession(SESSION_ID)).thenReturn(List.of(deliveredFirst, undeliveredLast));
+		lenient().when(loadNotificationPort.countAttempts(any(Notification.class))).thenReturn(2);
+
+		int sent = service.resendUndelivered(NOW);
+
+		assertThat(sent).isZero();
+		verify(sendPushPort, never()).send(any());
+		verify(saveNotificationPort, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("재발송 작업은 마지막 행이 대상에 없고 수신된 행이어도 CALL이 아니면 묶음이 수신된 것으로 보고 보내지 않는다")
+	void doesNotResendNonCallWhenLastRowOutsideTargetsWasDelivered() {
+		Notification oldUndelivered = row(FIRST_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID, SENT_AT, null);
+		Notification deliveredLast = row(SECOND_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID,
+				Instant.parse("2026-11-09T06:05:00Z"), Instant.parse("2026-11-09T06:06:00Z"));
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(oldUndelivered));
+		when(loadNotificationPort.loadBySession(SESSION_ID)).thenReturn(List.of(oldUndelivered, deliveredLast));
+		lenient().when(loadNotificationPort.countAttempts(any(Notification.class))).thenReturn(2);
+
+		int sent = service.resendUndelivered(NOW);
+
+		assertThat(sent).isZero();
+		verify(sendPushPort, never()).send(any());
+		verify(saveNotificationPort, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("재발송 작업은 CALL 알림은 묶음에 수신된 행이 있어도 호출이 확인되지 않았으면 다시 보내고, 다른 기기 묶음의 행은 판단에 섞지 않는다")
+	void resendsCallEvenWhenGroupHasDeliveredRowAndIgnoresOtherGroupRows() {
+		Notification deliveredFirst = row(FIRST_ID, "CALL", CALL_ID, CHILD_DEVICE_ID, SENT_AT,
+				Instant.parse("2026-11-09T06:01:00Z"));
+		Notification undeliveredLast = row(SECOND_ID, "CALL", CALL_ID, CHILD_DEVICE_ID,
+				Instant.parse("2026-11-09T06:05:00Z"), null);
+		Notification otherDeviceRecent = row(OTHER_ID, "CALL", CALL_ID, GUARDIAN_DEVICE_ID, NOW.minusSeconds(5),
+				NOW.minusSeconds(4));
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(undeliveredLast));
+		when(loadNotificationPort.loadBySession(SESSION_ID))
+				.thenReturn(List.of(deliveredFirst, undeliveredLast, otherDeviceRecent));
+		when(loadNotificationPort.countAttempts(any(Notification.class))).thenReturn(2);
+		when(callProgressPort.isCallAcknowledged(CALL_ID)).thenReturn(false);
+		givenSaveAssignsNewId();
+		when(loadPushTargetPort.loadPushTarget(CHILD_DEVICE_ID)).thenReturn(
+				Optional.of(new PushTarget(CHILD_USER_ID, CHILD_DEVICE_ID, Platform.ANDROID, "fcm-token")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
+
+		int sent = service.resendUndelivered(NOW);
+
+		assertThat(sent).isEqualTo(1);
+		verify(sendPushPort, times(1)).send(any(PushMessage.class));
+	}
+
+	// ── #52 세션 종료 · 호출 철회 ──
+
+	@Test
+	@DisplayName("재발송 작업은 세션이 끝났으면 그 세션의 알림을 다시 보내지 않고 새 행도 만들지 않는다")
+	void doesNotResendWhenSessionEnded() {
+		Notification undelivered = row(FIRST_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID, SENT_AT, null);
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(undelivered));
+		lenient().when(loadNotificationPort.countAttempts(any(Notification.class))).thenReturn(1);
+		when(loadResendGuardPort.isSessionEnded(SESSION_ID)).thenReturn(true);
+
+		int sent = service.resendUndelivered(NOW);
+
+		assertThat(sent).isZero();
+		verify(sendPushPort, never()).send(any());
+		verify(saveNotificationPort, never()).save(any());
+		verify(callProgressPort, never()).markCallSent(anyLong(), any());
+	}
+
+	@Test
+	@DisplayName("재발송 작업은 호출이 철회됐으면 그 CALL 알림을 다시 보내지 않고 새 행도 만들지 않는다")
+	void doesNotResendCallNotificationOfRevokedCall() {
+		Notification call = row(FIRST_ID, "CALL", CALL_ID, CHILD_DEVICE_ID, SENT_AT, null);
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(call));
+		lenient().when(loadNotificationPort.countAttempts(any(Notification.class))).thenReturn(1);
+		lenient().when(callProgressPort.isCallAcknowledged(CALL_ID)).thenReturn(false);
+		when(loadResendGuardPort.isCallRevoked(CALL_ID)).thenReturn(true);
+
+		int sent = service.resendUndelivered(NOW);
+
+		assertThat(sent).isZero();
+		verify(sendPushPort, never()).send(any());
+		verify(saveNotificationPort, never()).save(any());
+		verify(callProgressPort, never()).markCallSent(anyLong(), any());
+	}
+
+	@Test
+	@DisplayName("재발송 작업은 철회된 호출의 알림만 멈추고 같은 세션의 callId 없는 알림은 계속 다시 보낸다")
+	void stopsOnlyRevokedCallAndKeepsResendingNotificationsWithoutCall() {
+		Notification call = row(FIRST_ID, "CALL", CALL_ID, CHILD_DEVICE_ID, SENT_AT, null);
+		Notification departure = row(OTHER_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID, SENT_AT, null);
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(call, departure));
+		lenient().when(loadNotificationPort.countAttempts(any(Notification.class))).thenReturn(1);
+		lenient().when(callProgressPort.isCallAcknowledged(CALL_ID)).thenReturn(false);
+		when(loadResendGuardPort.isCallRevoked(CALL_ID)).thenReturn(true);
+		givenSaveAssignsNewId();
+		when(loadPushTargetPort.loadPushTarget(GUARDIAN_DEVICE_ID)).thenReturn(
+				Optional.of(new PushTarget(GUARDIAN_USER_ID, GUARDIAN_DEVICE_ID, Platform.IOS, "guardian-token")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
+
+		int sent = service.resendUndelivered(NOW);
+
+		assertThat(sent).isEqualTo(1);
+		ArgumentCaptor<PushMessage> pushed = ArgumentCaptor.forClass(PushMessage.class);
+		verify(sendPushPort, times(1)).send(pushed.capture());
+		assertThat(pushed.getValue().target().deviceId()).isEqualTo(GUARDIAN_DEVICE_ID);
+	}
+
+	// ── #54 CALL 발송 성공 시 markCallSent ──
+
+	@Test
+	@DisplayName("재발송 작업은 CALL 알림을 보내는 데 성공하면 callProgressPort.markCallSent(callId, 현재 시각)을 부른다")
+	void marksCallSentWhenCallResendSucceeds() {
+		Notification call = row(FIRST_ID, "CALL", CALL_ID, CHILD_DEVICE_ID, SENT_AT, null);
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(call));
+		when(loadNotificationPort.countAttempts(any(Notification.class))).thenReturn(1);
+		when(callProgressPort.isCallAcknowledged(CALL_ID)).thenReturn(false);
+		givenSaveAssignsNewId();
+		when(loadPushTargetPort.loadPushTarget(CHILD_DEVICE_ID)).thenReturn(
+				Optional.of(new PushTarget(CHILD_USER_ID, CHILD_DEVICE_ID, Platform.ANDROID, "fcm-token")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
+
+		service.resendUndelivered(NOW);
+
+		verify(callProgressPort, times(1)).markCallSent(CALL_ID, NOW);
+	}
+
+	@Test
+	@DisplayName("재발송 작업은 CALL 알림 발송이 실패하면 markCallSent를 부르지 않는다")
+	void doesNotMarkCallSentWhenCallResendFails() {
+		Notification call = row(FIRST_ID, "CALL", CALL_ID, CHILD_DEVICE_ID, SENT_AT, null);
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(call));
+		when(loadNotificationPort.countAttempts(any(Notification.class))).thenReturn(1);
+		when(callProgressPort.isCallAcknowledged(CALL_ID)).thenReturn(false);
+		givenSaveAssignsNewId();
+		when(loadPushTargetPort.loadPushTarget(CHILD_DEVICE_ID)).thenReturn(
+				Optional.of(new PushTarget(CHILD_USER_ID, CHILD_DEVICE_ID, Platform.ANDROID, "fcm-token")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(false);
+
+		service.resendUndelivered(NOW);
+
+		verify(callProgressPort, never()).markCallSent(anyLong(), any());
+	}
+
+	@Test
+	@DisplayName("재발송 작업은 CALL이 아닌 알림을 보내는 데 성공해도 markCallSent를 부르지 않는다")
+	void doesNotMarkCallSentForNonCallNotification() {
+		Notification departure = row(FIRST_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID, SENT_AT, null);
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(departure));
+		when(loadNotificationPort.countAttempts(any(Notification.class))).thenReturn(1);
+		givenSaveAssignsNewId();
+		when(loadPushTargetPort.loadPushTarget(GUARDIAN_DEVICE_ID)).thenReturn(
+				Optional.of(new PushTarget(GUARDIAN_USER_ID, GUARDIAN_DEVICE_ID, Platform.ANDROID, "fcm-token")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
+
+		service.resendUndelivered(NOW);
+
+		verify(callProgressPort, never()).markCallSent(anyLong(), any());
 	}
 
 	@Test
@@ -219,6 +430,69 @@ class ResendUndeliveredServiceTest {
 		assertThat(sent).isZero();
 		verify(sendPushPort, never()).send(any());
 		verify(saveNotificationPort, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("재발송 작업은 폐기된 기기(살아 있는 기기 조회가 빈 값)에는 FCM을 보내지 않고 건수에 세지 않으며 폐기 포함 조회를 쓰지 않는다")
+	void doesNotResendToRevokedDevice() {
+		Notification revoked = row(FIRST_ID, "DEPARTURE", null, CHILD_DEVICE_ID, SENT_AT, null);
+		Notification live = row(OTHER_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID, SENT_AT, null);
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(revoked, live));
+		when(loadNotificationPort.countAttempts(any(Notification.class))).thenReturn(1);
+		givenSaveAssignsNewId();
+		when(loadPushTargetPort.loadPushTarget(CHILD_DEVICE_ID)).thenReturn(Optional.empty());
+		when(loadPushTargetPort.loadPushTarget(GUARDIAN_DEVICE_ID)).thenReturn(
+				Optional.of(new PushTarget(GUARDIAN_USER_ID, GUARDIAN_DEVICE_ID, Platform.IOS, "guardian-token")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
+
+		int sent = service.resendUndelivered(NOW);
+
+		assertThat(sent).isEqualTo(1);
+		ArgumentCaptor<PushMessage> pushed = ArgumentCaptor.forClass(PushMessage.class);
+		verify(sendPushPort, times(1)).send(pushed.capture());
+		assertThat(pushed.getValue().target().deviceId()).isEqualTo(GUARDIAN_DEVICE_ID);
+		verify(loadPushTargetPort, never()).loadPushTargetIncludingRevoked(anyLong());
+	}
+
+	@Test
+	@DisplayName("재발송 작업은 묶음 시도가 3번 이상인 CALL 행은 세션별 조회 · 세션 종료 · 호출 철회 · 호출 확인 판단을 부르지 않고 건너뛴다")
+	void skipsRowWithThreeAttemptsBeforeAnyJudgement() {
+		Notification third = row(OTHER_ID, "CALL", CALL_ID, CHILD_DEVICE_ID, SENT_AT, null);
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(third));
+		when(loadNotificationPort.countAttempts(third)).thenReturn(3);
+
+		int sent = service.resendUndelivered(NOW);
+
+		assertThat(sent).isZero();
+		verify(loadNotificationPort, never()).loadBySession(anyLong());
+		verify(loadResendGuardPort, never()).isSessionEnded(anyLong());
+		verify(loadResendGuardPort, never()).isCallRevoked(anyLong());
+		verify(callProgressPort, never()).isCallAcknowledged(anyLong());
+		verify(saveNotificationPort, never()).save(any());
+		verify(sendPushPort, never()).send(any());
+	}
+
+	@Test
+	@DisplayName("재발송 작업은 시도가 3번 이상으로 거른 행의 세션은 조회하지 않고 시도가 3번 미만인 다른 묶음은 그대로 판단해 보낸다")
+	void skipsOnlyRowsWithThreeAttemptsAndKeepsJudgingOthers() {
+		long otherSessionId = 502L;
+		Notification exhausted = Notification.restore(OTHER_ID, otherSessionId, null, "DEPARTURE", CHILD_DEVICE_ID,
+				SENT_AT, null, null);
+		Notification fresh = row(FIRST_ID, "DEPARTURE", null, GUARDIAN_DEVICE_ID, SENT_AT, null);
+		when(loadNotificationPort.loadResendTargets(NOW)).thenReturn(List.of(exhausted, fresh));
+		when(loadNotificationPort.countAttempts(exhausted)).thenReturn(3);
+		when(loadNotificationPort.countAttempts(fresh)).thenReturn(1);
+		givenSaveAssignsNewId();
+		when(loadPushTargetPort.loadPushTarget(GUARDIAN_DEVICE_ID)).thenReturn(
+				Optional.of(new PushTarget(GUARDIAN_USER_ID, GUARDIAN_DEVICE_ID, Platform.ANDROID, "fcm-token")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
+
+		int sent = service.resendUndelivered(NOW);
+
+		assertThat(sent).isEqualTo(1);
+		verify(loadNotificationPort, never()).loadBySession(otherSessionId);
+		verify(loadResendGuardPort, never()).isSessionEnded(otherSessionId);
+		verify(sendPushPort, times(1)).send(any(PushMessage.class));
 	}
 
 	private void givenSaveAssignsNewId() {

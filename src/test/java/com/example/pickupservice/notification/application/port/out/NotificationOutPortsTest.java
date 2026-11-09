@@ -36,7 +36,7 @@ class NotificationOutPortsTest {
 	}
 
 	@Test
-	@DisplayName("SendPushPort · LoadPushTargetPort · LoadMemberNamePort · CallProgressPort는 interface이고 설계서 시그니처의 메서드만 갖는다")
+	@DisplayName("SendPushPort · LoadPushTargetPort · LoadSessionFamilyPort · LoadMemberNamePort · CallProgressPort · LoadResendGuardPort는 interface이고 설계서 시그니처의 메서드만 갖는다")
 	void externalPortsHaveDesignSignatures() {
 		verifyExternalPorts();
 	}
@@ -64,13 +64,19 @@ class NotificationOutPortsTest {
 				method("send", "boolean", PushMessage.class));
 		assertPort(LoadPushTargetPort.class,
 				method("loadPushTargets", "java.util.List<" + PushTarget.class.getName() + ">", List.class),
-				method("loadPushTarget", "java.util.Optional<" + PushTarget.class.getName() + ">", long.class));
+				method("loadPushTarget", "java.util.Optional<" + PushTarget.class.getName() + ">", long.class),
+				method("loadPushTargetIncludingRevoked", "java.util.Optional<" + PushTarget.class.getName() + ">", long.class));
+		assertPort(LoadSessionFamilyPort.class,
+				method("loadFamilyId", "java.util.Optional<java.lang.Long>", long.class));
 		assertPort(LoadMemberNamePort.class,
 				method("loadNames", "java.util.Map<java.lang.Long, java.lang.String>", List.class));
 		assertPort(CallProgressPort.class,
 				method("markCallSent", "void", long.class, Instant.class),
 				method("markCallDelivered", "void", long.class, Instant.class),
 				method("isCallAcknowledged", "boolean", long.class));
+		assertPort(LoadResendGuardPort.class,
+				method("isSessionEnded", "boolean", long.class),
+				method("isCallRevoked", "boolean", long.class));
 	}
 
 	private void verifyPushMessage() {

@@ -7,10 +7,12 @@ import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.notification.adapter.out.auth.NotificationPushTargetAdapter;
 import com.example.pickupservice.notification.adapter.out.pickup.NotificationCallProgressAdapter;
+import com.example.pickupservice.notification.adapter.out.pickup.NotificationResendGuardAdapter;
 import com.example.pickupservice.notification.adapter.out.pickup.NotificationSessionFamilyAdapter;
 import com.example.pickupservice.notification.adapter.out.user.NotificationMemberNameAdapter;
 import com.example.pickupservice.pickup.application.port.in.CallProgressUseCase;
 import com.example.pickupservice.pickup.application.port.in.FindSessionFamilyUseCase;
+import com.example.pickupservice.pickup.application.port.in.ResendGuardUseCase;
 import com.example.pickupservice.user.application.port.in.LoadMemberUseCase;
 import com.example.pickupservice.user.application.port.in.MemberInfo;
 import org.junit.jupiter.api.DisplayName;
@@ -51,6 +53,8 @@ class NotificationModuleLinkAdaptersTest {
 	private CallProgressUseCase callProgressUseCase;
 	@Mock
 	private FindSessionFamilyUseCase findSessionFamilyUseCase;
+	@Mock
+	private ResendGuardUseCase resendGuardUseCase;
 
 	@Test
 	@DisplayName("LoadPushTargetPort.loadPushTargets는 auth LoadPushTargetUseCase.findPushTargets에 같은 userIds를 넘기고 결과를 그대로 돌려준다")
@@ -78,23 +82,45 @@ class NotificationModuleLinkAdaptersTest {
 	}
 
 	@Test
-	@DisplayName("LoadPushTargetPort.loadPushTarget은 auth LoadPushTargetByDeviceUseCase.findPushTargetByDeviceId에 위임해 결과를 그대로 돌려준다")
-	void loadPushTargetDelegatesToAuthFindPushTargetByDeviceId() {
+	@DisplayName("LoadPushTargetPort.loadPushTarget은 auth LoadPushTargetByDeviceUseCase.findLivePushTargetByDeviceId(살아 있는 기기만)에 위임해 결과를 그대로 돌려준다")
+	void loadPushTargetDelegatesToAuthFindLivePushTargetByDeviceId() {
+		PushTarget target = new PushTarget(CHILD_ID, CHILD_DEVICE_ID, Platform.ANDROID, "child-token");
+		when(loadPushTargetByDeviceUseCase.findLivePushTargetByDeviceId(CHILD_DEVICE_ID)).thenReturn(Optional.of(target));
+		NotificationPushTargetAdapter adapter = new NotificationPushTargetAdapter(loadPushTargetUseCase, loadPushTargetByDeviceUseCase);
+
+		assertThat(adapter.loadPushTarget(CHILD_DEVICE_ID)).contains(target);
+		verify(loadPushTargetByDeviceUseCase).findLivePushTargetByDeviceId(CHILD_DEVICE_ID);
+		verifyNoMoreInteractions(loadPushTargetByDeviceUseCase);
+	}
+
+	@Test
+	@DisplayName("LoadPushTargetPort.loadPushTarget은 auth가 빈 값(폐기된 기기 등)을 주면 빈 값을 돌려준다")
+	void loadPushTargetReturnsEmptyWhenAuthReturnsEmpty() {
+		when(loadPushTargetByDeviceUseCase.findLivePushTargetByDeviceId(CHILD_DEVICE_ID)).thenReturn(Optional.empty());
+		NotificationPushTargetAdapter adapter = new NotificationPushTargetAdapter(loadPushTargetUseCase, loadPushTargetByDeviceUseCase);
+
+		assertThat(adapter.loadPushTarget(CHILD_DEVICE_ID)).isNotNull().isEmpty();
+	}
+
+	@Test
+	@DisplayName("LoadPushTargetPort.loadPushTargetIncludingRevoked는 auth LoadPushTargetByDeviceUseCase.findPushTargetByDeviceId(폐기 기기 포함)에 위임해 결과를 그대로 돌려준다")
+	void loadPushTargetIncludingRevokedDelegatesToAuthFindPushTargetByDeviceId() {
 		PushTarget target = new PushTarget(CHILD_ID, CHILD_DEVICE_ID, Platform.ANDROID, "child-token");
 		when(loadPushTargetByDeviceUseCase.findPushTargetByDeviceId(CHILD_DEVICE_ID)).thenReturn(Optional.of(target));
 		NotificationPushTargetAdapter adapter = new NotificationPushTargetAdapter(loadPushTargetUseCase, loadPushTargetByDeviceUseCase);
 
-		assertThat(adapter.loadPushTarget(CHILD_DEVICE_ID)).contains(target);
+		assertThat(adapter.loadPushTargetIncludingRevoked(CHILD_DEVICE_ID)).contains(target);
 		verify(loadPushTargetByDeviceUseCase).findPushTargetByDeviceId(CHILD_DEVICE_ID);
+		verifyNoMoreInteractions(loadPushTargetByDeviceUseCase);
 	}
 
 	@Test
-	@DisplayName("LoadPushTargetPort.loadPushTarget은 auth가 빈 값을 주면 빈 값을 돌려준다")
-	void loadPushTargetReturnsEmptyWhenAuthReturnsEmpty() {
+	@DisplayName("LoadPushTargetPort.loadPushTargetIncludingRevoked는 auth가 빈 값을 주면 빈 값을 돌려준다")
+	void loadPushTargetIncludingRevokedReturnsEmptyWhenAuthReturnsEmpty() {
 		when(loadPushTargetByDeviceUseCase.findPushTargetByDeviceId(CHILD_DEVICE_ID)).thenReturn(Optional.empty());
 		NotificationPushTargetAdapter adapter = new NotificationPushTargetAdapter(loadPushTargetUseCase, loadPushTargetByDeviceUseCase);
 
-		assertThat(adapter.loadPushTarget(CHILD_DEVICE_ID)).isNotNull().isEmpty();
+		assertThat(adapter.loadPushTargetIncludingRevoked(CHILD_DEVICE_ID)).isNotNull().isEmpty();
 	}
 
 	@Test
@@ -172,6 +198,28 @@ class NotificationModuleLinkAdaptersTest {
 
 		assertThat(adapter.loadFamilyId(SESSION_ID)).contains(FAMILY_ID);
 		assertThat(adapter.loadFamilyId(SESSION_ID + 1)).isNotNull().isEmpty();
+	}
+
+	@Test
+	@DisplayName("LoadResendGuardPort.isSessionEnded는 pickup ResendGuardUseCase.isSessionEnded 결과(true · false)를 그대로 돌려준다")
+	void isSessionEndedDelegatesToPickup() {
+		when(resendGuardUseCase.isSessionEnded(SESSION_ID)).thenReturn(true);
+		when(resendGuardUseCase.isSessionEnded(SESSION_ID + 1)).thenReturn(false);
+		NotificationResendGuardAdapter adapter = new NotificationResendGuardAdapter(resendGuardUseCase);
+
+		assertThat(adapter.isSessionEnded(SESSION_ID)).isTrue();
+		assertThat(adapter.isSessionEnded(SESSION_ID + 1)).isFalse();
+	}
+
+	@Test
+	@DisplayName("LoadResendGuardPort.isCallRevoked는 pickup ResendGuardUseCase.isCallRevoked 결과(true · false)를 그대로 돌려준다")
+	void isCallRevokedDelegatesToPickup() {
+		when(resendGuardUseCase.isCallRevoked(CALL_ID)).thenReturn(true);
+		when(resendGuardUseCase.isCallRevoked(CALL_ID + 1)).thenReturn(false);
+		NotificationResendGuardAdapter adapter = new NotificationResendGuardAdapter(resendGuardUseCase);
+
+		assertThat(adapter.isCallRevoked(CALL_ID)).isTrue();
+		assertThat(adapter.isCallRevoked(CALL_ID + 1)).isFalse();
 	}
 
 	private static MemberInfo member(long userId, Role role, String name) {
