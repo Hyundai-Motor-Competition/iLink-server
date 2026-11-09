@@ -188,6 +188,24 @@ class PickupOutcomeControllerTest extends PickupWebTestSupport {
 		then(correctOutcomeUseCase).shouldHaveNoInteractions();
 	}
 
+	@Test
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/outcome/correction에 correctedStopAt이 없으면 422 VALIDATION_FAILED(fields correctedStopAt)를 돌려주고 유스케이스를 부르지 않는다")
+	void correctOutcomeWithoutCorrectedStopAtReturns422ValidationFailedOnCorrectedStopAt() throws Exception {
+		mockMvc.perform(put(CORRECTION_PATH, SESSION_ID)
+						.header(HttpHeaders.AUTHORIZATION, bearerOf(GUARDIAN))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"reasonCode":"WRONG_STOP_TIME","note":"정차 시각이 실제보다 1분 늦게 찍혔어요"}
+								"""))
+				.andExpect(status().is(HttpStatus.UNPROCESSABLE_CONTENT.value()))
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields.length()").value(1))
+				.andExpect(jsonPath("$.error.fields[0].field").value("correctedStopAt"));
+
+		then(correctOutcomeUseCase).shouldHaveNoInteractions();
+	}
+
 	/**
 	 * 정정 요청 본문. correctedStopAt은 세션 날짜(2026-11-05, 한국) 안이다.
 	 */

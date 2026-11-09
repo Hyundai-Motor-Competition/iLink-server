@@ -5,7 +5,7 @@ import com.example.pickupservice.pickup.application.port.in.ConfirmRouteCommand;
 import jakarta.validation.constraints.NotNull;
 
 public record ConfirmRouteRequest(
-		long spotId,
+		@NotNull Long spotId,
 		String navRouteId,
 		@NotNull Integer stateVersion
 ) {

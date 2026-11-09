@@ -5,9 +5,9 @@ import com.example.pickupservice.pickup.application.port.in.ChangeSpotCommand;
 import jakarta.validation.constraints.NotNull;
 
 public record ChangeSpotRequest(
-		long spotId,
+		@NotNull Long spotId,
 		@NotNull Integer stateVersion,
-		int spotVersion
+		@NotNull Integer spotVersion
 ) {
 
 	public ChangeSpotCommand toCommand(AuthPrincipal principal, long sessionId) {

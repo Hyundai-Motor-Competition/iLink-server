@@ -292,6 +292,23 @@ class PickupCallControllerTest extends PickupWebTestSupport {
 		then(holdCallUseCase).shouldHaveNoInteractions();
 	}
 
+	@Test
+	@DisplayName("POST /v1/calls/{callId}/revocation에 101자 reason을 보내면 422 VALIDATION_FAILED(fields reason)를 돌려주고 유스케이스를 부르지 않는다")
+	void revokeWith101CharReasonReturns422ValidationFailedOnReason() throws Exception {
+		mockMvc.perform(post(REVOCATION_PATH, CALL_ID)
+						.header(HttpHeaders.AUTHORIZATION, bearerOf(VEHICLE))
+						.header(IDEMPOTENCY_KEY_HEADER, UUID.randomUUID().toString())
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"stateVersion\":15,\"reason\":\"%s\"}".formatted("가".repeat(101))))
+				.andExpect(status().is(HttpStatus.UNPROCESSABLE_CONTENT.value()))
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields.length()").value(1))
+				.andExpect(jsonPath("$.error.fields[0].field").value("reason"));
+
+		then(revokeCallUseCase).shouldHaveNoInteractions();
+	}
+
 	/**
 	 * CALL-01 호출 보류 · 해제 뒤 모습: call.held만 바뀌고(발송 전이라 callId 없음, status.call NONE) stateVersion 1 증가.
 	 */

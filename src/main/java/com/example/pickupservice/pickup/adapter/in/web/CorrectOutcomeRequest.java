@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 
 public record CorrectOutcomeRequest(
-		OffsetDateTime correctedStopAt,
+		@NotNull OffsetDateTime correctedStopAt,
 		@NotNull @Pattern(regexp = "WRONG_STOP_TIME|OTHER") String reasonCode,
 		@Size(max = 200) String note
 ) {

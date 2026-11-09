@@ -843,6 +843,51 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 		then(openIncidentUseCase).shouldHaveNoInteractions();
 	}
 
+	static Stream<Arguments> bodyRequestsWithInvalidField() {
+		String reason101 = "가".repeat(101);
+		return Stream.of(
+				Arguments.of("SES-02 date 없음", HttpMethod.POST, SESSIONS_PATH, """
+						{"scheduleIds":[801,802]}
+						""", "date"),
+				Arguments.of("SES-04 spotId 없음", HttpMethod.PUT, ROUTE_PATH, """
+						{"navRouteId":"nav-route-7f3a","stateVersion":15}
+						""", "spotId"),
+				Arguments.of("SES-05 spotId 없음", HttpMethod.POST, SPOT_CHANGES_PATH, """
+						{"stateVersion":15,"spotVersion":4}
+						""", "spotId"),
+				Arguments.of("SES-05 spotVersion 없음", HttpMethod.POST, SPOT_CHANGES_PATH, """
+						{"spotId":22,"stateVersion":15}
+						""", "spotVersion"),
+				Arguments.of("SES-06 reason 101자", HttpMethod.PUT, HOLD_PATH,
+						"{\"stateVersion\":15,\"reason\":\"%s\"}".formatted(reason101), "reason"),
+				Arguments.of("SES-07 reason 101자", HttpMethod.POST, CANCELLATION_PATH,
+						"{\"stateVersion\":15,\"reason\":\"%s\"}".formatted(reason101), "reason"));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("bodyRequestsWithInvalidField")
+	@DisplayName("세션 요청의 필수 값(date · spotId)이 없거나 reason이 100자를 넘으면 422 VALIDATION_FAILED(fields 그 필드)를 돌려주고 유스케이스를 부르지 않는다")
+	void bodyWithMissingRequiredFieldOrLongReasonReturns422ValidationFailedOnThatField(
+			String caseName, HttpMethod method, String path, String body, String field) throws Exception {
+		mockMvc.perform(request(method, path, SESSION_ID)
+						.header(HttpHeaders.AUTHORIZATION, bearerOf(VEHICLE))
+						.header(IDEMPOTENCY_KEY_HEADER, UUID.randomUUID().toString())
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", hasSize(1)))
+				.andExpect(jsonPath("$.error.fields[0].field").value(field))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(startPickupUseCase).shouldHaveNoInteractions();
+		then(confirmRouteUseCase).shouldHaveNoInteractions();
+		then(changeSpotUseCase).shouldHaveNoInteractions();
+		then(holdSessionUseCase).shouldHaveNoInteractions();
+		then(cancelSessionUseCase).shouldHaveNoInteractions();
+	}
+
 	private MockHttpServletRequestBuilder incidentRequest(AuthPrincipal principal, String body) {
 		return put(INCIDENT_PATH, SESSION_ID)
 				.header(HttpHeaders.AUTHORIZATION, bearerOf(principal))

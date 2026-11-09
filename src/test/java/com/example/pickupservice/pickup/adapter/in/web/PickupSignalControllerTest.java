@@ -162,6 +162,56 @@ class PickupSignalControllerTest extends PickupWebTestSupport {
 		then(receiveVehicleEventUseCase).shouldHaveNoInteractions();
 	}
 
+	@ParameterizedTest(name = "{0}")
+	@ValueSource(strings = {"eventId", "type", "occurredAt"})
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/vehicle-events에 필수 값(eventId · type · occurredAt)이 없으면 422 VALIDATION_FAILED(fields 그 필드)를 돌려주고 유스케이스를 부르지 않는다")
+	void receiveVehicleEventWithoutRequiredFieldReturns422ValidationFailedOnThatField(String missingField)
+			throws Exception {
+		mockMvc.perform(vehicleEventRequest(vehicleEventBodyWithout(missingField)))
+				.andExpect(validationFailedOn(missingField))
+				.andExpect(jsonPath("$.error.fields.length()").value(1))
+				.andExpect(jsonPath("$.error.fields[0].field").value(missingField));
+
+		then(receiveVehicleEventUseCase).shouldHaveNoInteractions();
+	}
+
+	@ParameterizedTest(name = "eventId {0}")
+	@ValueSource(strings = {"not-a-uuid", "12345", "3f1c9b2e-8a4d-4c6e-9f10-2b7d5e8a1c3",
+			"3f1c9b2e-8a4d-4c6e-9f10-2b7d5e8a1c34-extra"})
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/vehicle-events에 UUID가 아닌 eventId를 보내면 422 VALIDATION_FAILED(fields[0].field eventId)를 돌려주고 유스케이스를 부르지 않는다")
+	void receiveVehicleEventWithNonUuidEventIdReturns422ValidationFailedOnEventId(String eventId) throws Exception {
+		mockMvc.perform(vehicleEventRequest(vehicleEventBody(eventId, "STOPPED", null)))
+				.andExpect(validationFailedOn("eventId"))
+				.andExpect(jsonPath("$.error.fields.length()").value(1))
+				.andExpect(jsonPath("$.error.fields[0].field").value("eventId"));
+
+		then(receiveVehicleEventUseCase).shouldHaveNoInteractions();
+	}
+
+	@ParameterizedTest(name = "type {0}")
+	@ValueSource(strings = {"ARRIVED", "stopped", "DOOR_OPENED", "UNKNOWN"})
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/vehicle-events에 STOPPED · DEPARTED · STOP_FAILED · DOOR_CYCLE 밖의 type을 보내면 422 VALIDATION_FAILED(fields[0].field type)를 돌려주고 유스케이스를 부르지 않는다")
+	void receiveVehicleEventWithUnknownTypeReturns422ValidationFailedOnType(String type) throws Exception {
+		mockMvc.perform(vehicleEventRequest(vehicleEventBody(EVENT_ID, type, null)))
+				.andExpect(validationFailedOn("type"))
+				.andExpect(jsonPath("$.error.fields.length()").value(1))
+				.andExpect(jsonPath("$.error.fields[0].field").value("type"));
+
+		then(receiveVehicleEventUseCase).shouldHaveNoInteractions();
+	}
+
+	@ParameterizedTest(name = "type {0}")
+	@ValueSource(strings = {"SOS", "need_help", "CALL_POLICE", "STOPPED"})
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/help-requests에 NEED_HELP · CANT_FIND_CAR · CONTACT_PARENT 밖의 type을 보내면 422 VALIDATION_FAILED(fields[0].field type)를 돌려주고 유스케이스를 부르지 않는다")
+	void requestHelpWithUnknownTypeReturns422ValidationFailedOnType(String type) throws Exception {
+		mockMvc.perform(helpRequest(childBearer(), type))
+				.andExpect(validationFailedOn("type"))
+				.andExpect(jsonPath("$.error.fields.length()").value(1))
+				.andExpect(jsonPath("$.error.fields[0].field").value("type"));
+
+		then(requestHelpUseCase).shouldHaveNoInteractions();
+	}
+
 	@Test
 	@DisplayName("POST /v1/pickup-sessions/{sessionId}/prep-time-extensions는 200과 extraPrepMinutes · callNotBefore를 돌려준다")
 	void extendPrepTimeReturns200WithExtraPrepMinutesAndCallNotBefore() throws Exception {
@@ -277,11 +327,15 @@ class PickupSignalControllerTest extends PickupWebTestSupport {
 	}
 
 	private MockHttpServletRequestBuilder helpRequest(String bearer) {
+		return helpRequest(bearer, "NEED_HELP");
+	}
+
+	private MockHttpServletRequestBuilder helpRequest(String bearer, String type) {
 		return post(HELP_REQUESTS_PATH, SESSION_ID)
 				.header(HttpHeaders.AUTHORIZATION, bearer)
 				.header(IDEMPOTENCY_KEY_HEADER, UUID.randomUUID().toString())
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"type\":\"NEED_HELP\"}");
+				.content("{\"type\":\"%s\"}".formatted(type));
 	}
 
 	private String childBearer() {
@@ -311,11 +365,31 @@ class PickupSignalControllerTest extends PickupWebTestSupport {
 	}
 
 	private static String vehicleEventBody(String type, String door) {
+		return vehicleEventBody(EVENT_ID, type, door);
+	}
+
+	private static String vehicleEventBody(String eventId, String type, String door) {
 		String doorField = door == null ? "" : ",\"door\":\"%s\"".formatted(door);
 		return """
 				{"eventId":"%s","type":"%s","occurredAt":"2026-11-09T18:20:30+09:00",\
 				"location":{"lat":37.501234,"lng":127.039876}%s}
-				""".formatted(EVENT_ID, type, doorField);
+				""".formatted(eventId, type, doorField);
+	}
+
+	/** 정상 이벤트 본문(STOPPED)에서 필드 하나만 뺀다. */
+	private static String vehicleEventBodyWithout(String missingField) {
+		StringBuilder body = new StringBuilder("{");
+		if (!"eventId".equals(missingField)) {
+			body.append("\"eventId\":\"").append(EVENT_ID).append("\",");
+		}
+		if (!"type".equals(missingField)) {
+			body.append("\"type\":\"STOPPED\",");
+		}
+		if (!"occurredAt".equals(missingField)) {
+			body.append("\"occurredAt\":\"2026-11-09T18:20:30+09:00\",");
+		}
+		body.append("\"location\":{\"lat\":37.501234,\"lng\":127.039876}}");
+		return body.toString();
 	}
 
 	private static ResultMatcher validationFailedOn(String field) {
