@@ -1,81 +1,61 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-08 09:32 KST · tdd-guard
-- 설계서: C:/pickup/docs
-- 프로젝트: gradle · C:/pickup
-- 테스트: ● GREEN · 1141 passed · 전체 · 66s
-- 진행: 공유모듈 57/57 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 58/58 · 픽업 0/203 · 알림 0/44 · 남은 항목 247/632
-- 현재 도메인: 장소 (07_장소-place.md) · 진행 시작: /tdd go
+- 생성: 2026-11-09 15:22 KST · tdd-guard
+- 설계서: C:/ilink/docs
+- 프로젝트: gradle · C:/ilink
+- 테스트: ● GREEN · 1421 passed · 전체 · 112s
+- 진행: 공유모듈 57/57 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 58/58 · 픽업 63/218 · 알림 0/44 · 남은 항목 199/647
+- 현재 도메인: 픽업 (08_픽업-pickup.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
 
-## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 완료 · 항목 57/57 · 완료 기준 4/4 · 리뷰 11-07 15:37 조건부 통과 (상 0 · 중 1 · 하 9)
-- 남은 할 일 없음
+## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 대기 · 항목 57/57 · 완료 기준 0/4
+### 도메인 리뷰
+- [ ] 기록 없음 → /tdd review shared
+### 완료 기준
+- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
+- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
-## 2. 사용자 (user) · 04_사용자-user.md · 완료 · 항목 73/73 · 완료 기준 4/4 · 리뷰 11-08 02:39 조건부 통과 (상 0 · 중 1 · 하 5)
-- 남은 할 일 없음
+## 2. 사용자 (user) · 04_사용자-user.md · 대기 · 항목 73/73 · 완료 기준 0/4
+### 도메인 리뷰
+- [ ] 기록 없음 → /tdd review user
+### 완료 기준
+- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
+- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
-## 3. 인증 (auth) · 05_인증-auth.md · 완료 · 항목 120/120 · 완료 기준 4/4 · 리뷰 11-07 23:03 통과 (상 1 · 중 0 · 하 5)
-- 남은 할 일 없음
+## 3. 인증 (auth) · 05_인증-auth.md · 대기 · 항목 120/120 · 완료 기준 0/4
+### 도메인 리뷰
+- [ ] 기록 없음 → /tdd review auth
+### 완료 기준
+- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
+- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
-## 4. 일정 (schedule) · 06_일정-schedule.md · 완료 · 항목 77/77 · 완료 기준 4/4 · 리뷰 11-08 02:05 조건부 통과 (상 0 · 중 0 · 하 2)
-- 남은 할 일 없음
+## 4. 일정 (schedule) · 06_일정-schedule.md · 대기 · 항목 77/77 · 완료 기준 0/4
+### 도메인 리뷰
+- [ ] 기록 없음 → /tdd review schedule
+### 완료 기준
+- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
+- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
-## 5. 장소 (place) · 07_장소-place.md · 완료 · 항목 58/58 · 완료 기준 4/4 · 리뷰 11-08 09:28 조건부 통과 (상 0 · 중 2 · 하 6)
-- 남은 할 일 없음
+## 5. 장소 (place) · 07_장소-place.md · 대기 · 항목 58/58 · 완료 기준 0/4
+### 도메인 리뷰
+- [ ] 기록 없음 → /tdd review place
+### 완료 기준
+- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
+- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
-## 6. 픽업 (pickup) · 08_픽업-pickup.md · 대기 · 항목 0/203 · 완료 기준 0/4
+## 6. 픽업 (pickup) · 08_픽업-pickup.md · 진행 중 · 항목 63/218 · 완료 기준 0/4
 ### 테스트 케이스
-- [ ] #1 [기반] PickupSession.start는 ACTIVE · ROUTING · SELECTED · stateVersion 0인 세션과 자녀마다 WAITING인 SessionChild를 만든다
-- [ ] #2 [기반] PickupSession.start는 장소의 spotId · name · stopPoint · meetingPoint를 세션 스냅샷으로 복사한다
-- [ ] #3 [기반] 세션을 바꾸는 도메인 동작을 하면 stateVersion이 1 오른다
-- [ ] #4 [기반] hold는 ACTIVE를 ON_HOLD로 바꾸고 releaseHold는 ON_HOLD를 ACTIVE로 되돌린다
-- [ ] #5 [기반] cancel은 ACTIVE와 ON_HOLD 세션을 CANCELLED로 바꾼다
-- [ ] #6 [기반] COMPLETED나 CANCELLED 세션에 cancel을 부르면 SESSION_ALREADY_FINISHED로 거절된다
-- [ ] #7 [기반] confirmRoute는 spotStatus를 CONFIRMED로 바꾸고 routeVersion을 1 올린다
-- [ ] #8 [기반] changeSpot은 spotStatus를 SELECTED로 되돌리고 spotVersion을 1 올리고 스냅샷을 새 장소 값으로 바꾼다
-- [ ] #9 [기반] changeSpot은 MEETING 자녀가 있으면 CHILD_ALREADY_MOVING으로 거절된다
-- [ ] #10 [기반] applyTelemetry는 etaAt을 observedAt + navEtaSeconds로, remainingMeters와 etaUpdatedAt을 새 값으로 덮어쓴다
-- [ ] #11 [기반] applyTelemetry는 observedAt이 마지막 값보다 오래되면 아무것도 바꾸지 않는다
-- [ ] #12 [기반] ETA는 etaUpdatedAt이 60초를 넘게 지나면 stale로 판정된다
-- [ ] #13 [기반] CallTrigger는 navEtaSeconds 180 · remainingMeters 2000이면 ETA_3MIN을 돌려준다
-- [ ] #14 [기반] CallTrigger는 navEtaSeconds 600 · remainingMeters 700이면 DIST_700M을 돌려준다
-- [ ] #15 [기반] CallTrigger는 navEtaSeconds 181 · remainingMeters 701이면 트리거 없음을 돌려준다
-- [ ] #16 [기반] Guard는 ON_HOLD 세션에서 G1을 unmet에 넣는다
-- [ ] #17 [기반] Guard는 spotStatus가 CONFIRMED가 아니면 G2를 unmet에 넣는다
-- [ ] #18 [기반] Guard는 확정 경로가 지금 장소 버전과 다르면 G3을 unmet에 넣는다
-- [ ] #19 [기반] Guard는 ETA가 stale이면 G4를 unmet에 넣는다
-- [ ] #20 [기반] Guard는 세션 자녀 중 한 명이라도 callNotBefore가 지나지 않았으면 G5를 unmet에 넣는다
-- [ ] #21 [기반] Guard는 다섯 조건을 모두 만족하면 met true와 빈 unmet을 돌려준다
-- [ ] #22 [기반] 새 Call은 status ACCEPTED와 triggerType · 그때의 spotVersion을 갖는다
-- [ ] #23 [기반] 철회된 호출 뒤에 만든 Call은 prevCallId로 이전 호출을 가리킨다
-- [ ] #24 [기반] Call.markSent는 status를 SENT로 바꾸고 sentAt을 채운다
-- [ ] #25 [기반] Call.revoke는 status REVOKED · revokedAt · revokeReason을 채운다
-- [ ] #26 [기반] 이미 REVOKED인 Call을 revoke하면 CALL_ALREADY_REVOKED로 거절된다
-- [ ] #27 [기반] 자녀 둘인 세션에서 한 명만 확인하면 Call은 ACKNOWLEDGED가 아니고 둘 다 확인하면 ACKNOWLEDGED다
-- [ ] #28 [기반] SessionChild.acknowledge를 두 번 부르면 첫 acknowledgedAt이 유지된다
-- [ ] #29 [기반] SessionChild.acknowledge는 CALLED 자녀를 MEETING으로 바꾼다
-- [ ] #30 [기반] extendPrep은 18:09에 5분을 더하면 extraPrepMinutes 5 · callNotBefore 18:14로 만든다
-- [ ] #31 [기반] extendPrep은 18:05에 5분, 18:09에 5분을 더하면 extraPrepMinutes 10 · callNotBefore 18:19로 만든다
-- [ ] #32 [기반] extendPrep은 누적이 15분을 넘으면 PREP_EXTENSION_LIMIT으로 거절된다
-- [ ] #33 [기반] extendPrep은 childPhase를 바꾸지 않는다
-- [ ] #34 [기반] detectBoarding은 STOPPED · 운전석 아닌 문 · 호출 발송 뒤면 boardingDetectedAt · boardingCancelableUntil(+10초) · boardingDoor와 모든 자녀의 boardedAt을 채운다
-- [ ] #35 [기반] detectBoarding은 STOPPED가 아니면 아무것도 바꾸지 않는다
-- [ ] #36 [기반] detectBoarding은 합류 안내 발송 전이면 아무것도 바꾸지 않는다
-- [ ] #37 [기반] rejectBoarding은 취소 창 안이면 그 자녀의 boardedAt만 비운다
-- [ ] #38 [기반] rejectBoarding은 boardingCancelableUntil이 지났으면 REJECTION_WINDOW_CLOSED로 거절된다
-- [ ] #39 [기반] complete는 MANUAL인데 vehiclePhase가 STOPPED가 아니면 VEHICLE_NOT_STOPPED로 거절된다
-- [ ] #40 [기반] complete는 notBoardedChildUserIds의 자녀를 NOT_BOARDED로 바꾸고 세션을 COMPLETED로 바꾼다
-- [ ] #41 [기반] complete는 탑승하지도 미탑승 지정되지도 않은 자녀가 있으면 CHILDREN_NOT_ALL_BOARDED로 거절된다
-- [ ] #42 [기반] complete는 모든 자녀의 lastLat · lastLng · lastLocatedAt을 비운다
-- [ ] #43 [기반] openIncident는 세션을 ON_HOLD로 바꾸고 incidentType · incidentOpenedAt을 채운다
-- [ ] #44 [기반] 열린 예외가 있는 세션에 openIncident를 부르면 INCIDENT_ALREADY_OPEN으로 거절된다
-- [ ] #45 [기반] updateChildLocation은 at이 저장된 값보다 오래되면 위치를 바꾸지 않는다
-- [ ] #46 [기반] 도움 요청 규칙은 같은 아이의 마지막 요청 뒤 60초 안이면 HELP_REQUEST_TOO_SOON과 마지막 시각 + 60초를 돌려준다
-- [ ] #47 [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
-- [ ] #48 [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [ ] #49 [기반] JPA 엔티티 5개가 BaseTimeEntity를 상속하고 테이블 정의대로 매핑된다(PickupOutcome PK는 sessionId)
-- [ ] #50 [기반] 테스트 시드로 차량 1대 · 자녀 2명 · 기본 장소가 있는 ACTIVE 세션 1개를 만든다
 - [ ] #51 [persistence] PickupSession을 SessionChild와 함께 저장하고 읽으면 스냅샷 좌표와 자녀 상태가 같다
 - [ ] #52 [persistence] 같은 세션에 같은 childUserId의 SessionChild를 두 번 저장하면 유니크 위반이 난다
 - [ ] #53 [persistence] loadActiveByVehicle은 그 차량의 ACTIVE · ON_HOLD 세션만 찾는다
@@ -229,6 +209,8 @@
 - [ ] #201 [web] PUT /v1/guardians/me/data-settings는 200과 learningConsent · retentionDays를 돌려준다
 - [ ] #202 [web] PUT /v1/guardians/me/data-settings를 CO_GUARDIAN 토큰으로 부르면 403 FORBIDDEN을 돌려준다
 - [ ] #203 [web] Idempotency-Key는 SES-02 · 04~07 · 11~13, SIG-03 · 05, CALL-01~04에만 요구되고 SIG-01 · 02 · 04와 조회 · OUT API에는 요구되지 않는다
+- [ ] #207 user · auth · place의 진행 중 픽업 확인 어댑터가 임시 false · 빈 값 대신 pickup ActivePickupQueryUseCase를 부른다
+- [ ] #209 [persistence] GuardianDataSetting을 저장하고 읽으면 learningConsent가 같고 행이 없는 보호자는 빈 값을 돌려준다
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
