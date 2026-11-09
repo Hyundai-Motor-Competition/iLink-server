@@ -33,6 +33,14 @@ pickup:
     kakao:
       base-url: https://dapi.kakao.com
       api-key: ${KAKAO_REST_API_KEY:}
+  session:
+    eta-valid-for: PT1M
+    call-trigger-eta: PT180S
+    boarding-cancel-window: PT10S
+    call-trigger-distance-meters: 700
+    help-request-interval: PT60S
+    prep-extension-limit: PT15M
+    data-retention-days: 90
 
 logging:
   pattern:
