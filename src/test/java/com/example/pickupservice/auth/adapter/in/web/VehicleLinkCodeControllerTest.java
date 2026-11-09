@@ -13,6 +13,7 @@ import com.example.pickupservice.auth.domain.ConsentType;
 import com.example.pickupservice.auth.domain.LinkMode;
 import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
 import com.example.pickupservice.common.logging.RequestLogAttributes;
 import com.example.pickupservice.common.security.AuthPrincipal;
@@ -577,7 +578,7 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	}
 
 	private static BusinessException vehicleAlreadyLinked() {
-		return BusinessException.of(HttpStatus.CONFLICT, "VEHICLE_ALREADY_LINKED", "이미 보호자가 연결된 차량입니다");
+		return BusinessException.of(ErrorCode.VEHICLE_ALREADY_LINKED);
 	}
 
 	private static LinkCodeResult linkCodeResult() {

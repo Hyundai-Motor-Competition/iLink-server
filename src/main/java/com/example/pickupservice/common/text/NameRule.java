@@ -29,10 +29,13 @@ public final class NameRule {
 		if (codePoint == ZERO_WIDTH_JOINER || codePoint == VARIATION_SELECTOR_16) {
 			return true;
 		}
-		// 숫자 · # · * 같은 ASCII 문자도 isEmoji가 true라서 제외한다
-		if (codePoint < ASCII_LIMIT) {
+		if (isAsciiAllowedDespiteEmojiFlag(codePoint)) {
 			return false;
 		}
 		return Character.isEmoji(codePoint) || Character.isExtendedPictographic(codePoint);
+	}
+
+	private static boolean isAsciiAllowedDespiteEmojiFlag(int codePoint) {
+		return codePoint < ASCII_LIMIT;
 	}
 }

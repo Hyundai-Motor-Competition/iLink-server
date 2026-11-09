@@ -1,8 +1,8 @@
 # FOLLOWUP · 사용자 (user)
 
-- 생성: 2026-11-07 18:02 KST · tdd-guard
-- 상태: 진행 중 (체크 71/71 · 완료 기준 3/4)
-- 테스트: ● GREEN · 399 passed · 전체 · 1.3s · cd C:/pickup && ./gradlew.bat test --rerun --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321…
+- 생성: 2026-11-08 02:40 KST · tdd-guard
+- 상태: 완료 (체크 73/73 · 완료 기준 4/4)
+- 테스트: ● GREEN · 996 passed · 전체 · 1.6s · cd /c/pickup && ./gradlew.bat test --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321/08c3708…
 - 설계서: C:/pickup/docs/04_사용자-user.md
 
 ## 완료 항목
@@ -77,6 +77,8 @@
 - [x] #69 [서비스] 멤버 수정으로 CHILD를 자녀 외 role로 바꿀 때 자녀 외 멤버가 이미 5명이면 MEMBER_LIMIT_EXCEEDED로 거절한다 ← UpdateMemberServiceTest.멤버 수정으로 CHILD를 자녀 외 role로 바꿀 때 자녀 외 멤버가 이미 5명이면 MEMBER_LIMIT_EXCEEDED로 거절한다
 - [x] #70 [web] PATCH /v1/families/me/members/{userId}에 role GUARDIAN을 보내면 422 VALIDATION_FAILED와 fields의 role을 돌려준다 ← FamilyControllerTest.PATCH /v1/families/me/members/{userId}에 role GUARDIAN을 보내면 422 VALIDATION_FAILED와 fields의 role을 돌려준다
 - [x] #71 [서비스] createGuardian은 이미 가족에 연결됐거나 연결이 해제된 차량이면 409 VEHICLE_ALREADY_LINKED로 거절하고 아무것도 저장하지 않는다 ← CreateGuardianServiceTest.createGuardian은 이미 가족에 연결됐거나 연결이 해제된 차량이면 409 VEHICLE_ALREADY_LINKED로 거절하고 아무것도 저장하지 않는다
+- [x] #72 멤버 목록(findMembers · FAM-01 members[])은 userId 오름차순으로 돌려준다 ← LoadMemberServiceTest.findMembers는 LoadUserPort가 멤버를 섞인 순서로 돌려줘도 userId 오름차순으로 돌려준다
+- [x] #73 VEHICLE_ALREADY_LINKED는 common ErrorCode 하나로 정의되고 user · auth 모두 409 「이미 보호자가 연결된 차량입니다」로 응답한다 ← ErrorCodeTest.VEHICLE_ALREADY_LINKED는 common ErrorCode에만 정의되고 UserErrors · AuthErrors 등 main 소스 어디에도 "VEHICLE_ALREADY_LINKED" 문자열 코드로 따로 정의하지 않는다
 
 ## 미완료 항목
 - 없음
@@ -84,59 +86,41 @@
 ## 완료 기준 (공통 규칙 문서)
 - [x] C1 설계서의 테스트 케이스가 모두 GREEN
 - [x] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [x] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
 - [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-07 18:02 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 1 · 중 7 · 하 11 · 리뷰 시점 체크 71/71
-- 리뷰 시점 테스트: ● GREEN · 399 passed · 전체 · 1.3s · cd C:/pickup && ./gradlew.bat test --rerun --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321…
+- 2026-11-08 02:39 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 1 · 하 5 · 리뷰 시점 체크 73/73
+- 리뷰 시점 테스트: ● GREEN · 996 passed · 전체 · 1.6s · cd /c/pickup && ./gradlew.bat test --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321/08c3708…
   - 결론: 조건부 통과
-  - 동작을 바꿔야 하는 [상]은 없음. 지난 리뷰 [상] 1 · [중] 3은 사람 결정대로 코드 · 테스트에 반영. 남은 것은 문서 갱신 · 커밋 · 사람 결정 1건(UserSeed).
-  - 이전 리뷰 지적 처리 상태
-  - [상] FAM-03 role 변경 우회: 해소(UpdateMemberService.java:55-66, UpdateMemberRequest.java:10 @MemberRole; #68 #69 #70 + 대조 2).
-  - [중] service VALIDATION_FAILED fields 없음: 해소(BusinessException.invalidField, ErrorResponse.from, GlobalExceptionHandler:76; RegisterMemberService:36 · UpdateMemberService:51,61).
-  - [중] createGuardian 차량 덮어쓰기: 해소(CreateGuardianService:34-36, 409 VEHICLE_ALREADY_LINKED, #71).
-  - [중] FAM-07 실제 삭제: 사람 결정으로 미룸(pickup · schedule 전).
-  - [중] IntegrationTestSupport의 UserSeed @Import: 남음(auth 시작 전 결정).
-  - [하] VIN 인덱스 uk_: 해소. [하] 주석 NameRule:32: 남음. [하] 커밋 안 된 변경: 남음(수정 20 · 새 파일 4, 마지막 커밋 d70cacf).
-  - 발견 사항
-  - [중] 설계서 04가 사람 결정을 테스트 케이스에만 반영 — API 명세 FAM-03 오류 열, 「멤버」 핵심 로직, 「차량」 createGuardian 줄에 role GUARDIAN 422 · 5명 한도 422 · phone 필수 422 · 409 VEHICLE_ALREADY_LINKED가 없음 → note(설계서 갱신)
-  - [중] common 테스트 기반이 user를 참조(IntegrationTestSupport:12) → 사람 결정(auth 시작 전)
-  - [중] 「연결 중」 정의가 05(docs/05_인증-auth.md:90, familyId 있고 unlinkedAt 빈 행)와 다름 — user는 unlinkedAt IS NULL만 → 사람 결정(auth 시작 전)
-  - [하] Swagger FAM-03 422 설명에 새 오류 없음(FamilyApiDoc:40) → 리팩터링
-  - [하] 03 공유모듈 문서에 invalidField 없음 → note
-  - [하] CO_GUARDIAN이 PATCH role GUARDIAN이면 403 대신 422(Bean Validation이 먼저) → note(우선순위 사람 확인)
-  - [하] 서비스가 GUARDIAN 승격을 직접 막지 않음(web DTO에만 의존) → note
-  - [하] phone 확인 방식 · reason 문구가 등록(PhoneRule)과 수정(null · blank)에서 다름 → 리팩터링
-  - [하] createGuardian 동시 승인 미방지 → note(auth LINK-04 때)
-  - [하] VEHICLE_ALREADY_LINKED가 auth에서 중복 정의될 수 있음(UserErrors package-private) → note
-  - [하] 제약 이름 MemberRole vs ValidName · ValidPhone → 리팩터링
-  - [하] #67 증거 테스트가 두 클래스에 같은 DisplayName으로 나뉨 → note
-  - [하] 지난 리뷰 [하] 그대로(동시성 한도, @Version, 정렬, 인덱스, vehicle NULL 표시, VIN 길이, web 오류 행 테스트, 끝까지 잇는 테스트) → note(FOLLOWUP 기록됨)
-  - 완료 기준
-  - C1 충족 — 71/71, --rerun 399 tests · 0 failures(user 206)
-  - C2 충족(문서 갱신 필요) — 코드는 설계서 · 사람 결정과 일치, 설계서 API 표 · 핵심 로직 갱신 필요
-  - C3 사람 확인 필요 — 검토 완료, 남은 어긋남: IntegrationTestSupport UserSeed @Import(결정 미룸), 주석 NameRule:32
-  - C4 충족 — 확인 필요 사항 14행이 docs/followup/user.md:122-138에 있음
-  - 테스트: ./gradlew.bat test --rerun --console=plain → tests=399 · failures=0 · errors=0 · skipped=0
-- 이전 리뷰: 2026-11-07 17:45 KST (수정 필요)
+  - 상 등급 발견 없음. 지난 리뷰의 C3 걸림 3건 해소: VEHICLE_ALREADY_LINKED는 ErrorCode.java:19 한 곳(02:79), 설명 주석 2건 삭제(02:78).
+  - 이전 지적: 04 사람 결정 반영 해소(04:66 · :83-86 · :96) · 멤버 순서 해소(#72) · VEHICLE_ALREADY_LINKED 중복 해소(#73) · 주석 · Swagger · 테스트 중복 · 한도 상수 · vehicle NULL 해소 · #64 문장 · README · 동시 해제 500 · versionToSave · FAM-07 · 02:211 · 03 invalidField · MemberRole 남음(note)
+  - [중] #73이 03 규칙과 어긋남 — 03_공유모듈-shared.md:100 「ErrorCode enum에는 02의 공통 코드만, 도메인 코드는 넣지 않는다」(:18 · :95 · :230도) vs ErrorCode.java:19 VEHICLE_ALREADY_LINKED → 문서 갱신(사람 결정 #73에 맞춰 「여러 모듈이 쓰는 도메인 오류는 ErrorCode에 둔다」 예외 추가)
+  - [하] 04:218 「항목 #201」은 없는 번호(맞는 항목 #32 · #67) → note
+  - [하] FOLLOWUP user.md 확인 필요 표 3행이 04와 다름 → note
+  - [하] #73 증거 테스트가 소스 문자열 검사(ErrorCodeTest.vehicleAlreadyLinkedIsNotRedefinedOutsideCommonErrorCode) — 02:80 「ArchUnit 같은 자동 검사는 쓰지 않는다」와 결 다름, common 테스트가 user · auth 경로를 읽음 → note(사람 확인)
+  - [하] 연결 해제된 차량도 같은 문구로 응답(CreateGuardianService.java:35-36) → note
+  - [하] CreateGuardianServiceTest 새 테스트가 #71 상황을 반복 → 리팩터링(선택)
+  - 새 항목: #72 정렬 맞음(LoadMemberService.java:30, MemberResults.java:21, 증거 테스트가 섞인 입력 · containsExactly), #73 코드 맞음
+  - 완료 기준: C1 충족(73/73, 996 · 실패 0) · C2 충족(#64 문장만 사람 note) · C3 조건부(03:100 문서 어긋남 1건 — 03을 고치면 체크) · C4 충족(FOLLOWUP 표 3행 동기화 필요)
+- 이전 리뷰: 2026-11-08 02:20 KST (조건부 통과), 2026-11-07 18:02 KST (조건부 통과), 2026-11-07 17:45 KST (수정 필요)
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
 |---|---|
 | 「자녀 외 멤버 최대 5명」에 GUARDIAN 자신이 들어가는지 | 소스에 없음. GUARDIAN 포함 CHILD가 아닌 멤버 전체를 센다고 가정 |
-| GUARDIAN이 자기 role을 바꾸려 할 때 오류 코드 | 소스에 없음(「못 바꿈」만 있음). 422 VALIDATION_FAILED로 가정 |
+| GUARDIAN이 자기 role을 바꾸려 할 때 오류 코드 | 결정됨: 422 VALIDATION_FAILED(fields role), 항목 #32 · #67 |
 | 전화번호 국제 형식 범위 | 예시가 +8210…뿐. +로 시작하는 국제 형식(E.164)을 받는다고 가정 |
 | 멤버 해제 때 User 행 처리 | 소스에 없음. SessionChild · PickupSchedule이 User를 FK로 가리켜 지난 기록이 있는 멤버는 행을 지울 수 없음. 삭제 대신 표시만 하는 방식이 필요한지 정해야 함 |
 | 멤버 해제 때 그 자녀의 일정 · 장소 처리 | 소스에 없음. 그대로 둔다고 가정 |
 | LINK-05를 차량 앱이 부를 수 있는지 | 4.3 표의 사용 화면에 「차량 설정 요약 화면」이 있으나 4.14 호출은 GUARDIAN뿐. 4.14대로 USER 주체 GUARDIAN만 허용 |
-| LINK-05 때 차량 기기 토큰 폐기 | 소스에 없음. 폐기하지 않는다고 가정 |
+| LINK-05 때 차량 기기 토큰 폐기 | 결정됨(사람 결정 2026-11-07). 해제하면 그 차량의 살아 있는 기기를 모두 폐기한다. 해제된 차량 앱은 AUTH-02로 다시 등록한다. 포트도 결정됨: RevokeVehicleDevicesPort → auth RevokeVehicleDevicesUseCase |
 | settingsVersion을 올리는 변경의 범위 | SET-06만 명시됨. 일정(SET-02 · 03) · 장소(SPOT-02 · 03) · 멤버 변경도 올리는지 정해야 함(SET-08 충돌 판단에 영향) |
 | 번호판 마스킹 규칙 | 예시 「12가 ****」뿐. 마지막 숫자 4자리를 *로 바꾼다고 가정 |
-| user ↔ auth 서로 부름 | auth는 User 생성을 user에 요청하고, user는 기기 상태 · 폐기를 auth에 요청. user 쪽은 out 포트로 두고 auth 구현 전에는 테스트 대역으로 검증 |
-| 진행 중 픽업 확인(FAM-07 · LINK-05)을 pickup in 포트로 부르는 것 | pickup이 user보다 뒤에 구현되므로 out 포트 + 테스트 대역으로 먼저 검증 |
+| user ↔ auth 서로 부름 | auth는 User 생성을 user에 요청하고, user는 기기 상태 · 폐기를 auth에 요청. user 쪽은 out 포트로 둔다. auth 쪽 임시 어댑터(LoadMemberDeviceStatusPort 기기 상태 · RevokeMemberDevicesPort 기기 폐기)는 auth 연동으로 교체됨 |
+| 진행 중 픽업 확인(FAM-07 · LINK-05)을 pickup in 포트로 부르는 것 | pickup이 user보다 뒤에 구현되므로 out 포트 + 테스트 대역으로 먼저 검증. pickup 쪽 CheckActivePickupPort만 아직 임시 어댑터(늘 false). pickup 구현 때 교체해야 함 |
 | 포트 · 유스케이스 이름 | 소스 2.2 예시(StartPickupUseCase, LoadSessionPort)의 이름 규칙을 따른 제안 |
-| LINK-04 NEW로 만드는 GUARDIAN의 name | LINK-04 요청에 이름이 없음(05_인증-auth.md에도 기록). 이름을 받을 곳을 정해야 함 |
+| LINK-04 NEW로 만드는 GUARDIAN의 name · phone | name은 결정됨(사람 결정 2026-11-07). LINK-04 요청 name, mode NEW일 때 필수(05_인증-auth.md와 같음). phone은 미정. 요청에 없어 null로 만들고 있어 「자녀 외 phone 필수」 규칙과 어긋남. 보호자 전화번호를 받을 곳을 정해야 함 |
 | Role enum 위치 | 해소: 02에 「common 순수 타입(Role · PrincipalType · LatLng)은 domain에서 써도 된다」 예외를 둠. user/domain은 common.security.Role을 그대로 쓰고 Role enum을 따로 만들지 않음(사람 결정 2026-11-07, 03 확인 필요 사항) |
 
 ## 다음 단계
@@ -159,3 +143,7 @@
 - [도메인 리뷰 하] 5명 한도 동시 요청 시 6명 가능(잠금 없음). Family @Version 없음 → SET-06 동시 요청 시 settingsVersion 증가 유실(SET-08 설계 때). users · vehicle.family_id 조회 인덱스 없음. 설계서 테이블 갱신 필요(vehicle.model · plate_number NULL, family 기본값은 도메인). VIN 길이 · 중복 VIN 500은 auth AUTH-02 때 항목 추가. 일부 오류 행(FAM-02 403, FAM-03 403 · 자기 role 422, FAM-07 422, 404)은 web 테스트 없음. 컨트롤러→서비스→DB 끝까지 잇는 테스트 없음(FAM-02 · FAM-07 1개씩 검토). 주석 규칙(NameRule:32). 메인에 커밋 안 된 변경 있음 → /tdd commit 필요.
 - [문서] 03_공유모듈-shared.md의 BusinessException 팩토리 표(93행~)와 시그니처 블록(230~235행)에 invalidField(String field, String reason)(#66, user 도메인에서 추가) 반영 필요.
 - [재리뷰 · 문서 갱신] 04 설계서 API 명세 FAM-03 오류 열 · 「멤버」 핵심 로직 · 「차량」 createGuardian 줄에 사람 결정(2026-11-07) 반영 필요: role GUARDIAN 422(fields role) · CHILD→자녀 외 전환 시 422 MEMBER_LIMIT_EXCEEDED · phone 필수 422(fields phone) · 409 VEHICLE_ALREADY_LINKED. 리팩터링 후보: FamilyApiDoc FAM-03 422 설명, 등록 · 수정 phone 확인 방식(PhoneRule) · reason 문구 통일, 제약 이름(MemberRole → ValidMemberRole), 한도 상수 5 중복. 사람 확인: CO_GUARDIAN PATCH role GUARDIAN이 403 대신 422(검증 순서), 「연결 중」 정의 05(familyId 있고 unlinkedAt 빈 행)와 불일치 — auth 시작 전 결정. VEHICLE_ALREADY_LINKED 코드 공유 위치는 auth 때.
+- [결정 · 사람, user 재리뷰 뒤] 멤버 목록 userId 오름차순, VEHICLE_ALREADY_LINKED common 하나로(문구 「이미 보호자가 연결된 차량입니다」), 설명 주석 2건 삭제. [재리뷰 note] 04 #64 문구 · 증거(auth 연동, UserModuleLinkAdaptersTest:64 · :92 · :109), 04 API 표 FAM-03 · 멤버 핵심 로직 · createGuardian 줄에 사람 결정 반영, README에 PHONE_ENCRYPTION_KEY, 같은 차량 동시 연결 해제 500(404/409 결정 필요), versionToSave 폴백이 잠금을 끔(테스트 전용 6인자 restore), FAM-07 실제 삭제 시 pickup_schedule 행 남음(pickup 전 결정), 02:211 픽스처 규칙 갱신, 03 invalidField, 04 vehicle model · plateNumber NULL, FOLLOWUP user.md 낡음
+- user #73: common ErrorCode에 도메인 오류 VEHICLE_ALREADY_LINKED가 들어감 — 02 공통 오류 표(L171~, 모든 API 공통 오류)에 「여러 모듈이 쓰는 도메인 오류도 ErrorCode에 둔다」를 적을지 문서 결정 필요. 연결 해제된 차량도 같은 문구로 응답(뜻이 좁아짐)
+- user: #64 항목 문장(04:198 「NONE · 아무것도 안 함」)과 증거가 지금 auth 연동 코드와 다름 — 테스트 케이스 절이라 사람이 문장 수정 여부 결정. README 실행 방법에 PHONE_ENCRYPTION_KEY 추가 필요(docs 밖). UserErrors.java:13 「최대 5명입니다」 문구에 숫자 5 따로 있음. PickupActivityAdapter가 pickup 전 임시라는 뜻이 이름에 없음
+- [공통 · 사람 확인] 소스 문자열 검사 테스트가 02:80 「ArchUnit 같은 자동 검사는 쓰지 않는다」와 결이 다름: user ErrorCodeTest.vehicleAlreadyLinkedIsNotRedefinedOutsideCommonErrorCode, schedule ScheduleModuleImportTest · PickupScheduleTest/InvalidScheduleExceptionTest의 import 검사. 남길지(02 규칙에 예외로 적을지) 결정 필요. CreateGuardianServiceTest 새 테스트가 #71 상황 반복(선택 리팩터링)

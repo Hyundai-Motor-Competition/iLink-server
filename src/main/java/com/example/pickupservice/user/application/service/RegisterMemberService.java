@@ -17,8 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RegisterMemberService implements RegisterMemberUseCase {
 
-	private static final long NON_CHILD_MEMBER_LIMIT = 5;
-
 	private final LoadUserPort loadUserPort;
 	private final SaveUserPort saveUserPort;
 
@@ -28,9 +26,8 @@ public class RegisterMemberService implements RegisterMemberUseCase {
 		if (command.requesterRole() == Role.CO_GUARDIAN && command.role() == Role.CO_GUARDIAN) {
 			throw BusinessException.of(ErrorCode.FORBIDDEN);
 		}
-		if (command.role() != Role.CHILD
-				&& loadUserPort.countNonChildMembers(command.familyId()) >= NON_CHILD_MEMBER_LIMIT) {
-			throw UserErrors.memberLimitExceeded();
+		if (command.role() != Role.CHILD) {
+			NonChildMemberLimit.checkRoomFor(loadUserPort, command.familyId());
 		}
 		if (command.role() != Role.CHILD && !PhoneRule.isValid(command.phone())) {
 			throw BusinessException.invalidField("phone", "자녀 외 멤버는 국제 형식 전화번호가 필요합니다");

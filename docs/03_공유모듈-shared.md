@@ -15,7 +15,7 @@
 ```text
 common
 ├─ security        SecurityConfig(SecurityFilterChain · @EnableMethodSecurity · PublicEndpoints 빈을 모아 permitAll), PublicEndpoints · PublicEndpoint(인증 없는 API 등록), JwtDecoderConfig(HS256 검증 · exp 필수), AuthPrincipalJwtConverter(클레임 → AuthPrincipal), AuthPrincipal · PrincipalType · Role, 401 · 403 처리
-├─ error           ErrorResponse, ErrorCode(02 공통 코드, TOO_MANY_REQUESTS 포함), BusinessException(정적 팩토리만), GlobalExceptionHandler(@RestControllerAdvice), ValidationFieldErrors, ErrorResponseWriter(필터 단계 오류 본문)
+├─ error           ErrorResponse, ErrorCode(02 공통 코드와 여러 모듈이 같이 쓰는 도메인 코드, TOO_MANY_REQUESTS 포함), BusinessException(정적 팩토리만), GlobalExceptionHandler(@RestControllerAdvice), ValidationFieldErrors, ErrorResponseWriter(필터 단계 오류 본문)
 ├─ idempotency     IdempotencyKeyFilter, @IdempotencyKeyRequired, IdempotencyKeyEntity · IdempotencyKeyRepository, IdempotencyKeyCleaner(@Scheduled 만료 삭제), CachedBodyRequest(본문 다시 읽기)
 ├─ logging         RequestIdFilter(MDC requestId), RequestLoggingInterceptor(HandlerInterceptor, AOP 아님), @PollingLog
 ├─ web             Spring MVC 공통 설정: JsonOnlyWebMvcConfig(응답은 JSON만), 검증 재정의 허용(ValidationConfigurationCustomizer)
@@ -86,17 +86,18 @@ common에는 엔드포인트가 없다. 아래 부품이 모든 도메인의 API
 ## 핵심 로직
 
 ### 오류 형식
-- 모든 오류 응답 본문은 `{"error":{"code","message","retryAfterSeconds","fields"}}`. code · message · retryAfterSeconds 키는 늘 있고(값이 없으면 retryAfterSeconds는 null), fields는 VALIDATION_FAILED일 때만 채운다.
+- 모든 오류 응답 본문은 `{"error":{"code","message","retryAfterSeconds","fields","overlapScheduleIds"}}`. code · message · retryAfterSeconds 키는 늘 있고(값이 없으면 retryAfterSeconds는 null), fields는 VALIDATION_FAILED일 때만, overlapScheduleIds는 값이 있을 때만(NON_NULL) 나온다.
 - 컨트롤러까지 간 요청의 예외는 GlobalExceptionHandler(@RestControllerAdvice)가, 필터 단계 오류(Security 401 · 403, IdempotencyKeyFilter 409 · 422 · 500)는 ErrorResponseWriter가 같은 본문으로 쓴다.
 - BusinessException은 공개 생성자가 없고 정적 팩토리로만 만든다(팀장 결정, 파라미터 3개 규칙).
 
 | 팩토리 | 쓰는 때 | 응답 |
 |---|---|---|
-| of(ErrorCode) | 02의 공통 코드(NOT_FOUND · FORBIDDEN 등) | 그 코드의 HTTP 상태 · code · 문구 |
-| of(HttpStatus, String code, String message) | 도메인 오류 코드(문자열) | 넣은 상태 · code · message |
+| of(ErrorCode) | 02의 공통 코드(NOT_FOUND · FORBIDDEN 등), 여러 모듈이 같이 쓰는 도메인 코드(VEHICLE_ALREADY_LINKED) | 그 코드의 HTTP 상태 · code · 문구 |
+| of(HttpStatus, String code, String message) | 한 모듈만 쓰는 도메인 오류 코드(문자열) | 넣은 상태 · code · message |
 | tooManyRequests(int retryAfterSeconds) | 429 횟수 제한 | 429 TOO_MANY_REQUESTS, retryAfterSeconds 채움 |
+| conflictWithOverlap(HttpStatus status, String code, String message, List\<Long\> overlapScheduleIds) | 겹치는 일정 id를 함께 보내는 도메인 오류(schedule SCHEDULE_OVERLAP) | 넣은 상태 · code · message, error.overlapScheduleIds 채움 |
 
-- ErrorCode enum에는 02의 공통 코드만 둔다(TOO_MANY_REQUESTS 포함). 도메인 코드는 enum에 넣지 않는다.
+- ErrorCode enum에는 02의 공통 코드만 둔다(TOO_MANY_REQUESTS 포함). 도메인 코드는 enum에 넣지 않는다. 단, 여러 모듈이 같은 뜻으로 쓰는 도메인 오류는 한 번만 ErrorCode에 둔다(예: VEHICLE_ALREADY_LINKED 409 「이미 보호자가 연결된 차량입니다」 — user createGuardian · auth LINK-01 · LINK-04, 사람 결정 user #73).
 - 429는 retryAfterSeconds를 채운다. 도메인 코드로 429를 낼 때 retryAfterSeconds를 채우는 방법은 확인 필요.
 - 500은 고정 문구를 보내고 예외 내용은 서버 로그에만 남긴다(MDC requestId가 함께 찍힘).
 - 409 STATE_VERSION_CONFLICT 응답에는 error와 함께 최신 세션 뷰가 실린다(pickup이 채움). 실리는 필드 이름은 확인 필요.
@@ -226,12 +227,13 @@ record PublicEndpoint(HttpMethod method, String pattern) {}
 // PublicEndpoints: 인증 없는 API를 가진 도메인이 내는 빈. PublicEndpoint 목록을 담고 SecurityConfig가 모두 모아 permitAll
 
 // common.error
-// ErrorCode: 02의 공통 코드(TOO_MANY_REQUESTS 포함). 코드마다 HTTP 상태 · 기본 문구
+// ErrorCode: 02의 공통 코드(TOO_MANY_REQUESTS 포함)와 여러 모듈이 같이 쓰는 도메인 코드(VEHICLE_ALREADY_LINKED). 코드마다 HTTP 상태 · 기본 문구
 class BusinessException extends RuntimeException {   // 공개 생성자 없음
     static BusinessException of(ErrorCode errorCode);
     static BusinessException of(HttpStatus status, String code, String message);
     static BusinessException tooManyRequests(int retryAfterSeconds);
-    HttpStatus status(); String code(); Integer retryAfterSeconds();
+    static BusinessException conflictWithOverlap(HttpStatus status, String code, String message, List<Long> overlapScheduleIds);
+    HttpStatus status(); String code(); Integer retryAfterSeconds(); List<Long> overlapScheduleIds();
 }
 
 // 컨트롤러 메서드에 다는 애너테이션
@@ -334,7 +336,7 @@ class BusinessException extends RuntimeException {   // 공개 생성자 없음
 | 본문 형식 오류의 코드 | JSON 값 타입 · enum · 시각 형식 오류와 빠진 본문이 모두 400 INVALID_REQUEST(fields 없음). 유지할지 422로 바꿀지 정함. INVALID_REQUEST 문구 「요청 형식을 확인해 주세요」는 구현자가 정함 |
 | 도메인 코드의 ResponseStatusException | Spring 4xx 예외의 code는 HttpStatus 이름(CONFLICT 등)으로 나감. 도메인 코드에서 금지하고 BusinessException만 쓸지 정함. reason 없는 404 예외와 매핑 없는 경로의 문구가 다름 |
 | 422 fields 표기 범위 | 클래스 단위 제약 오류는 fields에 안 담김. 중첩 · 배열 필드 이름 형식(a.b, a[].b 또는 children[0].name), 한 필드 여러 위반, List 본문 인덱스, 이름이 다른 @PathVariable은 정하지 않음 |
-| BusinessException 생성자 | 해소: 공개 생성자 없음. 정적 팩토리 of(ErrorCode) · of(HttpStatus, String code, String message) · tooManyRequests(int retryAfterSeconds), ErrorCode에 TOO_MANY_REQUESTS 추가(팀장 결정). IdempotencyKeyEntity 6인자 생성자, status · code null 방어, 5xx BusinessException 로그는 다음 리뷰 때 다시 봄 |
+| BusinessException 생성자 | 해소: 공개 생성자 없음. 정적 팩토리 of(ErrorCode) · of(HttpStatus, String code, String message) · tooManyRequests(int retryAfterSeconds), ErrorCode에 TOO_MANY_REQUESTS 추가(팀장 결정). conflictWithOverlap(HttpStatus, String code, String message, List<Long> overlapScheduleIds) 추가(일정 SET-02 · 03의 overlapScheduleIds용, 06 결정). IdempotencyKeyEntity 6인자 생성자, status · code null 방어, 5xx BusinessException 로그는 다음 리뷰 때 다시 봄 |
 | 도메인 코드 429의 retryAfterSeconds | of(HttpStatus, code, message)에는 retryAfterSeconds가 없고 tooManyRequests는 code가 TOO_MANY_REQUESTS로 고정됨. 05의 429 LINK_CODE_REISSUE_LIMIT · LINK_CODE_ATTEMPT_LIMIT에 retryAfterSeconds를 채울지, 채운다면 어떤 팩토리로 할지 auth 전에 정함 |
 | 이벤트 스레드 풀 크기 · 포화 정책 | 소스에 없음. 임시값 core 2 · max 4 · queue 100(pickup.async.event.*). 큐가 찬 뒤에야 core를 넘어 늘어 실제 동시 실행은 2개(제안: core = max 4). 포화 때 기본 AbortPolicy라 AFTER_COMMIT 이벤트가 버려짐(재발송 스케줄러가 보완) → 유지 또는 CallerRunsPolicy. 직접 만든 Executor 빈 때문에 Boot의 applicationTaskExecutor가 빠져 MVC 비동기가 SimpleAsyncTaskExecutor를 쓸 수 있음(SES-08 때 확인). @Scheduled 실행 스레드는 기본 1개(08 시작 때 정함) |
 | SSE 종료 줄 · 다른 비동기 응답 로그 | emitter 타임아웃 · 연결 끊김 · completeWithError 때 stream=closed 줄의 status · errorCode, Callable · DeferredResult 응답의 로그는 정하지 않음. SSE 타임아웃(AsyncRequestTimeoutException, 503)이 지금 500 + ERROR 로그로 처리됨. pickup SES-08 때 정함 |

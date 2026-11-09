@@ -10,7 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Tag(name = "차량 연결", description = "차량 연결 해제")
 public interface VehicleLinkApiDoc {
 
-	@Operation(summary = "차량 연결 해제 (LINK-05)", description = "GUARDIAN만. 행은 지우지 않고 unlinkedAt만 채운다")
+	@Operation(summary = "차량 연결 해제 (LINK-05)", description = "GUARDIAN만. 행은 지우지 않고 unlinkedAt만 채우며, 그 차량의 살아 있는 기기를 모두 폐기한다")
 	@Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER, required = true, description = "중복 요청 방지 키")
 	@ApiResponse(responseCode = "204", description = "해제됨")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")

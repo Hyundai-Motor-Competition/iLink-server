@@ -1,137 +1,28 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-07 23:03 KST · tdd-guard
+- 생성: 2026-11-08 09:32 KST · tdd-guard
 - 설계서: C:/pickup/docs
 - 프로젝트: gradle · C:/pickup
-- 테스트: ● GREEN · 725 passed · 전체 · 1.5s
-- 진행: 공유모듈 57/57 · 사용자 71/71 · 인증 120/120 · 일정 0/55 · 장소 0/43 · 픽업 0/203 · 알림 0/44 · 남은 항목 345/593
-- 현재 도메인: 인증 (05_인증-auth.md) · 진행 시작: /tdd go
+- 테스트: ● GREEN · 1141 passed · 전체 · 66s
+- 진행: 공유모듈 57/57 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 58/58 · 픽업 0/203 · 알림 0/44 · 남은 항목 247/632
+- 현재 도메인: 장소 (07_장소-place.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
 
 ## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 완료 · 항목 57/57 · 완료 기준 4/4 · 리뷰 11-07 15:37 조건부 통과 (상 0 · 중 1 · 하 9)
 - 남은 할 일 없음
 
-## 2. 사용자 (user) · 04_사용자-user.md · 대기 · 항목 71/71 · 완료 기준 3/4 · 리뷰 11-07 18:02 조건부 통과 (상 1 · 중 7 · 하 11)
-### 완료 기준
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+## 2. 사용자 (user) · 04_사용자-user.md · 완료 · 항목 73/73 · 완료 기준 4/4 · 리뷰 11-08 02:39 조건부 통과 (상 0 · 중 1 · 하 5)
+- 남은 할 일 없음
 
 ## 3. 인증 (auth) · 05_인증-auth.md · 완료 · 항목 120/120 · 완료 기준 4/4 · 리뷰 11-07 23:03 통과 (상 1 · 중 0 · 하 5)
 - 남은 할 일 없음
 
-## 4. 일정 (schedule) · 06_일정-schedule.md · 대기 · 항목 0/55 · 완료 기준 0/4 · 리뷰 10-28 21:19 조건부 통과 (상 0 · 중 0 · 하 6) · 재리뷰 필요
-### 테스트 케이스
-- [ ] #1 [기반] PickupSchedule은 학원 출입구가 없으면 DRAFT, 있으면 READY로 만들어진다
-- [ ] #2 [기반] 일정 규칙은 targetPickup이 0~60을 벗어나면 거절한다
-- [ ] #3 [기반] 일정 규칙은 weekdays가 비어 있으면 거절한다
-- [ ] #4 [기반] 겹침 규칙은 같은 자녀 · 같은 요일 · 같은 classEndTime 일정을 겹침으로 판정한다
-- [ ] #5 [기반] 하루 한도 규칙은 같은 자녀 같은 요일에 네 번째 일정이면 한도 초과로 판정한다
-- [ ] #6 [기반] targetPickupTime 계산은 classEndTime 18:00 · targetPickup 5에서 18:05를 돌려준다
-- [ ] #7 [기반] 이름 마스킹은 김보호를 김*호로 바꾼다
-- [ ] #8 [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
-- [ ] #9 [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [ ] #10 [기반] AcademyEntity · PickupScheduleEntity가 BaseTimeEntity를 상속하고 location · entrance는 geography(Point,4326)로 매핑된다
-- [ ] #11 [기반] 테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다
-- [ ] #12 [persistence] Academy를 저장하고 읽으면 location · entrance 좌표가 같다
-- [ ] #13 [persistence] weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다
-- [ ] #14 [persistence] classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다
-- [ ] #15 [persistence] loadSchedulesOfChild는 그 자녀의 일정만 돌려준다
-- [ ] #16 [persistence] loadSchedulesOfChildren은 여러 자녀의 일정을 한 번에 돌려준다
-- [ ] #17 [서비스] 학원 검색은 외부 지도 API 결과를 저장하지 않고 externalPlaceId · name · address · location으로 돌려준다
-- [ ] #18 [서비스] 학원 검색은 외부 지도 API가 실패하면 MAP_API_UNAVAILABLE로 거절한다
-- [ ] #19 [서비스] 일정 등록은 학원을 만들고 scheduleId · academyId · status를 돌려준다
-- [ ] #20 [서비스] 일정 등록은 출입구 없는 학원이면 status DRAFT를 돌려준다
-- [ ] #21 [서비스] 일정 등록은 childId가 CHILD가 아니면 NOT_FOUND로 거절한다
-- [ ] #22 [서비스] 일정 등록은 다른 가족의 자녀면 NOT_FOUND로 거절한다
-- [ ] #23 [서비스] 일정 등록은 겹치는 일정이 있으면 SCHEDULE_OVERLAP과 겹치는 scheduleId 목록으로 거절한다
-- [ ] #24 [서비스] 일정 등록은 같은 요일 일정이 이미 3개면 DAILY_SCHEDULE_LIMIT으로 거절한다
-- [ ] #25 [서비스] 일정 수정은 자기 자신과는 겹침으로 판정하지 않는다
-- [ ] #26 [서비스] 일정 수정은 요일 · 시간 · 학원을 바꾸고 status를 다시 판정한다
-- [ ] #27 [서비스] 설정 요약은 자녀 기기가 CONNECTED가 아니면 missing에 CHILD_DEVICE를 넣는다
-- [ ] #28 [서비스] 설정 요약은 READY 일정이 없으면 missing에 SCHEDULE을 넣는다
-- [ ] #29 [서비스] 설정 요약은 일정 학원에 기본 장소가 없으면 missing에 PICKUP_SPOT을 넣는다
-- [ ] #30 [서비스] 설정 요약은 joinCallMode와 Family.settingsVersion을 담는다
-- [ ] #31 [서비스] 설정 완료는 settingsVersion이 다르면 SETTINGS_VERSION_CONFLICT로 거절한다
-- [ ] #32 [서비스] 설정 완료는 missing이 남아 있으면 SETUP_INCOMPLETE로 거절한다
-- [ ] #33 [서비스] 주간 일정은 weekStart가 없으면 한국 날짜 기준 이번 주 월요일부터 7일을 돌려준다
-- [ ] #34 [서비스] 주간 일정은 요일이 맞는 날짜에만 그 일정을 넣는다
-- [ ] #35 [서비스] 주간 일정 readiness는 자녀 기기나 기본 장소가 빠지면 startable false와 missing을 돌려준다
-- [ ] #36 [서비스] 차량용 설정 요약은 GUARDIAN 이름을 가려서 돌려주고 자녀 목록과 joinCallMode를 담는다
-- [ ] #37 [서비스] findSchedules는 scheduleId 목록의 일정과 학원 정보를 돌려준다
-- [ ] #38 [web] GET /v1/places/academies는 200과 items[]를 돌려준다
-- [ ] #39 [web] GET /v1/places/academies에 1자 query를 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #40 [web] GET /v1/places/academies가 외부 API 오류면 502 MAP_API_UNAVAILABLE을 돌려준다
-- [ ] #41 [web] POST /v1/children/{childId}/schedules는 201과 scheduleId · academyId · status를 돌려준다
-- [ ] #42 [web] POST /v1/children/{childId}/schedules에 targetPickup 61을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #43 [web] POST /v1/children/{childId}/schedules가 겹치면 409 SCHEDULE_OVERLAP과 overlapScheduleIds를 돌려준다
-- [ ] #44 [web] POST /v1/children/{childId}/schedules가 하루 한도를 넘으면 422 DAILY_SCHEDULE_LIMIT을 돌려준다
-- [ ] #45 [web] PUT /v1/schedules/{scheduleId}는 200과 scheduleId · academyId · status를 돌려준다
-- [ ] #46 [web] PUT /v1/schedules/{scheduleId}를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] #47 [web] GET /v1/children/{childId}/schedules는 200과 items[]를 돌려준다
-- [ ] #48 [web] GET /v1/children/{childId}/setup-summary는 200과 child · schedules · pickupSpots · joinCallMode · missing · settingsVersion을 돌려준다
-- [ ] #49 [web] POST /v1/children/{childId}/setup-completion은 200과 syncedToVehicle을 돌려준다
-- [ ] #50 [web] POST /v1/children/{childId}/setup-completion이 버전 충돌이면 409 SETTINGS_VERSION_CONFLICT를 돌려준다
-- [ ] #51 [web] POST /v1/children/{childId}/setup-completion이 누락이 있으면 422 SETUP_INCOMPLETE를 돌려준다
-- [ ] #52 [web] GET /v1/vehicles/me/weekly-pickups는 차량 토큰으로 200과 weekStart · days · readiness를 돌려준다
-- [ ] #53 [web] GET /v1/vehicles/me/weekly-pickups를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] #54 [web] GET /v1/vehicles/me/settings-summary는 차량 토큰으로 200과 guardianNameMasked · children · joinCallMode를 돌려준다
-- [ ] #55 [web] Idempotency-Key는 POST /v1/children/{childId}/schedules · POST /v1/children/{childId}/setup-completion에만 요구된다
-### 완료 기준
-- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
-- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+## 4. 일정 (schedule) · 06_일정-schedule.md · 완료 · 항목 77/77 · 완료 기준 4/4 · 리뷰 11-08 02:05 조건부 통과 (상 0 · 중 0 · 하 2)
+- 남은 할 일 없음
 
-## 5. 장소 (place) · 07_장소-place.md · 대기 · 항목 0/43 · 완료 기준 0/4
-### 테스트 케이스
-- [ ] #1 [기반] 기본 장소 규칙은 가족 · 학원의 첫 장소를 isDefault true로 만든다
-- [ ] #2 [기반] 기본 장소 규칙은 새 기본 장소를 지정하면 같은 가족 · 학원의 이전 기본 장소를 false로 바꾼다
-- [ ] #3 [기반] 삭제 규칙은 같은 학원에 다른 장소가 남아 있는 기본 장소의 삭제를 거절한다
-- [ ] #4 [기반] 삭제 규칙은 학원에 하나 남은 기본 장소의 삭제를 허용한다
-- [ ] #5 [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
-- [ ] #6 [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [ ] #7 [기반] PickupSpotEntity가 BaseTimeEntity를 상속하고 stopPoint · meetingPoint는 geography(Point,4326)로 매핑된다
-- [ ] #8 [기반] 테스트 시드로 해솔영어학원의 기본 장소 정문 앞과 다른 장소 1개를 만든다
-- [ ] #9 [persistence] PickupSpot을 저장하고 읽으면 stopPoint · meetingPoint의 lat · lng가 소수점 6자리까지 같다
-- [ ] #10 [persistence] stop_point 컬럼에 GIST 인덱스가 있다
-- [ ] #11 [persistence] loadSpots는 그 가족의 장소만 돌려주고 academyId를 주면 그 학원 장소만 돌려준다
-- [ ] #12 [persistence] loadSpotsWithin은 near에서 radiusM 안에 정차 지점이 있는 장소만 돌려준다
-- [ ] #13 [persistence] isWithinMeters는 학원에서 499m인 좌표에 true, 501m인 좌표에 false를 돌려준다
-- [ ] #14 [persistence] loadDefaultSpot은 가족 · 학원의 isDefault true 장소를 돌려준다
-- [ ] #15 [서비스] 장소 추가는 학원의 첫 장소면 isDefault false로 보내도 isDefault true로 저장한다
-- [ ] #16 [서비스] 장소 추가는 isDefault true면 같은 학원의 이전 기본 장소를 해제한다
-- [ ] #17 [서비스] 장소 추가는 정차 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
-- [ ] #18 [서비스] 장소 추가는 만남 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
-- [ ] #19 [서비스] 장소 추가는 호출한 보호자를 createdBy로 저장한다
-- [ ] #20 [서비스] 장소 수정은 보낸 필드만 바꾼다
-- [ ] #21 [서비스] 장소 수정은 바꾼 좌표가 500m를 넘으면 SPOT_TOO_FAR로 거절한다
-- [ ] #22 [서비스] 장소 수정은 isDefault true로 바꾸면 같은 학원의 이전 기본 장소를 해제한다
-- [ ] #23 [서비스] 장소 삭제는 진행 중 세션이 쓰는 장소면 SPOT_IN_USE로 거절한다
-- [ ] #24 [서비스] 장소 삭제는 다른 장소가 남은 기본 장소면 DEFAULT_SPOT_REQUIRED로 거절한다
-- [ ] #25 [서비스] 다른 가족의 spotId를 수정 · 삭제하려 하면 NOT_FOUND로 거절한다
-- [ ] #26 [서비스] 장소 조회는 학원별로 묶어 academyName과 함께 돌려준다
-- [ ] #27 [서비스] 장소 조회는 진행 중 세션이 없으면 walkMinutes를 null로 돌려준다
-- [ ] #28 [서비스] findDefaultSpot은 가족 · 학원의 기본 장소를 돌려주고 없으면 빈 값을 돌려준다
-- [ ] #29 [web] GET /v1/families/me/pickup-spots는 200과 academies[]를 돌려준다
-- [ ] #30 [web] GET /v1/families/me/pickup-spots는 차량 토큰으로도 200을 돌려준다
-- [ ] #31 [web] GET /v1/families/me/pickup-spots에 near만 보내고 radiusM을 빼면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #32 [web] GET /v1/families/me/pickup-spots에 radiusM 3001을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #33 [web] GET /v1/families/me/pickup-spots를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] #34 [web] POST /v1/families/me/pickup-spots는 201과 spotId · isDefault를 돌려준다
-- [ ] #35 [web] POST /v1/families/me/pickup-spots에 51자 name을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] #36 [web] POST /v1/families/me/pickup-spots가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
-- [ ] #37 [web] POST /v1/families/me/pickup-spots를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] #38 [web] PATCH /v1/pickup-spots/{spotId}는 200과 spotId · name · stopPoint · meetingPoint · memo · isDefault를 돌려준다
-- [ ] #39 [web] PATCH /v1/pickup-spots/{spotId}가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
-- [ ] #40 [web] DELETE /v1/pickup-spots/{spotId}는 204를 돌려준다
-- [ ] #41 [web] DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다
-- [ ] #42 [web] DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다
-- [ ] #43 [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
-### 완료 기준
-- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
-- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+## 5. 장소 (place) · 07_장소-place.md · 완료 · 항목 58/58 · 완료 기준 4/4 · 리뷰 11-08 09:28 조건부 통과 (상 0 · 중 2 · 하 6)
+- 남은 할 일 없음
 
 ## 6. 픽업 (pickup) · 08_픽업-pickup.md · 대기 · 항목 0/203 · 완료 기준 0/4
 ### 테스트 케이스

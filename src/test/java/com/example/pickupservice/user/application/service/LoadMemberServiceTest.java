@@ -23,6 +23,8 @@ class LoadMemberServiceTest {
 	private static final long FAMILY_ID = 12L;
 	private static final long GUARDIAN_ID = 101L;
 	private static final long CHILD_ID = 131L;
+	private static final long CO_GUARDIAN_ID = 105L;
+	private static final long TEACHER_ID = 140L;
 
 	@Mock
 	private LoadUserPort loadUserPort;
@@ -62,6 +64,21 @@ class LoadMemberServiceTest {
 		assertThat(result).containsExactly(
 				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678"),
 				new MemberInfo(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null));
+	}
+
+	@Test
+	@DisplayName("findMembers는 LoadUserPort가 멤버를 섞인 순서로 돌려줘도 userId 오름차순으로 돌려준다")
+	void findMembersReturnsMembersInAscendingUserIdOrder() {
+		given(loadUserPort.loadUsers(FAMILY_ID)).willReturn(List.of(
+				User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null),
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678"),
+				User.restore(TEACHER_ID, FAMILY_ID, Role.TEACHER, "이선생", "+821098765432"),
+				User.restore(CO_GUARDIAN_ID, FAMILY_ID, Role.CO_GUARDIAN, "박보호", "+821011112222")));
+
+		List<MemberInfo> result = loadMemberService.findMembers(FAMILY_ID);
+
+		assertThat(result).extracting(MemberInfo::userId)
+				.containsExactly(GUARDIAN_ID, CO_GUARDIAN_ID, CHILD_ID, TEACHER_ID);
 	}
 
 	@Test

@@ -37,7 +37,7 @@ public interface FamilyApiDoc {
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (GUARDIAN이 아닌 사람이 role 변경)")
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (없거나 다른 가족의 멤버)")
-	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (이름 · 전화번호 형식 오류, GUARDIAN 자신의 role 변경)")
+	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (이름 · 전화번호 형식 오류, GUARDIAN 자신의 role 변경, role GUARDIAN 지정, phone 없는 CHILD를 자녀 외 role로 변경) · MEMBER_LIMIT_EXCEEDED(CHILD를 자녀 외 role로 바꿀 때 자녀 외 멤버가 이미 5명)")
 	MemberResponse updateMember(@Parameter(hidden = true) AuthPrincipal principal, long userId, UpdateMemberRequest request);
 
 	@Operation(summary = "멤버 해제 (FAM-07)", description = "GUARDIAN만. 해제하면 그 멤버의 기기와 토큰도 폐기된다")

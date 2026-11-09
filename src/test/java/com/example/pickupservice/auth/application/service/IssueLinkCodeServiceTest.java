@@ -274,7 +274,7 @@ class IssueLinkCodeServiceTest {
 	}
 
 	@Test
-	@DisplayName("연결 코드 발급은 연결 전 토큰(familyId 없음)인데 그 차량이 이미 가족에 연결돼 있으면 VEHICLE_ALREADY_LINKED로 거절한다")
+	@DisplayName("연결 코드 발급은 연결 전 토큰(familyId 없음)인데 그 차량이 이미 가족에 연결돼 있으면 409 VEHICLE_ALREADY_LINKED 「이미 보호자가 연결된 차량입니다」로 거절한다")
 	void issueLinkCodeWithPreLinkTokenRejectsVehicleAlreadyLinkedToFamily() {
 		lenient().when(loadVehicleUseCase.findVehicle(VEHICLE_ID)).thenReturn(Optional.of(linkedVehicle(VEHICLE_ID)));
 
@@ -282,6 +282,7 @@ class IssueLinkCodeServiceTest {
 				.isInstanceOfSatisfying(BusinessException.class, e -> {
 					assertThat(e.status()).isEqualTo(HttpStatus.CONFLICT);
 					assertThat(e.code()).isEqualTo("VEHICLE_ALREADY_LINKED");
+					assertThat(e.getMessage()).isEqualTo("이미 보호자가 연결된 차량입니다");
 				});
 
 		verify(loadVehicleUseCase).findVehicle(VEHICLE_ID);
