@@ -8,6 +8,7 @@ import com.example.pickupservice.auth.domain.MemberInvite;
 import com.example.pickupservice.auth.domain.OwnerType;
 import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
+import com.example.pickupservice.pickup.application.port.in.ActivePickupQueryUseCase;
 import com.example.pickupservice.user.application.port.out.CheckActivePickupPort;
 import com.example.pickupservice.user.application.port.out.LoadMemberDeviceStatusPort;
 import com.example.pickupservice.user.application.port.out.RevokeMemberDevicesPort;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Instant;
 import java.util.HexFormat;
@@ -27,6 +29,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @RequiredArgsConstructor
 class UserModuleLinkAdaptersTest extends IntegrationTestSupport {
@@ -39,6 +43,9 @@ class UserModuleLinkAdaptersTest extends IntegrationTestSupport {
 	private final SaveDevicePort saveDevicePort;
 	private final LoadDevicePort loadDevicePort;
 	private final SaveInvitePort saveInvitePort;
+
+	@MockitoBean
+	private ActivePickupQueryUseCase activePickupQueryUseCase;
 
 	@Test
 	@DisplayName("세 포트는 각각 빈이 정확히 1개이고 user.adapter.out 아래 클래스가 구현한다")
@@ -97,16 +104,20 @@ class UserModuleLinkAdaptersTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("CheckActivePickupPort는 isInActivePickup · hasActivePickup 모두 false를 돌려준다")
-	void activePickupPortAlwaysReturnsFalse() {
+	@DisplayName("CheckActivePickupPort는 isInActivePickup · hasActivePickup을 pickup ActivePickupQueryUseCase 결과 그대로 돌려준다")
+	void activePickupPortDelegatesToPickupUseCase() {
 		CheckActivePickupPort activePickupPort = onlyBeanOf(CheckActivePickupPort.class);
+		given(activePickupQueryUseCase.isInActivePickup(101L)).willReturn(true);
+		given(activePickupQueryUseCase.isInActivePickup(102L)).willReturn(false);
+		given(activePickupQueryUseCase.hasActivePickup(77L)).willReturn(true);
+		given(activePickupQueryUseCase.hasActivePickup(78L)).willReturn(false);
 
-		assertThat(activePickupPort.isInActivePickup(1L)).isFalse();
-		assertThat(activePickupPort.isInActivePickup(101L)).isFalse();
-		assertThat(activePickupPort.isInActivePickup(9_999_999L)).isFalse();
-		assertThat(activePickupPort.hasActivePickup(1L)).isFalse();
-		assertThat(activePickupPort.hasActivePickup(77L)).isFalse();
-		assertThat(activePickupPort.hasActivePickup(9_999_999L)).isFalse();
+		assertThat(activePickupPort.isInActivePickup(101L)).isTrue();
+		assertThat(activePickupPort.isInActivePickup(102L)).isFalse();
+		assertThat(activePickupPort.hasActivePickup(77L)).isTrue();
+		assertThat(activePickupPort.hasActivePickup(78L)).isFalse();
+		verify(activePickupQueryUseCase).isInActivePickup(101L);
+		verify(activePickupQueryUseCase).hasActivePickup(77L);
 	}
 
 	private static Device liveUserDevice(long userId, Instant at) {

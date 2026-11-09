@@ -25,6 +25,8 @@ pickup:
       queue-capacity: 100
   idempotency:
     cleanup-interval: PT1H
+  sse:
+    ping-interval: PT30S
   jwt:
     access-ttl: PT30M
   invite:
@@ -33,6 +35,15 @@ pickup:
     kakao:
       base-url: https://dapi.kakao.com
       api-key: ${KAKAO_REST_API_KEY:}
+  session:
+    eta-valid-for: PT1M
+    call-trigger-eta: PT180S
+    boarding-cancel-window: PT10S
+    auto-complete-interval: PT10S
+    call-trigger-distance-meters: 700
+    help-request-interval: PT60S
+    prep-extension-limit: PT15M
+    data-retention-days: 90
 
 logging:
   pattern:

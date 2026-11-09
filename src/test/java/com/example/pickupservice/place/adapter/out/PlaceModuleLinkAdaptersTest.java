@@ -1,6 +1,8 @@
 package com.example.pickupservice.place.adapter.out;
 
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
+import com.example.pickupservice.common.geo.LatLng;
+import com.example.pickupservice.pickup.application.port.in.ActivePickupQueryUseCase;
 import com.example.pickupservice.place.application.port.out.AcademyInfo;
 import com.example.pickupservice.place.application.port.out.CheckActivePickupPort;
 import com.example.pickupservice.place.application.port.out.LoadAcademyPort;
@@ -12,10 +14,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.assertj.core.api.Assertions.within;
 
 @RequiredArgsConstructor
@@ -31,15 +37,25 @@ class PlaceModuleLinkAdaptersTest extends IntegrationTestSupport {
 	private final ApplicationContext applicationContext;
 	private final ScheduleSeed scheduleSeed;
 
-	@Test
-	@DisplayName("pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다")
-	void temporaryPickupActivityAdapterReportsNoActiveSession() {
-		CheckActivePickupPort pickupPort = onlyBeanOf(CheckActivePickupPort.class);
+	@MockitoBean
+	private ActivePickupQueryUseCase activePickupQueryUseCase;
 
-		assertThat(pickupPort.isUsedByActiveSession(1L)).isFalse();
-		assertThat(pickupPort.isUsedByActiveSession(9_999_999L)).isFalse();
-		assertThat(pickupPort.loadActiveChildLocation(1L)).isNotNull().isEmpty();
-		assertThat(pickupPort.loadActiveChildLocation(9_999_999L)).isNotNull().isEmpty();
+	@Test
+	@DisplayName("CheckActivePickupPort는 isUsedByActiveSession은 pickup isSpotInUse, loadActiveChildLocation은 pickup activeChildLocation 결과를 그대로 돌려준다")
+	void pickupActivityAdapterDelegatesToPickupUseCase() {
+		CheckActivePickupPort pickupPort = onlyBeanOf(CheckActivePickupPort.class);
+		LatLng childLocation = new LatLng(37.5665, 126.9780);
+		given(activePickupQueryUseCase.isSpotInUse(11L)).willReturn(true);
+		given(activePickupQueryUseCase.isSpotInUse(12L)).willReturn(false);
+		given(activePickupQueryUseCase.activeChildLocation(21L)).willReturn(Optional.of(childLocation));
+		given(activePickupQueryUseCase.activeChildLocation(22L)).willReturn(Optional.empty());
+
+		assertThat(pickupPort.isUsedByActiveSession(11L)).isTrue();
+		assertThat(pickupPort.isUsedByActiveSession(12L)).isFalse();
+		assertThat(pickupPort.loadActiveChildLocation(21L)).contains(childLocation);
+		assertThat(pickupPort.loadActiveChildLocation(22L)).isNotNull().isEmpty();
+		verify(activePickupQueryUseCase).isSpotInUse(11L);
+		verify(activePickupQueryUseCase).activeChildLocation(21L);
 	}
 
 	@Test

@@ -36,6 +36,13 @@ class ErrorCodeTest {
 	}
 
 	@Test
+	@DisplayName("common ErrorCode.RESEND_TOO_SOON은 HTTP 429(TOO_MANY_REQUESTS)이고 문구는 「잠시 뒤에 다시 보내 주세요」다")
+	void resendTooSoonIsTooManyRequestsWithResendMessage() {
+		assertThat(ErrorCode.RESEND_TOO_SOON.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+		assertThat(ErrorCode.RESEND_TOO_SOON.getMessage()).isEqualTo("잠시 뒤에 다시 보내 주세요");
+	}
+
+	@Test
 	@DisplayName("VEHICLE_ALREADY_LINKED는 common ErrorCode에만 정의되고 UserErrors · AuthErrors 등 main 소스 어디에도 \"VEHICLE_ALREADY_LINKED\" 문자열 코드로 따로 정의하지 않는다")
 	void vehicleAlreadyLinkedIsNotRedefinedOutsideCommonErrorCode() {
 		List<Path> redefining = mainSources()

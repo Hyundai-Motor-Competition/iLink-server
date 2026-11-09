@@ -1,5 +1,6 @@
 package com.example.pickupservice.auth.application.service;
 
+import com.example.pickupservice.auth.application.port.in.LoadPushTargetByDeviceUseCase;
 import com.example.pickupservice.auth.application.port.in.LoadPushTargetUseCase;
 import com.example.pickupservice.auth.application.port.in.PushTarget;
 import com.example.pickupservice.auth.application.port.out.LoadDevicePort;
@@ -10,12 +11,19 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-public class LoadPushTargetService implements LoadPushTargetUseCase {
+public class LoadPushTargetService implements LoadPushTargetUseCase, LoadPushTargetByDeviceUseCase {
 
 	private final LoadDevicePort loadDevicePort;
+
+	@Override
+	@Transactional(readOnly = true)
+	public Optional<PushTarget> findLivePushTargetByDeviceId(long deviceId) {
+		return toPushTarget(loadDevicePort.loadDevice(deviceId).filter(Device::isLive));
+	}
 
 	@Override
 	@Transactional(readOnly = true)
@@ -27,5 +35,18 @@ public class LoadPushTargetService implements LoadPushTargetUseCase {
 				.map(device -> new PushTarget(device.getOwnerId(), device.getDeviceId(), device.getPlatform(),
 						device.getPushToken()))
 				.toList();
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Optional<PushTarget> findPushTargetByDeviceId(long deviceId) {
+		return toPushTarget(loadDevicePort.loadDevice(deviceId));
+	}
+
+	private Optional<PushTarget> toPushTarget(Optional<Device> device) {
+		return device
+				.filter(d -> d.getOwnerType() == OwnerType.USER)
+				.filter(d -> d.getPushToken() != null && !d.getPushToken().isEmpty())
+				.map(d -> new PushTarget(d.getOwnerId(), d.getDeviceId(), d.getPlatform(), d.getPushToken()));
 	}
 }
