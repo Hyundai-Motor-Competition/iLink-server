@@ -44,7 +44,7 @@ public class CallProgressService implements CallProgressUseCase {
 		}
 		PickupSession locked = loadLockedSession(first.getSessionId());
 		Call call = loadCall(callId);
-		if (call.getStatus() == CallStatus.REVOKED) {
+		if (call.getStatus() == CallStatus.REVOKED || call.getSentAt() != null) {
 			return;
 		}
 		call.markSent(sentAt);
@@ -64,7 +64,7 @@ public class CallProgressService implements CallProgressUseCase {
 		}
 		PickupSession session = loadLockedSession(first.getSessionId());
 		Call call = loadCall(callId);
-		if (call.getStatus() == CallStatus.REVOKED) {
+		if (call.getStatus() == CallStatus.REVOKED || call.getDeliveredAt() != null) {
 			return;
 		}
 		call.markDelivered(deliveredAt);

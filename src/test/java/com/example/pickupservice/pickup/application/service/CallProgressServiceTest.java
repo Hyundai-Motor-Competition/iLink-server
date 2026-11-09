@@ -225,6 +225,42 @@ class CallProgressServiceTest {
 		assertThat(session.getStateVersion()).isEqualTo(STATE_VERSION_AFTER_SENT);
 	}
 
+	@ParameterizedTest(name = "{0}")
+	@EnumSource(value = CallStatus.class, names = { "SENT", "DELIVERED", "ACKNOWLEDGED" })
+	@DisplayName("이미 보낸(sentAt 있는) Call에 다시 온 markCallSent는 무시해 Call · 세션 · CALL_SENT를 저장 · 발행하지 않고 자녀 상태 · stateVersion · 첫 sentAt · status를 그대로 둔다")
+	void markCallSentIgnoresCallAlreadySent(CallStatus status) {
+		Call sent = callWithStatus(status);
+		PickupSession session = session(STATE_VERSION_AFTER_SENT, ChildPhase.CALLED);
+		givenCall(sent);
+		givenLockedSession(session);
+
+		callProgressService.markCallSent(CALL_ID, SENT_AT.plusSeconds(30));
+
+		assertNothingSavedOrPublished();
+		assertThat(sent.getSentAt()).isEqualTo(SENT_AT);
+		assertThat(sent.getStatus()).isEqualTo(status);
+		assertThat(session.getChildren()).extracting(SessionChild::getChildPhase).containsOnly(ChildPhase.CALLED);
+		assertThat(session.getStateVersion()).isEqualTo(STATE_VERSION_AFTER_SENT);
+	}
+
+	@Test
+	@DisplayName("markCallSent는 세션 행을 잠근 뒤 Call을 다시 읽어, 잠금을 기다리는 사이 다른 요청이 먼저 보냈으면 Call · 세션 · CALL_SENT를 저장 · 발행하지 않고 stateVersion을 올리지 않는다")
+	void markCallSentRereadsCallAfterLockAndIgnoresCallSentMeanwhile() {
+		Call sentMeanwhile = sentCall();
+		PickupSession session = session(STATE_VERSION_AFTER_SENT, ChildPhase.CALLED);
+		lenient().when(loadCallPort.loadCall(CALL_ID))
+				.thenReturn(Optional.of(acceptedCall()), Optional.of(sentMeanwhile));
+		givenLockedSession(session);
+
+		callProgressService.markCallSent(CALL_ID, SENT_AT.plusSeconds(30));
+
+		assertNothingSavedOrPublished();
+		assertThat(sentMeanwhile.getSentAt()).isEqualTo(SENT_AT);
+		assertThat(session.getChildren()).extracting(SessionChild::getChildPhase).containsOnly(ChildPhase.CALLED);
+		assertThat(session.getStateVersion()).isEqualTo(STATE_VERSION_AFTER_SENT);
+		assertCallRereadAfterLock();
+	}
+
 	// ── markCallDelivered ──
 
 	@Test
@@ -289,6 +325,21 @@ class CallProgressServiceTest {
 		assertNothingSavedOrPublished();
 		assertThat(revoked.getStatus()).isEqualTo(CallStatus.REVOKED);
 		assertThat(revoked.getDeliveredAt()).isNull();
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@EnumSource(value = CallStatus.class, names = { "DELIVERED", "ACKNOWLEDGED" })
+	@DisplayName("이미 수신 확인된(deliveredAt 있는) Call에 다시 온 markCallDelivered는 무시해 Call · 세션 · CALL_DELIVERED를 저장 · 발행하지 않고 첫 deliveredAt · status를 그대로 둔다")
+	void markCallDeliveredIgnoresCallAlreadyDelivered(CallStatus status) {
+		Call delivered = callWithStatus(status);
+		givenCall(delivered);
+		givenLockedSession(session(STATE_VERSION_AFTER_SENT, ChildPhase.CALLED));
+
+		callProgressService.markCallDelivered(CALL_ID, DELIVERED_AT.plusSeconds(30));
+
+		assertNothingSavedOrPublished();
+		assertThat(delivered.getDeliveredAt()).isEqualTo(DELIVERED_AT);
+		assertThat(delivered.getStatus()).isEqualTo(status);
 	}
 
 	// ── 잠금을 기다리는 사이 철회된 호출 ──

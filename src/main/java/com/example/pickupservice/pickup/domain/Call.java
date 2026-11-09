@@ -42,7 +42,7 @@ public class Call {
 	}
 
 	public void markSent(Instant at) {
-		if (status == CallStatus.REVOKED) {
+		if (status == CallStatus.REVOKED || sentAt != null) {
 			return;
 		}
 		this.sentAt = at;
@@ -53,7 +53,7 @@ public class Call {
 	}
 
 	public void markDelivered(Instant at) {
-		if (status == CallStatus.REVOKED) {
+		if (status == CallStatus.REVOKED || deliveredAt != null) {
 			return;
 		}
 		this.deliveredAt = at;

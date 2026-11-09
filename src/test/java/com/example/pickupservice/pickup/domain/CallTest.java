@@ -148,6 +148,20 @@ class CallTest {
 	}
 
 	@Test
+	@DisplayName("이미 deliveredAt이 있는 Call에 다시 온 markDelivered는 첫 deliveredAt을 덮어쓰지 않고 status도 그대로 둔다")
+	void secondMarkDeliveredKeepsFirstDeliveredAt() {
+		Call call = Call.accept(SESSION_ID, CallTriggerType.ETA_3MIN, SPOT_VERSION);
+		call.markSent(SENT_AT);
+		call.markDelivered(DELIVERED_AT);
+
+		call.markDelivered(LATE_DELIVERED_AT);
+
+		assertThat(call.getDeliveredAt()).isEqualTo(DELIVERED_AT);
+		assertThat(call.getStatus()).isEqualTo(CallStatus.DELIVERED);
+		assertThat(call.getSentAt()).isEqualTo(SENT_AT);
+	}
+
+	@Test
 	@DisplayName("발송 보고보다 수신 확인이 먼저 오면 ACCEPTED인 Call도 DELIVERED · deliveredAt이 되고 sentAt은 null 그대로다")
 	void markDeliveredOnAcceptedCallChangesToDeliveredAndKeepsSentAtNull() {
 		Call call = Call.accept(SESSION_ID, CallTriggerType.ETA_3MIN, SPOT_VERSION);
@@ -170,6 +184,32 @@ class CallTest {
 		assertThat(call.getStatus()).isEqualTo(CallStatus.DELIVERED);
 		assertThat(call.getSentAt()).isEqualTo(SENT_AT);
 		assertThat(call.getDeliveredAt()).isEqualTo(DELIVERED_AT);
+	}
+
+	@Test
+	@DisplayName("이미 sentAt이 있는 Call에 다시 온 markSent는 첫 sentAt을 덮어쓰지 않고 status도 그대로 둔다")
+	void secondMarkSentKeepsFirstSentAt() {
+		Call call = Call.accept(SESSION_ID, CallTriggerType.ETA_3MIN, SPOT_VERSION);
+		call.markSent(SENT_AT);
+
+		call.markSent(LATE_SENT_AT);
+
+		assertThat(call.getSentAt()).isEqualTo(SENT_AT);
+		assertThat(call.getStatus()).isEqualTo(CallStatus.SENT);
+	}
+
+	@Test
+	@DisplayName("DELIVERED이고 sentAt도 있는 Call에 다시 온 markSent는 첫 sentAt · deliveredAt · status를 그대로 둔다")
+	void secondMarkSentOnDeliveredCallKeepsFirstSentAtAndStatus() {
+		Call call = Call.accept(SESSION_ID, CallTriggerType.ETA_3MIN, SPOT_VERSION);
+		call.markSent(SENT_AT);
+		call.markDelivered(DELIVERED_AT);
+
+		call.markSent(LATE_SENT_AT);
+
+		assertThat(call.getSentAt()).isEqualTo(SENT_AT);
+		assertThat(call.getDeliveredAt()).isEqualTo(DELIVERED_AT);
+		assertThat(call.getStatus()).isEqualTo(CallStatus.DELIVERED);
 	}
 
 	@Test
