@@ -1,13 +1,13 @@
 package com.example.pickupservice;
 
-import com.example.pickupservice.common.fixture.PostgisTestcontainersConfiguration;
+import com.example.pickupservice.common.fixture.TestPostgisConfiguration;
 import org.springframework.boot.SpringApplication;
 
 public class TestPickupServiceApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.from(PickupServiceApplication::main)
-				.with(PostgisTestcontainersConfiguration.class)
+				.with(TestPostgisConfiguration.class)
 				.withAdditionalProfiles("dev")
 				.run(args);
 	}

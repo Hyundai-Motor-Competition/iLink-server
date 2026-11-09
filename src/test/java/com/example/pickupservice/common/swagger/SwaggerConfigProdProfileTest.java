@@ -1,7 +1,7 @@
 package com.example.pickupservice.common.swagger;
 
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
-import com.example.pickupservice.common.fixture.PostgisTestcontainersConfiguration;
+import com.example.pickupservice.common.fixture.TestPostgisConfiguration;
 import com.example.pickupservice.common.security.Role;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @SpringBootTest(properties = "spring.jpa.hibernate.ddl-auto=update")
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")
-@Import({PostgisTestcontainersConfiguration.class, AccessTokenFixture.class})
+@Import({TestPostgisConfiguration.class, AccessTokenFixture.class})
 @RequiredArgsConstructor
 class SwaggerConfigProdProfileTest {
 

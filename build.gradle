@@ -14,8 +14,43 @@ java {
 	}
 }
 
+// 테스트 DB 방식. auto(기본): Windows는 embedded, 그 밖의 OS는 testcontainers.
+// embedded: 내장 PostgreSQL 17 + PostGIS Windows 묶음(Docker 없음, Windows x64만)
+// testcontainers: postgis/postgis:17-3.7 컨테이너(Docker 필요)
+// 강제: ./gradlew test -Ppickup.test.db=embedded|testcontainers
+// 같은 규칙이 src/test의 TestPostgis.Mode에 있다(Gradle 밖에서 돌릴 때 쓴다)
+def isWindows = System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('windows')
+def requestedTestDb = providers.gradleProperty('pickup.test.db').getOrElse('auto').trim().toLowerCase(Locale.ROOT)
+def testDbMode = [
+		auto          : isWindows ? 'embedded' : 'testcontainers',
+		embedded      : 'embedded',
+		testcontainers: 'testcontainers',
+][requestedTestDb]
+if (testDbMode == null) {
+	throw new GradleException("pickup.test.db는 auto · embedded · testcontainers 중 하나입니다: ${requestedTestDb}")
+}
+def useWindowsEmbeddedTestDb = testDbMode == 'embedded' && isWindows
+
 repositories {
 	mavenCentral()
+	exclusiveContent {
+		forRepository {
+			ivy {
+				name = 'OSGeoPostgisWindows'
+				url = 'https://download.osgeo.org/postgis/windows'
+				patternLayout {
+					artifact '[organisation]/[module]-[revision]x64.[ext]'
+					artifact '[organisation]/archive/[module]-[revision]x64.[ext]'
+				}
+				metadataSources { artifact() }
+			}
+		}
+		filter { includeGroup 'pg17' }
+	}
+}
+
+configurations {
+	postgisBundle
 }
 
 dependencies {
@@ -42,9 +77,50 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
 	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 	testImplementation 'org.testcontainers:testcontainers-postgresql'
+	// EmbeddedPostgis가 컴파일되도록 API만 둔다. 실행 jar와 PostgreSQL 바이너리는 아래 embedded 모드에서만 넣는다
+	testCompileOnly 'io.zonky.test:embedded-postgres:2.2.2'
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
+	postgisBundle 'pg17:postgis-bundle-pg17:3.6.2@zip'
+}
+
+if (useWindowsEmbeddedTestDb) {
+	dependencies {
+		// 기본 의존인 4개 OS 바이너리(약 116MB) 대신 Windows 것만 넣는다
+		testRuntimeOnly('io.zonky.test:embedded-postgres:2.2.2') {
+			exclude group: 'io.zonky.test.postgres'
+		}
+		testRuntimeOnly platform('io.zonky.test.postgres:embedded-postgres-binaries-bom:17.11.0')
+		testRuntimeOnly 'io.zonky.test.postgres:embedded-postgres-binaries-windows-amd64'
+	}
+}
+
+def postgisDir = layout.buildDirectory.dir('postgis-bundle')
+
+def unpackPostgisBundle = tasks.register('unpackPostgisBundle', Sync) {
+	description = 'Unpacks the PostGIS Windows bundle that the embedded PostgreSQL test server loads.'
+	from({ zipTree(configurations.postgisBundle.singleFile) }) {
+		include '*/bin/*.dll', '*/lib/**', '*/share/**'
+		eachFile { it.relativePath = new RelativePath(true, it.relativePath.segments.drop(1)) }
+		includeEmptyDirs = false
+	}
+	into postgisDir
+}
+
+[tasks.named('test'), tasks.named('bootTestRun')].each { taskProvider ->
+	taskProvider.configure {
+		systemProperty 'pickup.test.db', testDbMode
+		if (useWindowsEmbeddedTestDb) {
+			dependsOn unpackPostgisBundle
+			systemProperty 'pickup.test.postgis-dir', postgisDir.get().asFile.absolutePath
+		} else if (testDbMode == 'embedded') {
+			doFirst {
+				throw new GradleException('pickup.test.db=embedded는 Windows x64에서만 돈다. '
+						+ 'PostGIS 바이너리를 Windows 묶음으로만 받기 때문이다. 이 OS에서는 testcontainers(기본)를 쓴다')
+			}
+		}
+	}
 }
 
 tasks.named('test') {

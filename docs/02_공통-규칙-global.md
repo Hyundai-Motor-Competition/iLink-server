@@ -127,7 +127,7 @@ Java 21 + Spring Boot 4 서버 하나에 PostgreSQL(PostGIS) 하나만 붙인다
 | 요청 검증 | Bean Validation (@Valid) | 요청 값 형식 · 범위 |
 | API 문서 | springdoc-openapi | doc 인터페이스로 문서화, dev에서만 켬 |
 | 코드 편의 | Lombok | @RequiredArgsConstructor, @Getter |
-| 테스트 | JUnit 5, Testcontainers(PostGIS) | 실제 DB 통합 테스트 |
+| 테스트 | JUnit 5, embedded-postgres(Windows) · Testcontainers(그 밖의 OS), PostgreSQL 17 + PostGIS 3 | 실제 DB 통합 테스트. Windows는 Docker 없이 로컬 프로세스로 띄움 |
 | 상태 확인 | Spring Boot Actuator | 헬스 체크 |
 
 테이블 만드는 방식
@@ -209,7 +209,7 @@ code 이름은 기획안 「4. 이벤트 · 상태」 탭의 ERR 이름을 그�
 
 ## 테스트 규칙
 
-- JUnit 5. DB가 닿는 테스트는 Testcontainers(postgis/postgis)로 실제 DB를 띄운다.
+- JUnit 5. DB가 닿는 테스트는 PostgreSQL 17 + PostGIS 3 실제 DB를 띄운다. Windows는 embedded-postgres로 로컬 프로세스(Docker 없음), 그 밖의 OS(Linux CI 등)는 Testcontainers(postgis/postgis:17-3.7). `-Ppickup.test.db=embedded|testcontainers`로 강제한다.
 - 테스트 픽스처는 common에 한 번만 만들고 모든 모듈이 같이 쓴다.
 - 아키텍처 규칙(의존 방향, domain에 Spring · JPA 없음)은 테스트가 아니라 코드 리뷰로 확인한다.
 
