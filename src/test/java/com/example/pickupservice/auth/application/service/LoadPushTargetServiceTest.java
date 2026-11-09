@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -55,6 +56,57 @@ class LoadPushTargetServiceTest {
 		List<PushTarget> targets = loadPushTargetService.findPushTargets(List.of());
 
 		assertThat(targets).isEmpty();
+	}
+
+	@Test
+	@DisplayName("findPushTargetByDeviceId는 폐기된 USER 기기도 pushToken이 있으면 PushTarget으로 돌려준다")
+	void findPushTargetByDeviceIdReturnsRevokedUserDeviceWithPushToken() {
+		when(loadDevicePort.loadDevice(804L)).thenReturn(Optional.of(
+				userDevice(804L, CHILD_ID, Platform.IOS, "fcm-revoked", EARLIER)));
+
+		Optional<PushTarget> target = loadPushTargetService.findPushTargetByDeviceId(804L);
+
+		assertThat(target).contains(new PushTarget(CHILD_ID, 804L, Platform.IOS, "fcm-revoked"));
+	}
+
+	@Test
+	@DisplayName("findPushTargetByDeviceId는 폐기되지 않은 USER 기기도 PushTarget으로 돌려준다")
+	void findPushTargetByDeviceIdReturnsLiveUserDevice() {
+		when(loadDevicePort.loadDevice(801L)).thenReturn(Optional.of(
+				userDevice(801L, CHILD_ID, Platform.ANDROID, "fcm-child", null)));
+
+		assertThat(loadPushTargetService.findPushTargetByDeviceId(801L))
+				.contains(new PushTarget(CHILD_ID, 801L, Platform.ANDROID, "fcm-child"));
+	}
+
+	@Test
+	@DisplayName("findPushTargetByDeviceId는 pushToken이 null이거나 빈 기기면 빈 값을 돌려준다")
+	void findPushTargetByDeviceIdReturnsEmptyWhenPushTokenMissing() {
+		when(loadDevicePort.loadDevice(802L)).thenReturn(Optional.of(
+				userDevice(802L, CHILD_ID, Platform.ANDROID, null, null)));
+		when(loadDevicePort.loadDevice(803L)).thenReturn(Optional.of(
+				userDevice(803L, CHILD_ID, Platform.IOS, "", null)));
+
+		assertThat(loadPushTargetService.findPushTargetByDeviceId(802L)).isNotNull().isEmpty();
+		assertThat(loadPushTargetService.findPushTargetByDeviceId(803L)).isNotNull().isEmpty();
+	}
+
+	@Test
+	@DisplayName("findPushTargetByDeviceId는 VEHICLE 기기면 pushToken이 있어도 빈 값을 돌려준다")
+	void findPushTargetByDeviceIdReturnsEmptyForVehicleDevice() {
+		when(loadDevicePort.loadDevice(901L)).thenReturn(Optional.of(
+				Device.restore(901L, OwnerType.VEHICLE, 55L, Platform.ANDROID, "fcm-vehicle", EARLIER, "d".repeat(64),
+						null)));
+
+		assertThat(loadPushTargetService.findPushTargetByDeviceId(901L)).isNotNull().isEmpty();
+	}
+
+	@Test
+	@DisplayName("findPushTargetByDeviceId는 없는 기기 id면 빈 값을 돌려준다")
+	void findPushTargetByDeviceIdReturnsEmptyForMissingDevice() {
+		when(loadDevicePort.loadDevice(999L)).thenReturn(Optional.empty());
+
+		assertThat(loadPushTargetService.findPushTargetByDeviceId(999L)).isNotNull().isEmpty();
 	}
 
 	private static Device userDevice(long deviceId, long userId, Platform platform, String pushToken,

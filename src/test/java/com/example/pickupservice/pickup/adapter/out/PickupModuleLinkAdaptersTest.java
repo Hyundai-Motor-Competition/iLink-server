@@ -247,14 +247,10 @@ class PickupModuleLinkAdaptersTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("notification 구현 전 임시 RecordNotificationPort.recordNotifications는 받는 사람이 있어도 빈 목록을 돌려준다")
-	void temporaryNotificationPortReturnsEmptyList() {
+	@DisplayName("RecordNotificationPort.recordNotifications는 받는 사람이 없으면 알림을 만들지 않고 빈 목록을 돌려준다(실제 notification 연결 뒤에도 같다)")
+	void notificationPortReturnsEmptyListWhenNoReceivers() {
 		RecordNotificationPort notificationPort = onlyBeanOf(RecordNotificationPort.class);
 
-		assertThat(notificationPort.recordNotifications(
-				new NotificationRequest(1L, null, "SESSION_STARTED", List.of(101L, 102L)))).isNotNull().isEmpty();
-		assertThat(notificationPort.recordNotifications(
-				new NotificationRequest(2L, 30L, "CALL", List.of(103L)))).isNotNull().isEmpty();
 		assertThat(notificationPort.recordNotifications(
 				new NotificationRequest(3L, null, "HELP", List.of()))).isNotNull().isEmpty();
 	}
