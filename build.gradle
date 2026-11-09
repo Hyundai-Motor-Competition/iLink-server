@@ -77,8 +77,11 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
 	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 	testImplementation 'org.testcontainers:testcontainers-postgresql'
-	// EmbeddedPostgis가 컴파일되도록 API만 둔다. 실행 jar와 PostgreSQL 바이너리는 아래 embedded 모드에서만 넣는다
-	testCompileOnly 'io.zonky.test:embedded-postgres:2.2.2'
+	// EmbeddedPostgis가 쓰는 API jar는 모든 OS에 둔다. JUnit이 테스트 클래스를 훑을 때 EmbeddedPostgis도 읽으므로
+	// 실행 클래스패스에 없으면 Linux(Jenkins)에서 NoClassDefFoundError로 탐색이 실패한다. PostgreSQL 바이너리는 아래 embedded 모드에서만 넣는다
+	testImplementation('io.zonky.test:embedded-postgres:2.2.2') {
+		exclude group: 'io.zonky.test.postgres'
+	}
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
@@ -88,9 +91,6 @@ dependencies {
 if (useWindowsEmbeddedTestDb) {
 	dependencies {
 		// 기본 의존인 4개 OS 바이너리(약 116MB) 대신 Windows 것만 넣는다
-		testRuntimeOnly('io.zonky.test:embedded-postgres:2.2.2') {
-			exclude group: 'io.zonky.test.postgres'
-		}
 		testRuntimeOnly platform('io.zonky.test.postgres:embedded-postgres-binaries-bom:17.11.0')
 		testRuntimeOnly 'io.zonky.test.postgres:embedded-postgres-binaries-windows-amd64'
 	}
