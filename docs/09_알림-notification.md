@@ -102,16 +102,16 @@ void markCallSent(long callId, Instant at); void markCallDelivered(long callId, 
 ```
 
 ## 테스트 케이스
-- [ ] [기반] Notification.markDelivered는 deliveredAt이 비었을 때만 receivedAt을 채운다
-- [ ] [기반] Notification.markSent는 sentAt을 채운다
-- [ ] [기반] 재발송 규칙은 attempt가 3이면 더 보내지 않는다
-- [ ] [기반] 재발송 규칙은 CALL 알림을 deliveredAt이 있어도 호출이 확인되지 않았으면 재발송 대상으로 본다
-- [ ] [기반] 재발송 규칙은 CALL이 아닌 알림을 deliveredAt이 있으면 재발송 대상에서 뺀다
-- [ ] [기반] 다시 보내기 규칙은 같은 알림의 마지막 발송 뒤 1분 안이면 RESEND_TOO_SOON으로 거절한다
-- [ ] [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
-- [ ] [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [ ] [기반] NotificationEntity가 BaseTimeEntity를 상속하고 테이블 정의대로 매핑된다
-- [ ] [기반] 테스트 시드로 CALL 알림 1건(자녀 기기, sentAt 있음 · deliveredAt 없음)을 만든다
+- [x] [기반] Notification.markDelivered는 deliveredAt이 비었을 때만 receivedAt을 채운다
+- [x] [기반] Notification.markSent는 sentAt을 채운다
+- [x] [기반] 재발송 규칙은 attempt가 3이면 더 보내지 않는다
+- [x] [기반] 재발송 규칙은 CALL 알림을 deliveredAt이 있어도 호출이 확인되지 않았으면 재발송 대상으로 본다
+- [x] [기반] 재발송 규칙은 CALL이 아닌 알림을 deliveredAt이 있으면 재발송 대상에서 뺀다
+- [x] [기반] 다시 보내기 규칙은 같은 알림의 마지막 발송 뒤 1분 안이면 RESEND_TOO_SOON으로 거절한다
+- [x] [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
+- [x] [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
+- [x] [기반] NotificationEntity가 BaseTimeEntity를 상속하고 테이블 정의대로 매핑된다
+- [x] [기반] 테스트 시드로 CALL 알림 1건(자녀 기기, sentAt 있음 · deliveredAt 없음)을 만든다
 - [ ] [persistence] loadBySession은 그 세션의 알림을 발송 순서대로 돌려준다
 - [ ] [persistence] loadResendTargets는 sentAt이나 deliveredAt이 빈 행 중 마지막 발송 뒤 1분이 지난 행을 돌려준다
 - [ ] [persistence] countAttempts는 같은 세션 · callId · type · deviceId 행 수를 센다
@@ -146,6 +146,7 @@ void markCallSent(long callId, Instant at); void markCallDelivered(long callId, 
 - [ ] [web] POST /v1/notifications/{notificationId}/resend가 1분 안이면 429 RESEND_TOO_SOON과 retryAfterSeconds를 돌려준다
 - [ ] [web] POST /v1/notifications/{notificationId}/resend를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
 - [ ] [web] Idempotency-Key는 POST /v1/notifications/{notificationId}/resend에만 요구된다
+- [x] [기반] ErrorCode에 RESEND_TOO_SOON(429)이 있고 BusinessException이 그 코드와 retryAfterSeconds를 함께 담는다
 
 ## 확인 필요 사항
 

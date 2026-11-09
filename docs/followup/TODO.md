@@ -1,11 +1,11 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-09 19:49 KST · tdd-guard
+- 생성: 2026-11-09 20:21 KST · tdd-guard
 - 설계서: C:/ilink/docs
 - 프로젝트: gradle · C:/ilink
-- 테스트: ● GREEN · 2046 passed · 전체 · 142s
-- 진행: 공유모듈 57/57 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 58/58 · 픽업 241/241 · 알림 0/44 · 남은 항목 44/670
-- 현재 도메인: 픽업 (08_픽업-pickup.md) · 진행 시작: /tdd go
+- 테스트: ● GREEN · 2077 passed · 전체 · 141s
+- 진행: 공유모듈 57/57 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 58/58 · 픽업 241/241 · 알림 11/45 · 남은 항목 34/671
+- 현재 도메인: 알림 (09_알림-notification.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
 
@@ -57,18 +57,8 @@
 ## 6. 픽업 (pickup) · 08_픽업-pickup.md · 완료 · 항목 241/241 · 완료 기준 4/4 · 리뷰 11-09 19:49 통과 (상 0 · 중 0 · 하 5)
 - 남은 할 일 없음
 
-## 7. 알림 (notification) · 09_알림-notification.md · 대기 · 항목 0/44 · 완료 기준 0/4
+## 7. 알림 (notification) · 09_알림-notification.md · 진행 중 · 항목 11/45 · 완료 기준 0/4
 ### 테스트 케이스
-- [ ] #1 [기반] Notification.markDelivered는 deliveredAt이 비었을 때만 receivedAt을 채운다
-- [ ] #2 [기반] Notification.markSent는 sentAt을 채운다
-- [ ] #3 [기반] 재발송 규칙은 attempt가 3이면 더 보내지 않는다
-- [ ] #4 [기반] 재발송 규칙은 CALL 알림을 deliveredAt이 있어도 호출이 확인되지 않았으면 재발송 대상으로 본다
-- [ ] #5 [기반] 재발송 규칙은 CALL이 아닌 알림을 deliveredAt이 있으면 재발송 대상에서 뺀다
-- [ ] #6 [기반] 다시 보내기 규칙은 같은 알림의 마지막 발송 뒤 1분 안이면 RESEND_TOO_SOON으로 거절한다
-- [ ] #7 [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
-- [ ] #8 [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [ ] #9 [기반] NotificationEntity가 BaseTimeEntity를 상속하고 테이블 정의대로 매핑된다
-- [ ] #10 [기반] 테스트 시드로 CALL 알림 1건(자녀 기기, sentAt 있음 · deliveredAt 없음)을 만든다
 - [ ] #11 [persistence] loadBySession은 그 세션의 알림을 발송 순서대로 돌려준다
 - [ ] #12 [persistence] loadResendTargets는 sentAt이나 deliveredAt이 빈 행 중 마지막 발송 뒤 1분이 지난 행을 돌려준다
 - [ ] #13 [persistence] countAttempts는 같은 세션 · callId · type · deviceId 행 수를 센다
