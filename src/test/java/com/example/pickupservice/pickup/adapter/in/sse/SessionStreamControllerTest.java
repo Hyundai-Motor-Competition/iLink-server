@@ -1,12 +1,13 @@
-package com.example.pickupservice.pickup.adapter.in.web;
+package com.example.pickupservice.pickup.adapter.in.sse;
 
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
-import com.example.pickupservice.pickup.adapter.in.sse.SessionStreamRegistry;
+import com.example.pickupservice.pickup.adapter.in.web.PickupWebTestSupport;
 import com.example.pickupservice.pickup.application.port.in.SessionEventPage;
 import com.example.pickupservice.pickup.application.port.in.SessionQuery;
+import com.example.pickupservice.pickup.application.port.out.SessionEventMessage;
 import com.example.pickupservice.pickup.domain.SessionEvent;
 import com.example.pickupservice.pickup.domain.SessionEventType;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @RequiredArgsConstructor
 @TestPropertySource(properties = "pickup.sse.ping-interval=PT0.1S")
-class PickupStreamControllerTest extends PickupWebTestSupport {
+class SessionStreamControllerTest extends PickupWebTestSupport {
 
 	private static final String STREAM_PATH = "/v1/pickup-sessions/{sessionId}/stream";
 	private static final String LAST_EVENT_ID_HEADER = "Last-Event-ID";
@@ -145,7 +146,7 @@ class PickupStreamControllerTest extends PickupWebTestSupport {
 		MvcResult result = mockMvc.perform(streamRequest(VEHICLE, null))
 				.andExpect(request().asyncStarted())
 				.andReturn();
-		sessionStreamRegistry.send(SESSION_ID, callSentEvent());
+		sessionStreamRegistry.send(callSentMessage());
 
 		List<Map<String, String>> events = awaitEvents(result, 1);
 		assertThat(events.get(0)).containsEntry("event", "CALL_SENT").containsEntry("id", "42");
@@ -212,6 +213,11 @@ class PickupStreamControllerTest extends PickupWebTestSupport {
 	private static SessionEvent callSentEvent() {
 		return SessionEvent.restore(9001L, SESSION_ID, 42L, SessionEventType.CALL_SENT, 16,
 				Instant.parse("2026-11-05T09:09:02Z"), Map.of("callId", 3301, "trigger", "ETA_3MIN"));
+	}
+
+	private static SessionEventMessage callSentMessage() {
+		return new SessionEventMessage(SESSION_ID, 9001L, 42L, SessionEventType.CALL_SENT.name(), 16,
+				Instant.parse("2026-11-05T09:09:02Z"), Map.of("callId", 3301, "trigger", "ETA_3MIN"), List.of());
 	}
 
 	private static SessionEvent callDeliveredEvent() {

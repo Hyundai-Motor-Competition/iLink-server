@@ -1,6 +1,7 @@
 package com.example.pickupservice.pickup.adapter.in.sse;
 
 import com.example.pickupservice.common.time.TimeUtils;
+import com.example.pickupservice.pickup.application.port.out.SessionEventMessage;
 import com.example.pickupservice.pickup.domain.SessionEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +11,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,23 +44,31 @@ public class SessionStreamRegistry {
 		});
 	}
 
-	public void send(long sessionId, SessionEvent event) {
+	public void send(SessionEventMessage message) {
+		sendToAll(message.sessionId(), toFrame(message));
+	}
+
+	public void sendTo(long sessionId, SseEmitter emitter, SessionEvent event) {
+		sendFrame(sessionId, emitter, toFrame(event));
+	}
+
+	private void sendToAll(long sessionId, Frame frame) {
 		List<SseEmitter> emitters = emittersBySession.get(sessionId);
 		if (emitters == null) {
 			return;
 		}
 		for (SseEmitter emitter : emitters) {
-			sendTo(sessionId, emitter, event);
+			sendFrame(sessionId, emitter, frame);
 		}
 	}
 
-	/** 이어 받기와 새 이벤트가 같이 쓰는, 이벤트 한 건을 보내는 곳. 보내기에 실패한 emitter는 지운다. */
-	public void sendTo(long sessionId, SseEmitter emitter, SessionEvent event) {
+	private void sendFrame(long sessionId, SseEmitter emitter, Frame frame) {
 		try {
-			emitter.send(SseEmitter.event()
-					.name(event.getType().name())
-					.id(String.valueOf(event.getSeq()))
-					.data(toJson(event)));
+			SseEmitter.SseEventBuilder builder = SseEmitter.event().name(frame.name());
+			if (frame.seq() != null) {
+				builder.id(String.valueOf(frame.seq()));
+			}
+			emitter.send(builder.data(frame.data()));
 		} catch (IOException | RuntimeException e) {
 			log.debug("SSE 이벤트를 보내지 못해 연결을 지운다. sessionId={}", sessionId, e);
 			unregister(sessionId, emitter);
@@ -87,16 +97,27 @@ public class SessionStreamRegistry {
 		});
 	}
 
-	private String toJson(SessionEvent event) {
-		return jsonMapper.writeValueAsString(new EventData(
-				event.getEventId(),
-				event.getSeq(),
-				event.getStateVersion(),
-				TimeUtils.toKst(event.getOccurredAt()),
-				event.getPayload()));
+	private Frame toFrame(SessionEvent event) {
+		return toFrame(event.getType().name(), event.getEventId(), event.getSeq(), event.getStateVersion(),
+				event.getOccurredAt(), event.getPayload());
 	}
 
-	private record EventData(long eventId, long seq, int stateVersion, String occurredAt,
+	private Frame toFrame(SessionEventMessage message) {
+		return toFrame(message.type(), message.eventId(), message.seq(), message.stateVersion(),
+				message.occurredAt(), message.payload());
+	}
+
+	private Frame toFrame(String name, Long eventId, Long seq, int stateVersion, Instant occurredAt,
+			Map<String, Object> payload) {
+		String data = jsonMapper.writeValueAsString(new EventData(eventId, seq, stateVersion,
+				TimeUtils.toKst(occurredAt), payload));
+		return new Frame(name, seq, data);
+	}
+
+	private record Frame(String name, Long seq, String data) {
+	}
+
+	private record EventData(Long eventId, Long seq, int stateVersion, String occurredAt,
 			Map<String, Object> payload) {
 	}
 

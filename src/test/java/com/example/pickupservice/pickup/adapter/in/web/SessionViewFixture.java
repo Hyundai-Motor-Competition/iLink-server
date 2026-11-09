@@ -21,9 +21,9 @@ import java.util.List;
 /**
  * 설계서 「세션 뷰 (SessionView)」 응답 예시와 같은 값. 예시에 없는 children[].callNotBefore · location은 필드 표대로 넣었다.
  */
-final class SessionViewFixture {
+public final class SessionViewFixture {
 
-	static final long SESSION_ID = 1024L;
+	public static final long SESSION_ID = 1024L;
 	static final int STATE_VERSION = 15;
 
 	static final String SESSION_VIEW_JSON = """
@@ -49,7 +49,7 @@ final class SessionViewFixture {
 	private SessionViewFixture() {
 	}
 
-	static SessionView sessionView() {
+	public static SessionView sessionView() {
 		return new SessionView(
 				SESSION_ID,
 				STATE_VERSION,

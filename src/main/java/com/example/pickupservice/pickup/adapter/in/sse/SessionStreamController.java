@@ -1,7 +1,7 @@
-package com.example.pickupservice.pickup.adapter.in.web;
+package com.example.pickupservice.pickup.adapter.in.sse;
 
 import com.example.pickupservice.common.security.AuthPrincipal;
-import com.example.pickupservice.pickup.adapter.in.sse.SessionStreamRegistry;
+import com.example.pickupservice.pickup.adapter.in.sse.doc.SessionStreamApiDoc;
 import com.example.pickupservice.pickup.application.port.in.GetSessionUseCase;
 import com.example.pickupservice.pickup.application.port.in.ListSessionEventsUseCase;
 import com.example.pickupservice.pickup.application.port.in.SessionEventPage;
@@ -19,7 +19,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequiredArgsConstructor
-public class PickupStreamController {
+public class SessionStreamController implements SessionStreamApiDoc {
 
 	private static final int REPLAY_PAGE_SIZE = 100;
 
@@ -27,6 +27,7 @@ public class PickupStreamController {
 	private final ListSessionEventsUseCase listSessionEventsUseCase;
 	private final SessionStreamRegistry sessionStreamRegistry;
 
+	@Override
 	@PreAuthorize("hasAuthority('PRINCIPAL_VEHICLE')")
 	@GetMapping(value = "/v1/pickup-sessions/{sessionId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public SseEmitter stream(
