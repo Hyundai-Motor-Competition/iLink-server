@@ -6,6 +6,7 @@ import com.example.pickupservice.notification.application.port.in.RecordNotifica
 import com.example.pickupservice.notification.application.port.out.LoadPushTargetPort;
 import com.example.pickupservice.notification.application.port.out.SaveNotificationPort;
 import com.example.pickupservice.notification.domain.Notification;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,15 +14,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class RecordNotificationService implements RecordNotificationUseCase {
 
 	private final LoadPushTargetPort loadPushTargetPort;
 	private final SaveNotificationPort saveNotificationPort;
-
-	public RecordNotificationService(LoadPushTargetPort loadPushTargetPort, SaveNotificationPort saveNotificationPort) {
-		this.loadPushTargetPort = loadPushTargetPort;
-		this.saveNotificationPort = saveNotificationPort;
-	}
 
 	@Override
 	@Transactional
