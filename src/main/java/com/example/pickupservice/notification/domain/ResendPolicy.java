@@ -1,6 +1,8 @@
 package com.example.pickupservice.notification.domain;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Comparator;
 
 public final class ResendPolicy {
 
@@ -18,6 +20,13 @@ public final class ResendPolicy {
 			return !callAcknowledged;
 		}
 		return notification.getDeliveredAt() == null;
+	}
+
+	public static Instant lastAttemptAt(Collection<Notification> bundle) {
+		Notification latest = bundle.stream()
+				.max(Comparator.comparingLong(Notification::getNotificationId))
+				.orElseThrow();
+		return latest.getSentAt() != null ? latest.getSentAt() : latest.getCreatedAt();
 	}
 
 	public static void ensureResendAllowed(Instant lastSentAt, Instant now) {
