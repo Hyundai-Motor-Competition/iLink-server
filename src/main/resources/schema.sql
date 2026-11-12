@@ -12,3 +12,9 @@ CREATE INDEX IF NOT EXISTS idx_pickup_spot_stop_point
 
 CREATE UNIQUE INDEX IF NOT EXISTS uk_pickup_spot_default
     ON pickup_spot (family_id, academy_id) WHERE is_default;
+
+CREATE INDEX IF NOT EXISTS idx_public_parking_location
+    ON public_parking USING gist (location);
+
+CREATE INDEX IF NOT EXISTS idx_curb_stop_candidate_location
+    ON curb_stop_candidate USING gist (location);
