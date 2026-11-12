@@ -71,6 +71,22 @@ class GangnamReferenceFilesTest {
 		assertThat(root.path("features").get(0).path("geometry").path("type").asString()).isEqualTo("Polygon");
 	}
 
+	@Test
+	@DisplayName("parking_public.csv의 parking_id는 60행 모두 서로 다르다")
+	void parkingIdsAreAllDistinct() throws IOException {
+		List<String> ids = firstColumnValues(PARKING);
+		assertThat(ids).hasSize(60);
+		assertThat(ids).doesNotHaveDuplicates();
+	}
+
+	@Test
+	@DisplayName("curb_stop_candidates.csv의 candidate_id는 3,147행 모두 서로 다르다")
+	void candidateIdsAreAllDistinct() throws IOException {
+		List<String> ids = firstColumnValues(CURB);
+		assertThat(ids).hasSize(3147);
+		assertThat(ids).doesNotHaveDuplicates();
+	}
+
 	private static InputStream open(String path) {
 		InputStream in = GangnamReferenceFilesTest.class.getClassLoader().getResourceAsStream(path);
 		assertThat(in).as(path).isNotNull();
@@ -101,6 +117,13 @@ class GangnamReferenceFilesTest {
 			}
 		}
 		return lines;
+	}
+
+	private static List<String> firstColumnValues(String path) throws IOException {
+		List<String> lines = readLines(path);
+		return lines.subList(1, lines.size()).stream()
+				.map(line -> line.split(",", -1)[0].trim())
+				.toList();
 	}
 
 	private static List<String> headerColumns(String path) throws IOException {
