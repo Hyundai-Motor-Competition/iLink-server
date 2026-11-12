@@ -35,6 +35,8 @@ pickup:
     kakao:
       base-url: https://dapi.kakao.com
       api-key: ${KAKAO_REST_API_KEY:}
+    kakao-mobility:
+      base-url: https://apis-navi.kakaomobility.com
   session:
     eta-valid-for: PT1M
     call-trigger-eta: PT180S

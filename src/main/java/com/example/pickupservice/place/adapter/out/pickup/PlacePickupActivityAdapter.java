@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
-// pickup의 ActivePickupQueryUseCase에 위임한다
 @Component
 @RequiredArgsConstructor
 class PlacePickupActivityAdapter implements CheckActivePickupPort {

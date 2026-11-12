@@ -1,94 +1,142 @@
 # FOLLOWUP · 장소 (place)
 
-- 생성: 2026-11-08 09:32 KST · tdd-guard
-- 상태: 완료 (체크 58/58 · 완료 기준 4/4)
-- 테스트: ● GREEN · 1141 passed · 전체 · 66s · cd C:/pickup && ./gradlew.bat test --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321/08c3708…
-- 설계서: C:/pickup/docs/07_장소-place.md
+- 생성: 2026-11-12 23:42 KST · tdd-guard
+- 상태: 진행 중 (체크 96/96 · 완료 기준 2/4)
+- 테스트: ● GREEN · 2415 passed · 전체 · 279s · .\gradlew.bat test --console=plain
+- 설계서: C:/ilink/docs/07_장소-place.md
 
 ## 완료 항목
-- [x] #1 [기반] 기본 장소 규칙은 가족 · 학원의 첫 장소를 isDefault true로 만든다 ← DefaultSpotRuleTest.기본 장소 규칙은 가족 · 학원의 첫 장소를 isDefault false로 보내도 isDefault true로 만든다
-- [x] #2 [기반] 기본 장소 규칙은 새 기본 장소를 지정하면 같은 가족 · 학원의 이전 기본 장소를 false로 바꾼다 ← DefaultSpotRuleTest.기본 장소 규칙은 새 기본 장소를 지정하면 같은 가족 · 학원의 이전 기본 장소를 false로 바꿔 돌려준다
-- [x] #3 [기반] 삭제 규칙은 같은 학원에 다른 장소가 남아 있는 기본 장소의 삭제를 거절한다 ← SpotDeletionRuleTest.삭제 규칙은 같은 학원에 다른 장소가 남아 있는 기본 장소의 삭제를 거절한다
-- [x] #4 [기반] 삭제 규칙은 학원에 하나 남은 기본 장소의 삭제를 허용한다 ← SpotDeletionRuleTest.삭제 규칙은 학원에 하나 남은 기본 장소의 삭제를 허용한다
-- [x] #5 [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다 ← PlaceInPortsTest.핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
-- [x] #6 [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다 ← PlaceOutPortsTest.핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [x] #7 [기반] PickupSpotEntity가 BaseTimeEntity를 상속하고 stopPoint · meetingPoint는 geography(Point,4326)로 매핑된다 ← PlacePersistenceEntitiesTest.PickupSpotEntity는 @Entity이고 BaseTimeEntity를 바로 상속한다
-- [x] #8 [기반] 테스트 시드로 해솔영어학원의 기본 장소 정문 앞과 다른 장소 1개를 만든다 ← PlaceSeedTest.테스트 시드로 해솔영어학원의 기본 장소 정문 앞과 다른 장소 1개를 만든다
-- [x] #9 [persistence] PickupSpot을 저장하고 읽으면 stopPoint · meetingPoint의 lat · lng가 소수점 6자리까지 같다 ← PlacePersistenceAdapterTest.PickupSpot을 저장하고 읽으면 stopPoint · meetingPoint의 lat · lng가 소수점 6자리까지 같다
-- [x] #10 [persistence] stop_point 컬럼에 GIST 인덱스가 있다 ← PlacePersistenceEntitiesMappingTest.서버가 뜨면 pickup_spot.stop_point에 GIST 인덱스가 만들어진다
-- [x] #11 [persistence] loadSpots는 그 가족의 장소만 돌려주고 academyId를 주면 그 학원 장소만 돌려준다 ← PlacePersistenceAdapterTest.loadSpots는 academyId를 주면 그 가족의 그 학원 장소만 돌려준다
-- [x] #12 [persistence] loadSpotsWithin은 near에서 radiusM 안에 정차 지점이 있는 장소만 돌려준다 ← PlacePersistenceAdapterTest.loadSpotsWithin은 near에서 radiusM 안에 정차 지점이 있는 장소만 돌려준다: 499m 안 · 501m 밖, 만남 지점만 안이면 빼고, 다른 가족 장소는 뺀다
-- [x] #13 [persistence] isWithinMeters는 학원에서 499m인 좌표에 true, 501m인 좌표에 false를 돌려준다 ← PostgisDistanceAdapterTest.isWithinMeters는 학원에서 499m인 좌표에 true, 501m인 좌표에 false를 돌려준다
-- [x] #14 [persistence] loadDefaultSpot은 가족 · 학원의 isDefault true 장소를 돌려준다 ← PlacePersistenceAdapterTest.loadDefaultSpot은 가족 · 학원의 isDefault true 장소를 돌려주고 다른 가족 · 학원의 기본 장소는 돌려주지 않는다
-- [x] #15 [서비스] 장소 추가는 학원의 첫 장소면 isDefault false로 보내도 isDefault true로 저장한다 ← AddPickupSpotServiceTest.장소 추가는 학원의 첫 장소면 isDefault false로 보내도 isDefault true로 저장한다
-- [x] #16 [서비스] 장소 추가는 isDefault true면 같은 학원의 이전 기본 장소를 해제한다 ← AddPickupSpotServiceTest.장소 추가는 isDefault true면 같은 학원의 이전 기본 장소를 해제한다
-- [x] #17 [서비스] 장소 추가는 정차 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다 ← AddPickupSpotServiceTest.장소 추가는 정차 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
-- [x] #18 [서비스] 장소 추가는 만남 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다 ← AddPickupSpotServiceTest.장소 추가는 만남 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
-- [x] #19 [서비스] 장소 추가는 호출한 보호자를 createdBy로 저장한다 ← AddPickupSpotServiceTest.장소 추가는 호출한 보호자를 createdBy로 저장한다
-- [x] #20 [서비스] 장소 수정은 보낸 필드만 바꾼다 ← UpdatePickupSpotServiceTest.장소 수정은 이름만 보내면 이름만 바꾸고 나머지 필드는 그대로 둔다
-- [x] #21 [서비스] 장소 수정은 바꾼 좌표가 500m를 넘으면 SPOT_TOO_FAR로 거절한다 ← UpdatePickupSpotServiceTest.장소 수정은 바꾼 정차 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
-- [x] #22 [서비스] 장소 수정은 isDefault true로 바꾸면 같은 학원의 이전 기본 장소를 해제한다 ← UpdatePickupSpotServiceTest.장소 수정은 isDefault true로 바꾸면 같은 학원의 이전 기본 장소를 해제한다
-- [x] #23 [서비스] 장소 삭제는 진행 중 세션이 쓰는 장소면 SPOT_IN_USE로 거절한다 ← DeletePickupSpotServiceTest.장소 삭제는 진행 중 세션이 쓰는 장소면 SPOT_IN_USE로 거절한다
-- [x] #24 [서비스] 장소 삭제는 다른 장소가 남은 기본 장소면 DEFAULT_SPOT_REQUIRED로 거절한다 ← DeletePickupSpotServiceTest.장소 삭제는 다른 장소가 남은 기본 장소면 DEFAULT_SPOT_REQUIRED로 거절한다
-- [x] #25 [서비스] 다른 가족의 spotId를 수정 · 삭제하려 하면 NOT_FOUND로 거절한다 ← DeletePickupSpotServiceTest.다른 가족의 spotId를 삭제하려 하면 NOT_FOUND로 거절한다
-- [x] #26 [서비스] 장소 조회는 학원별로 묶어 academyName과 함께 돌려준다 ← ListPickupSpotsServiceTest.장소 조회는 학원별로 묶어 academyName과 함께 academyId · spotId 오름차순으로 돌려준다
-- [x] #27 [서비스] 장소 조회는 진행 중 세션이 없으면 walkMinutes를 null로 돌려준다 ← ListPickupSpotsServiceTest.장소 조회는 진행 중 세션이 없으면 모든 장소의 walkMinutes를 null로 돌려준다
-- [x] #28 [서비스] findDefaultSpot은 가족 · 학원의 기본 장소를 돌려주고 없으면 빈 값을 돌려준다 ← LoadPickupSpotServiceTest.findDefaultSpot은 가족 · 학원의 기본 장소를 SpotInfo로 돌려준다
-- [x] #29 [web] GET /v1/families/me/pickup-spots는 200과 academies[]를 돌려준다 ← PickupSpotControllerTest.GET /v1/families/me/pickup-spots는 200과 academies[](academyId · academyName · spots[])를 isDefault 키와 null walkMinutes 그대로 돌려준다
-- [x] #30 [web] GET /v1/families/me/pickup-spots는 차량 토큰으로도 200을 돌려준다 ← PickupSpotControllerTest.GET /v1/families/me/pickup-spots는 차량 토큰으로도 200과 academies[]를 돌려준다
-- [x] #31 [web] GET /v1/families/me/pickup-spots에 near만 보내고 radiusM을 빼면 422 VALIDATION_FAILED를 돌려준다 ← PickupSpotControllerTest.GET /v1/families/me/pickup-spots에 near만 보내고 radiusM을 빼면 422 VALIDATION_FAILED와 fields의 radiusM을 돌려주고 유스케이스를 부르지 않는다
-- [x] #32 [web] GET /v1/families/me/pickup-spots에 radiusM 3001을 보내면 422 VALIDATION_FAILED를 돌려준다 ← PickupSpotControllerTest.[2] radiusM = 3001
-- [x] #33 [web] GET /v1/families/me/pickup-spots를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupSpotControllerTest.GET /v1/families/me/pickup-spots를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다
-- [x] #34 [web] POST /v1/families/me/pickup-spots는 201과 spotId · isDefault를 돌려준다 ← PickupSpotControllerTest.POST /v1/families/me/pickup-spots는 201과 spotId · isDefault를 돌려준다
-- [x] #35 [web] POST /v1/families/me/pickup-spots에 51자 name을 보내면 422 VALIDATION_FAILED를 돌려준다 ← PickupSpotControllerTest.POST /v1/families/me/pickup-spots에 51자 name을 보내면 422 VALIDATION_FAILED와 fields의 name을 돌려주고 유스케이스를 부르지 않는다
-- [x] #36 [web] POST /v1/families/me/pickup-spots가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다 ← PickupSpotControllerTest.POST /v1/families/me/pickup-spots가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
-- [x] #37 [web] POST /v1/families/me/pickup-spots를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupSpotControllerTest.POST /v1/families/me/pickup-spots를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다
-- [x] #38 [web] PATCH /v1/pickup-spots/{spotId}는 200과 spotId · name · stopPoint · meetingPoint · memo · isDefault를 돌려준다 ← PickupSpotControllerTest.PATCH /v1/pickup-spots/{spotId}는 200과 spotId · name · stopPoint · meetingPoint · memo · isDefault를 돌려준다
-- [x] #39 [web] PATCH /v1/pickup-spots/{spotId}가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다 ← PickupSpotControllerTest.PATCH /v1/pickup-spots/{spotId}가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
-- [x] #40 [web] DELETE /v1/pickup-spots/{spotId}는 204를 돌려준다 ← PickupSpotControllerTest.DELETE /v1/pickup-spots/{spotId}를 CO_GUARDIAN 토큰으로 부르면 204를 돌려준다
-- [x] #41 [web] DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다 ← PickupSpotControllerTest.DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다
-- [x] #42 [web] DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다 ← PickupSpotControllerTest.DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다
-- [x] #43 [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다 ← PlaceIdempotencyKeyTest.Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
-- [x] #44 [persistence] pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다 ← PlaceModuleLinkAdaptersTest.pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다
-- [x] #45 [persistence] LoadAcademyPort 어댑터는 schedule의 LoadAcademyUseCase.findAcademy 결과를 place가 쓰는 학원 정보(academyId · name · location)로 바꿔 돌려주고 없으면 빈 값을 돌려준다 ← PlaceModuleLinkAdaptersTest.LoadAcademyPort 어댑터는 schedule의 LoadAcademyUseCase.findAcademy 결과를 place 학원 정보(academyId · name · location)로 바꿔 돌려준다
-- [x] #46 [서비스] findSpot은 spotId의 장소를 돌려주고 없으면 빈 값을, findSpots는 가족의 학원 목록에 속한 장소를 spotId · academyId · name · isDefault로 돌려준다 ← LoadPickupSpotServiceTest.findSpots는 가족의 학원 목록에 속한 장소만 spotId · academyId · name · isDefault로 돌려주고 장소 조회는 1회만 한다
-- [x] #47 schedule의 임시 LoadPickupSpotPort를 place findSpots 연동으로 바꿔 설정 요약 · 주간 일정의 PICKUP_SPOT 판정이 실제 장소를 본다 ← ScheduleModuleLinkAdaptersTest.설정 요약은 시드 가족 · 민준의 해솔영어학원에 기본 장소가 있으면 missing에 PICKUP_SPOT을 넣지 않고 그 장소를 보여준다
-- [x] #48 [서비스] 장소 수정은 기본 장소를 isDefault false로 바꾸려 하면 DEFAULT_SPOT_REQUIRED로 거절한다(다른 장소를 기본으로 지정해야 바뀜) ← UpdatePickupSpotServiceTest.장소 수정은 기본 장소를 isDefault false로 바꾸려 하면 DEFAULT_SPOT_REQUIRED로 거절한다
-- [x] #49 [persistence] deleteSpot은 그 장소 행만 지우고 같은 가족 · 학원의 다른 장소는 남긴다 ← PlacePersistenceAdapterTest.deleteSpot은 그 장소 행만 지우고 같은 가족 · 학원의 다른 장소는 남긴다
-- [x] #50 장소 삭제는 진행 중 세션이 쓰는 기본 장소면 같은 학원에 다른 장소가 남아 있어도 SPOT_IN_USE를 먼저 돌려준다 ← DeletePickupSpotServiceTest.장소 삭제는 진행 중 세션이 쓰는 기본 장소면 같은 학원에 다른 장소가 남아 있어도 SPOT_IN_USE를 먼저 돌려준다
-- [x] #51 장소 수정은 좌표를 바꿀 때 학원 정보가 없으면 NOT_FOUND로 거절하고 저장하지 않는다 ← UpdatePickupSpotServiceTest.장소 수정은 좌표를 바꿀 때 학원 정보가 없으면 NOT_FOUND로 거절하고 저장하지 않는다
-- [x] #52 [web] GET /v1/families/me/pickup-spots에 lat,lng 형식이 아닌 near(abc · 37.5)를 보내면 422 VALIDATION_FAILED와 fields의 near를 돌려준다 ← PickupSpotControllerTest.[1] near = "abc"
-- [x] #53 [서비스] 장소 조회는 학원 정보가 없는 학원의 장소도 academyName null로 묶어 돌려준다 ← ListPickupSpotsServiceTest.장소 조회는 학원 정보가 없는 학원의 장소도 academyName null로 묶어 돌려준다
-- [x] #54 [서비스] 장소 수정은 기본 장소를 isDefault false로 바꾸면서 500m 밖 좌표를 보내도 DEFAULT_SPOT_REQUIRED로 먼저 거절하고 거리 검사를 하지 않는다 ← UpdatePickupSpotServiceTest.장소 수정은 기본 장소를 isDefault false로 바꾸면서 500m 밖 좌표를 보내도 DEFAULT_SPOT_REQUIRED로 먼저 거절하고 거리 검사를 하지 않는다
-- [x] #55 [persistence] saveSpot으로 spotId가 있는 장소를 다시 저장하면 새 행을 만들지 않고 그 행의 이름 · 좌표 · isDefault가 바뀐다 ← PlacePersistenceAdapterTest.saveSpot으로 spotId가 있는 장소를 다시 저장하면 새 행을 만들지 않고 그 행의 이름 · 좌표 · isDefault가 바뀐다
-- [x] #56 pickup_spot에 (family_id, academy_id) WHERE is_default 부분 유니크 인덱스가 있어 같은 가족 · 학원에 기본 장소 두 개를 저장할 수 없다 ← PlacePersistenceEntitiesMappingTest.서버가 뜨면 pickup_spot에 (family_id, academy_id) WHERE is_default 부분 유니크 인덱스가 만들어진다
-- [x] #57 장소 추가 · 수정에서 isDefault true로 지정하면 이전 기본 장소를 먼저 해제한 뒤 저장해 유니크 인덱스와 부딪히지 않는다(실제 DB로 확인) ← AddPickupSpotServiceIntegrationTest.기본 장소가 있는 학원에 isDefault true로 장소를 추가하면 유니크 인덱스와 부딪히지 않고 새 장소만 기본이 되고 이전 기본은 false가 된다
-- [x] #58 동시 요청으로 기본 장소 유니크 인덱스가 부딪히면 409 DEFAULT_SPOT_CONFLICT로 거절한다 ← AddPickupSpotServiceTest.장소 추가는 저장소가 기본 장소 충돌을 알리면 409 DEFAULT_SPOT_CONFLICT로 거절한다
+- [x] #1 [기반] 기본 장소 규칙은 가족 · 학원의 첫 장소를 isDefault true로 만든다
+- [x] #2 [기반] 기본 장소 규칙은 새 기본 장소를 지정하면 같은 가족 · 학원의 이전 기본 장소를 false로 바꾼다
+- [x] #3 [기반] 삭제 규칙은 같은 학원에 다른 장소가 남아 있는 기본 장소의 삭제를 거절한다
+- [x] #4 [기반] 삭제 규칙은 학원에 하나 남은 기본 장소의 삭제를 허용한다
+- [x] #5 [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
+- [x] #6 [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
+- [x] #7 [기반] PickupSpotEntity가 BaseTimeEntity를 상속하고 stopPoint · meetingPoint는 geography(Point,4326)로 매핑된다
+- [x] #8 [기반] 테스트 시드로 해솔영어학원의 기본 장소 정문 앞과 다른 장소 1개를 만든다
+- [x] #9 [persistence] PickupSpot을 저장하고 읽으면 stopPoint · meetingPoint의 lat · lng가 소수점 6자리까지 같다
+- [x] #10 [persistence] stop_point 컬럼에 GIST 인덱스가 있다
+- [x] #11 [persistence] loadSpots는 그 가족의 장소만 돌려주고 academyId를 주면 그 학원 장소만 돌려준다
+- [x] #12 [persistence] loadSpotsWithin은 near에서 radiusM 안에 정차 지점이 있는 장소만 돌려준다
+- [x] #13 [persistence] isWithinMeters는 학원에서 499m인 좌표에 true, 501m인 좌표에 false를 돌려준다
+- [x] #14 [persistence] loadDefaultSpot은 가족 · 학원의 isDefault true 장소를 돌려준다
+- [x] #15 [서비스] 장소 추가는 학원의 첫 장소면 isDefault false로 보내도 isDefault true로 저장한다
+- [x] #16 [서비스] 장소 추가는 isDefault true면 같은 학원의 이전 기본 장소를 해제한다
+- [x] #17 [서비스] 장소 추가는 정차 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
+- [x] #18 [서비스] 장소 추가는 만남 지점이 학원에서 500m를 넘으면 SPOT_TOO_FAR로 거절한다
+- [x] #19 [서비스] 장소 추가는 호출한 보호자를 createdBy로 저장한다
+- [x] #20 [서비스] 장소 수정은 보낸 필드만 바꾼다
+- [x] #21 [서비스] 장소 수정은 바꾼 좌표가 500m를 넘으면 SPOT_TOO_FAR로 거절한다
+- [x] #22 [서비스] 장소 수정은 isDefault true로 바꾸면 같은 학원의 이전 기본 장소를 해제한다
+- [x] #23 [서비스] 장소 삭제는 진행 중 세션이 쓰는 장소면 SPOT_IN_USE로 거절한다
+- [x] #24 [서비스] 장소 삭제는 다른 장소가 남은 기본 장소면 DEFAULT_SPOT_REQUIRED로 거절한다
+- [x] #25 [서비스] 다른 가족의 spotId를 수정 · 삭제하려 하면 NOT_FOUND로 거절한다
+- [x] #26 [서비스] 장소 조회는 학원별로 묶어 academyName과 함께 돌려준다
+- [x] #27 [서비스] 장소 조회는 진행 중 세션이 없으면 walkMinutes를 null로 돌려준다
+- [x] #28 [서비스] findDefaultSpot은 가족 · 학원의 기본 장소를 돌려주고 없으면 빈 값을 돌려준다
+- [x] #29 [web] GET /v1/families/me/pickup-spots는 200과 academies[]를 돌려준다
+- [x] #30 [web] GET /v1/families/me/pickup-spots는 차량 토큰으로도 200을 돌려준다
+- [x] #31 [web] GET /v1/families/me/pickup-spots에 near만 보내고 radiusM을 빼면 422 VALIDATION_FAILED를 돌려준다
+- [x] #32 [web] GET /v1/families/me/pickup-spots에 radiusM 3001을 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] #33 [web] GET /v1/families/me/pickup-spots를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #34 [web] POST /v1/families/me/pickup-spots는 201과 spotId · isDefault를 돌려준다
+- [x] #35 [web] POST /v1/families/me/pickup-spots에 51자 name을 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] #36 [web] POST /v1/families/me/pickup-spots가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
+- [x] #37 [web] POST /v1/families/me/pickup-spots를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #38 [web] PATCH /v1/pickup-spots/{spotId}는 200과 spotId · name · stopPoint · meetingPoint · memo · isDefault를 돌려준다
+- [x] #39 [web] PATCH /v1/pickup-spots/{spotId}가 500m를 넘으면 422 SPOT_TOO_FAR를 돌려준다
+- [x] #40 [web] DELETE /v1/pickup-spots/{spotId}는 204를 돌려준다
+- [x] #41 [web] DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다
+- [x] #42 [web] DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다
+- [x] #43 [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
+- [x] #44 [persistence] pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다
+- [x] #45 [persistence] LoadAcademyPort 어댑터는 schedule의 LoadAcademyUseCase.findAcademy 결과를 place가 쓰는 학원 정보(academyId · name · location)로 바꿔 돌려주고 없으면 빈 값을 돌려준다
+- [x] #46 [서비스] findSpot은 spotId의 장소를 돌려주고 없으면 빈 값을, findSpots는 가족의 학원 목록에 속한 장소를 spotId · academyId · name · isDefault로 돌려준다
+- [x] #47 schedule의 임시 LoadPickupSpotPort를 place findSpots 연동으로 바꿔 설정 요약 · 주간 일정의 PICKUP_SPOT 판정이 실제 장소를 본다
+- [x] #48 [서비스] 장소 수정은 기본 장소를 isDefault false로 바꾸려 하면 DEFAULT_SPOT_REQUIRED로 거절한다(다른 장소를 기본으로 지정해야 바뀜)
+- [x] #49 [persistence] deleteSpot은 그 장소 행만 지우고 같은 가족 · 학원의 다른 장소는 남긴다
+- [x] #50 장소 삭제는 진행 중 세션이 쓰는 기본 장소면 같은 학원에 다른 장소가 남아 있어도 SPOT_IN_USE를 먼저 돌려준다
+- [x] #51 장소 수정은 좌표를 바꿀 때 학원 정보가 없으면 NOT_FOUND로 거절하고 저장하지 않는다
+- [x] #52 [web] GET /v1/families/me/pickup-spots에 lat,lng 형식이 아닌 near(abc · 37.5)를 보내면 422 VALIDATION_FAILED와 fields의 near를 돌려준다
+- [x] #53 [서비스] 장소 조회는 학원 정보가 없는 학원의 장소도 academyName null로 묶어 돌려준다
+- [x] #54 [서비스] 장소 수정은 기본 장소를 isDefault false로 바꾸면서 500m 밖 좌표를 보내도 DEFAULT_SPOT_REQUIRED로 먼저 거절하고 거리 검사를 하지 않는다
+- [x] #55 [persistence] saveSpot으로 spotId가 있는 장소를 다시 저장하면 새 행을 만들지 않고 그 행의 이름 · 좌표 · isDefault가 바뀐다
+- [x] #56 pickup_spot에 (family_id, academy_id) WHERE is_default 부분 유니크 인덱스가 있어 같은 가족 · 학원에 기본 장소 두 개를 저장할 수 없다
+- [x] #57 장소 추가 · 수정에서 isDefault true로 지정하면 이전 기본 장소를 먼저 해제한 뒤 저장해 유니크 인덱스와 부딪히지 않는다(실제 DB로 확인)
+- [x] #58 동시 요청으로 기본 장소 유니크 인덱스가 부딪히면 409 DEFAULT_SPOT_CONFLICT로 거절한다
+- [x] #59 [기반] 걷는 시간 규칙은 직선거리에 1.3을 곱해 반올림한 walkMeters와 그것을 1.1로 나눠 올림한 walkSeconds를 돌려준다 ← WalkTimeRuleTest.걷는 시간 규칙은 직선거리 100m를
+- [x] #60 [기반] 후보 합치기 규칙은 길가 후보를 도로 이름마다 학원에 가장 가까운 1곳씩 최대 4곳만 남긴다 ← SpotCandidateMergerTest.후보 합치기 규칙은 같은 도로의 길가 후보 2곳 중
+- [x] #61 [기반] 후보 합치기 규칙은 합친 후보를 walkMeters가 작은 순 8곳으로 줄인다 ← SpotCandidateMergerTest.후보 합치기 규칙은 후보 10곳이면
+- [x] #62 [기반] 추천 순위 규칙은 totalSeconds가 작은 순으로 3곳에 rank 1~3을 붙이고 totalSeconds가 같으면 walkMeters가 작은 쪽을 앞에 둔다 ← SpotRankingRuleTest.추천 순위 규칙은 totalSeconds가 같으면
+- [x] #63 [기반] 추천 순위 규칙은 driveSeconds가 없으면 totalSeconds를 null로 두고 walkMeters가 작은 순으로 3곳을 고른다 ← SpotRankingRuleTest.추천 순위 규칙은 driveSeconds가 없으면
+- [x] #64 [기반] 주의 표시 규칙은 CURB_STOP에 LINE_DATA_2021, DOTTED_YELLOW 길가에 STOP_5MIN_ONLY, 단속 카메라 근처 길가에 ENFORCEMENT_CAMERA_NEAR를 붙이고 PUBLIC_PARKING에는 붙이지 않는다 ← SpotCautionRuleTest.주의 표시 규칙은 세 조건이 모두 맞으면
+- [x] #65 [기반] 지원 지역 규칙은 강남구 경계 도형 안의 좌표에 true, 밖의 좌표에 false를 돌려준다 ← ServiceAreaTest.지원 지역 규칙은 강남구 경계 상자 안이지만
+- [x] #66 [기반] 핵심 로직 「시그니처」의 SPOT-04 in 포트 · out 포트 인터페이스와 Query · Result record가 있다 ← SpotRecommendOutPortsTest.LoadSpotCandidatePort는 interface이고
+- [x] #67 [기반] PublicParkingEntity · CurbStopCandidateEntity가 테이블 정의대로 매핑되고 location은 geography(Point,4326)이다 ← SpotReferenceTablesMappingTest.public_parking.location · curb_stop_candidate.location은 타입 Point
+- [x] #68 [persistence] 서버가 뜰 때 PublicParking · CurbStopCandidate가 비어 있으면 classpath CSV에서 60행 · 3,147행을 읽어 넣고 이미 행이 있으면 다시 넣지 않는다 ← GangnamReferenceDataLoaderTest.서버가 뜬 뒤 public_parking은 60행
+- [x] #69 [persistence] loadPublicParkingWithin은 중심에서 radiusM 안의 공영주차장만 돌려준다 ← SpotCandidatePersistenceAdapterTest.loadPublicParkingWithin은 중심에서 499m인
+- [x] #70 [persistence] loadCurbStopsWithin은 중심에서 radiusM 안의 길가 후보만 돌려준다 ← SpotCandidatePersistenceAdapterTest.loadCurbStopsWithin은 중심에서 499m인
+- [x] #71 [persistence] public_parking · curb_stop_candidate의 location 컬럼에 GIST 인덱스가 있다 ← SpotReferenceTablesMappingTest.서버가 뜨면 public_parking.location
+- [x] #72 [서비스] 차량 시간 어댑터는 자동차 길찾기를 목적지마다 불러 routes[0].summary.duration을 목적지 순서대로 돌려준다 ← KakaoMobilityDriveTimeAdapterTest.자동차 길찾기를 목적지마다 불러
+- [x] #73 [서비스] 차량 시간 어댑터는 departAt이 있으면 미래 운행 정보 길찾기를 목적지마다 departure_time(yyyyMMddHHmm, Asia/Seoul)으로 부른다 ← KakaoMobilityDriveTimeAdapterTest.departure_time은 departAt을 Asia/Seoul의
+- [x] #74 [서비스] 차량 시간 어댑터는 외부 API가 실패하거나 result_code가 0이 아니면 빈 목록을 돌려준다 ← KakaoMobilityDriveTimeAdapterTest.result_code가 0이 아닌 응답(304)이 오면
+- [x] #75 [서비스] 장소 추천은 학원 좌표가 강남구 밖이면 supported false와 빈 items를 돌려주고 외부 API를 부르지 않는다 ← RecommendPickupSpotsServiceTest.학원 좌표가 지원 지역(강남구) 밖이면
+- [x] #76 [서비스] 장소 추천은 공영주차장 · 길가 후보를 합쳐 totalSeconds가 작은 3곳을 rank 1~3으로 돌려준다 ← RecommendPickupSpotsServiceTest.공영주차장 2곳과 길가 2곳을 합쳐
+- [x] #77 [서비스] 장소 추천은 arriveAt이 없으면 driveSecondsNow를, 있으면 driveSecondsAt을 부른다 ← RecommendPickupSpotsServiceTest.arriveAt이 없으면 driveSecondsNow만
+- [x] #78 [서비스] 장소 추천은 차량 시간이 빈 목록이면 driveSeconds · totalSeconds를 null로 두고 walkMeters가 작은 순으로 돌려준다 ← RecommendPickupSpotsServiceTest.차량 시간 포트가 빈 목록을
+- [x] #79 [web] GET /v1/pickup-spot-recommendations는 200과 supported · items[](rank · kind · name · location · walkMeters · walkSeconds · driveSeconds · totalSeconds · cautions)를 돌려준다 ← PickupSpotRecommendationControllerTest.GET /v1/pickup-spot-recommendations는 200과 supported · items[](rank · kind · name · location · walkMeters · walkSeconds · driveSeconds · totalSeconds · cautions)를 돌려준다
+- [x] #80 [web] GET /v1/pickup-spot-recommendations는 차량 토큰으로도 200을 돌려준다 ← PickupSpotRecommendationControllerTest.GET /v1/pickup-spot-recommendations는 차량 토큰으로도 200과 supported · items[]를 돌려준다
+- [x] #81 [web] GET /v1/pickup-spot-recommendations에 academyId나 origin이 없거나 origin이 lat,lng 형식이 아니면 422 VALIDATION_FAILED와 fields를 돌려준다 ← PickupSpotRecommendationControllerTest.GET /v1/pickup-spot-recommendations에 origin이 없으면
+- [x] #82 [web] GET /v1/pickup-spot-recommendations에 과거 arriveAt을 보내면 422 VALIDATION_FAILED를 돌려준다 ← PickupSpotRecommendationControllerTest.GET /v1/pickup-spot-recommendations에 과거 arriveAt을 보내면
+- [x] #83 [web] GET /v1/pickup-spot-recommendations를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupSpotRecommendationControllerTest.GET /v1/pickup-spot-recommendations를 TEACHER 토큰으로
+- [x] #84 [web] Idempotency-Key는 GET /v1/pickup-spot-recommendations에 요구되지 않는다 ← PickupSpotRecommendationControllerTest.GET /v1/pickup-spot-recommendations는 Idempotency-Key 없이 보내도 422 없이 200을 돌려준다
+- [x] #85 [서비스] 장소 추천은 academyId의 학원을 LoadAcademyPort로 읽어 그 location을 학원 좌표로 쓰고 학원이 없으면 NOT_FOUND로 거절한다 ← RecommendPickupSpotsServiceTest.학원이 없으면 NOT_FOUND로
+- [x] #86 [web] GET /v1/pickup-spot-recommendations에 없는 academyId를 보내면 404 NOT_FOUND를 돌려준다 ← PickupSpotRecommendationControllerTest.GET /v1/pickup-spot-recommendations가 유스케이스에서 던진 NOT_FOUND를 404 NOT_FOUND로 돌려준다
+- [x] #87 [서비스] 장소 추천은 후보가 3곳보다 적으면 있는 만큼만 돌려주고 0곳이면 supported true와 빈 items를 돌려준다 ← RecommendPickupSpotsServiceTest.후보가 0곳이면 supported true와
+- [x] #88 [기반] classpath reference/gangnam에 boundary_gangnam.geojson · parking_public.csv(60행) · curb_stop_candidates.csv(3,147행)가 있다 ← GangnamReferenceFilesTest.curb_stop_candidates.csv는 머리 줄을 뺀
+- [x] #89 [persistence] ServiceAreaPort 어댑터는 classpath reference/gangnam/boundary_gangnam.geojson을 읽어 강남구 안의 좌표에 true, 밖의 좌표에 false를 돌려준다 ← GangnamServiceAreaAdapterTest.isSupported는 강남구 밖의 교대역
+- [x] #90 [기반] parking_public.csv의 parking_id와 curb_stop_candidates.csv의 candidate_id는 겹치지 않는다 ← GangnamReferenceFilesTest.parking_public.csv의 parking_id는 60행 모두
+- [x] #91 직선거리 규칙은 두 좌표 사이 거리를 m로 돌려주고(위도 0.001도는 약 111m) place.domain은 JTS를 쓰는 GeoPoints 없이 계산한다 ← StraightDistanceTest.직선거리 규칙은 위도 0.001도 차이를 약 111m(±1m)로 돌려준다
+PlaceDomainImportTest.place domain 소스 어디에도 JTS를 쓰는 common.geo.GeoPoints 문자열이 없다
+- [x] #92 장소 추천은 차량 시간 포트를 부를 때 DB 트랜잭션이 열려 있지 않다 ← RecommendPickupSpotsServiceIntegrationTest.arriveAt 없이 추천할 때 차량 시간 포트 driveSecondsNow가 불리는 순간 DB 트랜잭션이 열려 있지 않다
+- [x] #93 장소 추천은 실제 참조 데이터와 강남구 경계로 대치동 학원 좌표 주변의 공영주차장 · 길가 후보를 돌려준다(차량 시간은 목) ← RecommendPickupSpotsServiceIntegrationTest.대치동 학원으로 추천하면 supported true이고 실제 참조 데이터의 공영주차장 은마아파트 · 길가 영동대로50길이 들어 있는 1~3곳을 rank 1부터 돌려준다
+- [x] #94 GET /v1/pickup-spot-recommendations에 ISO 형식이 아닌 arriveAt을 보내면 422 VALIDATION_FAILED와 fields의 arriveAt을 돌려준다 ← PickupSpotRecommendationControllerTest.[1] arriveAt = "내일"
+- [x] #95 차량 시간 어댑터는 미래 운행 정보 길찾기에 summary 파라미터를 붙이지 않는다 ← KakaoMobilityDriveTimeAdapterTest.미래 운행 정보 길찾기는 summary 파라미터를 붙이지 않는다 (departAt 있음)
+- [x] #96 참조 데이터 로더는 테이블별 적재를 한 트랜잭션으로 해서 중간에 실패하면 그 테이블에 일부 행을 남기지 않는다 ← GangnamReferenceDataLoaderRollbackTest.curb_stop_candidate 적재가 뒤쪽 묶음에서 실패하면
 
 ## 미완료 항목
 - 없음
 
 ## 완료 기준 (공통 규칙 문서)
-- [x] C1 설계서의 테스트 케이스가 모두 GREEN
+- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [x] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [x] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
 - [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-08 09:28 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 2 · 하 6 · 리뷰 시점 체크 58/58
-- 리뷰 시점 테스트: ● GREEN · 1141 passed · 전체 · 1.2s · cd C:/pickup && ./gradlew.bat test --console=plain > "C:/Users/keuye/AppData/Local/Temp/claude/86b70dd9bf0b8321/08c3708…
+- 2026-11-12 23:36 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 3 · 하 9 · 리뷰 시점 체크 96/96
+- 리뷰 시점 테스트: ● GREEN · 2415 passed · 전체 · 287s · .\gradlew.bat test --console=plain
   - 결론: 조건부 통과
-  - 이전 지적 해소: near 형식 422(#52) · Swagger soft delete · 404 문구 · academyName null(#53) · PATCH false 순서(#54) · 재저장(#55) · 기본 장소 DB 유일성(#56~#58, 사람 결정) · 설명 주석 9곳 · SpotResponse 이름
-  - [중] 08 설계서 L38 spotId FK 표기와 DB FK 없음 불일치 남음 → 사람 결정(pickup 시작 전)
-  - [중] 쓰지 않는 loadActiveChildLocation 호출 남음, 주석이 지워져 이유가 안 보임 — ListPickupSpotsService.java:38 → note(walkMinutes 정할 때)
-  - [하] FOLLOWUP 확인 필요 표 유일성 행 · 새 2행 미동기화 — docs/followup/place.md:110 → note
-  - [하] web 계층 409 DEFAULT_SPOT_CONFLICT 테스트 없음(공통 처리라 위험 낮음) → note
-  - [하] 실제 동시 요청 시나리오 테스트 없음(어댑터 변환은 PlacePersistenceAdapterTest 2건) → note
-  - [하] 테스트 Javadoc 3곳 — AddPickupSpotServiceIntegrationTest.java:24, UpdatePickupSpotServiceIntegrationTest.java:22, DefaultSpotIndexes.java:7 → 리팩터링
-  - [하] 인덱스 정의 거르는 조건 중복 — DefaultSpotIndexes.java:20-23 · PlacePersistenceEntitiesMappingTest.java:155-161 → 리팩터링
-  - [하] 02 L137 schema.sql 설명 미갱신 · 파라미터 많음 · lat · lng 범위 검사 없음 → note
-  - 완료 기준: C1 충족(58/58, 1141 passed, place 143) · C2 충족(409 · 인덱스 · 저장 순서가 07 · Swagger와 일치) · C3 사람 확인 필요(main 주석 규칙 해소, 테스트 Javadoc 3곳 판단) · C4 충족(FOLLOWUP 표 동기화는 note)
-- 이전 리뷰: 2026-11-08 03:42 KST (조건부 통과), 2026-11-08 03:25 KST (조건부 통과), 2026-11-08 03:18 KST (조건부 통과)
+  - (상 0 · 중 3 · 하 9. 이전 [중] 4건 중 1건 해소, 남은 3건은 모두 사람 결정 대기. 새로 생긴 [상] · [중] 없음. 전체를 다시 볼 근거 없음)
+  - [중] (이전 리뷰, 남음) 길가 후보 3,147행 중 812행의 road_name이 비어 있어 응답 name이 null이 되고, 이름 없는 도로가 한 묶음으로 1곳만 남음. 후속 과제에는 기록됨. name null 응답 테스트도 아직 없음 — curb_stop_candidates.csv(빈 행 812 재확인), SpotCandidateMerger.java:40, docs/followup/place.md 후속 과제 2번째 줄 → 사람 결정 뒤 항목 추가
+  - [중] (이전 리뷰, 남음) 결과를 버리는 loadActiveChildLocation 호출이 그대로이고 strict stub이 호출을 강제함 — ListPickupSpotsService.java:38, ListPickupSpotsServiceTest.java:139 → 리팩터링(호출과 stub 제거)
+  - [중] (이전 리뷰, 남음) #44 문장이 지금 동작과 반대이고 그 이름의 증거 테스트가 없음. 07의 「임시 어댑터」 설명도 옛 내용 — 07 L8 · L24 · L208, PlaceModuleLinkAdaptersTest.java:44 → 사람 결정(문장 · 증거 · 07 문구를 「pickup에 위임」으로 고침)
+  - [하] main 코드에 Javadoc 1줄이 새로 생김(02 L78 위반). PlacePickupActivityAdapter 주석은 지웠으나 로더에 새로 달았고, 같은 내용이 이미 07 L129에 있음. place main의 주석은 이 1줄뿐 — GangnamReferenceDataLoader.java:50 → 리팩터링(삭제)
+  - [하] #93 증거가 맞지 않는 테스트로 기록됨. 기록된 「강남구 밖(서울시청) 학원으로 추천하면」은 supported false만 보고 「대치동 주변 후보를 돌려준다」를 검증하지 않음. 맞는 테스트는 「대치동 학원으로 추천하면 supported true이고…」(통과). #91 증거도 「0m」 테스트라 문장의 111m · GeoPoints 없음을 보지 않음(맞는 것: 「위도 0.001도 차이를 약 111m」, PlaceDomainImportTest) — docs/followup/place.md:99 · :101, RecommendPickupSpotsServiceIntegrationTest.java:86-111 · :132-141, StraightDistanceTest.java:23-30 → note(증거 …
+  - [하] 새 테스트 파일 2개에 Javadoc · 설명 주석 8곳이 늘어남. 지난번에 지적한 4곳은 지워졌고 그 전 6곳은 그대로 — GangnamReferenceDataLoaderRollbackTest.java:14 · :35, RecommendPickupSpotsServiceIntegrationTest.java:41 · :45 · :47 · :58 · :177 · :183 / 남은 6곳: PlaceModuleLinkAdaptersTest.java:33, AddPickupSpotServiceTest.java:238, PlacePersistenceAdapterTest.java:40 · :45, UpdatePickupSpotServiceTest.java:378 · :384 → 리팩터링
+  - [하] PlaceDomainImportTest는 소스 글자를 훑어 의존 규칙을 검사하는 테스트인데, 02 L80 · L214는 「아키텍처 규칙은 테스트가 아니라 코드 리뷰로 확인」이라고 정함. 같은 방식의 선례는 있음(ScheduleModuleImportTest.java:16-30). import common.geo.* 꼴은 못 잡음 — PlaceDomainImportTest.java:26 · :40 → 사람 결정(그대로 두고 02 L80에 예외를 적을지, 지울지)
+  - [하] iLink_Project_Package/ 폴더가 여전히 추적 안 됨이고 .gitignore에도 없음. 07 문구는 고쳐졌으나(L70) 폴더 처리 결정이 후속 과제에 없음 — git status ?? iLink_Project_Package/ → 사람 결정(/tdd commit 전에 무시 · 삭제 · 커밋 중 하나)
+  - [하] 07 API 표 SPOT-04 오류 칸에 「arriveAt 형식 오류」가 없음. 코드 · API 문서 · #94 테스트에는 있음 — 07 L80, PickupSpotRecommendationController.java:57-61, PickupSpotRecommendationApiDoc.java:20-21 → note(문서 갱신)
+  - [하] 모양 2건. responseCode = "422",description에 빈칸 빠짐. StraightDistance는 생성자가 상수보다 위(다른 domain 클래스는 상수가 먼저: SpotCandidateMerger.java:14-16) — PickupSpotRecommendationApiDoc.java:20, StraightDistance.java:7-10 → 리팩터링
+  - [하] (이전 리뷰, 남음 · 모두 후속 과제에 기록됨) 「서버가 뜬 뒤 60행 · 3,147행」 테스트가 @AfterEach의 load()로도 통과 가능, 공영주차장 좌표 소수점 7~8자리, 02 문서 갱신, GangnamServiceAreaAdapter 위치, 카카오 어댑터 2개 중복, prod DDL 스크립트 없음, API 문서 예시 +09:00 → note
+  - [하] (그 이전 리뷰, 남음) 08 L39 FK 표기, web 테스트 없음(SPOT-02 404 · DELETE 404 · 409 DEFAULT_SPOT_CONFLICT), 세션 있을 때 walkMinutes 테스트, 동시 요청 시나리오, PATCH memo "", lat · lng 범위, toPoint(LatLng) 반복 3곳, pickup이 place SpotInfo를 바로 씀, 02 L19 → note
+  - 이전 지적 처리 (22건): 해소됨 9건(트랜잭션 안 외부 호출, API 문서 404, 로더 트랜잭션 #96, BOM 표기, domain → GeoPoints 의존 #91, distanceMeters 직접 테스트 없음, #79 증거, 07 구조 블록 · 출처 문구, 지적한 테스트 Javadoc 4곳 · PlacePickupActivityAdapter 주석). 일부 해소 1건(테스트 없음 4건 중 3건: #93 · #94 · #95. name null 응답 1건 남음). 남음 12건.
+  - 새 항목 #91~#96 대조: 6개 모두 설계 문장(07 L127-129 · L122 · L80)과 코드가 맞고, 테스트가 그 문장을 직접 단언함. GeoPoints.distanceMeters 제거로 다른 도메인이 깨지는 곳 없음(사용처 0건). TransactionTemplate을 main에서 쓰는 곳은 로더 하나뿐이고 07 L129에 근거 있음.
+  - 미확인: 실제 카카오모빌리티 호출(키 · 응답 모양 · 한도). #96 테스트가 트랜잭션을 빼면 실제로 RED가 되는지. 서버 2대가 빈 테이블로 동시에 뜰 때 로더 동작(빈 테이블 확인이 트랜잭션 밖이고 잠금이 없음). RollbackTest가 만드는 트리거 · 함수가 실행이 중간에 죽었을 때 남는지. dev 배포 DB에 참조 데이터가 들어갔는지.
+  - 완료 기준: C1 미충족 — 전체 GREEN 2415, place 297건 실패 0, #91~#96 모두 테스트 있음. 단 #44 문장(07 L208)이 지금 동작과 반대이고 그 이름의 증거 테스트가 없음(이전과 같음, 사람 결정 대기) / C2 충족 — 바뀐 3곳(트랜잭션 경계 · 직선거리 위치 · 적재 트랜잭션)이 07 L127-129와 일치. 이름 없는 길의 name null만 설계에 없음(사람 결정 대기) / C3 미충족 — 02 L78 주석 1건이 새로 생김(GangnamReferenceDataLoader.java:50, 지우면 해소). 02 L70 의존은 해소됨. 02 L173과 다른 422, 02 L80과 ImportTest는 사람 결정 대기 / C4 충족 — 07 확인 필요 24행이 FOLL…
+  - 후속 과제(새로 적을 것): iLink_Project_Package 폴더 처리, 로더 Javadoc 삭제, #91 · #93 증거 다시 기록, 02 L80 · L214와 ImportTest 2개, 07 L80 오류 칸
+  - 테스트: mcp__tdd-guard__tests scope "all" → GREEN 2415 passed · 287s. place 39개 클래스 297건 실패 0
+- 이전 리뷰: 2026-11-12 23:06 KST (조건부 통과), 2026-11-11 11:57 KST (조건부 통과)
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -106,12 +154,29 @@
 | SPOT-02의 academyId가 가족 일정에 없는 학원인 경우 | 그대로 둠: Academy가 있으면 받고, 없으면 404 |
 | 장소 변경이 settingsVersion을 올리는지 | 04_사용자-user.md와 같은 질문. 올리지 않는다고 가정 |
 | 11/4 기획 수정안(소스 7.1) | 확정되면 학원 출입구를 기본 장소로 쓰고 직접 찍는 장소는 대안 0~2개가 됨 → 「첫 장소가 기본」 규칙이 바뀜 |
+| SPOT-04 지원 지역 | 결정됨(사람 2026-11-12): 강남구만. 다른 구는 supported false |
+| SPOT-04 후보 종류 | 결정됨(사람 2026-11-12): 공영주차장과 길가 정차 구간만. 민영 주차장은 제외(요금 · 운영 시간 · 개방 여부를 받을 공개 데이터가 없음), 어린이보호구역 근처 길가도 제외 |
+| SPOT-04 걷는 시간 | 직선거리 × 1.3 ÷ 1.1m/s로 가정. 보행 경로 API는 쓰지 않음 |
+| SPOT-04 길가 선 데이터 | 서울시 차선 데이터가 2021-08 파일이라 그 뒤 바뀐 곳은 반영 안 됨. cautions LINE_DATA_2021로 알림. 최신본 확보 필요 |
+| SPOT-04 어린이보호구역 판정 | 구역 경계선 데이터가 없어 대상 시설 300m 안을 제외로 가정. 경찰청 보호구역 도형을 받으면 교체 |
+| SPOT-04 후보가 3곳보다 적을 때 | 있는 만큼만 돌려줌. 0곳이면 supported true와 빈 items |
+| SPOT-04 카카오모빌리티 한도 | 무료 하루 자동차 길찾기 10,000건 · 미래 운행 5,000건. 요청 1건이 최대 8건을 씀. 한도를 넘을 때 대응은 미정. 다중 목적지 길찾기는 반경 10km 한도 때문에 쓰지 않음[팀장 결정 2026-11-12] |
+| SPOT-04 카카오 결과 저장 | 카카오 DevTalk 답변 기준 장소 ID · place_url만 저장 가능. 추천 결과는 저장하지 않음 |
+| SPOT-04 참조 데이터 갱신 | CSV를 손으로 다시 만들어 넣음. 자동 갱신 없음 |
+| SPOT-04 origin | 클라이언트가 차량 현재 좌표를 보냄. 서버가 가진 SIG-01 위치는 쓰지 않음 |
+| SPOT-04 학원 위치 | 결정됨(사람 2026-11-12): 저장된 Academy를 academyId로 조회해 location을 씀. 출입구 좌표(entrance)는 아직 쓰지 않음. 저장된 값이 카카오 검색에서 온 것이라 저장 방식은 06_일정-schedule에서 따로 정함(미정) |
 
 ## 다음 단계
 - 커밋 · 푸시: /tdd commit (기능별 분할 커밋) · /tdd push (커밋 후 기능 브랜치 푸시)
 - 다음 도메인: 픽업 (08_픽업-pickup.md). 시작: /tdd domain pickup
 
 ## 후속 과제
+- SPOT-04는 필수 query(academyId · origin)가 빠지면 422 VALIDATION_FAILED(fields)를 낸다. 02_공통-규칙-global L173은 필수 파라미터 누락 · 타입 오류를 400 INVALID_REQUEST로 정해 서로 다르다. 구현은 설계서(422)를 따르며 컨트롤러가 문자열로 받아 직접 검사한다. 공통 규칙에 예외를 적을지, SPOT-04를 400으로 맞출지 사람이 정해야 함
+- [설계 결정 필요] 길가 후보 3,147행 중 812행(26%)은 road_name이 비어 있다. 이 후보가 뽑히면 SPOT-04 응답 name이 null이고, 이름 없는 도로는 한 묶음으로 쳐서 1곳만 남는다. 대체 이름(예: 이름 없는 길) · 후보에서 빼기 · null 허용 중 사람이 정해야 함
+- [운영] prod는 ddl-auto validate라 새 테이블 public_parking · curb_stop_candidate를 운영 DB에 직접 만들어야 서버가 뜬다. 저장소에 DDL 스크립트가 없다(schema.sql은 인덱스만). 배포 전에 생성 스크립트를 준비해야 함
+- SPOT-04 후속: (1) 실제 카카오모빌리티 호출은 테스트가 없다(MockRestServiceServer만). 키 · 한도 · 응답 모양은 2026-11-12 수동 호출로만 확인 (2) 공영주차장 좌표가 소수점 7~8자리라 응답 location이 6자리를 넘음. 공통 좌표 반올림 결정과 함께 정리 (3) API 문서 예시 arriveAt의 +09:00은 URL에서 %2B로 바꿔야 함. 실제 HTTP로는 미확인 (4) GangnamServiceAreaAdapter는 classpath 파일을 읽는데 adapter/out/persistence에 있음 (5) 카카오 어댑터 2개(KakaoMapSearchAdapter · KakaoMobilityDriveTimeAdapter)의 RestClient 설정 · 헤더 · 실패 처리가 겹침. common으로 묶을 후보 (6) 「서버가 뜬 뒤 60행 · 3,147행」 테스트는 @AfterEach의 load()로도 통과할 수 있어 ApplicationRunner 연결을 직접 보지 않음 (7) 02_공통-규칙-global에 추천 책임 · 네이티브 쿼리 예외(반경 조회 2개 · 로더 INSERT) · 참조 테이블 PK 예외를 반영해야 함 (8) 참조 데이터(parking_public.csv · curb_stop_candidates.csv)는 손으로 다시 만들어 넣어야 하고, 길가 선 데이터는 2021-08 파일 기준
+- [설계 결정 필요] (1) iLink_Project_Package/ 폴더(기획 문서 + 강남구 원본 데이터 약 15MB)가 git에 없고 .gitignore에도 없다. 커밋 · 무시 · 삭제 중 사람이 정해야 함. 2026-11-12 커밋에서는 제외함 (2) PlaceDomainImportTest는 소스 글자를 훑어 의존 규칙을 보는 테스트인데 02_공통-규칙-global L80 · L214는 아키텍처 규칙을 코드 리뷰로 확인한다고 정한다(선례 ScheduleModuleImportTest). 그대로 두고 02에 예외를 적을지, 지울지 사람이 정해야 함 (3) 참조 데이터 로더는 빈 테이블 확인이 트랜잭션 밖이고 잠금이 없어, 서버 2대가 빈 테이블로 동시에 뜨면 한쪽이 기본 키 충돌로 실패할 수 있음. 배포 대수 확인 필요
+- [완료 기준 미충족 · 사람 결정 필요] C1: #44 문장(임시 CheckActivePickupPort는 false · 빈 값)이 지금 동작(pickup 연동 어댑터)과 반대라 문장을 고치거나 항목을 정리해야 함. 전체 테스트는 GREEN 2415 passed. C3: 필수 쿼리 누락을 422로 돌려주는 것과 공통 규칙의 400 중 어느 쪽인지, PlaceDomainImportTest를 02 문서 L80 · L214의 예외로 둘지 정해지지 않음. GangnamReferenceDataLoader의 Javadoc 위반은 2026-11-12 정리 리뷰에서 지움
 - place: SPOT-03 PATCH에서 null이 「안 보냄」이라 memo를 지울 방법이 없음 — 빈 문자열("")을 「지움」으로 볼지 결정 필요. 설계서에 없던 record 이름(AcademySpots · SpotItem), SpotInfo 필드(spotId · familyId · academyId · name · stopPoint · meetingPoint)는 test-writer가 정함
 - place 결정(팀장): #48 기본 장소를 PATCH로 isDefault false로 바꾸면 남은 장소 수와 상관없이 422 DEFAULT_SPOT_REQUIRED(장소가 있는 학원엔 기본 장소가 늘 하나). 학원 정보가 없을 때 수정 · 추가는 404(테스트는 추가 쪽만)
 - place 결정(팀장): SPOT-01 학원 정보가 없으면 academyName null로 묶음 유지, walkMinutes는 계산 방법이 정해질 때까지 늘 null, 학원 이름은 학원마다 loadAcademy 1회(가족 학원 수가 적다고 가정), 묶음 academyId · 장소 spotId 오름차순
