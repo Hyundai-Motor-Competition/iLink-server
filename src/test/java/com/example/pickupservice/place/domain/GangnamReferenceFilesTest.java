@@ -128,7 +128,7 @@ class GangnamReferenceFilesTest {
 
 	private static List<String> headerColumns(String path) throws IOException {
 		String header = readLines(path).get(0);
-		if (header.startsWith("﻿")) {
+		if (header.startsWith("\uFEFF")) {
 			header = header.substring(1);
 		}
 		return Arrays.stream(header.split(",")).map(String::trim).toList();

@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** classpath의 reference/gangnam/boundary_gangnam.geojson을 읽는 어댑터이므로 DB 없이 직접 만든다. */
 class GangnamServiceAreaAdapterTest {
 
 	private final ServiceAreaPort serviceAreaPort = new GangnamServiceAreaAdapter();

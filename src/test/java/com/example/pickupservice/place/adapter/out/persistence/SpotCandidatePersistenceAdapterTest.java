@@ -22,7 +22,6 @@ import static org.assertj.core.api.Assertions.within;
 @RequiredArgsConstructor
 class SpotCandidatePersistenceAdapterTest extends IntegrationTestSupport {
 
-	/** 강남구 실제 데이터와 섞이지 않게 제주 부근을 쓴다. */
 	private static final LatLng CENTER = new LatLng(33.5, 126.5);
 	private static final int RADIUS_M = 500;
 	private static final double SIX_DECIMALS = 0.0000005;
