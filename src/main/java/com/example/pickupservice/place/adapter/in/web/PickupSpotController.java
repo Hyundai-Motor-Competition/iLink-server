@@ -98,23 +98,7 @@ public class PickupSpotController implements PickupSpotApiDoc {
 		if (radiusM < MIN_RADIUS_M || radiusM > MAX_RADIUS_M) {
 			throw BusinessException.invalidField("radiusM", "50~3000 사이여야 합니다");
 		}
-		return parseLatLng(near);
-	}
-
-	private static LatLng parseLatLng(String near) {
-		String[] parts = near.split(",", -1);
-		if (parts.length != 2) {
-			throw invalidNear();
-		}
-		try {
-			return new LatLng(Double.parseDouble(parts[0].trim()), Double.parseDouble(parts[1].trim()));
-		} catch (NumberFormatException e) {
-			throw invalidNear();
-		}
-	}
-
-	private static BusinessException invalidNear() {
-		return BusinessException.invalidField("near", "lat,lng 형식이어야 합니다");
+		return LatLngParam.parse("near", near);
 	}
 
 }
