@@ -44,7 +44,7 @@ uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스�
 
 | 컬럼 | 타입 | 키 · 제약 | 설명 |
 |---|---|---|---|
-| parkingId | VARCHAR(20) | PK | 주차장관리번호 |
+| parkingId | VARCHAR(20) | PK | 주차장관리번호. 원본에서 번호가 겹치는 행은 뒤에 -2 · -3 · -4를 붙여 구분(122-3-000002가 4곳에 쓰임) |
 | name | VARCHAR(100) | | |
 | location | geography(Point,4326) | GIST | |
 | spaces | INT | NULL | 주차 면수 |
@@ -242,6 +242,7 @@ List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<In
 - [ ] [서비스] 장소 추천은 후보가 3곳보다 적으면 있는 만큼만 돌려주고 0곳이면 supported true와 빈 items를 돌려준다
 - [x] [기반] classpath reference/gangnam에 boundary_gangnam.geojson · parking_public.csv(60행) · curb_stop_candidates.csv(3,147행)가 있다
 - [ ] [persistence] ServiceAreaPort 어댑터는 classpath reference/gangnam/boundary_gangnam.geojson을 읽어 강남구 안의 좌표에 true, 밖의 좌표에 false를 돌려준다
+- [x] [기반] parking_public.csv의 parking_id와 curb_stop_candidates.csv의 candidate_id는 겹치지 않는다
 
 ## 확인 필요 사항
 
