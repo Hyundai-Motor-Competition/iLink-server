@@ -1,17 +1,89 @@
 # 도메인 리뷰 · 전체
 
-- 생성: 2026-11-09 23:02 KST · tdd-guard
-- 테스트: ● GREEN · 2261 passed · 전체 · 240s
+- 생성: 2026-11-12 23:36 KST · tdd-guard
+- 테스트: ● GREEN · 2415 passed · 전체 · 287s
 - 도메인 리뷰 상세는 이 폴더의 <key>.md "도메인 리뷰" 절. 요청: /tdd review <key> · 전체: /tdd review all
 
 ## 도메인별 최근 리뷰
-- 공유모듈 (shared) · 체크 57/57 · 리뷰 없음
-- 사용자 (user) · 체크 73/73 · 리뷰 없음
-- 인증 (auth) · 체크 120/120 · 리뷰 없음
-- 일정 (schedule) · 체크 77/77 · 리뷰 없음
-- 장소 (place) · 체크 58/58 · 리뷰 없음
-- 픽업 (pickup) · 체크 241/241 · 리뷰 11-09 19:49 통과 (상 0 · 중 0 · 하 5)
-- 알림 (notification) · 체크 64/64 · 리뷰 11-09 23:02 통과 (상 0 · 중 0 · 하 7)
+- 공유모듈 (shared) · 체크 57/57 · 리뷰 11-11 11:48 조건부 통과 (상 0 · 중 8 · 하 22)
+- 사용자 (user) · 체크 73/73 · 리뷰 11-11 11:38 조건부 통과 (상 0 · 중 6 · 하 19)
+- 인증 (auth) · 체크 120/120 · 리뷰 11-11 11:47 조건부 통과 (상 0 · 중 2 · 하 12)
+- 일정 (schedule) · 체크 77/77 · 리뷰 11-11 12:02 조건부 통과 (상 0 · 중 5 · 하 15)
+- 장소 (place) · 체크 96/96 · 리뷰 11-12 23:36 조건부 통과 (상 0 · 중 3 · 하 9)
+- 픽업 (pickup) · 체크 241/241 · 리뷰 11-11 12:06 조건부 통과 (상 0 · 중 5 · 하 10)
+- 알림 (notification) · 체크 64/64 · 리뷰 11-11 12:11 조건부 통과 (상 0 · 중 1 · 하 17)
 
 ## 전체 리뷰 (도메인 간 일관성)
-- 아직 없음. /tdd review all
+- 2026-11-11 12:25 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 10 · 하 12
+- 리뷰 시점 테스트: ● GREEN · 2261 passed · 전체 · 71s · .\gradlew.bat test --console=plain
+  - 결론: 조건부 통과
+  - 동작을 바로 바꿔야 하는 [상]은 0건입니다. [중] 10건은 대부분 도메인끼리 계약이 어긋난 것이라, 아래 사람 결정을 먼저 받아야 고칠 수 있습니다. 브리핑의 12개 주제는 모두 직접 확인했습니다. 다만 두 주제는 사실이 브리핑과 조금 다릅니다. 2번 MAP_API_UNAVAILABLE 중복은 schedule 모듈 안의 일입니다. 10번 C:/pickup 경로는 FOLLOWUP을 다시 만들면서 머리말에서는 빠졌습니다.
+  - ## 발견 사항
+  - [중] 「다음 세션부터 적용」 약속을 04 · 06은 하는데 08은 지키지 않음. SET-06(합류 안내 방식)과 SET-03(일정 수정)이 둘 다 해당 — 04:102 · FamilyApiDoc.java:53 · 06:98 · ScheduleApiDoc.java:38은 「다음 세션부터(pickup이 스냅샷)」라고 적음. 08:681은 「판정 때마다 joinCallMode를 읽음」, 08:680은 「일정 값은 스냅샷 안 함」이라고 적음. 실제 코드도 그때그때 읽음: CallEngine.java:64, SendCallService.java:41, SessionViewAssembler.java:112, GetContactsService.java:53 → 사람 결정(D4)
+  - [중] SIG-04 403 LOCATION_CONSENT_REQUIRED가 실제로는 나지 않음 — PickupChildReadinessAdapter.java:26-29가 늘 true를 돌려줌. 테스트 이름도 「임시」임(PickupModuleLinkAdaptersTest:240). auth는 동의를 검사만 하고 저장하지 않음(auth/adapter/out에 consent 0건). 08:549 · :612 항목은 mock으로만 GREEN. 05:306 · 08:726 확인 필요 표에만 기록됨. 지금은 FAM-06에서 LOCATION 동의가 필수라 실제 피해는 없음 → 사람 결정(D5)
+  - [중] @Scheduled 작업 4개가 스레드 1개를 나눠 쓰고, 테스트에서도 돎 — 작업: IdempotencyKeyCleaner.java:20, AutoCompleteBoardingScheduler.java:17(PT10S), SessionStreamRegistry.java:86(ping PT30S, 02:56의 adapter/in/scheduler 밖), ResendUndeliveredScheduler.java:17(fixedDelay=60_000L 상수라 설정으로 못 끔). application.yml에 spring.task.scheduling.pool.size가 없어 기본 1개. 테스트에서 끄는 것은 cleanup뿐(TestPostgisConfiguration.java:71-74)이라 03:205…
+  - [중] pickup → notification 이벤트 계약이 문서에 없는 문자열 키임 — SessionEventMessages.java:21-26이 payload에 "notificationIds"를 넣음. DispatchSessionEventService.java:110이 그 키를 문자열로 읽음. 같은 메시지를 SSE 리스너(SessionEventStreamListener.java:17)도 받아 차량에 보냄(pickup 리뷰 근거 SessionStreamRegistry.java:47-48, 이번에 직접 재확인 안 함). 08 · 09에서 notificationIds 검색 결과 0건 → 리팩터링(SessionEventMessage에 칸을 따로 두고, payload는 저장 이벤트와 같게) + 08 · 09 계…
+  - [중] in 포트가 domain enum을 내보내고, 복사본이 모듈마다 있음 — 내보내는 곳: user FamilyInfo · CallModeResult(JoinCallMode), auth GetMemberDeviceStatusUseCase · PushTarget(MemberDeviceStatus · Platform), schedule ScheduleInfo(ScheduleStatus). 다른 모듈 main이 그대로 import하는 곳 9곳: SessionCallView.java:3, SessionViewResponse.java:19, CallEngine.java:20, SendCallService.java:14, LoadChildReadinessPort.java:3, PickupChildReadiness…
+  - [중] 같은 code의 오류를 모듈마다 따로 정의함. 반대로 한 모듈만 쓰는 코드는 common에 있음 — ACTIVE_PICKUP_EXISTS는 UserErrors.java:27 · AuthErrors.java:22에 있고 문구가 다름. SETUP_INCOMPLETE(새로 찾음)는 ScheduleErrors.java:36(missing 없음, 「아직 끝나지 않은 설정이 있습니다」)과 PickupErrors.java:28(missing 있음, 「픽업 준비가 끝나지 않았습니다」)에 따로 있음. RESEND_TOO_SOON은 ErrorCode.java:25에 있는데 쓰는 곳은 ResendNotificationService.java:61 하나뿐. 02:169 · 03:100과 어긋남. MAP_API_UNAVAI…
+  - [중] 429 응답 모양이 네 가지임 — LINK_CODE_REISSUE_LIMIT · ATTEMPT_LIMIT은 retryAfterSeconds 없음(AuthErrors.java:27 · :42). HELP_REQUEST_TOO_SOON은 retryAfterSeconds 없이 nextAllowedAt만 있음(PickupErrors.java:88-90). RESEND_TOO_SOON은 ErrorCode 전용 팩토리로 retryAfterSeconds를 채움(ResendNotificationService.java:61). LINK-02 TOO_MANY_REQUESTS도 retryAfterSeconds를 채움(LinkStatusPollGuard.java:37). 02:183은 「429는 retryAfterSec…
+  - [중] 03 「오류 형식」 절이 여러 도메인이 더한 공통 코드를 담지 않음 — 03:93-100 · :231-237에 없는 것: 팩토리 tooManyRequests(ErrorCode,int) · invalidField · stateVersionConflict · withDetail(BusinessException.java:47 · 52 · 64 · 70), ErrorCode의 SESSION_ALREADY_FINISHED · CALL_ALREADY_REVOKED · RESEND_TOO_SOON(ErrorCode.java:21-22 · 25), 최상위 session 키. withDetail 예약 키에 overlapScheduleIds가 빠짐(BusinessException.java:14). 02:11 · 03…
+  - [중] FK 표기가 설계서끼리 반대이고, FAM-07 실제 삭제로 고아 행이 생김 — 「FK →」로 적은 곳: 04:39 · :49, 05:31 · :46, 08:37-39 · 62 · 69-71 · 86 · 98-99 · 113 · 121 · 128, 09:37-40. 「DB FK 없음(관례)」로 적은 곳: 06:43-50, 07:31-40. 실제는 schema.sql · 엔티티 모두 FK 0건(@ManyToOne · @JoinColumn 0건). 02:140-149에는 이 관례가 없음. 그래서 04:220 「FK 때문에 못 지움」, 05:316 · 09:190 「세션 FK라」는 근거가 틀림. 실제 삭제 위치는 RemoveMemberService.java:40 → UserPersistenceAdapter…
+  - [중] 「임시 어댑터」 체크 항목 5개가 지금 동작과 반대이고, 같은 설계서 묶음의 교체 항목과도 모순 — 04:202(#64), 05:266(#98), 06:231(#58), 07:153(#44), 08:634(#204). 교체 항목은 따로 체크돼 있음: 08:637, 07:156, 09:157. src/test에서 「구현 전 임시」 검색 결과 0건. 실제 연동을 검증하는 테스트는 UserModuleLinkAdaptersTest:107, AuthModuleLinkAdaptersTest:59, PlaceModuleLinkAdaptersTest:44, PickupModuleLinkAdaptersTest:250. 머리말 · 구조 줄도 낡음: 04:8 · :227, 05:19, 07:8 · :19, 08:8(「…
+  - [하] 다른 모듈용 in 포트 3개가 그 포트를 가진 설계서에 없음 — auth LoadPushTargetByDeviceUseCase(05 검색 0건), pickup ResendGuardUseCase · FindSessionFamilyUseCase(08 검색 0건). 셋 다 notification 작업 때 생김. 쓰는 쪽 09에는 각 1건 있음. 나머지 15개 공개 포트는 각 설계서에 있음 → note(05 · 08 시그니처 갱신. auth C2가 이것에 걸림)
+  - [하] 02:19 의존 방향 목록이 실제와 다르고, 다른 모듈을 부르는 방식이 두 가지임 — 실제 main import 방향은 17개이고, 양방향 쌍이 6개(user↔auth, user↔pickup, auth↔pickup, schedule↔place, place↔pickup, pickup↔notification). 02:19에는 4개만 있음. 서비스가 상대 in 포트를 직접 주입하는 곳: auth 서비스 10개 → user, schedule 서비스 7개 → user(06:8에만 적힘). 나머지 모듈은 자기 out 포트 + adapter/out/<모듈>을 씀. 이벤트 record는 보내는 쪽 port.out에 둠(auth DeviceReplacedEvent, pickup SessionEventMessage)…
+  - [하] 진행 기록의 기준이 도메인마다 다름 — 완료 기준이 shared · user · auth · schedule · place는 0/4인데, pickup(pickup.md:255-258) · notification(notification.md:78-81)은 4/4. 그런데 최신 리뷰는 pickup C2 「사람 확인 필요」, notification C3 「사람 확인 필요」였음. auth.md:5 · shared.md:5의 테스트 줄은 전체가 아니라 common 범위(275 passed). 증거(←) 비율: shared 0/57, user 0/73, auth 0/120, schedule 11/77, place 0/58, pickup 166/241, notification 64/64. TODO.md:8 「현…
+  - [하] 소스 문자열 · 구조 검사 테스트가 여러 도메인에 있음 — ErrorCodeTest.java:19 · :58, NameRuleTest.java:23 · :138, PlateNumberMaskerTest.java:21 · :76, ScheduleModuleImportTest.java:18-24, PickupScheduleTest.java:30, InvalidScheduleExceptionTest.java:16. 같은 결의 리플렉션 위치 검사: PickupModuleLinkAdaptersTest:92-105 등 *ModuleLinkAdaptersTest. 02:80 · :214와 어긋남 → 사람 결정(D1과 같이)
+  - [하] main 설명 주석 4곳 — PickupActivityAdapter.java:8 · AuthPickupActivityAdapter.java:8 · PlacePickupActivityAdapter.java:11(셋 다 같은 문장), AcademyJpaRepository.java:14-17 Javadoc. 02:78 위반 → 리팩터링(삭제만, 결정 필요 없음)
+  - [하] 「픽업 시작 가능」 판정을 schedule과 pickup이 따로 하고 결과가 다름 — SET-09는 DRAFT면 startable false이고 missing에 넣지 않음(GetWeeklyPickupsService.java:85-101). SES-02는 DRAFT면 missing "SCHEDULE"이고, MissingSetupItem을 문자열 상수로 따로 둠(StartPickupService.java:50-52 · :132-146). 같은 날 차량 앱이 SET-09에서 missing []를, SES-02에서 [SCHEDULE]을 받음 → 사람 결정(D10)
+  - [하] Swagger의 Idempotency-Key 헤더 표기가 도메인마다 다름 — @Parameter가 있는 곳: user 3/3, place 2/2, pickup 16/16. 설명 글로만 적은 곳: auth 3/4(InviteApiDoc:18 · :34, VehicleLinkCodeApiDoc:43), schedule 2/2(ScheduleApiDoc:24, SetupApiDoc:25), notification 1/1(NotificationApiDoc:35) → 리팩터링
+  - [하] 인덱스를 두는 위치와 다른 모듈이 쓰는 조회 키의 인덱스 — @Table(indexes)에 둔 곳(device · vehicle_link_code · pickup_session)과 schema.sql에 둔 곳(GIST 2개 · 부분 유니크 3개)이 섞여 있음. 02:137은 schema.sql을 「VIN 부분 유니크」로만 설명함. 인덱스가 없는 조회 키: users.family_id(findMembers를 pickup · schedule · notification이 요청마다 부름), pickup_schedule.child_user_id, notification.session_id. prod DDL 스크립트 0개(ops 아래 .sql 없음, README:70-73에 안내만 있음) → note(02 테…
+  - [하] 02:213 「픽스처는 common에 한 번만」과 실제가 다름 — 도메인 시드(UserSeed · ScheduleSeed · PlaceSeed · AuthSeed · PickupSeed)를 다른 모듈 테스트가 Import함(auth #92 결정과 같음). user · schedule · pickup 테스트는 auth.domain.Device · MemberInvite를 직접 만듦 → note(02:213 갱신)
+  - [하] 시각 변환 방식이 도메인마다 다름 — DeliveryReceiptRequest.java:14는 toInstant()를 쓰고 pickup 요청 4곳은 TimeUtils.toUtc를 씀. CorrectOutcomeService.java:25가 SEOUL 상수를 따로 둠(TimeUtils.java:12는 private). toKst null 처리가 KstTime.java:13 · NotificationItemResponse.java:31에 중복 → 리팩터링(TimeUtils에 null 허용 · KST 날짜 변환 공개)
+  - [하] 08 이벤트 표 「받는 쪽」과 09 발송 규칙이 다름 — CALL_TRIGGERED · DEPARTURE_NOTICE_SENT의 보호자 FCM(pickup 리뷰 근거 DispatchSessionEventService.java:53-57, 이번에 직접 재확인 안 함) → 사람 결정(08 표나 09 규칙 중 하나를 고침)
+  - [하] auth 인터셉터가 모든 모듈 API에 걸리는데 02 · 03에 없음 — AuthPreLinkWebMvcConfig.java:11(/v1/**)의 PreLinkTokenInterceptor가 다른 모듈의 「VEHICLE familyId null」 경우를 대신 막음 → note(03 인증 절에 한 줄)
+  - ## 사람 결정 목록
+  - D1 공개 enum(JoinCallMode · DeviceStatus · Platform · ScheduleStatus)의 위치: (a) 각 모듈 port.in 공개 타입으로 옮기고 복사본 삭제, (b) 02:70 예외 목록에 추가. 같은 결정으로 소스 문자열 · 구조 검사 테스트를 02:80 · :214의 예외로 둘지 지울지 정함
+  - D2 같은 code 오류 기준: ACTIVE_PICKUP_EXISTS · SETUP_INCOMPLETE를 ErrorCode 하나 · 문구 하나로 합칠지, 상황별로 code를 나눌지
+  - D3 429 형식 하나: 모든 429에 retryAfterSeconds를 채울지, 도메인 code용 팩토리 하나를 둘지, RESEND_TOO_SOON을 ErrorCode에서 뺄지, HELP의 nextAllowedAt을 유지할지
+  - D4 세션 시작 때 고정할 값 목록(joinCallMode · 목표 시각 · 학원 연락처)과 04:102 · 06:98 · 08:680-681 문장 맞추기
+  - D5 위치 동의: auth에 동의 저장 + 조회 in 포트를 둘지, 08 SIG-04 403 행을 「동의 철회 기능 전까지 나지 않음」으로 표시할지
+  - D6 @Scheduled 스레드 수(예: 4)
+  - D7 02에 「DB FK 없음」 관례를 적을지, FAM-07을 실제 삭제로 둘지 삭제 표시로 바꿀지(07:173 지난 세션 장소 삭제도 같이)
+  - D8 임시 어댑터 체크 항목 5개(04 #64 · 05 #98 · 06 #58 · 07 #44 · 08 #204) 문장 수정 승인
+  - D9 서비스가 상대 모듈 in 포트를 직접 주입하는 방식(auth · schedule)을 허용할지, out 포트로 통일할지
+  - D10 DRAFT 일정을 SET-09 · SES-02 모두 missing SCHEDULE로 맞출지
+  - D11 완료 기준 체크 기준(최신 리뷰가 C 항목을 「사람 확인 필요」로 남긴 경우에도 체크할지)
+  - 완료 기준: 전체 리뷰라 도메인별 C1~C4는 각 FOLLOWUP 판정을 따릅니다. 여러 도메인의 C3를 함께 막는 것은 주석 4곳(02:78), 02:70 · :73 domain enum 노출(D1), 02:169 오류 정의 위치(D2)입니다.
+  - ## 후속 과제 (브리핑 공통 주제 12개)
+  - 1 in 포트 domain 타입 · 복사본 — 설계 결정 필요(D1)
+  - 2 같은 뜻 오류 중복 — 설계 결정 필요(D2). MAP_API_UNAVAILABLE은 schedule 안 중복이라 남음(리팩터링). SETUP_INCOMPLETE 중복을 새로 찾음
+  - 3 429 모양 — 설계 결정 필요(D3)
+  - 4 임시 어댑터 문장 — 남음(D8 승인 뒤 문서만 고치면 됨)
+  - 5 @Scheduled 스레드 · 테스트 격리 — 남음(격리는 03:205로 이미 결정됨) · 풀 크기는 설계 결정 필요(D6)
+  - 6 SET-06 다음 세션 — 설계 결정 필요(D4). SET-03까지 범위가 넓어짐
+  - 7 위치 동의 저장소 — 설계 결정 필요(D5)
+  - 8 FK 표기 · FAM-07 고아 행 — 설계 결정 필요(D7)
+  - 9 02:19 의존 방향 — 남음(note) · 호출 방식은 설계 결정 필요(D9)
+  - 10 FOLLOWUP 진행 기록 — 남음. C:/pickup 경로는 머리말에서 해소됨(다시 만든 FOLLOWUP, 커밋 안 됨). 완료 기준 · 증거 비율 차이는 남음(D11)
+  - 11 소스 문자열 검사 테스트 — 설계 결정 필요(D1과 같이)
+  - 12 설명 주석 — 남음(3줄 + AcademyJpaRepository Javadoc 1곳, 리팩터링)
+  - ## 테스트
+  - mcp__tdd-guard__tests scope "all"(`.\gradlew.bat test --console=plain`) → GREEN 2261 passed. Gradle UP-TO-DATE라 이전 보고서를 재사용함(71s)
+  - 그 밖에는 읽기 명령만 썼음: git status · git diff --stat(docs/followup 9개 파일 수정, 커밋 안 됨), grep · find로 모듈 간 import · enum 중복 · 오류 code · @Scheduled · FK · 주석 · Swagger 표기를 대조
+  - ## 주요 파일
+  - C:/ilink/docs/02_공통-규칙-global.md
+  - C:/ilink/docs/03_공유모듈-shared.md
+  - C:/ilink/docs/08_픽업-pickup.md
+  - C:/ilink/src/main/java/com/example/pickupservice/common/error/ErrorCode.java
+  - C:/ilink/src/main/java/com/example/pickupservice/common/error/BusinessException.java
+  - C:/ilink/src/main/java/com/example/pickupservice/common/async/SchedulingConfig.java
+  - C:/ilink/src/main/java/com/example/pickupservice/pickup/application/service/SessionEventMessages.java
+  - C:/ilink/src/main/java/com/example/pickupservice/pickup/application/service/StartPickupService.java
+  - C:/ilink/src/main/java/com/example/pickupservice/pickup/adapter/out/auth/PickupChildReadinessAdapter.java
+  - C:/ilink/src/main/java/com/example/pickupservice/schedule/application/service/GetWeeklyPickupsService.java
+  - C:/ilink/src/main/java/com/example/pickupservice/user/application/service/UserErrors.java
+  - C:/ilink/src/main/java/com/example/pickupservice/auth/application/service/AuthErrors.java
+  - C:/ilink/src/main/java/com/example/pickupservice/schedule/application/service/ScheduleErrors.java
+  - C:/ilink/src/main/java/com/example/pickupservice/pickup/application/service/PickupErrors.java
+  - C:/ilink/src/test/java/com/example/pickupservice/common/fixture/TestPostgisConfiguration.java
+  - C:/ilink/src/test/java/com/example/pickupservice/schedule/ScheduleModuleImportTest.java

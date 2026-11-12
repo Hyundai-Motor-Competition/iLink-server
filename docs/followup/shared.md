@@ -1,96 +1,161 @@
 # FOLLOWUP · 공유모듈 (shared)
 
-- 생성: 2026-11-07 15:37 KST · tdd-guard
-- 상태: 완료 (체크 57/57 · 완료 기준 4/4)
-- 테스트: ● GREEN · 191 passed · 전체 · 0.4s · cd C:/pickup && ./gradlew.bat test --rerun --console=plain 2>&1 | tail -25
-- 설계서: C:/pickup/docs/03_공유모듈-shared.md
+- 생성: 2026-11-11 11:48 KST · tdd-guard
+- 상태: 진행 중 (체크 57/57 · 완료 기준 0/4)
+- 테스트: ● GREEN · 275 passed · *, RealServerStartupTest · 165s · .\gradlew.bat test --tests com.example.pickupservice.common.* --tests com.example.pickupservice.RealServerStartupTest --console=plain
+- 설계서: C:/ilink/docs/03_공유모듈-shared.md
 
 ## 완료 항목
-- [x] #1 [기반] BaseTimeEntity를 상속한 엔티티를 저장하면 createdAt과 updatedAt이 채워진다 ← BaseTimeEntityTest.BaseTimeEntity를 상속한 엔티티를 저장하면 DB에서 다시 읽은 createdAt과 updatedAt이 저장 시각으로 채워져 있다
-- [x] #2 [기반] BaseTimeEntity를 상속한 엔티티를 수정해 저장하면 updatedAt만 바뀌고 createdAt은 그대로다 ← BaseTimeEntityTest.BaseTimeEntity를 상속한 엔티티를 수정해 저장하면 DB에서 다시 읽은 updatedAt만 늦은 시각으로 바뀌고 createdAt은 그대로다
-- [x] #3 [기반] TimeUtils.toKst는 UTC 2026-11-03T09:12:00Z를 2026-11-03T18:12:00+09:00으로 바꾼다 ← TimeUtilsTest.TimeUtils.toKst는 UTC 2026-11-03T09:12:00Z를 2026-11-03T18:12:00+09:00 문자열로 바꾼다
-- [x] #4 [기반] TimeUtils.toUtc는 2026-11-03T18:12:00+09:00을 UTC 2026-11-03T09:12:00Z로 바꾼다 ← TimeUtilsTest.TimeUtils.toUtc는 2026-11-03T18:12:00+09:00을 UTC 2026-11-03T09:12:00Z로 바꾼다
-- [x] #5 [기반] TimeUtils.todayKst는 UTC 2026-11-05T15:30:00Z 시점에 한국 날짜 2026-11-06을 돌려준다 ← TimeUtilsTest.TimeUtils.todayKst는 UTC 2026-11-05T15:30:00Z 시점에 한국 날짜 2026-11-06을 돌려준다
-- [x] #6 [기반] 서버가 뜨면 JVM 기본 시간대와 DB 연결 시간대가 UTC다 ← TimeZoneConfigTest.JVM 기본 시간대가 Asia/Seoul인 환경에서 서버가 뜨면 JVM 기본 시간대가 UTC로 바뀌어 있다
-- [x] #7 [기반] GeoPoints.toPoint는 lat 37.501234 · lng 127.039876을 SRID 4326 Point로 바꾸고 toLatLng로 같은 값을 돌려준다 ← GeoPointsTest.GeoPoints.toPoint로 바꾼 Point를 toLatLng로 다시 바꾸면 lat 37.501234 · lng 127.039876이 그대로 나온다
-- [x] #8 [기반] 공통 테스트 기반 클래스는 Testcontainers postgis/postgis 컨테이너에서 geography(Point,4326) 컬럼을 만들 수 있다 ← IntegrationTestSupportTest.공통 테스트 기반 클래스를 상속한 테스트에서 geography(Point,4326)로 매핑한 엔티티 컬럼은 타입 Point · SRID 4326인 geography 컬럼으로 만들어진다
-- [x] #9 [기반] 공통 테스트 픽스처로 VEHICLE 주체와 USER 주체(familyId · role 지정)의 테스트용 access 토큰을 만들 수 있다 ← AccessTokenFixtureTest.공통 테스트 픽스처로 만든 VEHICLE access 토큰(vehicleId 77 · familyId 12)을 애플리케이션 JwtDecoder로 해석하면 sub 77 · principalType VEHICLE · familyId 12가 나오고 role은 없다
-- [x] #10 [기반] 비동기 설정은 @EnableAsync와 이벤트 리스너용 스레드 풀 빈을 등록한다 ← AsyncConfigTest.이벤트 스레드 풀은 이름이 eventTaskExecutor인 ThreadPoolTaskExecutor 빈이고 @Async 메서드는 이 빈의 스레드 이름 접두사 event-를 가진 스레드에서 실행된다
-- [x] #11 [web] JSON 형식이 틀린 본문을 보내면 400 INVALID_REQUEST를 돌려준다 ← GlobalExceptionHandlerTest.JSON 형식이 틀린 본문을 보내면 400과 error.code INVALID_REQUEST · 비어 있지 않은 error.message를 돌려주고 error.fields는 채우지 않는다
-- [x] #12 [web] Bean Validation에 실패하면 422 VALIDATION_FAILED와 fields[].field · fields[].reason을 돌려준다 ← GlobalExceptionHandlerTest.@Valid 본문의 필드 두 개가 검증에 실패하면 422 VALIDATION_FAILED의 fields에 name과 grade가 각자의 reason과 함께 하나씩 들어간다
-- [x] #13 [web] 모든 오류 응답 본문은 error.code · error.message · error.retryAfterSeconds 키를 담는다 ← GlobalExceptionHandlerTest.GET만 받는 API를 POST로 부르면 405와 JSON 본문의 error.code METHOD_NOT_ALLOWED · error.message · error.retryAfterSeconds(null) 키를 돌려주고 error.fields는 채우지 않는다
-- [x] #14 [web] 공통 예외에 retryAfterSeconds 30을 담아 던지면 429 응답의 error.retryAfterSeconds가 30이다 ← GlobalExceptionHandlerTest.컨트롤러가 BusinessException(429, TOO_MANY_REQUESTS, 메시지, retryAfterSeconds 30)을 던지면 429와 JSON 본문의 error.code TOO_MANY_REQUESTS · 던진 메시지 그대로의 error.message · error.retryAfterSeconds 30을 돌려주고 error.fields는 채우지 않는다
-- [x] #15 [web] Authorization 헤더 없이 인증이 필요한 API를 부르면 401 UNAUTHORIZED를 돌려준다 ← SecurityConfigTest.인증이 필요한 GET API를 Authorization 헤더 없이 부르면 401과 JSON 본문의 error.code UNAUTHORIZED · 비어 있지 않은 error.message · error.retryAfterSeconds(null) 키를 돌려주고 error.fields는 채우지 않는다
-- [x] #16 [web] 만료된 access 토큰으로 부르면 401 UNAUTHORIZED를 돌려준다 ← SecurityConfigTest.서명은 올바르지만 만료 시각이 10분 지난 USER access 토큰으로 인증이 필요한 GET API를 부르면 401과 error.code UNAUTHORIZED 공통 오류 본문을 돌려준다
-- [x] #17 [web] 서명이 틀린 토큰으로 부르면 401 UNAUTHORIZED를 돌려준다 ← SecurityConfigTest.같은 클레임의 만료 전 USER access 토큰이라도 서버 키가 아닌 다른 임의 키로 HS256 서명했으면 인증이 필요한 GET API에서 401과 error.code UNAUTHORIZED 공통 오류 본문을 돌려준다
-- [x] #18 [web] 컨트롤러는 토큰의 주체 종류 · 주체 id · familyId · role을 AuthPrincipal로 받는다 ← AuthPrincipalTest.VEHICLE access 토큰(vehicleId 77 · familyId 12)으로 부르면 컨트롤러가 @AuthenticationPrincipal로 받은 AuthPrincipal은 type VEHICLE · id 77 · familyId 12 · role null이다
-- [x] #19 [web] 허용되지 않은 role로 부르면 403 FORBIDDEN을 돌려준다 ← RoleAuthorizationTest.@PreAuthorize("hasRole('GUARDIAN')") API를 role이 없는 VEHICLE 토큰으로 부르면 403과 error.code FORBIDDEN 공통 오류 본문을 돌려준다
-- [x] #20 [persistence] idempotency_key에 키 · 요청 해시 · 응답 본문을 저장하고 키로 다시 읽는다 ← IdempotencyKeyRepositoryTest.본문 없는 204 응답을 응답 본문 null로 저장하면 다시 읽었을 때 상태 204 · 응답 본문 null이다
-- [x] #21 [web] Idempotency-Key 대상 API에 같은 키 · 같은 본문을 두 번 보내면 두 번째는 첫 응답과 같은 상태 코드 · 본문을 돌려준다 ← IdempotencyKeyFilterTest.Idempotency-Key 대상 POST API에 USER 101이 같은 키 · 같은 본문을 두 번 보내면 두 번째 응답은 첫 응답과 같은 상태 201 · 같은 JSON 본문(호출마다 늘어나는 orderNumber까지 같음)이다
-- [x] #22 [web] Idempotency-Key 대상 API에 같은 키로 두 번째 요청이 오면 유스케이스는 한 번만 실행된다 ← IdempotencyKeyFilterTest.Idempotency-Key 대상 POST API에 USER 101이 같은 키 · 같은 본문을 차례로 세 번 보내면 유스케이스 역할의 컨트롤러 메서드는 정확히 한 번만 실행된다
-- [x] #23 [web] 같은 Idempotency-Key로 다른 본문을 보내면 409 IDEMPOTENCY_KEY_REUSED를 돌려준다 ← IdempotencyKeyFilterTest.USER 101이 Idempotency-Key 대상 POST API에 키 K · 본문 A로 201을 받은 뒤 같은 키 K · 다른 본문 B를 보내면 409 IDEMPOTENCY_KEY_REUSED 공통 오류를 받고 컨트롤러 메서드는 첫 요청 때 한 번만 실행되며 저장된 행의 요청 해시는 첫 요청 것 그대로다
-- [x] #24 [web] Idempotency-Key 대상 API를 헤더 없이 부르면 거절된다 ← IdempotencyKeyFilterTest.USER 101이 Idempotency-Key 대상 POST API를 Idempotency-Key 헤더 없이 부르면 422 VALIDATION_FAILED와 fields[0].field Idempotency-Key · fields[0].reason 한국어 문구를 받고 컨트롤러 메서드는 실행되지 않는다
-- [x] #25 [web] Idempotency-Key 대상이 아닌 API는 헤더 없이도 처리된다 ← IdempotencyKeyFilterTest.USER 101이 @IdempotencyKeyRequired가 없는 POST API를 Idempotency-Key 헤더 없이 부르면 422가 아니라 201로 처리되고 컨트롤러 메서드가 한 번 실행된다
-- [x] #26 [서비스] 만료 키 삭제 작업은 저장한 지 24시간이 지난 idempotency_key 행만 지운다 ← IdempotencyKeyCleanerTest.만료 키 삭제 작업은 현재 시각보다 25시간 전에 저장한 완료 행(응답 상태 201)은 지우고 23시간 전에 저장한 완료 행은 남기며 지운 행 수 1을 돌려준다
-- [x] #27 [web] 요청 로깅 AOP는 컨트롤러 요청마다 requestId · 호출 주체 · HTTP 메서드 · 경로 · 응답 코드 · 걸린 시간을 한 줄로 남긴다 ← RequestLoggingAspectTest.USER 101 토큰으로 GET /test/logging/ping을 부르면 그 요청의 로그가 INFO 한 줄만 남고 그 줄에 requestId · principal=USER:101 · method=GET · path=/test/logging/ping · status=200 · durationMs(숫자)가 모두 들어 있다
-- [x] #28 [web] 요청 로깅 AOP는 예외로 끝난 요청의 로그에 오류 코드를 남긴다 ← RequestLoggingAspectTest.컨트롤러가 BusinessException(409 · SOME_DOMAIN_CODE)을 던지면 그 요청 로그가 한 줄 남고 그 줄에 status=409 · errorCode=SOME_DOMAIN_CODE와 requestId · principal · method · path · durationMs가 들어 있다
-- [x] #29 [web] 요청 로깅 AOP는 요청 본문의 전화번호 · 위치 · 토큰 · 연결 코드 값을 로그에 그대로 남기지 않는다 ← RequestLoggingAspectTest.전화번호 · 위치 · 토큰 · 연결 코드를 담은 본문으로 POST /test/logging/sensitive-body가 200으로 끝나면 그 요청 동안 남은 어떤 로그에도 그 값들이 없다
-- [x] #30 [web] 요청 로깅 AOP는 SSE 스트림 요청을 연결 때와 종료 때만 남긴다 ← RequestLoggingAspectTest.VEHICLE 77 토큰으로 SSE 스트림 GET /test/logging/stream에 연결하면 연결 때 stream=open 한 줄이 남고 이벤트 3개를 보내는 동안 줄이 늘지 않으며 스트림을 닫으면 stream=closed 한 줄이 더해져 그 경로의 요청 로그는 정확히 두 줄이다
-- [x] #31 [web] 요청 로깅 AOP는 GET /v1/vehicle-link-codes/{codeId}/status 폴링을 응답 status가 직전과 다를 때만 남긴다 ← RequestLoggingAspectTest.@PollingLog를 단 폴링 API GET /test/logging/link-codes/9001/status가 응답 본문 status를 WAITING · WAITING · WAITING · LINKED · LINKED 순으로 돌려주도록 VEHICLE 77이 다섯 번 부르면 그 경로의 요청 로그는 처음 WAITING 응답(1번째)과 처음 LINKED 응답(4번째) 두 줄만 남는다
-- [x] #32 [web] dev 프로필에서는 springdoc API 문서가 열린다 ← SwaggerConfigTest.dev 프로필에서 토큰 없이 GET /v3/api-docs를 부르면 401이 아니라 200과 openapi 3 버전 필드 · info를 담은 JSON 문서를 돌려준다
-- [x] #33 [web] prod 프로필에서는 springdoc API 문서가 꺼져 있다 ← SwaggerConfigProdProfileTest.prod 프로필에서 토큰 없이 API 문서 · 스웨거 UI 경로를 부르면 문서도 401도 아닌 404 NOT_FOUND 공통 오류를 돌려준다
-- [x] #34 [web] 컨트롤러 파라미터 제약과 @Valid 본문이 함께 있어 메서드 검증으로 처리될 때도 본문 필드 오류의 fields[].field는 본문 필드 이름이다 ← GlobalExceptionHandlerTest.@PathVariable @Positive id와 @Valid 본문이 함께 있어 메서드 검증으로 처리될 때 id 1은 올바르고 본문 name이 빈 문자열이면 422 VALIDATION_FAILED의 fields[0].field는 파라미터 이름 request가 아니라 본문 필드 이름 name이고 fields[0].reason은 제약 메시지다
-- [x] #35 [web] @RequestParam · @RequestHeader 값 검증 실패의 fields[].field는 애너테이션에 적은 이름(예: Idempotency-Key)이다 ← GlobalExceptionHandlerTest.@RequestHeader("X-Sample-Key") @Size(min = 8) String sampleKey에 3자 값을 보내면 422 VALIDATION_FAILED의 fields[0].field는 Java 파라미터 이름 sampleKey가 아니라 애너테이션에 적은 헤더 이름 X-Sample-Key이고 fields[0].reason은 제약 메시지다
-- [x] #36 [web] 따로 처리하지 않은 Spring MVC 요청 예외(빠진 요청 헤더 · 받을 수 없는 Accept · ResponseStatusException)는 500이 아니라 그 예외의 4xx 상태와 공통 오류 본문으로 돌려준다 ← GlobalExceptionHandlerTest.필수 요청 헤더 X-Test-Header를 빼고 부르면 500이 아니라 400과 JSON 본문의 error.code INVALID_REQUEST · error.message · error.retryAfterSeconds(null) 키를 돌려주고 error.fields는 채우지 않는다
-- [x] #37 [web] 서명은 맞지만 주체 클레임이 빠졌거나 틀린 토큰(principalType 없음 · 숫자가 아닌 sub · 없는 role 값)으로 부르면 500이 아니라 401 UNAUTHORIZED를 돌려준다 ← AuthPrincipalJwtConverterTest.USER인데 role이 없는 값 SUPERUSER
-- [x] #38 [web] Accept application/xml로 불러도 성공 · 오류 응답은 XML이 아니라 JSON이다(의존성으로 들어온 jackson-dataformat-xml 컨버터를 쓰지 않음) ← JsonOnlyWebMvcConfigTest.produces 없이 record를 돌려주는 GET API를 Accept application/xml만 담아 부르면 XML로 나가지 않고 406과 Content-Type application/json 본문의 error.code NOT_ACCEPTABLE · error.message · error.retryAfterSeconds(null) 키를 돌려준다
-- [x] #39 [web] ResponseStatusException에 reason을 담아 던지면 그 reason이 error.message로 나간다 ← GlobalExceptionHandlerTest.컨트롤러가 reason 없이 ResponseStatusException(409)을 던지면 409 응답의 error.code는 CONFLICT이고 error.message는 null이나 빈 문자열이 아닌 기본 문구다
-- [x] #40 [web] familyId 클레임이 없는 VEHICLE access 토큰으로 부르면 401이 아니라 AuthPrincipal.familyId가 null로 들어온다 ← AuthPrincipalTest.familyId 클레임 없이 sub 77 · principalType VEHICLE만 담은 access 토큰으로 부르면 401이 아니라 200이고 AuthPrincipal은 type VEHICLE · id 77 · familyId null이다
-- [x] #41 [web] 스웨거 doc 인터페이스를 구현한 컨트롤러의 파라미터에 검증 제약(@Positive 등)을 달아도 500(HV000151)이 아니라 422 VALIDATION_FAILED를 돌려준다 ← GlobalExceptionHandlerTest.스웨거 doc 인터페이스(제약 없음)를 구현한 컨트롤러의 @PathVariable @Positive id에 0을 보내면 500(HV000151)이 아니라 422 VALIDATION_FAILED와 fields[0].field id · fields[0].reason 제약 메시지를 돌려준다
-- [x] #42 [web] 인증 없이 부르는 Idempotency-Key 대상 API도 같은 키 · 같은 본문의 두 번째 요청에 첫 응답과 같은 상태 코드 · 본문을 돌려준다 ← AnonymousIdempotencyKeyFilterTest.인증 없이 부르는 Idempotency-Key 대상 POST API에 토큰 없이 같은 키 · 같은 본문을 두 번 보내면 두 번째 응답은 첫 응답과 같은 상태 201 · 같은 JSON 본문(호출마다 늘어나는 orderNumber까지 같음)이고 컨트롤러 메서드는 한 번만 실행된다
-- [x] #43 [통합] 실제 웹 서버(RANDOM_PORT)로 애플리케이션 컨텍스트가 뜨고 GET /actuator/health가 200 UP이다 ← RealServerStartupTest.실제 웹 서버(RANDOM_PORT)로 컨텍스트가 뜨고 GET /actuator/health가 200과 status UP을 돌려준다
-- [x] #44 [web] 같은 주체가 같은 Idempotency-Key로 두 요청을 동시에 보내면 유스케이스는 한 번만 실행되고 나머지 요청은 409 IDEMPOTENCY_KEY_REUSED를 받는다 ← IdempotencyKeyFilterTest.USER 101이 같은 Idempotency-Key · 같은 본문으로 두 요청을 동시에 보내 첫 요청이 컨트롤러 안에서 처리 중일 때 들어온 두 번째 요청은 컨트롤러를 실행하지 않고 409 IDEMPOTENCY_KEY_REUSED 공통 오류를 받고 · 첫 요청은 201이며 컨트롤러 메서드는 정확히 한 번만 실행된다
-- [x] #45 [web] Idempotency-Key 예약 저장에서 유니크 위반이 아닌 DB 오류(NOT NULL 위반 등)가 나면 409 IDEMPOTENCY_KEY_REUSED가 아니라 500 공통 오류로 끝난다 ← IdempotencyKeyFilterTest.옛 dev DB처럼 idempotency_key.response_status에 NOT NULL 제약이 남아 키 예약 INSERT가 NOT NULL 위반으로 실패하면 USER 101의 Idempotency-Key 대상 POST API 요청은 409 IDEMPOTENCY_KEY_REUSED가 아니라 500 INTERNAL_SERVER_ERROR 공통 오류(본문에 테이블 · 컬럼 이름 없음)를 받고 컨트롤러 메서드는 실행되지 않으며 키 행도 남지 않는다
-- [x] #46 [web] Idempotency-Key 대상 API가 4xx · 5xx로 끝나면 키를 저장하지 않아 같은 키 · 같은 본문으로 다시 보내면 유스케이스가 다시 실행된다 ← IdempotencyKeyFilterTest.USER 101이 Idempotency-Key 대상 POST API에 키 K로 보낸 첫 요청이 처리하지 않은 예외로 500 INTERNAL_SERVER_ERROR로 끝나면 키 K 행이 남지 않고 같은 키 K · 같은 본문으로 다시 보내면 컨트롤러 메서드가 다시 실행되어(2번 실행) 201을 받으며 그 뒤 키 K 행에는 201이 저장된다
-- [x] #47 [web] 요청 로그의 requestId는 안전한 X-Request-Id 헤더 값(영숫자 · - · _ 64자 이하)을 그대로 쓰고 헤더가 없거나 그 밖의 값이면 새로 만든다 ← RequestLoggingAspectTest.안전한 X-Request-Id 헤더 req-Abc_123을 보내면 그 요청 로그 한 줄의 requestId가 req-Abc_123 그대로다
-- [x] #48 [web] @ResponseStatus(CREATED)를 단 컨트롤러 메서드의 요청 로그 status는 200이 아니라 201이다 ← RequestLoggingAspectTest.@ResponseStatus(CREATED)를 단 컨트롤러 메서드 POST /test/logging/annotated-created가 ResponseEntity가 아닌 record를 돌려주면 응답은 201이고 그 요청 로그 한 줄의 status도 200이 아니라 201이다
-- [x] #49 [web] @PreAuthorize 권한 거절로 403이 난 요청의 로그는 status=200이 아니라 status=403 errorCode=FORBIDDEN이다 ← RequestLoggingAspectTest.@PreAuthorize("hasRole('GUARDIAN')")를 단 GET /test/logging/guardian-only를 CHILD 토큰으로 불러 권한 거절로 403이 나면 응답은 403 FORBIDDEN 공통 오류 본문이고 그 요청 로그 한 줄은 status=200이 아니라 status=403 · errorCode=FORBIDDEN이다
-- [x] #50 [web] 요청 로그의 path는 실제 경로 변수 값이 아니라 매핑 패턴(예: /v1/invites/{token})으로 남아 토큰 · 연결 코드 값이 로그에 없다 ← RequestLoggingAspectTest.경로 변수를 가진 GET /test/logging/invites/{token}을 실제 초대 토큰 inv-7Hq2-secret으로 부르면 그 요청 로그 한 줄의 path는 실제 경로가 아니라 매핑 패턴 /test/logging/invites/{token}이고 그 요청 동안 남은 어떤 로그에도 토큰 값이 없다
-- [x] #51 [web] 같은 요청 동안 남는 모든 로그 줄(500 처리기 error 로그 포함)에 requestId가 찍힌다 ← RequestLoggingAspectTest.X-Request-Id req-51-check로 부른 GET /test/logging/unexpected-error가 처리하지 않은 예외로 500이 되면 콘솔에 찍힌 500 처리기의 Unhandled exception 줄에도 requestId req-51-check가 찍힌다
-- [x] #52 [web] exp 클레임이 없는 access 토큰은 서버 키로 서명돼 있어도 401 UNAUTHORIZED를 받는다 ← SecurityConfigTest.서버 키로 HS256 서명했고 sub 101 · principalType USER · familyId 12 · role GUARDIAN · iat를 담았지만 exp 클레임이 없는 access 토큰으로 인증이 필요한 GET API를 부르면 200이 아니라 401과 error.code UNAUTHORIZED 공통 오류 본문을 돌려준다
-- [x] #53 [web] Idempotency-Key 예약 단계에서 DataAccessException이 아닌 DB 오류(트랜잭션 시작 실패 등)가 나도 500 공통 오류 본문으로 끝난다 ← IdempotencyKeyFilterTest.키 예약 단계에서 DataAccessException이 아닌 트랜잭션 시작 실패(CannotCreateTransactionException)가 나면 USER 101의 Idempotency-Key 대상 POST API 요청은 예외가 필터 밖으로 새지 않고 500 INTERNAL_SERVER_ERROR 공통 오류(본문에 예외 메시지 · 예외 클래스 이름 없음)를 받고 컨트롤러 메서드는 실행되지 않으며 키 행도 남지 않는다
-- [x] #54 [web] DB 제약 위반이 나도 로그에 PostgreSQL 오류 상세(Failing row contains 행 값)가 남지 않는다 ← IdempotencyKeyFilterTest.키 detail-leak-54-check의 예약 INSERT가 CHECK 제약 위반으로 실패해 500으로 끝나도 그 동안 콘솔에 찍힌 로그 어디에도 PostgreSQL 오류 상세 Failing row contains와 그 행 값(키 detail-leak-54-check)이 없다
-- [x] #55 [web] 각 도메인이 PublicEndpoints 빈으로 등록한 메서드 · 경로는 토큰 없이 부를 수 있고 만료된 Bearer 토큰을 붙여도 401이 아니라 그대로 처리된다 ← PublicEndpointsTest.PublicEndpoints 빈에 POST /test/public/** 를 등록하면 POST /test/public/echo를 Authorization 헤더 없이 불러도 401이 아니라 200과 컨트롤러 응답을 돌려준다
-- [x] #56 [web] dev API 문서(/v3/api-docs)는 Bearer JWT 보안 스키마를 담는다 ← SwaggerConfigTest.dev 프로필의 GET /v3/api-docs 문서는 components.securitySchemes에 type http · scheme bearer · bearerFormat JWT인 bearerAuth 스키마를 담고 전역 security 요구에 bearerAuth를 건다
-- [x] #57 [web] 공통 오류 코드(ErrorCode)로 BusinessException을 만들어 던지면 그 코드의 HTTP 상태 · code · 문구로 응답한다(429는 retryAfterSeconds 포함) ← GlobalExceptionHandlerTest.컨트롤러가 공통 오류 코드로 만든 BusinessException.of(ErrorCode.NOT_FOUND)를 던지면 404와 error.code NOT_FOUND · error.message 대상을 찾을 수 없습니다(ErrorCode 문구) · error.retryAfterSeconds null을 돌려준다
+- [x] #1 [기반] BaseTimeEntity를 상속한 엔티티를 저장하면 createdAt과 updatedAt이 채워진다
+- [x] #2 [기반] BaseTimeEntity를 상속한 엔티티를 수정해 저장하면 updatedAt만 바뀌고 createdAt은 그대로다
+- [x] #3 [기반] TimeUtils.toKst는 UTC 2026-11-03T09:12:00Z를 2026-11-03T18:12:00+09:00으로 바꾼다
+- [x] #4 [기반] TimeUtils.toUtc는 2026-11-03T18:12:00+09:00을 UTC 2026-11-03T09:12:00Z로 바꾼다
+- [x] #5 [기반] TimeUtils.todayKst는 UTC 2026-11-05T15:30:00Z 시점에 한국 날짜 2026-11-06을 돌려준다
+- [x] #6 [기반] 서버가 뜨면 JVM 기본 시간대와 DB 연결 시간대가 UTC다
+- [x] #7 [기반] GeoPoints.toPoint는 lat 37.501234 · lng 127.039876을 SRID 4326 Point로 바꾸고 toLatLng로 같은 값을 돌려준다
+- [x] #8 [기반] 공통 테스트 기반 클래스는 Testcontainers postgis/postgis 컨테이너에서 geography(Point,4326) 컬럼을 만들 수 있다
+- [x] #9 [기반] 공통 테스트 픽스처로 VEHICLE 주체와 USER 주체(familyId · role 지정)의 테스트용 access 토큰을 만들 수 있다
+- [x] #10 [기반] 비동기 설정은 @EnableAsync와 이벤트 리스너용 스레드 풀 빈을 등록한다
+- [x] #11 [web] JSON 형식이 틀린 본문을 보내면 400 INVALID_REQUEST를 돌려준다
+- [x] #12 [web] Bean Validation에 실패하면 422 VALIDATION_FAILED와 fields[].field · fields[].reason을 돌려준다
+- [x] #13 [web] 모든 오류 응답 본문은 error.code · error.message · error.retryAfterSeconds 키를 담는다
+- [x] #14 [web] 공통 예외에 retryAfterSeconds 30을 담아 던지면 429 응답의 error.retryAfterSeconds가 30이다
+- [x] #15 [web] Authorization 헤더 없이 인증이 필요한 API를 부르면 401 UNAUTHORIZED를 돌려준다
+- [x] #16 [web] 만료된 access 토큰으로 부르면 401 UNAUTHORIZED를 돌려준다
+- [x] #17 [web] 서명이 틀린 토큰으로 부르면 401 UNAUTHORIZED를 돌려준다
+- [x] #18 [web] 컨트롤러는 토큰의 주체 종류 · 주체 id · familyId · role을 AuthPrincipal로 받는다
+- [x] #19 [web] 허용되지 않은 role로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #20 [persistence] idempotency_key에 키 · 요청 해시 · 응답 본문을 저장하고 키로 다시 읽는다
+- [x] #21 [web] Idempotency-Key 대상 API에 같은 키 · 같은 본문을 두 번 보내면 두 번째는 첫 응답과 같은 상태 코드 · 본문을 돌려준다
+- [x] #22 [web] Idempotency-Key 대상 API에 같은 키로 두 번째 요청이 오면 유스케이스는 한 번만 실행된다
+- [x] #23 [web] 같은 Idempotency-Key로 다른 본문을 보내면 409 IDEMPOTENCY_KEY_REUSED를 돌려준다
+- [x] #24 [web] Idempotency-Key 대상 API를 헤더 없이 부르면 거절된다
+- [x] #25 [web] Idempotency-Key 대상이 아닌 API는 헤더 없이도 처리된다
+- [x] #26 [서비스] 만료 키 삭제 작업은 저장한 지 24시간이 지난 idempotency_key 행만 지운다
+- [x] #27 [web] 요청 로깅 AOP는 컨트롤러 요청마다 requestId · 호출 주체 · HTTP 메서드 · 경로 · 응답 코드 · 걸린 시간을 한 줄로 남긴다
+- [x] #28 [web] 요청 로깅 AOP는 예외로 끝난 요청의 로그에 오류 코드를 남긴다
+- [x] #29 [web] 요청 로깅 AOP는 요청 본문의 전화번호 · 위치 · 토큰 · 연결 코드 값을 로그에 그대로 남기지 않는다
+- [x] #30 [web] 요청 로깅 AOP는 SSE 스트림 요청을 연결 때와 종료 때만 남긴다
+- [x] #31 [web] 요청 로깅 AOP는 GET /v1/vehicle-link-codes/{codeId}/status 폴링을 응답 status가 직전과 다를 때만 남긴다
+- [x] #32 [web] dev 프로필에서는 springdoc API 문서가 열린다
+- [x] #33 [web] prod 프로필에서는 springdoc API 문서가 꺼져 있다
+- [x] #34 [web] 컨트롤러 파라미터 제약과 @Valid 본문이 함께 있어 메서드 검증으로 처리될 때도 본문 필드 오류의 fields[].field는 본문 필드 이름이다
+- [x] #35 [web] @RequestParam · @RequestHeader 값 검증 실패의 fields[].field는 애너테이션에 적은 이름(예: Idempotency-Key)이다
+- [x] #36 [web] 따로 처리하지 않은 Spring MVC 요청 예외(빠진 요청 헤더 · 받을 수 없는 Accept · ResponseStatusException)는 500이 아니라 그 예외의 4xx 상태와 공통 오류 본문으로 돌려준다
+- [x] #37 [web] 서명은 맞지만 주체 클레임이 빠졌거나 틀린 토큰(principalType 없음 · 숫자가 아닌 sub · 없는 role 값)으로 부르면 500이 아니라 401 UNAUTHORIZED를 돌려준다
+- [x] #38 [web] Accept application/xml로 불러도 성공 · 오류 응답은 XML이 아니라 JSON이다(의존성으로 들어온 jackson-dataformat-xml 컨버터를 쓰지 않음)
+- [x] #39 [web] ResponseStatusException에 reason을 담아 던지면 그 reason이 error.message로 나간다
+- [x] #40 [web] familyId 클레임이 없는 VEHICLE access 토큰으로 부르면 401이 아니라 AuthPrincipal.familyId가 null로 들어온다
+- [x] #41 [web] 스웨거 doc 인터페이스를 구현한 컨트롤러의 파라미터에 검증 제약(@Positive 등)을 달아도 500(HV000151)이 아니라 422 VALIDATION_FAILED를 돌려준다
+- [x] #42 [web] 인증 없이 부르는 Idempotency-Key 대상 API도 같은 키 · 같은 본문의 두 번째 요청에 첫 응답과 같은 상태 코드 · 본문을 돌려준다
+- [x] #43 [통합] 실제 웹 서버(RANDOM_PORT)로 애플리케이션 컨텍스트가 뜨고 GET /actuator/health가 200 UP이다
+- [x] #44 [web] 같은 주체가 같은 Idempotency-Key로 두 요청을 동시에 보내면 유스케이스는 한 번만 실행되고 나머지 요청은 409 IDEMPOTENCY_KEY_REUSED를 받는다
+- [x] #45 [web] Idempotency-Key 예약 저장에서 유니크 위반이 아닌 DB 오류(NOT NULL 위반 등)가 나면 409 IDEMPOTENCY_KEY_REUSED가 아니라 500 공통 오류로 끝난다
+- [x] #46 [web] Idempotency-Key 대상 API가 4xx · 5xx로 끝나면 키를 저장하지 않아 같은 키 · 같은 본문으로 다시 보내면 유스케이스가 다시 실행된다
+- [x] #47 [web] 요청 로그의 requestId는 안전한 X-Request-Id 헤더 값(영숫자 · - · _ 64자 이하)을 그대로 쓰고 헤더가 없거나 그 밖의 값이면 새로 만든다
+- [x] #48 [web] @ResponseStatus(CREATED)를 단 컨트롤러 메서드의 요청 로그 status는 200이 아니라 201이다
+- [x] #49 [web] @PreAuthorize 권한 거절로 403이 난 요청의 로그는 status=200이 아니라 status=403 errorCode=FORBIDDEN이다
+- [x] #50 [web] 요청 로그의 path는 실제 경로 변수 값이 아니라 매핑 패턴(예: /v1/invites/{token})으로 남아 토큰 · 연결 코드 값이 로그에 없다
+- [x] #51 [web] 같은 요청 동안 남는 모든 로그 줄(500 처리기 error 로그 포함)에 requestId가 찍힌다
+- [x] #52 [web] exp 클레임이 없는 access 토큰은 서버 키로 서명돼 있어도 401 UNAUTHORIZED를 받는다
+- [x] #53 [web] Idempotency-Key 예약 단계에서 DataAccessException이 아닌 DB 오류(트랜잭션 시작 실패 등)가 나도 500 공통 오류 본문으로 끝난다
+- [x] #54 [web] DB 제약 위반이 나도 로그에 PostgreSQL 오류 상세(Failing row contains 행 값)가 남지 않는다
+- [x] #55 [web] 각 도메인이 PublicEndpoints 빈으로 등록한 메서드 · 경로는 토큰 없이 부를 수 있고 만료된 Bearer 토큰을 붙여도 401이 아니라 그대로 처리된다
+- [x] #56 [web] dev API 문서(/v3/api-docs)는 Bearer JWT 보안 스키마를 담는다
+- [x] #57 [web] 공통 오류 코드(ErrorCode)로 BusinessException을 만들어 던지면 그 코드의 HTTP 상태 · code · 문구로 응답한다(429는 retryAfterSeconds 포함)
 
 ## 미완료 항목
 - 없음
 
 ## 완료 기준 (공통 규칙 문서)
-- [x] C1 설계서의 테스트 케이스가 모두 GREEN
-- [x] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [x] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
+- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-07 15:37 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 1 · 하 9 · 리뷰 시점 체크 57/57
-- 리뷰 시점 테스트: ● GREEN · 191 passed · 전체 · 0.4s · cd C:/pickup && ./gradlew.bat test --rerun --console=plain 2>&1 | tail -25
+- 2026-11-11 11:48 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 8 · 하 22 · 리뷰 시점 체크 57/57
+- 리뷰 시점 테스트: ● GREEN · 275 passed · *, RealServerStartupTest · 165s · .\gradlew.bat test --tests com.example.pickupservice.common.* --tests com.example.pickupservice.RealServerStartupTest --console=plain
   - 결론: 조건부 통과
-  - 1차 리뷰 상 1 · 중 6은 모두 해소(#50~#57, 02 · 03 · 04 · 05 반영, ErrorCodeAttribute로 순환 제거, README prod 순서). [하] 대부분 해소.
-  - [중] 필터 단계에서 끝난 요청(Idempotency 재응답 · 409 · 422 헤더 없음 · 예약 500 · Security 401)은 요청 로그 줄이 남지 않음. 03 「요청 로깅」 · 02 「로그」 문구(요청 하나에 INFO 한 줄)와 어긋남 → 사람 결정(필터 단계에서도 한 줄 vs 03에 범위 밖 명시), 05 시작 전
-  - [하] 증거 인용 2건(#14 · #31)이 지금 테스트 이름과 다름 → note
-  - [하] FOLLOWUP 「확인 필요 사항(설계서)」 절이 옛 03 사본 → note
-  - [하] IdempotencyKeyEntity 6인자 생성자(테스트 전용 9곳)가 파라미터 3개 규칙을 넘음 → 리팩터링 또는 예외 허용(팀장)
-  - [하] 5xx BusinessException 서버 로그 없음 · status/code null 방어 없음 → note(외부 API · FCM 어댑터 전)
-  - [하] 3a 응답 저장 실패 경로 테스트 없음, 실패 시 requestId가 빠질 수 있음 → note
-  - [하] ErrorCode에 STATE_VERSION_CONFLICT 없음 → note(08)
-  - [하] prod CREATE TABLE 스크립트 없음 → note(prod 전)
-  - [하] 03 구조 표에 PollStateCaptureAdvice · PollStateStore · RequestLoggingConfig 없음, ValidationConfig 이름 → note
-  - [하] 연결 전 기기 토큰(familyId null VEHICLE) 권한 제한은 auth가 직접 → note(05)
-  - 다음 도메인 전 열린 질문: 04 전(/error 인증 · TimeUtils 경계 · BaseTimeEntity merge), 05 전(access 토큰 폐기 · 필수 클레임 · JWT 키 검사 · 공용 공간 보안 · 도메인 429 retryAfter · 스웨거 자물쇠 · 필터 단계 요청 로그), 06·07 전(좌표 반올림), 08 전(STATE_VERSION_CONFLICT · 스레드 풀 · SSE 503 · JVM 시간대)
-  - 완료 기준: C1 충족(57/57, 191 passed) / C2 충족(필터 단계 로그 문구는 [중] 결정 대기) / C3 사람 확인 필요(규칙 위반은 IdempotencyKeyEntity 6인자 생성자 하나) / C4 충족(확인 필요 37행 · 후속 과제 41건)
-- 이전 리뷰: 2026-11-07 14:44 KST (수정 필요)
+  - [중] 필터 단계에서 끝난 요청은 요청 로그 줄이 남지 않음(Idempotency 재응답 · 409 · 422 키 없음 · 예약 500 · Security 401). 지난 리뷰의 [중]이고 "05 시작 전 사람 결정"이었는데 05 · 08 · 09가 끝난 지금도 결정 기록이 없음 — IdempotencyKeyFilter.java:57-60 · 73-96(체인을 부르지 않고 끝남), RequestLoggingConfig.java:12(인터셉터는 DispatcherServlet 안에서만 돎), 02 「로그」 203행 "요청 하나에 INFO 한 줄", FOLLOWUP shared.md:183 (2) → 사람 결정
+  - [중] 5xx BusinessException이 서버 로그에 아무것도 남기지 않음. 이제 실제 사용처가 생김: SearchAcademyService.java:24-25가 예상 못 한 RuntimeException을 ScheduleErrors.java:13-17(502, initCause)로 바꾸는데, GlobalExceptionHandler.java:74-77이 로그 없이 응답만 써서 원인 스택이 사라짐. 03 102행 "예외 내용은 서버 로그에만"과 어긋남 → 항목 추가(5xx BusinessException은 원인과 함께 ERROR 로그)
+  - [중] 스케줄러 테스트 격리가 03 205행 결정과 다름. TestPostgisConfiguration.java:71-74는 idempotency cleanup만 P1D로 둠. AutoCompleteBoardingScheduler.java:38(PT10S)은 테스트에서도 돎(AutoCompleteBoardingSchedulerTest.java:119가 10초를 단언함). ResendUndeliveredScheduler.java:17은 fixedDelay=60_000L로 고정돼 설정으로 끌 수 없음. 둘 다 컨텍스트마다 기동 직후 공유 테스트 DB에서 실행되고, IdempotencyKeyCleanerTest.java:116-124처럼 고정 Clock(2026-01-15)을 쓰는 컨텍스트에서도 그 시계로 돎 …
+  - [중] @Scheduled 실행 스레드가 1개인데 작업은 4개(만료 키 삭제 · 10초 자동 완료 · 60초 재발송 · 30초 SSE ping). ResendUndeliveredService.java:83이 FCM을 같은 스레드에서 동기로 보내므로 자동 완료(AutoCompleteBoardingScheduler.java:38)와 ping(SessionStreamRegistry.java:86)이 늦어질 수 있음. application.yml에 spring.task.scheduling.pool.size 없음. 03 확인 필요 341행 "08 시작 때 정함"은 아직 미결 → 사람 결정
+  - [중] 03의 오류 형식 · ErrorCode · BusinessException 절이 코드와 다름. 코드에만 있는 것: tooManyRequests(ErrorCode,int)(BusinessException.java:47), invalidField(52), stateVersionConflict(64), withDetail · details(70-80), 오류 본문 추가 키 · 최상위 session(ErrorResponse.java:13 · 41-46), ErrorCode의 SESSION_ALREADY_FINISHED · CALL_ALREADY_REVOKED · RESEND_TOO_SOON(ErrorCode.java:21-22 · 25). RESEND_TOO_SOON은 notification만 써서 03 …
+  - [중] 도메인 429 응답 모양이 네 가지임: AuthErrors.java:26 · 41(retryAfterSeconds 없음), PickupErrors.java:88-90(retryAfterSeconds 없이 추가 키 nextAllowedAt), ResendNotificationService.java:61(ErrorCode + retryAfterSeconds), LinkStatusPollGuard.java:37(TOO_MANY_REQUESTS + retryAfterSeconds). 02 183행은 "429는 retryAfterSeconds에 다시 시도할 초"를 요구함. 03 340행 "auth 전에 정함"은 미결 → 사람 결정(도메인 429 팩토리 하나로)
+  - [중] 마감이 지난 열린 질문이 03에 그대로 남음: access 토큰 폐기(02 174행 "폐기면 401" vs 05 315행 "만료까지 유효"), 주체 종류별 필수 클레임(03 327행), JWT 키 길이 검사(03 328행), 인증 없는 공용 Idempotency 공간(03 · 05 321행), /error permitAll(03 323행) → 사람 결정
+  - [하] IdempotencyKeyEntity 6인자 생성자가 남음(IdempotencyKeyEntity.java:45-53, 테스트 9곳). 팀장 결정 "다음 shared 정리 때 삭제"가 아직 안 됨 → 리팩터링
+  - [하] 3a 응답 저장 실패 경로 테스트가 없음. release가 실패하면 원래 예외가 덮이고, 필터 밖으로 나간 예외 로그에는 requestId가 없음(IdempotencyKeyFilter.java:62-70) → note
+  - [하] 만료 삭제 경계 "정확히 24시간인 행은 남김"(03 169행) 테스트가 없음. 25시간 · 23시간만 확인함(IdempotencyKeyCleanerTest.java:25-27) → 항목 추가
+  - [하] withDetail 예약 키에 overlapScheduleIds가 없어 같은 키가 JSON에 두 번 나갈 수 있음(BusinessException.java:14 vs ErrorResponse.java:40) → 리팩터링
+  - [하] 03 구조 표 누락: common.text(NameRule · PlateNumberMasker) 패키지 전체, PollStateCaptureAdvice · PollStateStore · RequestLoggingConfig · RequestLogAttributes, ErrorCodeAttribute, IdempotencyKeyStore · IdempotencyKeyRequiredMatcher · RequestHasher, CurrentAuthPrincipal, JpaAuditingConfig. 02 11행 책임 목록도 같음 → note
+  - [하] common/text 테스트가 user · auth 소스 파일을 글자로 훑는 구조 검사임(NameRuleTest.java:110-126, PlateNumberMaskerTest.java:50-64). 02 80 · 214행 "아키텍처 규칙은 테스트로 하지 않는다"와 어긋나고, user · auth 파일 이름을 바꾸면 common 테스트가 깨짐 → 사람 결정(삭제 또는 해당 도메인으로 이동)
+  - [하] 테스트 코드 9개 파일에 Javadoc · 설명 주석이 있음(TestPostgisConfiguration.java:11-14, TestPostgis.java:6-14, EmbeddedPostgis.java:26-29, PostgisContainer.java:12-16, GeoOffsets.java:5-16 등). 02 78행 위반 → 리팩터링
+  - [하] toKst(null)을 호출 쪽에서 막는 코드가 3곳에 중복됨(KstTime.java:13, NotificationItemResponse.java:31-33, ReceiveVehicleEventService.java:66). Instant를 KST 날짜로 바꾸는 코드도 중복됨(CorrectOutcomeService.java:25 · 38) → 사람 결정(TimeUtils에 null 허용 변환 · KST 날짜 변환 추가)
+  - [하] JWT 키 만드는 코드가 3곳(JwtDecoderConfig.java:25, JwtTokenIssuer.java:40, AccessTokenFixture.java:100)이고 클레임 이름은 문자열로 중복됨(JwtTokenIssuer.java:68-76). auth가 더한 deviceId 클레임이 03 122행 클레임 표에 없고, CurrentDevice.java:10-17은 AuthPrincipal이 아니라 Jwt를 직접 읽음 → note(03 표 갱신) · 리팩터링
+  - [하] 배포가 JVM에 TZ=Asia/Seoul을 줌(Dockerfile:16, ops/k8s/dev/api.yaml:14). 03 343행의 대안 "배포 때 TZ=UTC"와 반대 방향이라 TimeZoneConfig 빈 순서에 기댐. #6 테스트가 KST로 뜬 뒤 UTC로 바뀌는 것은 확인함 → 사람 결정
+  - [하] 좌표 6자리 반올림 가정(03 316행)이 구현되지 않음. GeoPoints.java:16-18은 값을 그대로 쓰고 반올림 코드가 0건임 → 사람 결정
+  - [하] 실제로는 정해졌는데 03에 반영되지 않은 것: 스웨거 자물쇠(auth doc 5곳의 @SecurityRequirements), 도메인 ResponseStatusException 사용 0건, SSE 타임아웃 없음(SessionStreamRegistry.java:32 NO_TIMEOUT), SIG-02 eventId(08 420행) → note
+  - [하] 진행 기록이 서로 맞지 않음: FOLLOWUP shared.md:4-6은 "완료 기준 4/4 · C:/pickup 경로 · 191 passed"인데 TODO.md:12-20 · REVIEW.md:8은 "리뷰 없음 · 0/4". #8 문장은 "Testcontainers 컨테이너에서"인데 Windows에서는 내장 서버로 돎(TestPostgis.java:48). 증거 인용 #14 · #31이 지금 테스트 이름과 다름 → note
+  - 지난 리뷰(2026-11-07 15:37) 지적 확인
+  - [중] 필터 단계 요청 로그 — 남음(위 첫 [중])
+  - [하] 증거 인용 #14 · #31 — 남음(note)
+  - [하] FOLLOWUP 설계서 사본 — 남음(shared.md:96-135에 conflictWithOverlap 행 없음)
+  - [하] IdempotencyKeyEntity 6인자 — 남음
+  - [하] 5xx 로그 · null 방어 — 남음, 502 사용처가 생겨 [중]으로 올림
+  - [하] 3a 테스트 — 남음
+  - [하] ErrorCode STATE_VERSION_CONFLICT — 해소(ErrorCode.java:18)
+  - [하] prod CREATE TABLE 스크립트 — 남음(README.md:72는 안내만 있음)
+  - [하] 03 구조 표 PollState* — 남음(누락 범위가 더 커짐)
+  - [하] 연결 전 기기 권한 — 해소(PreLinkTokenInterceptor.java:21-27)
+  - 완료 기준
+  - C1 충족 — 57/57 체크, common 범위 GREEN 275 passed, 전체 GREEN 2261 passed
+  - C2 미충족 — 03이 BusinessException · ErrorCode · 오류 본문 추가 키 · common.text를 담지 않음, 스케줄러 테스트 격리가 03 205행과 다름, 좌표 반올림 가정 미구현, 필터 단계 요청 로그 미결
+  - C3 사람 확인 필요 — 규칙 어긋남 3건: IdempotencyKeyEntity 6인자(팀장 예외, 삭제 약속 미이행), 테스트 주석 9개 파일, common/text 소스 훑기 테스트
+  - C4 충족 — 03 확인 필요 표와 FOLLOWUP 후속 42건에 기록됨. 다만 "05 전 · 08 전" 마감 항목 다수가 미결
+  - 후속 과제
+  - toKst(null) 처리 — 설계 결정 필요(호출 쪽 3곳 중복)
+  - toKst 1초 미만 버림 — 설계 결정 필요
+  - BaseTimeEntity 보조 테스트 · merge 때 createdAt null — 남음
+  - Logback 로그 시각 +09:00 — 설계 결정 필요(배포 TZ=Asia/Seoul로 굳어짐)
+  - JVM 시간대 고정 방식 — 설계 결정 필요
+  - prod 시간대 · Clock 빈 위치 · toUtc Z 허용 — Clock 빈 해소(ClockConfig), 나머지 남음
+  - JWT 클레임 이름 05 반영 — 해소(05 318행, JwtTokenIssuerTest 계약 테스트). deviceId는 03 표에 없음
+  - Role enum 중복 — 해소(02 70행, Role은 common.security 하나)
+  - 키 길이 미검사 · 키 생성 중복 · 좌표 반올림 · Nimbus 60초 — 60초만 해소, 키 생성은 3곳으로 늘어 남음, 반올림 남음
+  - 이벤트 풀 임시값 · applicationTaskExecutor — 설계 결정 필요
+  - 422 파라미터 field 이름 — 해소(#35), 클래스 단위 · 중첩 표기는 남음
+  - 이벤트 풀 core=max · AbortPolicy · 본문 형식 오류 400 — 설계 결정 필요
+  - FieldError 이름 · AsyncConfig @Value · 405/415 형식 — 405/415 해소, 나머지 남음
+  - 테스트 DB 연결 수 — 해소(풀 3, max_connections 200)
+  - 키 없음 400 vs 422 · /error · Allow 헤더 — 422 해소, /error와 Allow는 남음
+  - access 토큰 폐기 — 설계 결정 필요
+  - BusinessException 4인자 · null 방어 · WWW-Authenticate · 500 로그 requestId — 4인자와 requestId 해소, 나머지 남음
+  - familyId null · 클레임 상수 위치 — familyId 해소, 상수 위치 남음
+  - #19 role 검사 방식 — 해소
+  - 소수 familyId · role 없는 USER — 설계 결정 필요
+  - 4xx code=HttpStatus 이름 · charset — RSE는 도메인 사용 0건으로 사실상 해소(03 갱신 필요), charset 남음
+  - #38 JSON 전용 — 해소
+  - doc 인터페이스 HV000151 — 해소(#41)
+  - NULLS NOT DISTINCT · SIG-02 eventId · 6인자 — 앞 둘 해소, 6인자 남음
+  - 인증 없는 키 null 저장 — 해소(#42)
+  - Idempotency 대상 · 해시 · 2xx만 저장 — 해소
+  - jsonb 재응답 · 쿼리 문자열 · 빈 조기 생성 — 빈 조기 생성 해소(#43), 나머지 남음
+  - 기동 실패 · 동시 요청 — 해소(#43 · #44)
+  - #44 구현 메모(duplicate-key 로그 · 처리 중 행 409) — 남음
+  - 3a 저장 실패 · 남은 처리 중 행 · charset — 설계 결정 필요
+  - 인증 없는 공용 공간 보안 — 설계 결정 필요
+  - prod sql.init · 유니크 두 개 · prod DDL — 앞 둘 해소, prod DDL 스크립트 남음
+  - 만료 삭제 경계 — 해소(경계 24시간 테스트는 없음)
+  - 스케줄러 테스트 격리 · 03 반영 — 03 반영 해소, 격리는 남음(위 [중])
+  - 요청 로그 형식 — 해소
+  - 인터셉터로 이동 — 해소(테스트 클래스 이름 RequestLoggingAspectTest는 남음)
+  - 예외 메시지 개인정보 규칙 — 해소(02 199행)
+  - SSE 로그 — 해소, 타임아웃 등의 종료 줄은 남음
+  - 폴링 로그 — 해소(VehicleLinkCodeController.java:45)
+  - springdoc 경로 — 해소(#33)
+  - 리뷰 후 사람 결정(path 패턴 · Role · PublicEndpoints · exp) — 해소. SSE 503 · 스케줄 스레드 1개는 남음
+  - 재리뷰 후 결정(6인자 · 필터 단계 로그 · 증거 인용) — 6인자 남음, 필터 단계 로그는 설계 결정 필요, 증거 인용 남음
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -126,7 +191,7 @@
 | 본문 형식 오류의 코드 | JSON 값 타입 · enum · 시각 형식 오류와 빠진 본문이 모두 400 INVALID_REQUEST(fields 없음). 유지할지 422로 바꿀지 정함. INVALID_REQUEST 문구 「요청 형식을 확인해 주세요」는 구현자가 정함 |
 | 도메인 코드의 ResponseStatusException | Spring 4xx 예외의 code는 HttpStatus 이름(CONFLICT 등)으로 나감. 도메인 코드에서 금지하고 BusinessException만 쓸지 정함. reason 없는 404 예외와 매핑 없는 경로의 문구가 다름 |
 | 422 fields 표기 범위 | 클래스 단위 제약 오류는 fields에 안 담김. 중첩 · 배열 필드 이름 형식(a.b, a[].b 또는 children[0].name), 한 필드 여러 위반, List 본문 인덱스, 이름이 다른 @PathVariable은 정하지 않음 |
-| BusinessException 생성자 | 해소: 공개 생성자 없음. 정적 팩토리 of(ErrorCode) · of(HttpStatus, String code, String message) · tooManyRequests(int retryAfterSeconds), ErrorCode에 TOO_MANY_REQUESTS 추가(팀장 결정). IdempotencyKeyEntity 6인자 생성자, status · code null 방어, 5xx BusinessException 로그는 다음 리뷰 때 다시 봄 |
+| BusinessException 생성자 | 해소: 공개 생성자 없음. 정적 팩토리 of(ErrorCode) · of(HttpStatus, String code, String message) · tooManyRequests(int retryAfterSeconds), ErrorCode에 TOO_MANY_REQUESTS 추가(팀장 결정). conflictWithOverlap(HttpStatus, String code, String message, List<Long> overlapScheduleIds) 추가(일정 SET-02 · 03의 overlapScheduleIds용, 06 결정). IdempotencyKeyEntity 6인자 생성자, status · code null 방어, 5xx BusinessException 로그는 다음 리뷰 때 다시 봄 |
 | 도메인 코드 429의 retryAfterSeconds | of(HttpStatus, code, message)에는 retryAfterSeconds가 없고 tooManyRequests는 code가 TOO_MANY_REQUESTS로 고정됨. 05의 429 LINK_CODE_REISSUE_LIMIT · LINK_CODE_ATTEMPT_LIMIT에 retryAfterSeconds를 채울지, 채운다면 어떤 팩토리로 할지 auth 전에 정함 |
 | 이벤트 스레드 풀 크기 · 포화 정책 | 소스에 없음. 임시값 core 2 · max 4 · queue 100(pickup.async.event.*). 큐가 찬 뒤에야 core를 넘어 늘어 실제 동시 실행은 2개(제안: core = max 4). 포화 때 기본 AbortPolicy라 AFTER_COMMIT 이벤트가 버려짐(재발송 스케줄러가 보완) → 유지 또는 CallerRunsPolicy. 직접 만든 Executor 빈 때문에 Boot의 applicationTaskExecutor가 빠져 MVC 비동기가 SimpleAsyncTaskExecutor를 쓸 수 있음(SES-08 때 확인). @Scheduled 실행 스레드는 기본 1개(08 시작 때 정함) |
 | SSE 종료 줄 · 다른 비동기 응답 로그 | emitter 타임아웃 · 연결 끊김 · completeWithError 때 stream=closed 줄의 status · errorCode, Callable · DeferredResult 응답의 로그는 정하지 않음. SSE 타임아웃(AsyncRequestTimeoutException, 503)이 지금 500 + ERROR 로그로 처리됨. pickup SES-08 때 정함 |

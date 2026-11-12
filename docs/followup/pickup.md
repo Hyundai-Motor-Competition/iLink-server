@@ -1,8 +1,8 @@
 # FOLLOWUP · 픽업 (pickup)
 
-- 생성: 2026-11-09 19:49 KST · tdd-guard
+- 생성: 2026-11-11 12:06 KST · tdd-guard
 - 상태: 완료 (체크 241/241 · 완료 기준 4/4)
-- 테스트: ● GREEN · 2046 passed · 전체 · 142s · .\gradlew.bat test --console=plain
+- 테스트: ● GREEN · 2261 passed · 전체 · 206s · .\gradlew.bat test --console=plain
 - 설계서: C:/ilink/docs/08_픽업-pickup.md
 
 ## 완료 항목
@@ -258,18 +258,88 @@
 - [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-09 19:49 KST · 도메인 리뷰어 · 결론 통과 · 상 0 · 중 0 · 하 5 · 리뷰 시점 체크 241/241
-- 리뷰 시점 테스트: ● GREEN · 2046 passed · 전체 · 142s · .\gradlew.bat test --console=plain
-  - 결론: 통과
-  - 세 번째 리뷰 [하] 중 스웨거 오류 응답 · #240 CANCELLED 테스트 · 주석 52줄 · restore 통일 · 2인자 openIncident · 엔티티 생성자 · 02 L55 · L60 해소. 바뀐 부분이 동작을 바꾸지 않음(restore 인자 순서 왕복 테스트, #238 childOf 먼저, #241 21종, 자동 완료 세션별 트랜잭션).
-  - [하] 체크 증거 이름 어긋남(#158~#162 → SessionStreamControllerTest, #241 SessionEventTest 새 DisplayName) → note
-  - [하] #207로 user · auth · place 어댑터에 한 줄 주석 3줄 추가됨(02 L78) → 후속 과제
-  - [하] 02 L72 네이티브 쿼리 예외 목록에 ProcessedVehicleEvent 없음 → note
-  - [하] 04 · 05 · 07 설계서 「임시 어댑터」 설명 남음 → note
-  - [하] SseEmitterProbe가 스프링 패키지 경로 → note
-  - 완료 기준: C1 충족(241/241, GREEN 2046) · C2 충족 · C3 충족(남은 [하]는 후속 과제) · C4 충족
-  - 테스트: scope all GREEN 2046 passed
-- 이전 리뷰: 2026-11-09 19:14 KST (조건부 통과), 2026-11-09 18:58 KST (조건부 통과), 2026-11-09 18:16 KST (수정 필요)
+- 2026-11-11 12:06 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 5 · 하 10 · 리뷰 시점 체크 241/241
+- 리뷰 시점 테스트: ● GREEN · 2261 passed · 전체 · 206s · .\gradlew.bat test --console=plain
+  - 결론: 조건부 통과
+  - [중] 실시간 SSE payload에 notificationIds가 섞여 저장된 이벤트와 다름 — SessionEventMessages.java:21-26이 payload에 notificationIds를 넣고, SessionStreamRegistry.java:47-48 · 105-107이 그 payload를 그대로 차량에 보냄. 대상은 SESSION_STARTED · DEPARTURE_NOTICE_SENT · CALL_TRIGGERED · PREP_TIME_EXTENDED · HELP_REQUESTED 5종. SES-09 · Last-Event-ID 재전송(DB payload)과 내용이 다르고, 08 「SSE 이벤트 한 건」 형식에 없는 키임(notification FOLLOWUP L134도 같은 지적) …
+  - [중] CALL-04가 markCallSent보다 먼저 오면 MEETING 자녀가 CALLED로 되돌아감 — AcknowledgeCallService.java:51-58은 ACCEPTED 호출도 확인을 받음. 자녀는 SES-03 call.callId로 ACCEPTED 호출을 볼 수 있음(SessionViewAssembler.java:112). markCallSent는 REVOKED와 sentAt만 확인하고(CallProgressService.java:47-51), markChildrenCalled는 모든 자녀를 무조건 CALLED로 바꿈(PickupSession.java:215-218, SessionChild.java:70-72). notification 병합 뒤에는 첫 FCM이 모두 실패하면 markCa…
+  - [중] @Scheduled 작업 4개가 스레드 1개를 나눠 씀 — application.yml에 spring.task.scheduling.pool.size가 없어 기본값 1(SchedulingConfig.java:7). 자동 완료(PT10S), SSE ping(PT30S), 알림 재발송(60초, FCM을 동기로 반복 호출 ResendUndeliveredService.java:44-54), IdempotencyKeyCleaner가 한 스레드에서 돌아, 재발송이 느리면 08 L345 「10초 자동 완료」와 30초 ping이 밀림 → 항목 추가(shared: 스케줄러 풀 크기)
+  - [중] SET-06 「다음 세션부터 적용」(04 L102)과 pickup 동작이 다름 — 판정 때마다 Family.joinCallMode를 새로 읽음(CallEngine.java:64, SendCallService.java:41, 세션 뷰 SessionViewAssembler.java:112). 08 L681 가정대로 구현된 것이라 pickup 코드 결함이 아니라 두 설계서가 서로 맞지 않는 문제임 → 사람 결정(세션에 mode 스냅샷 칸을 두거나 04 · Swagger 문장을 고치기)
+  - [중] SIG-04 403 LOCATION_CONSENT_REQUIRED가 운영에서 나지 않음 — PickupChildReadinessAdapter.java:26-29가 늘 true를 돌려줌. #119(서비스 mock)와 #182(web mock)는 GREEN이지만 실제 연결 경로는 거절하지 못함. 세션 뷰 children[].location도 동의를 확인하지 않음. 원인은 auth에 위치 동의 저장소가 없는 것(08 L726) → 사람 결정(auth에 동의 저장 · 조회 in 포트 추가)
+  - [하] 08 이벤트 표 「받는 쪽」과 실제 FCM 발송이 다름 — CALL_TRIGGERED와 DEPARTURE_NOTICE_SENT는 받는 쪽이 보호자인데, notification은 알림 행이 있는 이벤트를 행의 기기(자녀)에만 보냄. 그래서 보호자에게는 FCM이 가지 않음(DispatchSessionEventService.java:53-57, CallEngine.java:77-82, ConfirmRouteService.java:67-71, 09 L65-66) → 사람 결정(08 표나 09 규칙 중 하나를 고침)
+  - [하] 08에 반영 안 된 변경 — 시그니처에 ResendGuardUseCase · FindSessionFamilyUseCase가 없음. L10 「의존」과 #204 항목(L634)이 아직 「임시 빈 목록」인데, 실제로는 PickupNotificationAdapter.java:19가 notification에 위임함. 이미 SENT · DELIVERED인 Call에 다시 온 markCallSent · markCallDelivered를 무시하는 결정(Call.java:45 · 56)도 문서에 없음 → note
+  - [하] 08 테이블 FK 표기와 실제가 다름 — L37-39 · 62 · 69-71 · 86 · 98-99 · 113 · 121 · 128에는 「FK」라고 적혀 있지만 엔티티와 schema.sql에는 FK가 없음. FK를 두지 않는 것이 프로젝트 관례(06 L50, 07 L40)임. ProcessedVehicleEvent 테이블도 테이블 절에 없고 L741에만 있음 → note(문서 갱신)
+  - [하] 지난 리뷰 지적 중 남은 것 — #158~#162 증거가 PickupStreamControllerTest인데 그런 파일이 없고 실제 이름은 SessionStreamControllerTest임. 한 줄 주석 3줄(user PickupActivityAdapter.java:8, auth AuthPickupActivityAdapter.java:8, place PlacePickupActivityAdapter.java:11, 02 L78). 02 L72 네이티브 쿼리 예외 목록에 ProcessedVehicleEvent가 없음. 「임시 어댑터」 문장이 남음(04 L8 · L202 · L227, 05 L19 · L266, 07 L8 · L19 · L153) → note
+  - [하] pickup 공개 타입이 user.domain.JoinCallMode를 직접 씀 — port.in SessionCallView.java:3, web SessionViewResponse.java:19, CallEngine.java:20, SendCallService.java:14. 08 L427은 auth.domain.MemberDeviceStatus 한 가지만 예외로 적었고, schedule.domain.ScheduleStatus(StartPickupService.java:29)도 같은 경우임 → 사람 결정(02 L70 허용 목록에 적거나 pickup 자체 타입으로 바꾸기)
+  - [하] 테스트가 없는 곳 — ResendGuardService에서 세션 · 호출이 없을 때 true를 돌려주는 경우(ResendGuardService.java:26 · 32). 자동 완료에서 한 세션이 실패해도 다음 세션을 처리하는 경우(AutoCompleteBoardingService.java:41-47, 08 L345). PickupProperties의 yml 바인딩은 auto-complete-interval만 확인함 → 항목 추가
+  - [하] @Scheduled 작업이 통합 테스트 중에도 실제 시계로 돎(IntegrationTestSupport에 끄는 설정 없음) — 지금 테스트는 자녀가 타지 않은 세션이나 미래 창으로 피해 GREEN. 깨진 실행은 미확인 → note(shared)
+  - [하] HELP_REQUEST_TOO_SOON 429에 retryAfterSeconds가 비어 있음(PickupErrors.java:87-91) — notification RESEND_TOO_SOON은 BusinessException.tooManyRequests로 채움(02 L183). CorrectOutcomeService.java:25가 Asia/Seoul 상수를 따로 둠(TimeUtils.java:12는 private, 02 L79) → note
+  - [하] 세션이 끝나도 SSE 연결이 닫히지 않음 — SessionStreamRegistry.complete(L78)를 부르는 곳이 없고 NO_TIMEOUT(L25)임 → note(FOLLOWUP에 남음)
+  - [하] 푸시 토큰이 없는 자녀만 있으면 CALL 알림 행이 0건(RecordNotificationService.java:28-29)이라 markCallSent가 불리지 않음 → Call이 ACCEPTED에 머물러 DOOR_CYCLE 탑승 인식이 안 됨(ReceiveVehicleEventService.java:86-88) → 사람 결정
+  - 지난 리뷰 [하] 5건: #241 증거 해소 · SseEmitterProbe 유지(결정대로) · #158~#162 증거, 주석 3줄, 02 L72, 04 · 05 · 07 임시 문장은 남음
+  - notification · CI 영향: 0c0108d..HEAD 사이 pickup 변경 17파일 확인. ErrorCode 이동(SESSION_ALREADY_FINISHED · CALL_ALREADY_REVOKED)은 문구가 같고 PickupErrorsTest가 GREEN. FcmPushAdapter는 자격 증명이 없으면 false를 돌려줘 문맥이 깨지지 않음. build.gradle의 embedded-postgres 이동은 Windows에서 GREEN이고, Linux 실행은 미확인
+  - 완료 기준: C1 충족 — 체크 241/241, GREEN 2261. 단 #204 문장이 지금 코드(실제 위임)와 다름 / C2 사람 확인 필요 — [중] SSE payload가 SES-08 형식과 다름, SIG-04 403이 실제로 안 남, SET-06과 08 L681이 서로 맞지 않음 / C3 충족 — pickup 패키지 안의 공통 규칙 위반은 [하] SEOUL 상수 중복뿐이고 주석 3줄은 user · auth · place 파일 / C4 충족 — 확인 필요 표는 반영됨. 새 결정 3건(notificationIds, 재수신 무시, 새 in 포트)은 08에 없음(note)
+  - 후속 과제:
+  - [팀장 결정 · 설정 키] — 해소됨(application.yml L38-46)
+  - [service lane #94] — 4인자 생성자: 해소됨(생성자 하나) / 실패 건너뛰기 · yml 바인딩 테스트: 남음
+  - [리뷰 거리] — (1) 유지 결정 (2) 남음(#158~#162) (3) 남음 (4) 08 L734 가정대로
+  - [사람 결정 · 도메인 리뷰 뒤] — 해소됨(08 L690 · L703 · L720 · L721, 21종)
+  - [#227 후속] — 설계서 L194 반영: 해소됨 / CallEntity @Version: 남음
+  - [사람 결정 · 재리뷰 뒤] — (1)(2) 해소됨 / [재리뷰 하] 남은 것: SSE 연결 안 닫힘, restore 27인자 등 테스트 전용 main 코드, 자동 완료 실패 테스트, SIG-01 · SIG-04 범위 검증, CALL-04 먼저 → MEETING→CALLED(이번 [중])
+  - [세 번째 리뷰 하] — (2)만 남음, 나머지 해소됨
+  - [마지막 리뷰 하] — (1) #241 해소 · #158~#162 남음 (2)(3)(4) 남음 (5) 유지 / 임시 동작 중 notification 빈 목록은 해소됨, auth 위치 동의는 남음
+  - [pickup 기반 중간 정리] — (1) 2인자 extendPrep 제거로 해소됨 · 다른 한도 값 테스트는 남음 (2)(4) 해소됨 (3) 해소됨(isOlderThanLatest)
+  - [pickup 기반 리뷰 때 정리] restore — 해소됨
+  - [절차] gen_ports — 해소됨(전체 GREEN)
+  - [#205 후속] — (1)(3) 남음 (2) 사람 확인 필요
+  - [#204 임시 동작] — notification 해소됨 / auth 위치 동의 남음(이번 [중])
+  - [#206 문구 확인] — 사람 확인 필요
+  - [#38~#41 후속] — (1)(3) 해소됨 (2) 설계 결정 필요
+  - [#42~#44 후속] — 끝난 세션: 해소됨 / incidentCause 채우는 시점: 설계 결정 필요
+  - [#50 시드] — 남음(정보)
+  - [#214 후속] — 철회 때 acknowledgedAt: 해소됨(L712) / markChildrenCalled가 MEETING도 바꿈: 남음(이번 [중]) / 철회 때 extraPrep 비울지: 설계 결정 필요
+  - [문서 TODO 표시] — 해소됨(TODO L7 전 도메인 완료)
+  - [service lane #65~#68] — 해소됨(#229, StartPickupService.java:100-119)
+  - [service lane #70] missing SCHEDULE — 사람 확인 필요
+  - [SessionViewAssembler] — (1)(2)(3) 해소됨 (4) 남음 (5) 정보
+  - [persistence PickupSessionPersistenceAdapter] — 남음(정보 3건)
+  - [이벤트 받는 사람] — 해소됨(L720) / SESSION_STARTED payload · 시작 stateVersion: 설계 결정 필요
+  - [persistence 설계 확인] — 남음(3건)
+  - [자녀에게 장소 숨김] — 설계 결정 필요(L708 사람 확인 전)
+  - [persistence lane] — (1) 남음 (2)(3) 남음 (4) 해소됨
+  - [출발 알림] etaAt 위치 — 설계 결정 필요
+  - [service lane SessionAccess] — 해소됨
+  - [loadFirst 기준] — 남음(정보)
+  - [service lane 순서] — 해소됨
+  - [SessionEventPersistenceAdapter] — (1)(2) 남음 (3) FK 없음이 관례라 08 표기 수정 필요(이번 [하])
+  - [SES-05 · SES-06 설계 확인] — 해소됨(L688 · L689 · L690)
+  - [ReceiveTelemetryService] — (1) 해소됨 (2)(5) 설계 결정 필요 (3) 해소됨(L106 created_at)
+  - [ChangeSpot · Cancel] — (2)(4) 해소됨 (1)(3)(5) 남음
+  - [ReceiveTelemetry 설계서와 다름] — 해소됨(ReceiveTelemetryService.java:43-45)
+  - [persistence 마지막 묶음] — (1) 해소됨 (2)(3) 남음
+  - [ReceiveVehicleEventService] — (1) L706 가정대로 (2) 해소됨 (3) 남음
+  - [CALL 결과] — (1) 이미 SENT · DELIVERED 재수신: 해소됨(cedfd4b), 없는 callId: 남음 (3) 해소됨
+  - [CALL-02] — (1) API 표 순서 문서: 남음 (2) 설계 결정 필요 (3) 해소됨(CallEngine)
+  - [service lane 정리 거리] — 해소됨(SessionReceivers)
+  - [lane 병합 계획] — 해소됨 / SES-03 예시에 callNotBefore · location 빠짐: 남음
+  - [CallEngine] — 해소됨
+  - [준비 시간 · 도움 요청] — (1)(3)(5) 해소됨 (2) 남음(이번 [하]) (4) 남음
+  - [SES-07 탑승 완료] — (1) 설계 결정 필요 (3)(4) 해소됨
+  - [CALL-04 응답] — 설계 결정 필요
+  - [web 검증 SES-11] — 해소됨(CompletePickupRequest.java:11)
+  - [세션 뷰 incident] — 해소됨(#234) / OUT-02 correction 모양: 남음
+  - [web 검증 거리] — 해소됨(#225 · #237)
+  - [web 검증 · service 확인] — (1) 해소됨(OpenIncidentRequest.java:9) (2) 해소됨(#238) (3)(4) 남음
+  - [자동 완료 · 연락처 · 데이터 설정] — (1)(3) 해소됨 (2)(4) 남음
+  - [web 테스트 손볼 곳] #188 — 해소됨(PickupCallControllerTest.java:155 ACCEPTED)
+  - [OUT-04 파기 대기] — 남음(후속) / 자동 완료 트랜잭션: 해소됨
+  - [common TimeUtils] — SEOUL 중복 남음 / reasonCode 검증: 해소됨(CorrectOutcomeRequest.java:15)
+  - [web lane 남은 일] — 해소됨
+  - [service lane 리뷰 남은 것] — (1)(2)(3)(4) 해소됨 (5) 남음
+  - [#94 · #220] — 해소됨(#227 통합 테스트)
+  - [#222~#224] — (1)(3) 해소됨(사람 결정) (2)(4)(5) 남음
+  - 테스트: mcp__tdd-guard__tests scope "all" → 마지막 전체 실행 뒤 소스 변경이 없어 그 결과를 다시 씀: GREEN 2261 passed · 206s · .\gradlew.bat test --console=plain. 변경 확인은 git diff 0c0108d..HEAD(pickup 17파일, common · build.gradle · application-dev/prod.yml · ops/k8s)
+- 이전 리뷰: 2026-11-09 19:49 KST (통과), 2026-11-09 19:14 KST (조건부 통과), 2026-11-09 18:58 KST (조건부 통과), 2026-11-09 18:16 KST (수정 필요)
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |

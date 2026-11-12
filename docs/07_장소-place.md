@@ -12,13 +12,19 @@
 
 ```text
 place
-├─ adapter/in/web          PickupSpotController(SPOT-01~03), PickupSpotApiDoc
+├─ adapter/in/web          PickupSpotController(SPOT-01~03), PickupSpotApiDoc,
+│                          PickupSpotRecommendationController(SPOT-04), PickupSpotRecommendationApiDoc, LatLngParam("lat,lng" 파싱)
 ├─ adapter/out/persistence PickupSpotEntity, PlacePersistenceAdapter(LoadSpotPort · SaveSpotPort),
-│                          PostgisDistanceAdapter(DistancePort, ST_DWithin), PickupSpotJpaRepository(반경 네이티브 쿼리 2개)
+│                          PostgisDistanceAdapter(DistancePort, ST_DWithin), PickupSpotJpaRepository(반경 네이티브 쿼리 2개),
+│                          PublicParkingEntity · CurbStopCandidateEntity(추천 참조 데이터), PublicParkingJpaRepository · CurbStopCandidateJpaRepository(반경 네이티브 쿼리),
+│                          SpotCandidatePersistenceAdapter(LoadSpotCandidatePort), GangnamServiceAreaAdapter(ServiceAreaPort, classpath 경계 파일),
+│                          GangnamReferenceDataLoader(서버가 뜰 때 CSV 적재, JdbcTemplate 묶음 INSERT)
+├─ adapter/out/map         KakaoMobilityDriveTimeAdapter(DriveTimePort, 카카오모빌리티 길찾기)
 ├─ adapter/out/schedule    PlaceAcademyAdapter(LoadAcademyPort → schedule in 포트 LoadAcademyUseCase.findAcademy, academyId · name · location)
 ├─ adapter/out/pickup      PlacePickupActivityAdapter(CheckActivePickupPort, pickup 구현 전 임시: isUsedByActiveSession false, loadActiveChildLocation 빈 값)
 ├─ application/port/in · out · service
-└─ domain                  PickupSpot, 기본 장소 규칙
+└─ domain                  PickupSpot, 기본 장소 규칙,
+                           추천 규칙(StraightDistance · WalkTimeRule · SpotCandidateMerger · SpotRankingRule · SpotCautionRule · ServiceArea)
 ```
 
 ## 테이블
@@ -61,7 +67,7 @@ uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스�
 | lineKind | VARCHAR(20) | | DOTTED_YELLOW(주차금지 선 · 5분 이내 정차만) · NONE(선 표시 없음) |
 | nearEnforcementCctv | BOOLEAN | | 단속 카메라 100m 안 |
 
-두 테이블의 원본은 iLink_Project_Package/data/gangnam의 parking_public.csv(60행) · curb_stop_candidates.csv(3,147행)이다. 길가 후보는 주정차금지 선 · 횡단보도 · 교차점 · 소화전 · 버스정류소 · 버스전용차로 · 정차금지지대 근처와 어린이보호구역 대상 시설 300m 안을 미리 뺀 목록이다. 서버가 뜰 때 테이블이 비어 있으면 classpath reference/gangnam/의 같은 CSV에서 읽어 넣는다. CSV는 UTF-8이고 맨 앞에 BOM이 있다. 읽는 컬럼은 parking_public.csv의 parking_id · name · latitude · longitude · spaces · base_minutes · base_fee_won, curb_stop_candidates.csv의 candidate_id · latitude · longitude · road_name · line_kind · near_enforcement_cctv(Y 또는 빈 값)이고 나머지 컬럼은 무시한다. 강남구 경계는 classpath reference/gangnam/boundary_gangnam.geojson(Polygon 1개, 좌표 순서 [경도, 위도])이다. 세 파일은 src/main/resources/reference/gangnam/에 둔다.
+두 테이블의 데이터는 src/main/resources/reference/gangnam/의 parking_public.csv(60행) · curb_stop_candidates.csv(3,147행)이다. 공개 데이터(공공데이터포털 전국주차장정보표준데이터의 강남구 파일, 서울 열린데이터광장의 차선 · 횡단보도 · 버스정류소 · 소방용수시설 · 버스전용차로 데이터, OpenStreetMap 도로)를 2026-11-12에 받아 가공한 것이다. 길가 후보는 주정차금지 선 · 횡단보도 · 교차점 · 소화전 · 버스정류소 · 버스전용차로 · 정차금지지대 근처와 어린이보호구역 대상 시설 300m 안을 미리 뺀 목록이다. 서버가 뜰 때 테이블이 비어 있으면 classpath reference/gangnam/의 같은 CSV에서 읽어 넣는다. CSV는 UTF-8이고 맨 앞에 BOM이 있다. 읽는 컬럼은 parking_public.csv의 parking_id · name · latitude · longitude · spaces · base_minutes · base_fee_won, curb_stop_candidates.csv의 candidate_id · latitude · longitude · road_name · line_kind · near_enforcement_cctv(Y 또는 빈 값)이고 나머지 컬럼은 무시한다. 강남구 경계는 classpath reference/gangnam/boundary_gangnam.geojson(Polygon 1개, 좌표 순서 [경도, 위도])이다. 세 파일은 src/main/resources/reference/gangnam/에 둔다.
 
 ## API 명세
 
@@ -71,7 +77,7 @@ uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스�
 | SPOT-02 | POST /v1/families/me/pickup-spots | GUARDIAN · CO_GUARDIAN | 필요 | academyId, name(1~50자), stopPoint{lat, lng}, meetingPoint{lat, lng}, memo(0~200자, 선택), isDefault(기본 false) → 201 spotId, isDefault | 404 NOT_FOUND(학원 없음), 409 DEFAULT_SPOT_CONFLICT(동시 요청으로 기본 장소가 겹침), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR |
 | SPOT-03 | PATCH /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 불필요 | name, stopPoint, meetingPoint, memo, isDefault(모두 선택) → 200 spotId · name · stopPoint · meetingPoint · memo · isDefault | 404 NOT_FOUND(다른 가족 · 없는 spotId, 좌표를 바꿀 때 학원 없음), 409 DEFAULT_SPOT_CONFLICT(동시 요청으로 기본 장소가 겹침), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR, 422 DEFAULT_SPOT_REQUIRED(기본 장소를 isDefault false로) |
 | SPOT-03 | DELETE /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 필요 | — → 204 | 404 NOT_FOUND, 409 SPOT_IN_USE, 422 DEFAULT_SPOT_REQUIRED |
-| SPOT-04 | GET /v1/pickup-spot-recommendations | GUARDIAN · CO_GUARDIAN · DELEGATE, 차량 앱 | 불필요 | query academyId(저장된 학원, 필수), origin(차량 현재 좌표 "lat,lng", 필수), arriveAt(선택, ISO 시각) → 200 supported, items[](rank · kind(PUBLIC_PARKING · CURB_STOP) · name · location{lat, lng} · walkMeters · walkSeconds · driveSeconds · totalSeconds · cautions[]) 최대 3개 | 404 NOT_FOUND(학원 없음), 422 VALIDATION_FAILED(academyId · origin이 없거나 origin 형식 오류, arriveAt이 과거) |
+| SPOT-04 | GET /v1/pickup-spot-recommendations | GUARDIAN · CO_GUARDIAN · DELEGATE, 차량 앱 | 불필요 | query academyId(저장된 학원, 필수), origin(차량 현재 좌표 "lat,lng", 필수), arriveAt(선택, ISO 시각) → 200 supported, items[](rank · kind(PUBLIC_PARKING · CURB_STOP) · name · location{lat, lng} · walkMeters · walkSeconds · driveSeconds · totalSeconds · cautions[]) 최대 3개 | 404 NOT_FOUND(학원 없음), 422 VALIDATION_FAILED(academyId · origin이 없거나 형식 오류, arriveAt이 ISO 형식이 아니거나 과거) |
 
 응답 예시
 - SPOT-01: `{"academies":[{"academyId":55,"academyName":"해솔영어학원","spots":[{"spotId":21,"name":"정문 앞","stopPoint":{"lat":37.501234,"lng":127.039876},"meetingPoint":{"lat":37.501301,"lng":127.039901},"memo":"편의점 앞","isDefault":true,"walkMinutes":null}]}]}`
@@ -113,11 +119,14 @@ uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스�
   - CURB_STOP: CurbStopCandidate 반경 450m. 도로 이름마다 학원에 가장 가까운 1곳, 최대 4곳. name은 roadName.
 - walkMeters = 학원 좌표와 후보의 직선거리 × 1.3(반올림). walkSeconds = walkMeters ÷ 1.1(올림).
 - 합친 후보를 walkMeters가 작은 순 8곳으로 줄인 뒤 차량 시간을 구한다.
-- driveSeconds: arriveAt이 없으면 카카오모빌리티 자동차 길찾기(GET /v1/directions, origin · destination은 "경도,위도", summary=true)를 후보마다 1회. arriveAt이 있으면 미래 운행 정보 길찾기(GET /v1/future/directions, 같은 파라미터 + departure_time = arriveAt, yyyyMMddHHmm, Asia/Seoul)를 후보마다 1회. 응답의 routes[0].result_code가 0이면 routes[0].summary.duration(초)을 쓴다. 한 곳이라도 호출이 실패하거나 result_code가 0이 아니면 빈 목록으로 본다. 헤더는 Authorization: KakaoAK {키}.
+- driveSeconds: arriveAt이 없으면 카카오모빌리티 자동차 길찾기(GET /v1/directions, origin · destination은 "경도,위도", summary=true)를 후보마다 1회. arriveAt이 있으면 미래 운행 정보 길찾기(GET /v1/future/directions, origin · destination + departure_time = arriveAt, yyyyMMddHHmm, Asia/Seoul. summary는 붙이지 않는다. 2026-11-12 실제 호출에서 summary 없이 routes[0].summary.duration이 오는 것을 확인)를 후보마다 1회. 응답의 routes[0].result_code가 0이면 routes[0].summary.duration(초)을 쓴다. 한 곳이라도 호출이 실패하거나 result_code가 0이 아니면 빈 목록으로 본다. 헤더는 Authorization: KakaoAK {키}.
 - 다중 목적지 길찾기는 쓰지 않는다. 출발지 반경 10km가 한도라 차가 멀리 있으면 result_code 304가 온다(2026-11-12 실제 호출로 확인).
 - totalSeconds = walkSeconds + driveSeconds. totalSeconds 오름차순, 같으면 walkMeters가 작은 쪽이 앞. 앞에서 3곳에 rank 1~3을 붙인다.
 - cautions: CURB_STOP은 LINE_DATA_2021, lineKind가 DOTTED_YELLOW면 STOP_5MIN_ONLY, nearEnforcementCctv면 ENFORCEMENT_CAMERA_NEAR. PUBLIC_PARKING은 빈 배열.
 - 외부 API가 실패해도 오류를 내지 않는다. 카카오모빌리티가 실패하면 driveSeconds · totalSeconds를 null로 두고 walkMeters가 작은 순 3곳을 돌려준다.
+- 추천 서비스는 DB 트랜잭션을 열지 않는다. 외부 길찾기를 최대 8번 부르는 동안 DB 연결을 잡고 있지 않기 위해서다. 학원 · 후보 조회는 각자 짧은 조회로 끝낸다.
+- 직선거리 계산은 place.domain 안에 두고 JTS를 쓰는 common.geo.GeoPoints에 기대지 않는다.
+- 참조 데이터 적재는 테이블마다 한 트랜잭션으로 한다. 중간에 실패하면 그 테이블에 일부 행을 남기지 않는다.
 - 카카오모빌리티 주소는 pickup.map.kakao-mobility.base-url(https://apis-navi.kakaomobility.com), 키는 pickup.map.kakao.api-key를 같이 쓴다.
 
 ### 다른 모듈용 조회
@@ -220,29 +229,35 @@ List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<In
 - [x] [기반] 지원 지역 규칙은 강남구 경계 도형 안의 좌표에 true, 밖의 좌표에 false를 돌려준다
 - [x] [기반] 핵심 로직 「시그니처」의 SPOT-04 in 포트 · out 포트 인터페이스와 Query · Result record가 있다
 - [x] [기반] PublicParkingEntity · CurbStopCandidateEntity가 테이블 정의대로 매핑되고 location은 geography(Point,4326)이다
-- [ ] [persistence] 서버가 뜰 때 PublicParking · CurbStopCandidate가 비어 있으면 classpath CSV에서 60행 · 3,147행을 읽어 넣고 이미 행이 있으면 다시 넣지 않는다
-- [ ] [persistence] loadPublicParkingWithin은 중심에서 radiusM 안의 공영주차장만 돌려준다
-- [ ] [persistence] loadCurbStopsWithin은 중심에서 radiusM 안의 길가 후보만 돌려준다
-- [ ] [persistence] public_parking · curb_stop_candidate의 location 컬럼에 GIST 인덱스가 있다
-- [ ] [서비스] 차량 시간 어댑터는 자동차 길찾기를 목적지마다 불러 routes[0].summary.duration을 목적지 순서대로 돌려준다
-- [ ] [서비스] 차량 시간 어댑터는 departAt이 있으면 미래 운행 정보 길찾기를 목적지마다 departure_time(yyyyMMddHHmm, Asia/Seoul)으로 부른다
-- [ ] [서비스] 차량 시간 어댑터는 외부 API가 실패하거나 result_code가 0이 아니면 빈 목록을 돌려준다
-- [ ] [서비스] 장소 추천은 학원 좌표가 강남구 밖이면 supported false와 빈 items를 돌려주고 외부 API를 부르지 않는다
-- [ ] [서비스] 장소 추천은 공영주차장 · 길가 후보를 합쳐 totalSeconds가 작은 3곳을 rank 1~3으로 돌려준다
-- [ ] [서비스] 장소 추천은 arriveAt이 없으면 driveSecondsNow를, 있으면 driveSecondsAt을 부른다
-- [ ] [서비스] 장소 추천은 차량 시간이 빈 목록이면 driveSeconds · totalSeconds를 null로 두고 walkMeters가 작은 순으로 돌려준다
-- [ ] [web] GET /v1/pickup-spot-recommendations는 200과 supported · items[](rank · kind · name · location · walkMeters · walkSeconds · driveSeconds · totalSeconds · cautions)를 돌려준다
-- [ ] [web] GET /v1/pickup-spot-recommendations는 차량 토큰으로도 200을 돌려준다
-- [ ] [web] GET /v1/pickup-spot-recommendations에 academyId나 origin이 없거나 origin이 lat,lng 형식이 아니면 422 VALIDATION_FAILED와 fields를 돌려준다
-- [ ] [web] GET /v1/pickup-spot-recommendations에 과거 arriveAt을 보내면 422 VALIDATION_FAILED를 돌려준다
-- [ ] [web] GET /v1/pickup-spot-recommendations를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
-- [ ] [web] Idempotency-Key는 GET /v1/pickup-spot-recommendations에 요구되지 않는다
-- [ ] [서비스] 장소 추천은 academyId의 학원을 LoadAcademyPort로 읽어 그 location을 학원 좌표로 쓰고 학원이 없으면 NOT_FOUND로 거절한다
-- [ ] [web] GET /v1/pickup-spot-recommendations에 없는 academyId를 보내면 404 NOT_FOUND를 돌려준다
-- [ ] [서비스] 장소 추천은 후보가 3곳보다 적으면 있는 만큼만 돌려주고 0곳이면 supported true와 빈 items를 돌려준다
+- [x] [persistence] 서버가 뜰 때 PublicParking · CurbStopCandidate가 비어 있으면 classpath CSV에서 60행 · 3,147행을 읽어 넣고 이미 행이 있으면 다시 넣지 않는다
+- [x] [persistence] loadPublicParkingWithin은 중심에서 radiusM 안의 공영주차장만 돌려준다
+- [x] [persistence] loadCurbStopsWithin은 중심에서 radiusM 안의 길가 후보만 돌려준다
+- [x] [persistence] public_parking · curb_stop_candidate의 location 컬럼에 GIST 인덱스가 있다
+- [x] [서비스] 차량 시간 어댑터는 자동차 길찾기를 목적지마다 불러 routes[0].summary.duration을 목적지 순서대로 돌려준다
+- [x] [서비스] 차량 시간 어댑터는 departAt이 있으면 미래 운행 정보 길찾기를 목적지마다 departure_time(yyyyMMddHHmm, Asia/Seoul)으로 부른다
+- [x] [서비스] 차량 시간 어댑터는 외부 API가 실패하거나 result_code가 0이 아니면 빈 목록을 돌려준다
+- [x] [서비스] 장소 추천은 학원 좌표가 강남구 밖이면 supported false와 빈 items를 돌려주고 외부 API를 부르지 않는다
+- [x] [서비스] 장소 추천은 공영주차장 · 길가 후보를 합쳐 totalSeconds가 작은 3곳을 rank 1~3으로 돌려준다
+- [x] [서비스] 장소 추천은 arriveAt이 없으면 driveSecondsNow를, 있으면 driveSecondsAt을 부른다
+- [x] [서비스] 장소 추천은 차량 시간이 빈 목록이면 driveSeconds · totalSeconds를 null로 두고 walkMeters가 작은 순으로 돌려준다
+- [x] [web] GET /v1/pickup-spot-recommendations는 200과 supported · items[](rank · kind · name · location · walkMeters · walkSeconds · driveSeconds · totalSeconds · cautions)를 돌려준다
+- [x] [web] GET /v1/pickup-spot-recommendations는 차량 토큰으로도 200을 돌려준다
+- [x] [web] GET /v1/pickup-spot-recommendations에 academyId나 origin이 없거나 origin이 lat,lng 형식이 아니면 422 VALIDATION_FAILED와 fields를 돌려준다
+- [x] [web] GET /v1/pickup-spot-recommendations에 과거 arriveAt을 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] [web] GET /v1/pickup-spot-recommendations를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] [web] Idempotency-Key는 GET /v1/pickup-spot-recommendations에 요구되지 않는다
+- [x] [서비스] 장소 추천은 academyId의 학원을 LoadAcademyPort로 읽어 그 location을 학원 좌표로 쓰고 학원이 없으면 NOT_FOUND로 거절한다
+- [x] [web] GET /v1/pickup-spot-recommendations에 없는 academyId를 보내면 404 NOT_FOUND를 돌려준다
+- [x] [서비스] 장소 추천은 후보가 3곳보다 적으면 있는 만큼만 돌려주고 0곳이면 supported true와 빈 items를 돌려준다
 - [x] [기반] classpath reference/gangnam에 boundary_gangnam.geojson · parking_public.csv(60행) · curb_stop_candidates.csv(3,147행)가 있다
-- [ ] [persistence] ServiceAreaPort 어댑터는 classpath reference/gangnam/boundary_gangnam.geojson을 읽어 강남구 안의 좌표에 true, 밖의 좌표에 false를 돌려준다
+- [x] [persistence] ServiceAreaPort 어댑터는 classpath reference/gangnam/boundary_gangnam.geojson을 읽어 강남구 안의 좌표에 true, 밖의 좌표에 false를 돌려준다
 - [x] [기반] parking_public.csv의 parking_id와 curb_stop_candidates.csv의 candidate_id는 겹치지 않는다
+- [x] 직선거리 규칙은 두 좌표 사이 거리를 m로 돌려주고(위도 0.001도는 약 111m) place.domain은 JTS를 쓰는 GeoPoints 없이 계산한다
+- [x] 장소 추천은 차량 시간 포트를 부를 때 DB 트랜잭션이 열려 있지 않다
+- [x] 장소 추천은 실제 참조 데이터와 강남구 경계로 대치동 학원 좌표 주변의 공영주차장 · 길가 후보를 돌려준다(차량 시간은 목)
+- [x] GET /v1/pickup-spot-recommendations에 ISO 형식이 아닌 arriveAt을 보내면 422 VALIDATION_FAILED와 fields의 arriveAt을 돌려준다
+- [x] 차량 시간 어댑터는 미래 운행 정보 길찾기에 summary 파라미터를 붙이지 않는다
+- [x] 참조 데이터 로더는 테이블별 적재를 한 트랜잭션으로 해서 중간에 실패하면 그 테이블에 일부 행을 남기지 않는다
 
 ## 확인 필요 사항
 
