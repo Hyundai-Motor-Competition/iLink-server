@@ -1,6 +1,5 @@
 package com.example.pickupservice.place.domain;
 
-import com.example.pickupservice.common.geo.GeoPoints;
 import com.example.pickupservice.common.geo.LatLng;
 
 import java.util.ArrayList;
@@ -51,10 +50,10 @@ public final class SpotCandidateMerger {
 	}
 
 	private static double distance(LatLng academy, CurbStopCandidate curb) {
-		return GeoPoints.distanceMeters(academy, curb.location());
+		return StraightDistance.meters(academy, curb.location());
 	}
 
 	private static WalkTime walkTime(LatLng academy, LatLng location) {
-		return WalkTimeRule.fromStraightMeters(GeoPoints.distanceMeters(academy, location));
+		return WalkTimeRule.fromStraightMeters(StraightDistance.meters(academy, location));
 	}
 }

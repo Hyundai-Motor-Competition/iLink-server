@@ -12,7 +12,6 @@ class SpotCandidateMergerTest {
 
 	private static final LatLng ACADEMY = new LatLng(37.5, 127.0);
 
-	/** 학원에서 북쪽으로 step x 약 111m 떨어진 좌표. */
 	private static LatLng north(int step) {
 		return new LatLng(37.5 + step * 0.001, 127.0);
 	}
