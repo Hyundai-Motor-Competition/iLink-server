@@ -6,6 +6,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -39,6 +40,7 @@ public class GangnamReferenceDataLoader implements ApplicationRunner {
 			""";
 
 	private final JdbcTemplate jdbcTemplate;
+	private final TransactionTemplate transactionTemplate;
 
 	@Override
 	public void run(ApplicationArguments args) {
@@ -47,10 +49,10 @@ public class GangnamReferenceDataLoader implements ApplicationRunner {
 
 	public void load() {
 		if (isEmpty("public_parking")) {
-			loadParking();
+			transactionTemplate.executeWithoutResult(status -> loadParking());
 		}
 		if (isEmpty("curb_stop_candidate")) {
-			loadCurb();
+			transactionTemplate.executeWithoutResult(status -> loadCurb());
 		}
 	}
 
@@ -119,7 +121,7 @@ public class GangnamReferenceDataLoader implements ApplicationRunner {
 				if (header == null) {
 					return List.of();
 				}
-				if (header.startsWith("﻿")) {
+				if (header.startsWith("\uFEFF")) {
 					header = header.substring(1);
 				}
 				List<String> names = Arrays.asList(header.split(",", -1));

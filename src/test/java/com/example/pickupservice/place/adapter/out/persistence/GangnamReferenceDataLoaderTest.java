@@ -21,7 +21,6 @@ class GangnamReferenceDataLoaderTest extends IntegrationTestSupport {
 	private final GangnamReferenceDataLoader loader;
 	private final JdbcTemplate jdbcTemplate;
 
-	/** 테스트가 테이블을 비우거나 바꿨어도 끝나면 CSV 상태(60행 · 3,147행)로 되돌린다. */
 	@AfterEach
 	void restoreReferenceData() {
 		jdbcTemplate.update("delete from public_parking");
