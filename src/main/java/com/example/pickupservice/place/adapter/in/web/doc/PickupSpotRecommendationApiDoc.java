@@ -16,6 +16,7 @@ public interface PickupSpotRecommendationApiDoc {
 			+ "walkSeconds, driveSeconds, totalSeconds, cautions[]}")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (허용되지 않은 역할)")
+	@ApiResponse(responseCode = "404", description = "NOT_FOUND (학원 없음)")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (academyId · origin 없음 또는 형식 오류, "
 			+ "arriveAt이 형식 오류이거나 과거)")
 	SpotRecommendationsResponse recommendSpots(

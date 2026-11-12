@@ -21,6 +21,7 @@ import java.net.SocketTimeoutException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -120,6 +121,24 @@ class KakaoMobilityDriveTimeAdapterTest {
 		List<Integer> result = adapter.driveSecondsAt(ORIGIN, List.of(DEST_A), Instant.parse("2026-11-13T13:00:00Z"));
 
 		assertThat(result).containsExactly(610);
+		server.verify();
+	}
+
+	@Test
+	@DisplayName("미래 운행 정보 길찾기는 summary 파라미터를 붙이지 않는다 (departAt 있음)")
+	void driveSecondsAt_doesNotSendSummaryParameter() {
+		List<String> requestedUrls = new ArrayList<>();
+		server.expect(pathIs(FUTURE_DIRECTIONS_PATH))
+				.andExpect(method(HttpMethod.GET))
+				.andExpect(request -> requestedUrls.add(request.getURI().toString()))
+				.andRespond(success(610));
+
+		List<Integer> result = adapter.driveSecondsAt(ORIGIN, List.of(DEST_A), Instant.parse("2026-11-13T13:00:00Z"));
+
+		assertThat(result).containsExactly(610);
+		assertThat(requestedUrls).hasSize(1);
+		assertThat(UriComponentsBuilder.fromUriString(requestedUrls.get(0)).build().getQueryParams())
+				.doesNotContainKey("summary");
 		server.verify();
 	}
 

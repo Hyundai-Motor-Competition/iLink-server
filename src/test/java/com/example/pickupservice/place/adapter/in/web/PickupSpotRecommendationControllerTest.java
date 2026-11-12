@@ -220,6 +220,22 @@ class PickupSpotRecommendationControllerTest extends PlaceWebTestSupport {
 		then(recommendPickupSpotsUseCase).shouldHaveNoInteractions();
 	}
 
+	@ParameterizedTest
+	@ValueSource(strings = {"내일", "2026-11-13 22:00"})
+	@DisplayName("GET /v1/pickup-spot-recommendations에 ISO 형식이 아닌 arriveAt(내일 · 2026-11-13 22:00)을 보내면 422 VALIDATION_FAILED와 fields의 arriveAt을 돌려주고 유스케이스를 부르지 않는다")
+	void recommendWithNonIsoArriveAtReturns422ValidationFailed(String arriveAt) throws Exception {
+		mockMvc.perform(recommendRequest(guardianBearer())
+						.queryParam("academyId", String.valueOf(ACADEMY_ID))
+						.queryParam("origin", ORIGIN)
+						.queryParam("arriveAt", arriveAt))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("arriveAt")));
+
+		then(recommendPickupSpotsUseCase).shouldHaveNoInteractions();
+	}
+
 	@Test
 	@DisplayName("GET /v1/pickup-spot-recommendations를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다")
 	void recommendWithTeacherTokenReturns403Forbidden() throws Exception {
