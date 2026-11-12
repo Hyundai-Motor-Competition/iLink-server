@@ -15,13 +15,11 @@ import com.example.pickupservice.place.domain.SpotCandidateMerger;
 import com.example.pickupservice.place.domain.SpotRankingRule;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class RecommendPickupSpotsService implements RecommendPickupSpotsUseCase {
 
 	private static final int PARKING_RADIUS_M = 500;
