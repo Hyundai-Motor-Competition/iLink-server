@@ -4,7 +4,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| 범위 | 엔티티 PickupSpot. API SPOT-01(조회) · SPOT-02(추가) · SPOT-03(수정 · 삭제). 다른 모듈용 in 포트(기본 장소 · 장소 조회) |
+| 범위 | 엔티티 PickupSpot. API SPOT-01(조회) · SPOT-02(추가) · SPOT-03(수정 · 삭제) · SPOT-04(추천). 참조 데이터 PublicParking · CurbStopCandidate. 다른 모듈용 in 포트(기본 장소 · 장소 조회) |
 | 의존 | 03_공유모듈-shared, 04_사용자-user(가족 · 작성자), 06_일정-schedule(Academy 위치. out 포트 LoadAcademyPort → schedule in 포트 LoadAcademyUseCase.findAcademy). pickup의 in 포트(진행 중 세션이 쓰는 장소, 자녀 현재 위치)는 out 포트 CheckActivePickupPort + 임시 어댑터(pickup 구현 전). schedule의 LoadPickupSpotPort는 place LoadPickupSpotUseCase.findSpots에 위임 |
 | 진행 | 계층 병렬 |
 
@@ -40,6 +40,29 @@ place
 familyId · academyId · createdBy는 프로젝트 관례대로 DB FK 제약 없이 컬럼만 둔다.
 uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스라 02_공통-규칙-global 관례대로 src/main/resources/schema.sql에 CREATE UNIQUE INDEX IF NOT EXISTS로 적는다.
 
+공영주차장 (PublicParking) — 추천용 참조 데이터 [2026-11-12 추가]
+
+| 컬럼 | 타입 | 키 · 제약 | 설명 |
+|---|---|---|---|
+| parkingId | VARCHAR(20) | PK | 주차장관리번호 |
+| name | VARCHAR(100) | | |
+| location | geography(Point,4326) | GIST | |
+| spaces | INT | NULL | 주차 면수 |
+| baseMinutes | INT | NULL | 기본 시간(분) |
+| baseFeeWon | INT | NULL | 기본 요금(원) |
+
+길가 정차 후보 (CurbStopCandidate) — 추천용 참조 데이터 [2026-11-12 추가]
+
+| 컬럼 | 타입 | 키 · 제약 | 설명 |
+|---|---|---|---|
+| candidateId | BIGINT | PK | |
+| location | geography(Point,4326) | GIST | 도로 중심 좌표 |
+| roadName | VARCHAR(100) | NULL | |
+| lineKind | VARCHAR(20) | | DOTTED_YELLOW(주차금지 선 · 5분 이내 정차만) · NONE(선 표시 없음) |
+| nearEnforcementCctv | BOOLEAN | | 단속 카메라 100m 안 |
+
+두 테이블의 원본은 iLink_Project_Package/data/gangnam의 parking_public.csv(60행) · curb_stop_candidates.csv(3,147행)이다. 길가 후보는 주정차금지 선 · 횡단보도 · 교차점 · 소화전 · 버스정류소 · 버스전용차로 · 정차금지지대 근처와 어린이보호구역 대상 시설 300m 안을 미리 뺀 목록이다. 서버가 뜰 때 테이블이 비어 있으면 classpath reference/gangnam/의 같은 CSV에서 읽어 넣는다. CSV는 UTF-8이고 맨 앞에 BOM이 있다. 읽는 컬럼은 parking_public.csv의 parking_id · name · latitude · longitude · spaces · base_minutes · base_fee_won, curb_stop_candidates.csv의 candidate_id · latitude · longitude · road_name · line_kind · near_enforcement_cctv(Y 또는 빈 값)이고 나머지 컬럼은 무시한다. 강남구 경계는 classpath reference/gangnam/boundary_gangnam.geojson(Polygon 1개, 좌표 순서 [경도, 위도])이다. 세 파일은 src/main/resources/reference/gangnam/에 둔다.
+
 ## API 명세
 
 | ID | Method · 경로 | 호출 | Idempotency-Key | 요청 → 응답 | 오류 |
@@ -48,6 +71,7 @@ uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스�
 | SPOT-02 | POST /v1/families/me/pickup-spots | GUARDIAN · CO_GUARDIAN | 필요 | academyId, name(1~50자), stopPoint{lat, lng}, meetingPoint{lat, lng}, memo(0~200자, 선택), isDefault(기본 false) → 201 spotId, isDefault | 404 NOT_FOUND(학원 없음), 409 DEFAULT_SPOT_CONFLICT(동시 요청으로 기본 장소가 겹침), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR |
 | SPOT-03 | PATCH /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 불필요 | name, stopPoint, meetingPoint, memo, isDefault(모두 선택) → 200 spotId · name · stopPoint · meetingPoint · memo · isDefault | 404 NOT_FOUND(다른 가족 · 없는 spotId, 좌표를 바꿀 때 학원 없음), 409 DEFAULT_SPOT_CONFLICT(동시 요청으로 기본 장소가 겹침), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR, 422 DEFAULT_SPOT_REQUIRED(기본 장소를 isDefault false로) |
 | SPOT-03 | DELETE /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 필요 | — → 204 | 404 NOT_FOUND, 409 SPOT_IN_USE, 422 DEFAULT_SPOT_REQUIRED |
+| SPOT-04 | GET /v1/pickup-spot-recommendations | GUARDIAN · CO_GUARDIAN · DELEGATE, 차량 앱 | 불필요 | query academyId(저장된 학원, 필수), origin(차량 현재 좌표 "lat,lng", 필수), arriveAt(선택, ISO 시각) → 200 supported, items[](rank · kind(PUBLIC_PARKING · CURB_STOP) · name · location{lat, lng} · walkMeters · walkSeconds · driveSeconds · totalSeconds · cautions[]) 최대 3개 | 404 NOT_FOUND(학원 없음), 422 VALIDATION_FAILED(academyId · origin이 없거나 origin 형식 오류, arriveAt이 과거) |
 
 응답 예시
 - SPOT-01: `{"academies":[{"academyId":55,"academyName":"해솔영어학원","spots":[{"spotId":21,"name":"정문 앞","stopPoint":{"lat":37.501234,"lng":127.039876},"meetingPoint":{"lat":37.501301,"lng":127.039901},"memo":"편의점 앞","isDefault":true,"walkMinutes":null}]}]}`
@@ -80,6 +104,22 @@ uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스�
 - 저장소의 deleteSpot은 없는 spotId면 조용히 무시한다(서비스가 먼저 404를 돌려줌).
 - 장소를 고쳐도 진행 중 세션과 지난 결과는 세션의 스냅샷(spotName · stopPoint · meetingPoint)을 쓴다.
 
+### 장소 추천 (SPOT-04) [2026-11-12 추가]
+- 학원을 고르면 차를 댈 수 있는 장소를 「걷는 시간 + 차량 도착 시간」이 짧은 순으로 3곳까지 돌려준다. 추천 결과는 저장하지 않는다. 고른 장소는 SPOT-02로 저장한다.
+- 학원 좌표는 저장된 Academy의 location이다. academyId로 LoadAcademyPort.loadAcademy를 불러 읽고, 학원이 없으면 404 NOT_FOUND. 일정 등록(SET-02)으로 학원이 저장된 뒤에만 추천할 수 있다.
+- 지원 지역은 강남구다. 학원 좌표가 강남구 경계 도형(classpath reference/gangnam/boundary_gangnam.geojson) 밖이면 supported false와 빈 items를 돌려주고 외부 API를 부르지 않는다.
+- 후보는 두 종류다. 민영 · 건물 주차장은 요금 · 운영 시간 · 외부 차량 개방 여부를 알 수 없어 추천에 넣지 않는다.
+  - PUBLIC_PARKING: PublicParking 반경 500m.
+  - CURB_STOP: CurbStopCandidate 반경 450m. 도로 이름마다 학원에 가장 가까운 1곳, 최대 4곳. name은 roadName.
+- walkMeters = 학원 좌표와 후보의 직선거리 × 1.3(반올림). walkSeconds = walkMeters ÷ 1.1(올림).
+- 합친 후보를 walkMeters가 작은 순 8곳으로 줄인 뒤 차량 시간을 구한다.
+- driveSeconds: arriveAt이 없으면 카카오모빌리티 자동차 길찾기(GET /v1/directions, origin · destination은 "경도,위도", summary=true)를 후보마다 1회. arriveAt이 있으면 미래 운행 정보 길찾기(GET /v1/future/directions, 같은 파라미터 + departure_time = arriveAt, yyyyMMddHHmm, Asia/Seoul)를 후보마다 1회. 응답의 routes[0].result_code가 0이면 routes[0].summary.duration(초)을 쓴다. 한 곳이라도 호출이 실패하거나 result_code가 0이 아니면 빈 목록으로 본다. 헤더는 Authorization: KakaoAK {키}.
+- 다중 목적지 길찾기는 쓰지 않는다. 출발지 반경 10km가 한도라 차가 멀리 있으면 result_code 304가 온다(2026-11-12 실제 호출로 확인).
+- totalSeconds = walkSeconds + driveSeconds. totalSeconds 오름차순, 같으면 walkMeters가 작은 쪽이 앞. 앞에서 3곳에 rank 1~3을 붙인다.
+- cautions: CURB_STOP은 LINE_DATA_2021, lineKind가 DOTTED_YELLOW면 STOP_5MIN_ONLY, nearEnforcementCctv면 ENFORCEMENT_CAMERA_NEAR. PUBLIC_PARKING은 빈 배열.
+- 외부 API가 실패해도 오류를 내지 않는다. 카카오모빌리티가 실패하면 driveSeconds · totalSeconds를 null로 두고 walkMeters가 작은 순 3곳을 돌려준다.
+- 카카오모빌리티 주소는 pickup.map.kakao-mobility.base-url(https://apis-navi.kakaomobility.com), 키는 pickup.map.kakao.api-key를 같이 쓴다.
+
 ### 다른 모듈용 조회
 - findSpots는 가족 장소를 한 번 읽어 받은 학원 목록으로 거른다.
 
@@ -104,6 +144,12 @@ boolean isWithinMeters(LatLng from, LatLng to, int meters);                     
 Optional<AcademyInfo> loadAcademy(long academyId);                                     // LoadAcademyPort → schedule
 boolean isUsedByActiveSession(long spotId);                                            // CheckActivePickupPort → pickup
 Optional<LatLng> loadActiveChildLocation(long familyId);                               // CheckActivePickupPort → pickup (walkMinutes)
+
+// SPOT-04 추천 [2026-11-12 추가]
+SpotRecommendations recommendSpots(RecommendSpotsQuery q);                             // RecommendPickupSpotsUseCase (academyId, origin, arriveAt?)
+boolean isSupported(LatLng point);                                                     // ServiceAreaPort (강남구 경계 도형)
+List<PublicParking> loadPublicParkingWithin(LatLng center, int radiusM); List<CurbStopCandidate> loadCurbStopsWithin(LatLng center, int radiusM);   // LoadSpotCandidatePort
+List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<Integer> driveSecondsAt(LatLng origin, List<LatLng> destinations, Instant departAt);   // DriveTimePort → 카카오모빌리티 (목적지 순서대로, 실패 시 빈 목록)
 ```
 
 ## 테스트 케이스
@@ -165,6 +211,37 @@ Optional<LatLng> loadActiveChildLocation(long familyId);                        
 - [x] pickup_spot에 (family_id, academy_id) WHERE is_default 부분 유니크 인덱스가 있어 같은 가족 · 학원에 기본 장소 두 개를 저장할 수 없다
 - [x] 장소 추가 · 수정에서 isDefault true로 지정하면 이전 기본 장소를 먼저 해제한 뒤 저장해 유니크 인덱스와 부딪히지 않는다(실제 DB로 확인)
 - [x] 동시 요청으로 기본 장소 유니크 인덱스가 부딪히면 409 DEFAULT_SPOT_CONFLICT로 거절한다
+- [x] [기반] 걷는 시간 규칙은 직선거리에 1.3을 곱해 반올림한 walkMeters와 그것을 1.1로 나눠 올림한 walkSeconds를 돌려준다
+- [x] [기반] 후보 합치기 규칙은 길가 후보를 도로 이름마다 학원에 가장 가까운 1곳씩 최대 4곳만 남긴다
+- [x] [기반] 후보 합치기 규칙은 합친 후보를 walkMeters가 작은 순 8곳으로 줄인다
+- [x] [기반] 추천 순위 규칙은 totalSeconds가 작은 순으로 3곳에 rank 1~3을 붙이고 totalSeconds가 같으면 walkMeters가 작은 쪽을 앞에 둔다
+- [x] [기반] 추천 순위 규칙은 driveSeconds가 없으면 totalSeconds를 null로 두고 walkMeters가 작은 순으로 3곳을 고른다
+- [x] [기반] 주의 표시 규칙은 CURB_STOP에 LINE_DATA_2021, DOTTED_YELLOW 길가에 STOP_5MIN_ONLY, 단속 카메라 근처 길가에 ENFORCEMENT_CAMERA_NEAR를 붙이고 PUBLIC_PARKING에는 붙이지 않는다
+- [x] [기반] 지원 지역 규칙은 강남구 경계 도형 안의 좌표에 true, 밖의 좌표에 false를 돌려준다
+- [x] [기반] 핵심 로직 「시그니처」의 SPOT-04 in 포트 · out 포트 인터페이스와 Query · Result record가 있다
+- [x] [기반] PublicParkingEntity · CurbStopCandidateEntity가 테이블 정의대로 매핑되고 location은 geography(Point,4326)이다
+- [ ] [persistence] 서버가 뜰 때 PublicParking · CurbStopCandidate가 비어 있으면 classpath CSV에서 60행 · 3,147행을 읽어 넣고 이미 행이 있으면 다시 넣지 않는다
+- [ ] [persistence] loadPublicParkingWithin은 중심에서 radiusM 안의 공영주차장만 돌려준다
+- [ ] [persistence] loadCurbStopsWithin은 중심에서 radiusM 안의 길가 후보만 돌려준다
+- [ ] [persistence] public_parking · curb_stop_candidate의 location 컬럼에 GIST 인덱스가 있다
+- [ ] [서비스] 차량 시간 어댑터는 자동차 길찾기를 목적지마다 불러 routes[0].summary.duration을 목적지 순서대로 돌려준다
+- [ ] [서비스] 차량 시간 어댑터는 departAt이 있으면 미래 운행 정보 길찾기를 목적지마다 departure_time(yyyyMMddHHmm, Asia/Seoul)으로 부른다
+- [ ] [서비스] 차량 시간 어댑터는 외부 API가 실패하거나 result_code가 0이 아니면 빈 목록을 돌려준다
+- [ ] [서비스] 장소 추천은 학원 좌표가 강남구 밖이면 supported false와 빈 items를 돌려주고 외부 API를 부르지 않는다
+- [ ] [서비스] 장소 추천은 공영주차장 · 길가 후보를 합쳐 totalSeconds가 작은 3곳을 rank 1~3으로 돌려준다
+- [ ] [서비스] 장소 추천은 arriveAt이 없으면 driveSecondsNow를, 있으면 driveSecondsAt을 부른다
+- [ ] [서비스] 장소 추천은 차량 시간이 빈 목록이면 driveSeconds · totalSeconds를 null로 두고 walkMeters가 작은 순으로 돌려준다
+- [ ] [web] GET /v1/pickup-spot-recommendations는 200과 supported · items[](rank · kind · name · location · walkMeters · walkSeconds · driveSeconds · totalSeconds · cautions)를 돌려준다
+- [ ] [web] GET /v1/pickup-spot-recommendations는 차량 토큰으로도 200을 돌려준다
+- [ ] [web] GET /v1/pickup-spot-recommendations에 academyId나 origin이 없거나 origin이 lat,lng 형식이 아니면 422 VALIDATION_FAILED와 fields를 돌려준다
+- [ ] [web] GET /v1/pickup-spot-recommendations에 과거 arriveAt을 보내면 422 VALIDATION_FAILED를 돌려준다
+- [ ] [web] GET /v1/pickup-spot-recommendations를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [ ] [web] Idempotency-Key는 GET /v1/pickup-spot-recommendations에 요구되지 않는다
+- [ ] [서비스] 장소 추천은 academyId의 학원을 LoadAcademyPort로 읽어 그 location을 학원 좌표로 쓰고 학원이 없으면 NOT_FOUND로 거절한다
+- [ ] [web] GET /v1/pickup-spot-recommendations에 없는 academyId를 보내면 404 NOT_FOUND를 돌려준다
+- [ ] [서비스] 장소 추천은 후보가 3곳보다 적으면 있는 만큼만 돌려주고 0곳이면 supported true와 빈 items를 돌려준다
+- [x] [기반] classpath reference/gangnam에 boundary_gangnam.geojson · parking_public.csv(60행) · curb_stop_candidates.csv(3,147행)가 있다
+- [ ] [persistence] ServiceAreaPort 어댑터는 classpath reference/gangnam/boundary_gangnam.geojson을 읽어 강남구 안의 좌표에 true, 밖의 좌표에 false를 돌려준다
 
 ## 확인 필요 사항
 
@@ -183,3 +260,14 @@ Optional<LatLng> loadActiveChildLocation(long familyId);                        
 | SPOT-02의 academyId가 가족 일정에 없는 학원인 경우 | 그대로 둠: Academy가 있으면 받고, 없으면 404 |
 | 장소 변경이 settingsVersion을 올리는지 | 04_사용자-user.md와 같은 질문. 올리지 않는다고 가정 |
 | 11/4 기획 수정안(소스 7.1) | 확정되면 학원 출입구를 기본 장소로 쓰고 직접 찍는 장소는 대안 0~2개가 됨 → 「첫 장소가 기본」 규칙이 바뀜 |
+| SPOT-04 지원 지역 | 결정됨(사람 2026-11-12): 강남구만. 다른 구는 supported false |
+| SPOT-04 후보 종류 | 결정됨(사람 2026-11-12): 공영주차장과 길가 정차 구간만. 민영 주차장은 제외(요금 · 운영 시간 · 개방 여부를 받을 공개 데이터가 없음), 어린이보호구역 근처 길가도 제외 |
+| SPOT-04 걷는 시간 | 직선거리 × 1.3 ÷ 1.1m/s로 가정. 보행 경로 API는 쓰지 않음 |
+| SPOT-04 길가 선 데이터 | 서울시 차선 데이터가 2021-08 파일이라 그 뒤 바뀐 곳은 반영 안 됨. cautions LINE_DATA_2021로 알림. 최신본 확보 필요 |
+| SPOT-04 어린이보호구역 판정 | 구역 경계선 데이터가 없어 대상 시설 300m 안을 제외로 가정. 경찰청 보호구역 도형을 받으면 교체 |
+| SPOT-04 후보가 3곳보다 적을 때 | 있는 만큼만 돌려줌. 0곳이면 supported true와 빈 items |
+| SPOT-04 카카오모빌리티 한도 | 무료 하루 자동차 길찾기 10,000건 · 미래 운행 5,000건. 요청 1건이 최대 8건을 씀. 한도를 넘을 때 대응은 미정. 다중 목적지 길찾기는 반경 10km 한도 때문에 쓰지 않음[팀장 결정 2026-11-12] |
+| SPOT-04 카카오 결과 저장 | 카카오 DevTalk 답변 기준 장소 ID · place_url만 저장 가능. 추천 결과는 저장하지 않음 |
+| SPOT-04 참조 데이터 갱신 | CSV를 손으로 다시 만들어 넣음. 자동 갱신 없음 |
+| SPOT-04 origin | 클라이언트가 차량 현재 좌표를 보냄. 서버가 가진 SIG-01 위치는 쓰지 않음 |
+| SPOT-04 학원 위치 | 결정됨(사람 2026-11-12): 저장된 Academy를 academyId로 조회해 location을 씀. 출입구 좌표(entrance)는 아직 쓰지 않음. 저장된 값이 카카오 검색에서 온 것이라 저장 방식은 06_일정-schedule에서 따로 정함(미정) |
