@@ -1,10 +1,10 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-14 01:11 KST · tdd-guard
+- 생성: 2026-11-14 01:30 KST · tdd-guard
 - 설계서: C:/pw/pickup/docs
 - 프로젝트: gradle · C:/pw/pickup
-- 테스트: ● GREEN · 2797 passed · 전체 · 252s
-- 진행: 공유모듈 72/72 · 사용자 79/85 · 인증 120/124 · 일정 77/83 · 장소 107/107 · 픽업 271/276 · 알림 65/65 · 프로필사진 39/39 · 남은 항목 21/851
+- 테스트: ● GREEN · 2824 passed · 전체 · 144s
+- 진행: 공유모듈 72/72 · 사용자 79/85 · 인증 120/124 · 일정 77/83 · 장소 107/107 · 픽업 272/276 · 알림 65/65 · 프로필사진 39/39 · 남은 항목 20/851
 - 현재 도메인: 픽업 (08_픽업-pickup.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
@@ -67,9 +67,8 @@
 - [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
 - [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
-## 6. 픽업 (pickup) · 08_픽업-pickup.md · 진행 중 · 항목 271/276 · 완료 기준 0/4
+## 6. 픽업 (pickup) · 08_픽업-pickup.md · 진행 중 · 항목 272/276 · 완료 기준 0/4
 ### 테스트 케이스
-- [ ] #269 [web] PUT /v1/pickup-sessions/{sessionId}/route는 spotId 대신 candidate {name, location}을 받으면 임시 장소를 만들어 그 spotId로 경로를 확정한다. spotId와 candidate를 둘 다 보내거나 둘 다 빼면 422 VALIDATION_FAILED(최종디자인 11/13 V02 추천 장소, 팀장 결정 2026-11-13)
 - [ ] #270 [web] POST /v1/pickup-sessions/{sessionId}/spot-changes도 spotId 대신 candidate {name, location}을 받아 임시 장소로 세션 장소를 바꾼다(V03 「다른장소로 가기」)
 - [ ] #271 [서비스] 장소 변경에 here=true를 보내면 마지막으로 받은 차량 위치로 이름 「차량 정차 위치」, stopPoint · meetingPoint가 같은 임시 장소를 만들어 세션 장소를 바꾸고 바로 합류 안내(CALL)를 보낸다(V03 「여기로 부르기」, 서버가 한 번에 처리)
 - [ ] #272 [서비스] here=true인데 받은 차량 위치가 없으면 422 VALIDATION_FAILED, 정차 중이 아니라 호출 가드를 못 넘으면 장소를 바꾸지 않고 409 CALL_GUARD_UNMET로 거절한다
