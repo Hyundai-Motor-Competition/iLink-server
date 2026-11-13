@@ -94,6 +94,9 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(BusinessException.class)
 	public ResponseEntity<ErrorResponse> handleBusiness(BusinessException exception) {
+		if (exception.status().is5xxServerError()) {
+			log.error("서버 오류 응답 code={}", exception.code(), exception);
+		}
 		return toJsonResponse(exception.status(), ErrorResponse.from(exception));
 	}
 
