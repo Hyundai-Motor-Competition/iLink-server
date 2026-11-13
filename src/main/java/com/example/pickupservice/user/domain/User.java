@@ -14,13 +14,23 @@ public class User {
 	private Role role;
 	private String name;
 	private String phone;
+	private String profileImageKey;
 
 	public static User create(long familyId, Role role, String name, String phone) {
-		return new User(null, familyId, role, name, phone);
+		return new User(null, familyId, role, name, phone, null);
 	}
 
 	public static User restore(Long userId, Long familyId, Role role, String name, String phone) {
-		return new User(userId, familyId, role, name, phone);
+		return restore(userId, familyId, role, name, phone, null);
+	}
+
+	public static User restore(Long userId, Long familyId, Role role, String name, String phone,
+			String profileImageKey) {
+		return new User(userId, familyId, role, name, phone, profileImageKey);
+	}
+
+	public void changeProfileImageKey(String profileImageKey) {
+		this.profileImageKey = profileImageKey;
 	}
 
 	public void changeName(String name) {

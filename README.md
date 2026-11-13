@@ -14,6 +14,7 @@
 | PostgreSQL JDBC | 42.7.14 |
 | springdoc-openapi | 3.2.0 |
 | Firebase Admin SDK | 9.11.0 |
+| MinIO Java SDK | 9.0.4 |
 | Lombok | 1.18.48 |
 | Testcontainers (테스트용, Windows가 아닌 OS) | 2.0.5 |
 | embedded-postgres (zonky, 테스트용, Windows) | 2.2.2 + 바이너리 BOM 17.11.0 (PostgreSQL 17.11) |
@@ -82,7 +83,7 @@ prod는 `ddl-auto: validate`라 서버가 테이블을 만들지 않는다. 그�
 | 주소 | `https://ilink-api-dev.chisanw.com` (Cloudflare Tunnel → 홈서버 nginx → ingress-nginx) |
 | 매니페스트 | `ops/k8s/dev/api.yaml`(파이프라인이 매번 적용), `postgres.yaml` · `deployer.yaml`(운영자가 한 번 적용) |
 | DB | `ilink-dev`의 StatefulSet `postgres`(`postgis/postgis:17-3.7`), DB · 사용자 `pickup` |
-| 비밀값 | Secret `api`(`DB_PASSWORD` · `JWT_SECRET` · `PHONE_ENCRYPTION_KEY` · `KAKAO_REST_API_KEY`). 홈서버에서 `ilink-secrets`로 편집 · 반영(`ops/scripts/ilink-secrets.sh`) |
+| 비밀값 | Secret `api`(`DB_PASSWORD` · `JWT_SECRET` · `PHONE_ENCRYPTION_KEY` · `KAKAO_REST_API_KEY` · `MINIO_ACCESS_KEY` · `MINIO_SECRET_KEY`). 홈서버에서 `ilink-secrets`로 편집 · 반영(`ops/scripts/ilink-secrets.sh`) |
 | Jenkins credentials | `ilink-harbor`(Harbor 로봇 계정), `ilink-kubeconfig`(`ilink-deployer` 토큰) |
 
 ConfigMap(비밀이 아닌 환경 변수)을 바꾸려면 `ops/k8s/dev/api.yaml`을 고쳐 `main`에 올린다. 파드가 자동으로 다시 뜬다.

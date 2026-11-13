@@ -1,5 +1,6 @@
 package com.example.pickupservice.user.application.port.in;
 
+import com.example.pickupservice.common.image.ProfileImage;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.user.domain.DeviceStatus;
 import com.example.pickupservice.user.domain.JoinCallMode;
@@ -37,7 +38,7 @@ class UserInPortsTest {
 	}
 
 	@Test
-	@DisplayName("다른 모듈용 유스케이스 5개는 interface이고 설계서 시그니처의 메서드만 갖는다")
+	@DisplayName("다른 모듈용 유스케이스 6개는 interface이고 설계서 시그니처의 메서드만 갖는다")
 	void moduleUseCasesHaveDesignSignatures() {
 		verifyModuleUseCases();
 	}
@@ -78,6 +79,8 @@ class UserInPortsTest {
 	private void verifyModuleUseCases() {
 		assertUseCase(CreateGuardianUseCase.class,
 				method("createGuardian", GuardianAccount.class.getName(), CreateGuardianCommand.class));
+		assertUseCase(ChangeProfileImageUseCase.class,
+				method("changeProfileImage", "void", ChangeProfileImageCommand.class));
 		assertUseCase(RegisterVehicleUseCase.class,
 				method("registerVehicle", "long", String.class, String.class));
 		assertUseCase(LoadVehicleUseCase.class,
@@ -108,13 +111,15 @@ class UserInPortsTest {
 				"role", Role.class.getName(),
 				"name", String.class.getName(),
 				"phone", String.class.getName(),
-				"deviceStatus", DeviceStatus.class.getName()));
+				"deviceStatus", DeviceStatus.class.getName(),
+				"profileImageUrl", String.class.getName()));
 		assertRecord(RegisterMemberCommand.class, components(
 				"familyId", "long",
 				"requesterRole", Role.class.getName(),
 				"role", Role.class.getName(),
 				"name", String.class.getName(),
-				"phone", String.class.getName()));
+				"phone", String.class.getName(),
+				"profileImage", ProfileImage.class.getName()));
 		assertRecord(UpdateMemberCommand.class, components(
 				"familyId", "long",
 				"requesterId", "long",
@@ -142,7 +147,11 @@ class UserInPortsTest {
 		assertRecord(CreateGuardianCommand.class, components(
 				"vehicleId", "long",
 				"phone", String.class.getName(),
-				"name", String.class.getName()));
+				"name", String.class.getName(),
+				"profileImage", ProfileImage.class.getName()));
+		assertRecord(ChangeProfileImageCommand.class, components(
+				"userId", "long",
+				"profileImage", ProfileImage.class.getName()));
 		assertRecord(GuardianAccount.class, components(
 				"familyId", "long",
 				"userId", "long"));

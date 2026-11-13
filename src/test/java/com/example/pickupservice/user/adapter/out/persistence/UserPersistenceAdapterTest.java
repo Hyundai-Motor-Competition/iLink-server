@@ -344,6 +344,45 @@ class UserPersistenceAdapterTest extends IntegrationTestSupport {
 		assertThat(loadUserPort.countNonChildMembers(emptyFamilyId)).isZero();
 	}
 
+	@Test
+	@DisplayName("User의 profileImageKey는 넣지 않으면 NULL로 저장되고 다시 읽어도 비어 있다")
+	void profileImageKeyIsStoredAsNullWhenNotSet() {
+		long familyId = newFamilyId();
+		User saved = saveUserPort.saveUser(User.create(familyId, Role.GUARDIAN, "김보호", PHONE));
+		clearPersistenceContext();
+
+		assertThat(profileImageKeyColumn(saved.getUserId())).as("users.profile_image_key 컬럼 값").isNull();
+		assertThat(loadUserPort.loadUser(saved.getUserId())).get()
+				.extracting(User::getProfileImageKey)
+				.as("다시 읽은 profileImageKey")
+				.isNull();
+	}
+
+	@Test
+	@DisplayName("User의 profileImageKey에 값을 넣어 저장하면 다시 읽었을 때 같은 값이다")
+	void profileImageKeyIsLoadedWithSameValueAfterSave() {
+		long familyId = newFamilyId();
+		String key = "profiles/3f2b8c1e-6d4a-4b7f-9e21-0a5c7d9e1f42.webp";
+		User user = User.create(familyId, Role.CO_GUARDIAN, "이공동", PHONE);
+		user.changeProfileImageKey(key);
+		User saved = saveUserPort.saveUser(user);
+		assertThat(saved.getProfileImageKey()).as("저장 결과의 profileImageKey").isEqualTo(key);
+		clearPersistenceContext();
+
+		assertThat(profileImageKeyColumn(saved.getUserId())).as("users.profile_image_key 컬럼 값").isEqualTo(key);
+		assertThat(loadUserPort.loadUser(saved.getUserId())).get()
+				.extracting(User::getProfileImageKey)
+				.as("다시 읽은 profileImageKey")
+				.isEqualTo(key);
+	}
+
+	private Object profileImageKeyColumn(long userId) {
+		return transactionTemplate.execute(status -> entityManager
+				.createNativeQuery("select profile_image_key from users where user_id = :id")
+				.setParameter("id", userId)
+				.getSingleResult());
+	}
+
 	private long newFamilyId() {
 		long familyId = saveFamilyPort.saveFamily(Family.create()).getFamilyId();
 		familyIds.add(familyId);

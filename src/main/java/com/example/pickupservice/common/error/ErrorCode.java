@@ -21,6 +21,9 @@ public enum ErrorCode {
 	SESSION_ALREADY_FINISHED(HttpStatus.CONFLICT, "이미 끝난 픽업입니다"),
 	CALL_ALREADY_REVOKED(HttpStatus.CONFLICT, "이미 철회된 합류 호출입니다"),
 	VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_CONTENT, "입력값을 확인해 주세요"),
+	PROFILE_IMAGE_INVALID(HttpStatus.UNPROCESSABLE_CONTENT, "프로필 사진은 JPEG · PNG · WEBP만 올릴 수 있습니다"),
+	PROFILE_IMAGE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "프로필 사진은 5MB까지 올릴 수 있습니다"),
+	STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "사진 저장소를 잠시 쓸 수 없습니다. 잠시 후 다시 시도해 주세요"),
 	TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 시도해 주세요"),
 	RESEND_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS, "잠시 뒤에 다시 보내 주세요"),
 	INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다");

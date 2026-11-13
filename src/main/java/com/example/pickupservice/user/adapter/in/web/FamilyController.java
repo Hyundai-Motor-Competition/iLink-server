@@ -2,6 +2,7 @@ package com.example.pickupservice.user.adapter.in.web;
 
 import com.example.pickupservice.common.idempotency.IdempotencyKeyRequired;
 import com.example.pickupservice.common.security.AuthPrincipal;
+import com.example.pickupservice.common.web.ProfileImageParts;
 import com.example.pickupservice.user.adapter.in.web.doc.FamilyApiDoc;
 import com.example.pickupservice.user.application.port.in.ChangeCallModeUseCase;
 import com.example.pickupservice.user.application.port.in.ChangeChildLocationCommand;
@@ -9,6 +10,7 @@ import com.example.pickupservice.user.application.port.in.ChangeChildLocationUse
 import com.example.pickupservice.user.application.port.in.ChildLocationResult;
 import com.example.pickupservice.user.application.port.in.GetMyFamilyQuery;
 import com.example.pickupservice.user.application.port.in.GetMyFamilyUseCase;
+import com.example.pickupservice.user.application.port.in.RegisterMemberCommand;
 import com.example.pickupservice.user.application.port.in.RegisterMemberUseCase;
 import com.example.pickupservice.user.application.port.in.RemoveMemberCommand;
 import com.example.pickupservice.user.application.port.in.RemoveMemberUseCase;
@@ -16,6 +18,7 @@ import com.example.pickupservice.user.application.port.in.UpdateMemberUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,8 +28,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 @RestController
 @RequiredArgsConstructor
@@ -49,13 +56,27 @@ public class FamilyController implements FamilyApiDoc {
 	@Override
 	@IdempotencyKeyRequired
 	@PreAuthorize("hasAnyRole('GUARDIAN', 'CO_GUARDIAN')")
-	@PostMapping("/v1/families/me/members")
+	@PostMapping(path = "/v1/families/me/members", consumes = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseStatus(HttpStatus.CREATED)
 	public RegisterMemberResponse registerMember(
 			@AuthenticationPrincipal AuthPrincipal principal,
 			@Valid @RequestBody RegisterMemberRequest request) {
 		long userId = registerMemberUseCase.registerMember(request.toCommand(principal));
 		return new RegisterMemberResponse(userId);
+	}
+
+	@Override
+	@IdempotencyKeyRequired
+	@PreAuthorize("hasAnyRole('GUARDIAN', 'CO_GUARDIAN')")
+	@PostMapping(path = "/v1/families/me/members", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	@ResponseStatus(HttpStatus.CREATED)
+	public RegisterMemberResponse registerMemberWithProfileImage(
+			@AuthenticationPrincipal AuthPrincipal principal,
+			@Valid @RequestPart("request") RegisterMemberRequest request,
+			@RequestPart(value = "profileImage", required = false) MultipartFile profileImage) throws IOException {
+		RegisterMemberCommand command = request.toCommand(principal)
+				.withProfileImage(ProfileImageParts.toProfileImage(profileImage));
+		return new RegisterMemberResponse(registerMemberUseCase.registerMember(command));
 	}
 
 	@Override

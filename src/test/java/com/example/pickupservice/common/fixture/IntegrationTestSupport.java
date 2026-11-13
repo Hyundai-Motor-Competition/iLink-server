@@ -8,6 +8,6 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("dev")
-@Import({TestPostgisConfiguration.class, AccessTokenFixture.class})
+@Import({TestPostgisConfiguration.class, AccessTokenFixture.class, InMemoryProfileImageStorageConfiguration.class})
 public abstract class IntegrationTestSupport {
 }

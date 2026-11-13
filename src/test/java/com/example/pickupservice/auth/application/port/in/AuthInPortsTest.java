@@ -4,6 +4,7 @@ import com.example.pickupservice.auth.domain.ConsentType;
 import com.example.pickupservice.auth.domain.LinkMode;
 import com.example.pickupservice.auth.domain.MemberDeviceStatus;
 import com.example.pickupservice.auth.domain.Platform;
+import com.example.pickupservice.common.image.ProfileImage;
 import com.example.pickupservice.common.security.Role;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -149,7 +150,8 @@ class AuthInPortsTest {
 				"consents", generic(List.class, ConsentAgreement.class),
 				"platform", Platform.class.getName(),
 				"pushToken", String.class.getName(),
-				"name", String.class.getName()));
+				"name", String.class.getName(),
+				"profileImage", ProfileImage.class.getName()));
 		assertRecord(VehicleLinkResult.class, components(
 				"vehicleId", "long",
 				"familyId", "long",

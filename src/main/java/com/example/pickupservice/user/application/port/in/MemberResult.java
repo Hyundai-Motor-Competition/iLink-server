@@ -8,6 +8,7 @@ public record MemberResult(
 		Role role,
 		String name,
 		String phone,
-		DeviceStatus deviceStatus
+		DeviceStatus deviceStatus,
+		String profileImageUrl
 ) {
 }

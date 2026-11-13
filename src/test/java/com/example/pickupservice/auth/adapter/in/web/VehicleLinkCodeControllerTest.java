@@ -15,6 +15,8 @@ import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
+import com.example.pickupservice.common.image.ImageFormat;
+import com.example.pickupservice.common.image.StorageUnavailableException;
 import com.example.pickupservice.common.logging.RequestLogAttributes;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
@@ -23,14 +25,19 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +56,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.times;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -89,6 +97,10 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	private static final String REQUIRED_CONSENTS_JSON =
 			"[{\"type\": \"TERMS\", \"agreed\": true}, {\"type\": \"PRIVACY\", \"agreed\": true}, {\"type\": \"MARKETING\", \"agreed\": false}]";
 	private static final String MISSING_PRIVACY_CONSENTS_JSON = "[{\"type\": \"TERMS\", \"agreed\": true}]";
+	private static final String REQUEST_PART = "request";
+	private static final String PROFILE_IMAGE_PART = "profileImage";
+	private static final byte[] PNG_BYTES = {
+			(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52};
 
 	private final MockMvc mockMvc;
 	private final AccessTokenFixture accessTokenFixture;
@@ -546,6 +558,92 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 		then(approveLinkUseCase).shouldHaveNoInteractions();
 	}
 
+	@Test
+	@DisplayName("POST /v1/vehicle-links는 multipart의 request 파트와 profileImage 파트를 받아 201과 토큰을 돌려준다")
+	void approveLinkMultipartWithProfileImageReturns201AndPassesImageToUseCase() throws Exception {
+		given(approveLinkUseCase.approveLink(any())).willReturn(vehicleLinkResult());
+
+		mockMvc.perform(approveMultipartRequest(approveBody("NEW", "ANDROID", GUARDIAN_NAME, REQUIRED_CONSENTS_JSON),
+						new MockMultipartFile(PROFILE_IMAGE_PART, "guardian.png", MediaType.IMAGE_PNG_VALUE, PNG_BYTES)))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.vehicleId").value(LINKED_VEHICLE_ID))
+				.andExpect(jsonPath("$.familyId").value(FAMILY_ID))
+				.andExpect(jsonPath("$.userId").value(USER_ID))
+				.andExpect(jsonPath("$.accessToken").value(GUARDIAN_ACCESS_TOKEN))
+				.andExpect(jsonPath("$.refreshToken").value(GUARDIAN_REFRESH_TOKEN));
+
+		ArgumentCaptor<ApproveLinkCommand> captor = ArgumentCaptor.forClass(ApproveLinkCommand.class);
+		then(approveLinkUseCase).should().approveLink(captor.capture());
+		ApproveLinkCommand command = captor.getValue();
+		assertThat(command.code()).isEqualTo(CODE);
+		assertThat(command.mode()).isEqualTo(LinkMode.NEW);
+		assertThat(command.consents()).containsExactly(
+				new ConsentAgreement(ConsentType.TERMS, true),
+				new ConsentAgreement(ConsentType.PRIVACY, true),
+				new ConsentAgreement(ConsentType.MARKETING, false));
+		assertThat(command.platform()).isEqualTo(Platform.ANDROID);
+		assertThat(command.pushToken()).isEqualTo(PUSH_TOKEN);
+		assertThat(command.name()).isEqualTo(GUARDIAN_NAME);
+		assertThat(command.profileImage()).isNotNull();
+		assertThat(command.profileImage().format()).isEqualTo(ImageFormat.PNG);
+		assertThat(command.profileImage().bytes()).isEqualTo(PNG_BYTES);
+	}
+
+	@Test
+	@DisplayName("POST /v1/vehicle-links는 지금처럼 application/json 본문도 받아 201을 돌려준다")
+	void approveLinkStillAcceptsJsonBodyReturns201() throws Exception {
+		given(approveLinkUseCase.approveLink(any())).willReturn(vehicleLinkResult());
+
+		mockMvc.perform(approveRequest(approveBody("NEW", "ANDROID", GUARDIAN_NAME, REQUIRED_CONSENTS_JSON)))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.userId").value(USER_ID))
+				.andExpect(jsonPath("$.accessToken").value(GUARDIAN_ACCESS_TOKEN));
+
+		then(approveLinkUseCase).should().approveLink(new ApproveLinkCommand(
+				CODE,
+				LinkMode.NEW,
+				List.of(
+						new ConsentAgreement(ConsentType.TERMS, true),
+						new ConsentAgreement(ConsentType.PRIVACY, true),
+						new ConsentAgreement(ConsentType.MARKETING, false)),
+				Platform.ANDROID,
+				PUSH_TOKEN,
+				GUARDIAN_NAME));
+	}
+
+	@Test
+	@DisplayName("POST /v1/vehicle-links의 profileImage가 이미지가 아니면 422 PROFILE_IMAGE_INVALID를 돌려준다")
+	void approveLinkMultipartWithNonImageReturns422ProfileImageInvalid() throws Exception {
+		mockMvc.perform(approveMultipartRequest(approveBody("NEW", "ANDROID", GUARDIAN_NAME, REQUIRED_CONSENTS_JSON),
+						new MockMultipartFile(PROFILE_IMAGE_PART, "fake.png", MediaType.IMAGE_PNG_VALUE,
+								"not an image".getBytes(StandardCharsets.UTF_8))))
+				.andExpect(commonError(HttpStatus.UNPROCESSABLE_CONTENT, "PROFILE_IMAGE_INVALID"));
+
+		then(approveLinkUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/vehicle-links의 profileImage가 5MB를 넘으면 413 PROFILE_IMAGE_TOO_LARGE를 돌려준다")
+	void approveLinkMultipartWithImageOver5MbReturns413ProfileImageTooLarge() throws Exception {
+		byte[] oversized = Arrays.copyOf(PNG_BYTES, 5_242_881);
+
+		mockMvc.perform(approveMultipartRequest(approveBody("NEW", "ANDROID", GUARDIAN_NAME, REQUIRED_CONSENTS_JSON),
+						new MockMultipartFile(PROFILE_IMAGE_PART, "big.png", MediaType.IMAGE_PNG_VALUE, oversized)))
+				.andExpect(commonError(HttpStatus.CONTENT_TOO_LARGE, "PROFILE_IMAGE_TOO_LARGE"));
+
+		then(approveLinkUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/vehicle-links는 저장소 업로드가 실패하면 503 STORAGE_UNAVAILABLE을 돌려준다")
+	void approveLinkWhenStorageUploadFailsReturns503StorageUnavailable() throws Exception {
+		given(approveLinkUseCase.approveLink(any())).willThrow(new StorageUnavailableException());
+
+		mockMvc.perform(approveMultipartRequest(approveBody("NEW", "ANDROID", GUARDIAN_NAME, REQUIRED_CONSENTS_JSON),
+						new MockMultipartFile(PROFILE_IMAGE_PART, "guardian.png", MediaType.IMAGE_PNG_VALUE, PNG_BYTES)))
+				.andExpect(commonError(HttpStatus.SERVICE_UNAVAILABLE, "STORAGE_UNAVAILABLE"));
+	}
+
 	private static long nextVehicleId() {
 		return VEHICLE_IDS.incrementAndGet();
 	}
@@ -618,6 +716,18 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 				.header(IDEMPOTENCY_KEY_HEADER, UUID.randomUUID().toString())
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(body);
+	}
+
+	private static MockMultipartHttpServletRequestBuilder approveMultipartRequest(String requestJson,
+			MockMultipartFile... extraParts) {
+		MockMultipartHttpServletRequestBuilder builder = multipart(APPROVE_PATH)
+				.file(new MockMultipartFile(REQUEST_PART, "", MediaType.APPLICATION_JSON_VALUE,
+						requestJson.getBytes(StandardCharsets.UTF_8)));
+		for (MockMultipartFile part : extraParts) {
+			builder.file(part);
+		}
+		builder.header(IDEMPOTENCY_KEY_HEADER, UUID.randomUUID().toString());
+		return builder;
 	}
 
 	private static MockHttpServletRequestBuilder byCodeRequest(String code) {

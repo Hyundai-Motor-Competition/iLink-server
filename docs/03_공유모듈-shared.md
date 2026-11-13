@@ -146,6 +146,7 @@ common에는 엔드포인트가 없다. 아래 부품이 모든 도메인의 API
 - 헤더가 없으면 422 VALIDATION_FAILED(fields[0].field Idempotency-Key, reason 한국어 문구)로 거절하고 컨트롤러는 실행하지 않는다.
 - 범위: (주체 종류, 주체 id, 키). 인증 없는 요청은 주체를 null로 저장해 모든 호출자가 같은 공간을 쓴다(팀장 결정).
 - 요청 해시 = SHA-256(HTTP 메서드 + 경로 + 본문 바이트)의 16진수 64자. JSON 정규화는 하지 않는다. 경로는 쿼리 문자열을 뺀 요청 URI다.
+- multipart/form-data 요청은 예외다. 본문을 미리 읽지 않고(실제 서블릿 컨테이너에서 파트를 다시 읽을 수 있게) request 파트 바이트와 profileImage 바이트의 SHA-256으로 해시한다. 규칙은 10_프로필사진-profile.md 「Idempotency 해시 (multipart)」. 크기 한도를 넘어 파트를 읽지 못하면 Idempotency 처리 없이 넘겨 413으로 끝난다.
 
 | 기존 행(같은 주체 · 키) | 응답 |
 |---|---|

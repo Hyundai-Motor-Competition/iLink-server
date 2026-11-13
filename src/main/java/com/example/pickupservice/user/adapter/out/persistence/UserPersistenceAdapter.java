@@ -93,7 +93,8 @@ class UserPersistenceAdapter implements LoadFamilyPort, SaveFamilyPort, LoadUser
 	}
 
 	private static UserEntity toEntity(User user) {
-		return new UserEntity(user.getUserId(), user.getFamilyId(), user.getRole(), user.getName(), user.getPhone());
+		return new UserEntity(user.getUserId(), user.getFamilyId(), user.getRole(), user.getName(), user.getPhone(),
+				user.getProfileImageKey());
 	}
 
 	private static VehicleEntity toEntity(Vehicle vehicle, Long version) {
@@ -108,7 +109,7 @@ class UserPersistenceAdapter implements LoadFamilyPort, SaveFamilyPort, LoadUser
 
 	private static User toDomain(UserEntity entity) {
 		return User.restore(entity.getUserId(), entity.getFamilyId(), entity.getRole(), entity.getName(),
-				entity.getPhone());
+				entity.getPhone(), entity.getProfileImageKey());
 	}
 
 	private static Vehicle toDomain(VehicleEntity entity) {

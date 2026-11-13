@@ -39,12 +39,20 @@ public class UserEntity extends BaseTimeEntity {
 	@Column(length = 255)
 	private String phone;
 
+	@Column(name = "profile_image_key", length = 200)
+	private String profileImageKey;
+
 	public UserEntity(Long userId, Long familyId, Role role, String name, String phone) {
+		this(userId, familyId, role, name, phone, null);
+	}
+
+	public UserEntity(Long userId, Long familyId, Role role, String name, String phone, String profileImageKey) {
 		this.userId = userId;
 		this.familyId = familyId;
 		this.role = role;
 		this.name = name;
 		this.phone = phone;
+		this.profileImageKey = profileImageKey;
 	}
 
 }

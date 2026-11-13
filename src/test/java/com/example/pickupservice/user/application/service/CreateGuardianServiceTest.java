@@ -2,10 +2,13 @@ package com.example.pickupservice.user.application.service;
 
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.error.ErrorCode;
+import com.example.pickupservice.common.image.ProfileImage;
+import com.example.pickupservice.common.image.StorageUnavailableException;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.user.application.port.in.CreateGuardianCommand;
 import com.example.pickupservice.user.application.port.in.GuardianAccount;
 import com.example.pickupservice.user.application.port.out.LoadVehiclePort;
+import com.example.pickupservice.user.application.port.out.ProfileImageStoragePort;
 import com.example.pickupservice.user.application.port.out.SaveFamilyPort;
 import com.example.pickupservice.user.application.port.out.SaveUserPort;
 import com.example.pickupservice.user.application.port.out.SaveVehiclePort;
@@ -13,7 +16,7 @@ import com.example.pickupservice.user.domain.Family;
 import com.example.pickupservice.user.domain.JoinCallMode;
 import com.example.pickupservice.user.domain.User;
 import com.example.pickupservice.user.domain.Vehicle;
-import org.junit.jupiter.api.BeforeEach;
+import com.example.pickupservice.user.fixture.InMemoryProfileImageStorage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +24,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -29,14 +34,20 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import static com.example.pickupservice.common.fixture.TestImages.PNG_BYTES;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class CreateGuardianServiceTest {
@@ -48,7 +59,6 @@ class CreateGuardianServiceTest {
 	private static final String MODEL = "아이오닉 5";
 	private static final String NAME = "김보호";
 	private static final String PHONE = "+821012345678";
-
 	@Mock
 	private SaveFamilyPort saveFamilyPort;
 
@@ -61,13 +71,11 @@ class CreateGuardianServiceTest {
 	@Mock
 	private SaveVehiclePort saveVehiclePort;
 
-	private CreateGuardianService createGuardianService;
+	@Mock
+	private ProfileImageStoragePort profileImageStoragePort;
 
-	@BeforeEach
-	void setUp() {
-		createGuardianService = new CreateGuardianService(saveFamilyPort, saveUserPort, loadVehiclePort,
-				saveVehiclePort);
-	}
+	@InjectMocks
+	private CreateGuardianService createGuardianService;
 
 	private static Vehicle unownedVehicle() {
 		return Vehicle.restore(VEHICLE_ID, null, VIN, MODEL, null, null);
@@ -173,5 +181,121 @@ class CreateGuardianServiceTest {
 		assertThat(exception.status()).isEqualTo(ErrorCode.VEHICLE_ALREADY_LINKED.getStatus());
 		assertThat(exception.code()).isEqualTo(ErrorCode.VEHICLE_ALREADY_LINKED.name());
 		assertThat(exception.getMessage()).isEqualTo("이미 보호자가 연결된 차량입니다");
+	}
+
+	@Test
+	@DisplayName("보호자 생성(LINK-04 NEW)은 사진이 있으면 차량 검증 뒤 저장소에 올리고 업로드한 키를 보호자 User에 저장한다")
+	void uploadsProfileImageAndStoresKeyOnGuardian() {
+		given(loadVehiclePort.loadVehicle(VEHICLE_ID)).willReturn(Optional.of(unownedVehicle()));
+		given(saveFamilyPort.saveFamily(any())).willAnswer(invocation -> {
+			Family family = invocation.getArgument(0);
+			return Family.restore(FAMILY_ID, family.getJoinCallMode(), family.getSettingsVersion());
+		});
+		given(saveUserPort.saveUser(any())).willAnswer(invocation -> {
+			User user = invocation.getArgument(0);
+			return User.restore(USER_ID, user.getFamilyId(), user.getRole(), user.getName(), user.getPhone(),
+					user.getProfileImageKey());
+		});
+		lenient().when(saveVehiclePort.saveVehicle(any())).thenAnswer(invocation -> invocation.getArgument(0));
+		CreateGuardianCommand command = new CreateGuardianCommand(VEHICLE_ID, PHONE, NAME)
+				.withProfileImage(ProfileImage.of(PNG_BYTES));
+
+		GuardianAccount account = createGuardianService.createGuardian(command);
+
+		assertThat(account).isEqualTo(new GuardianAccount(FAMILY_ID, USER_ID));
+		InOrder inOrder = inOrder(loadVehiclePort, profileImageStoragePort, saveUserPort);
+		inOrder.verify(loadVehiclePort).loadVehicle(VEHICLE_ID);
+		ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+		ArgumentCaptor<byte[]> bytes = ArgumentCaptor.forClass(byte[].class);
+		inOrder.verify(profileImageStoragePort).put(key.capture(), bytes.capture(), eq("image/png"));
+		ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+		inOrder.verify(saveUserPort).saveUser(savedUser.capture());
+		assertThat(key.getValue()).matches(
+				"profiles/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.png");
+		assertThat(bytes.getValue()).isEqualTo(PNG_BYTES);
+		assertThat(savedUser.getValue().getRole()).isEqualTo(Role.GUARDIAN);
+		assertThat(savedUser.getValue().getProfileImageKey()).isEqualTo(key.getValue());
+	}
+
+	@Test
+	@DisplayName("보호자 생성은 차량이 이미 연결돼 거절되면 사진이 있어도 저장소에 아무것도 올리지 않는다")
+	void uploadsNothingWhenVehicleAlreadyLinked() {
+		given(loadVehiclePort.loadVehicle(VEHICLE_ID)).willReturn(
+				Optional.of(Vehicle.restore(VEHICLE_ID, 5L, VIN, MODEL, null, null)));
+		CreateGuardianCommand command = new CreateGuardianCommand(VEHICLE_ID, PHONE, NAME)
+				.withProfileImage(ProfileImage.of(PNG_BYTES));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> createGuardianService.createGuardian(command));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.code()).isEqualTo("VEHICLE_ALREADY_LINKED");
+		verify(profileImageStoragePort, never()).put(anyString(), any(), anyString());
+		verify(saveUserPort, never()).saveUser(any());
+	}
+
+	@Test
+	@DisplayName("보호자 생성은 사진이 없으면 저장소를 부르지 않고 profileImageKey를 비워 둔다")
+	void leavesProfileImageKeyEmptyWhenNoImage() {
+		given(loadVehiclePort.loadVehicle(VEHICLE_ID)).willReturn(Optional.of(unownedVehicle()));
+		given(saveFamilyPort.saveFamily(any())).willReturn(Family.restore(FAMILY_ID, JoinCallMode.AUTO, 0));
+		given(saveUserPort.saveUser(any())).willAnswer(invocation -> {
+			User user = invocation.getArgument(0);
+			return User.restore(USER_ID, user.getFamilyId(), user.getRole(), user.getName(), user.getPhone());
+		});
+		lenient().when(saveVehiclePort.saveVehicle(any())).thenAnswer(invocation -> invocation.getArgument(0));
+		CreateGuardianCommand command = new CreateGuardianCommand(VEHICLE_ID, PHONE, NAME).withProfileImage(null);
+
+		createGuardianService.createGuardian(command);
+
+		ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+		verify(saveUserPort).saveUser(savedUser.capture());
+		assertThat(savedUser.getValue().getProfileImageKey()).isNull();
+		verifyNoInteractions(profileImageStoragePort);
+	}
+
+	@Test
+	@DisplayName("저장소 설정이 없을 때 사진이 있는 보호자 생성 요청은 StorageUnavailableException으로 끝나고 보호자를 만들지 않는다")
+	void failsWithStorageUnavailableWhenStorageIsNotConfiguredAndImageIsGiven() {
+		InMemoryProfileImageStorage storage = new InMemoryProfileImageStorage();
+		storage.unconfigure();
+		CreateGuardianService service = new CreateGuardianService(
+				saveFamilyPort, saveUserPort, loadVehiclePort, saveVehiclePort, storage);
+		given(loadVehiclePort.loadVehicle(VEHICLE_ID)).willReturn(Optional.of(unownedVehicle()));
+		lenient().when(saveFamilyPort.saveFamily(any())).thenReturn(Family.restore(FAMILY_ID, JoinCallMode.AUTO, 0));
+		CreateGuardianCommand command = new CreateGuardianCommand(VEHICLE_ID, PHONE, NAME)
+				.withProfileImage(ProfileImage.of(PNG_BYTES));
+
+		Throwable thrown = catchThrowable(() -> service.createGuardian(command));
+
+		assertThat(thrown).isInstanceOf(StorageUnavailableException.class);
+		assertThat(storage.storedKeys()).isEmpty();
+		verify(saveUserPort, never()).saveUser(any());
+		verify(saveVehiclePort, never()).saveVehicle(any());
+	}
+
+	@Test
+	@DisplayName("저장소 설정이 없어도 사진이 없는 보호자 생성은 지금처럼 성공한다")
+	void createsGuardianWithoutImageWhenStorageIsNotConfigured() {
+		InMemoryProfileImageStorage storage = new InMemoryProfileImageStorage();
+		storage.unconfigure();
+		CreateGuardianService service = new CreateGuardianService(
+				saveFamilyPort, saveUserPort, loadVehiclePort, saveVehiclePort, storage);
+		given(loadVehiclePort.loadVehicle(VEHICLE_ID)).willReturn(Optional.of(unownedVehicle()));
+		given(saveFamilyPort.saveFamily(any())).willReturn(Family.restore(FAMILY_ID, JoinCallMode.AUTO, 0));
+		given(saveUserPort.saveUser(any())).willAnswer(invocation -> {
+			User user = invocation.getArgument(0);
+			return User.restore(USER_ID, user.getFamilyId(), user.getRole(), user.getName(), user.getPhone());
+		});
+		lenient().when(saveVehiclePort.saveVehicle(any())).thenAnswer(invocation -> invocation.getArgument(0));
+		CreateGuardianCommand command = new CreateGuardianCommand(VEHICLE_ID, PHONE, NAME);
+
+		GuardianAccount account = service.createGuardian(command);
+
+		assertThat(account).isEqualTo(new GuardianAccount(FAMILY_ID, USER_ID));
+		ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+		verify(saveUserPort).saveUser(savedUser.capture());
+		assertThat(savedUser.getValue().getProfileImageKey()).isNull();
+		assertThat(storage.storedKeys()).isEmpty();
 	}
 }

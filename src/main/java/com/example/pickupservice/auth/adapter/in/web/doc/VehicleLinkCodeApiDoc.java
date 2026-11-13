@@ -8,10 +8,14 @@ import com.example.pickupservice.auth.adapter.in.web.VehicleLinkResponse;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "차량 연결 코드", description = "QR 연결 코드 발급 · 상태 조회 · 코드 확인")
 public interface VehicleLinkCodeApiDoc {
@@ -48,5 +52,18 @@ public interface VehicleLinkCodeApiDoc {
 	@ApiResponse(responseCode = "410", description = "LINK_CODE_EXPIRED (만료 · 사용된 코드)")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED · CONSENT_REQUIRED (TERMS · PRIVACY 누락)")
 	VehicleLinkResponse approveLink(ApproveLinkRequest request);
+
+	@Operation(summary = "연결 승인 · 프로필 사진 포함 (LINK-04)", description = "인증 없이 부른다. Idempotency-Key 필요. multipart/form-data. request 파트는 JSON 승인 본문과 같고, profileImage 파트(JPEG · PNG · WEBP, 5MB 이하)는 선택이다. 0바이트 파트는 사진 없음으로 본다")
+	@SecurityRequirements
+	@ApiResponse(responseCode = "201", description = "vehicleId · familyId · userId · accessToken · refreshToken")
+	@ApiResponse(responseCode = "404", description = "LINK_CODE_INVALID (없는 코드)")
+	@ApiResponse(responseCode = "409", description = "LINK_MODE_MISMATCH · VEHICLE_ALREADY_LINKED · IDEMPOTENCY_KEY_REUSED")
+	@ApiResponse(responseCode = "410", description = "LINK_CODE_EXPIRED (만료 · 사용된 코드)")
+	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED · CONSENT_REQUIRED · PROFILE_IMAGE_INVALID(이미지가 아님)")
+	@ApiResponse(responseCode = "413", description = "PROFILE_IMAGE_TOO_LARGE (사진이 5MB 초과)")
+	@ApiResponse(responseCode = "503", description = "STORAGE_UNAVAILABLE (사진 저장소 업로드 실패)")
+	VehicleLinkResponse approveLinkWithProfileImage(
+			@Parameter(description = "승인 본문(JSON)", content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE)) ApproveLinkRequest request,
+			@Parameter(description = "프로필 사진(선택)") MultipartFile profileImage) throws IOException;
 
 }

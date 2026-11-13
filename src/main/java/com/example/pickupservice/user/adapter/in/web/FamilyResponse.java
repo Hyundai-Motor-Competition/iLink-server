@@ -9,7 +9,7 @@ public record FamilyResponse(
 		long familyId,
 		JoinCallMode joinCallMode,
 		VehicleResponse vehicle,
-		List<MemberResponse> members,
+		List<FamilyMemberResponse> members,
 		boolean childLocationEnabled
 ) {
 
@@ -18,7 +18,7 @@ public record FamilyResponse(
 				result.familyId(),
 				result.joinCallMode(),
 				VehicleResponse.from(result.vehicle()),
-				result.members().stream().map(MemberResponse::from).toList(),
+				result.members().stream().map(FamilyMemberResponse::from).toList(),
 				result.childLocationEnabled());
 	}
 

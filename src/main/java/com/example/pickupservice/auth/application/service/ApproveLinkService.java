@@ -18,6 +18,8 @@ import com.example.pickupservice.auth.domain.LinkMode;
 import com.example.pickupservice.auth.domain.OwnerType;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
+import com.example.pickupservice.user.application.port.in.ChangeProfileImageCommand;
+import com.example.pickupservice.user.application.port.in.ChangeProfileImageUseCase;
 import com.example.pickupservice.user.application.port.in.CreateGuardianCommand;
 import com.example.pickupservice.user.application.port.in.CreateGuardianUseCase;
 import com.example.pickupservice.user.application.port.in.GuardianAccount;
@@ -41,6 +43,7 @@ public class ApproveLinkService implements ApproveLinkUseCase {
 	private final LoadVehicleUseCase loadVehicleUseCase;
 	private final CreateGuardianUseCase createGuardianUseCase;
 	private final LoadMemberUseCase loadMemberUseCase;
+	private final ChangeProfileImageUseCase changeProfileImageUseCase;
 	private final LoadDevicePort loadDevicePort;
 	private final SaveDevicePort saveDevicePort;
 	private final IssueTokenPort issueTokenPort;
@@ -85,10 +88,14 @@ public class ApproveLinkService implements ApproveLinkUseCase {
 	private GuardianAccount resolveGuardian(ApproveLinkCommand command, VehicleInfo vehicle, Instant now) {
 		if (command.mode() == LinkMode.NEW) {
 			return createGuardianUseCase.createGuardian(
-					new CreateGuardianCommand(vehicle.vehicleId(), null, command.name()));
+					new CreateGuardianCommand(vehicle.vehicleId(), null, command.name(), command.profileImage()));
 		}
 		GuardianAccount guardian = findGuardian(vehicle.familyId());
 		revokePreviousDevices(guardian.userId(), now);
+		if (command.profileImage() != null) {
+			changeProfileImageUseCase.changeProfileImage(
+					new ChangeProfileImageCommand(guardian.userId(), command.profileImage()));
+		}
 		return guardian;
 	}
 

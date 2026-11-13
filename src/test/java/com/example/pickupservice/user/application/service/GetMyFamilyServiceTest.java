@@ -14,12 +14,14 @@ import com.example.pickupservice.user.domain.Family;
 import com.example.pickupservice.user.domain.JoinCallMode;
 import com.example.pickupservice.user.domain.User;
 import com.example.pickupservice.user.domain.Vehicle;
+import com.example.pickupservice.user.fixture.InMemoryProfileImageStorage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
@@ -31,7 +33,10 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class GetMyFamilyServiceTest {
@@ -54,6 +59,9 @@ class GetMyFamilyServiceTest {
 
 	@Mock
 	private LoadMemberDeviceStatusPort loadMemberDeviceStatusPort;
+
+	@Spy
+	private InMemoryProfileImageStorage profileImageStorage = new InMemoryProfileImageStorage();
 
 	@InjectMocks
 	private GetMyFamilyService getMyFamilyService;
@@ -178,5 +186,49 @@ class GetMyFamilyServiceTest {
 		FamilyResult result = getMyFamilyService.getMyFamily(new GetMyFamilyQuery(FAMILY_ID));
 
 		assertThat(result.childLocationEnabled()).isTrue();
+	}
+
+	@Test
+	@DisplayName("가족 조회는 profileImageKey가 있는 멤버에게 그 키의 서명 URL을, 없는 멤버에게 기본 아바타 서명 URL을 준다")
+	void fillsProfileImageUrlWithKeyUrlOrDefaultAvatarUrl() {
+		given(loadFamilyPort.loadFamily(FAMILY_ID))
+				.willReturn(Optional.of(Family.restore(FAMILY_ID, JoinCallMode.AUTO, 0)));
+		given(loadUserPort.loadUsers(FAMILY_ID)).willReturn(List.of(
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678",
+						"profiles/guardian-photo.jpg"),
+				User.restore(CHILD_MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", null)));
+		lenient().when(loadVehiclePort.loadLinkedVehicleOfFamily(FAMILY_ID)).thenReturn(Optional.empty());
+		given(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList())).willReturn(Map.of());
+
+		FamilyResult result = getMyFamilyService.getMyFamily(new GetMyFamilyQuery(FAMILY_ID));
+
+		String keyUrl = profileImageStorage.presignedUrl("profiles/guardian-photo.jpg").orElseThrow();
+		String defaultUrl = profileImageStorage.defaultUrl().orElseThrow();
+		assertThat(result.members())
+				.extracting(MemberResult::userId, MemberResult::profileImageUrl)
+				.containsExactly(
+						tuple(GUARDIAN_ID, keyUrl),
+						tuple(CHILD_MINJUN_ID, defaultUrl));
+		assertThat(keyUrl).isNotEqualTo(defaultUrl);
+	}
+
+	@Test
+	@DisplayName("가족 조회는 저장소 설정이 없으면 모든 멤버의 profileImageUrl을 null로 준다")
+	void givesNullProfileImageUrlToAllMembersWhenStorageIsNotConfigured() {
+		profileImageStorage.unconfigure();
+		given(loadFamilyPort.loadFamily(FAMILY_ID))
+				.willReturn(Optional.of(Family.restore(FAMILY_ID, JoinCallMode.AUTO, 0)));
+		given(loadUserPort.loadUsers(FAMILY_ID)).willReturn(List.of(
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678",
+						"profiles/guardian-photo.jpg"),
+				User.restore(CHILD_MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", null)));
+		lenient().when(loadVehiclePort.loadLinkedVehicleOfFamily(FAMILY_ID)).thenReturn(Optional.empty());
+		given(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList())).willReturn(Map.of());
+
+		FamilyResult result = getMyFamilyService.getMyFamily(new GetMyFamilyQuery(FAMILY_ID));
+
+		assertThat(result.members()).hasSize(2);
+		assertThat(result.members()).extracting(MemberResult::profileImageUrl).containsOnlyNulls();
+		verify(profileImageStorage, never()).put(anyString(), any(), anyString());
 	}
 }
