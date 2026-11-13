@@ -214,6 +214,37 @@ class SessionChildTest {
 		assertThat(child.getChildPhase()).isEqualTo(ChildPhase.MEETING);
 	}
 
+	@Test
+	@DisplayName("SessionChild.markReady는 처음 부르면 readyAt에 그 시각을 기록하고 childPhase · acknowledgedAt은 그대로 둔다")
+	void markReadyRecordsReadyAtAndKeepsPhase() {
+		SessionChild child = calledChild();
+
+		child.markReady(at(18, 12));
+
+		assertThat(child.getReadyAt()).isEqualTo(at(18, 12));
+		assertThat(child.getChildPhase()).isEqualTo(ChildPhase.CALLED);
+		assertThat(child.getAcknowledgedAt()).isNull();
+	}
+
+	@Test
+	@DisplayName("SessionChild.markReady를 두 번 부르면 첫 readyAt이 유지된다")
+	void markReadyTwiceKeepsFirstReadyAt() {
+		SessionChild child = calledChild();
+		Instant first = at(18, 12);
+		Instant second = at(18, 13);
+
+		child.markReady(first);
+		child.markReady(second);
+
+		assertThat(child.getReadyAt()).isEqualTo(first);
+	}
+
+	@Test
+	@DisplayName("SessionChild.waiting으로 만든 자녀의 readyAt은 null이다")
+	void waitingChildHasNullReadyAt() {
+		assertThat(SessionChild.waiting(CHILD_USER_ID, SCHEDULE_ID).getReadyAt()).isNull();
+	}
+
 	private static SessionChild calledChild() {
 		return SessionChild.restore(SESSION_CHILD_ID, CHILD_USER_ID, SCHEDULE_ID, ChildPhase.CALLED, 0, null, null,
 				null, null, null);

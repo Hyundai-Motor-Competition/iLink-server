@@ -5,5 +5,6 @@ public enum GuardId {
 	G2,
 	G3,
 	G4,
-	G5
+	G5,
+	G6
 }

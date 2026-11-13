@@ -21,6 +21,7 @@ public class LoadFamilyService implements LoadFamilyUseCase {
 	public FamilyInfo findFamily(long familyId) {
 		Family family = loadFamilyPort.loadFamily(familyId)
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
-		return new FamilyInfo(family.getFamilyId(), family.getJoinCallMode(), family.getSettingsVersion());
+		return new FamilyInfo(family.getFamilyId(), family.getJoinCallMode(), family.getSettingsVersion(),
+				family.isChildLocationEnabled());
 	}
 }

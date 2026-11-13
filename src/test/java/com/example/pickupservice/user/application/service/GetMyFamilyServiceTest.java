@@ -163,4 +163,20 @@ class GetMyFamilyServiceTest {
 		assertThat(result.joinCallMode()).isEqualTo(JoinCallMode.GUARDIAN_CONFIRM);
 		assertThat(result.vehicle()).isEqualTo(new VehicleSummary(VEHICLE_ID, "아이오닉 5", "12가 ****"));
 	}
+
+	@Test
+	@DisplayName("가족 조회(FAM-01)는 저장된 Family의 childLocationEnabled가 true면 FamilyResult.childLocationEnabled를 true로 옮긴다")
+	void copiesChildLocationEnabledTrueFromStoredFamilyToFamilyResult() {
+		given(loadFamilyPort.loadFamily(FAMILY_ID))
+				.willReturn(Optional.of(Family.restore(FAMILY_ID, JoinCallMode.AUTO, 0, true)));
+		given(loadUserPort.loadUsers(FAMILY_ID)).willReturn(List.of(
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678")));
+		lenient().when(loadVehiclePort.loadLinkedVehicleOfFamily(FAMILY_ID)).thenReturn(Optional.empty());
+		lenient().when(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList()))
+				.thenReturn(Map.of(GUARDIAN_ID, DeviceStatus.CONNECTED));
+
+		FamilyResult result = getMyFamilyService.getMyFamily(new GetMyFamilyQuery(FAMILY_ID));
+
+		assertThat(result.childLocationEnabled()).isTrue();
+	}
 }

@@ -4,7 +4,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| 범위 | 엔티티 PickupSession · SessionChild · Call · SessionEvent · PickupOutcome. API SES-01~13(세션), SIG-01~05(차량 · 자녀 신호), CALL-01~04(합류 호출), OUT-01~04(결과 · 기록) — 엔드포인트 28개. 세션 뷰, 실시간 이벤트 21종 · SSE, 합류 호출 판정(트리거 · 가드 G1~G5), 10초 자동 완료 스케줄러(adapter/in/scheduler). 다른 모듈용 in 포트(진행 중 픽업 확인, 호출 진행 기록) |
+| 범위 | 엔티티 PickupSession · SessionChild · Call · SessionEvent · PickupOutcome. API SES-01~13(세션), SIG-01~06(차량 · 자녀 신호), CALL-01~04(합류 호출), OUT-01~04(결과 · 기록) — 엔드포인트 29개. 세션 뷰, 실시간 이벤트 24종 · SSE, 합류 호출 판정(트리거 · 가드 G1~G6), 10초 자동 완료 스케줄러(adapter/in/scheduler). 다른 모듈용 in 포트(진행 중 픽업 확인, 호출 진행 기록) |
 | 의존 | 03_공유모듈-shared, 04_사용자-user(가족 · 자녀 · 차량 · 합류 안내 방식 · 전화번호), 05_인증-auth(자녀 기기 · 위치 동의), 06_일정-schedule(일정 · 학원 대표번호), 07_장소-place(기본 장소 · 저장 장소). notification의 in 포트(Notification 행 기록, 같은 트랜잭션)는 out 포트 + 테스트 대역 |
 | 진행 | 계층 병렬 |
 
@@ -14,9 +14,9 @@
 pickup
 ├─ adapter
 │  ├─ in
-│  │  ├─ web          PickupSessionController(SES-01~07 · 09~13), SignalController(SIG-01~05), CallController(CALL-01~04), OutcomeController(OUT-01~04), doc 인터페이스(컨트롤러마다 1개), 요청 · 응답 DTO(record)
+│  │  ├─ web          PickupSessionController(SES-01~07 · 09~13), SignalController(SIG-01~06), CallController(CALL-01~04), OutcomeController(OUT-01~04), doc 인터페이스(컨트롤러마다 1개), 요청 · 응답 DTO(record)
 │  │  ├─ sse          SessionStreamController (SES-08, 차량 전용), SessionStreamRegistry(차량 연결 보관) [사람 결정 2026-11-09]
-│  │  └─ scheduler    자동 완료 작업. 주기 pickup.session.auto-complete-interval(기본 PT10S), 세션마다 트랜잭션 [사람 결정 2026-11-09]
+│  │  └─ scheduler    자동 완료 작업 · 신호 끊김 철회 작업(pickup.call.signal-lost-check-interval, 기본 PT15S). 주기 pickup.session.auto-complete-interval(기본 PT10S), 세션마다 트랜잭션 [사람 결정 2026-11-09]
 │  └─ out
 │     ├─ persistence  JPA 엔티티 5개, Spring Data 저장소, 도메인 ↔ 엔티티 변환
 │     └─ event        도메인 이벤트 발행(ApplicationEventPublisher), SSE 송출 리스너(AFTER_COMMIT) — 구현 위치는 adapter/in/sse(리스너가 SessionStreamRegistry를 쓰므로)
@@ -52,6 +52,8 @@ pickup
 | etaAt | TIMESTAMPTZ | NULL | 내비 ETA, 최신값만 |
 | remainingMeters | INT | NULL | |
 | etaUpdatedAt | TIMESTAMPTZ | NULL | 60초 넘게 갱신 없으면 stale |
+| vehicleLat · vehicleLng | NUMERIC(9,6) | NULL | SIG-01 location의 마지막 차량 위치 [사람 결정 2026-11-13] |
+| vehicleLocatedAt | TIMESTAMPTZ | NULL | 그 위치의 observedAt |
 | boardingDetectedAt | TIMESTAMPTZ | NULL | SIG-02 DOOR_CYCLE로 탑승 후보가 된 시각 |
 | boardingCancelableUntil | TIMESTAMPTZ | NULL | 10초 취소 창 마감. 자동 완료 스케줄러가 이 시각이 지난 세션을 처리 |
 | boardingDoor | VARCHAR(20) | NULL | 인식한 문 |
@@ -76,6 +78,7 @@ pickup
 | lastLng | NUMERIC(9,6) | NULL | |
 | lastLocatedAt | TIMESTAMPTZ | NULL | 탑승 완료 · 철회 · 취소 때 세 컬럼 모두 NULL |
 | acknowledgedAt | TIMESTAMPTZ | NULL | 「확인했어요」 |
+| readyAt | TIMESTAMPTZ | NULL | SIG-06 준비 완료 첫 시각 [사람 결정 2026-11-13] |
 | boardedAt | TIMESTAMPTZ | NULL | 탑승 |
 
 세션 이벤트 (SessionEvent)
@@ -179,6 +182,7 @@ pickup
 | SIG-03 | POST /v1/pickup-sessions/{sessionId}/prep-time-extensions | 자녀 앱 | 필요 | minutes(5 · 10 · 15) → 200 extraPrepMinutes(누적), callNotBefore | 422 PREP_EXTENSION_LIMIT, 409 CALL_ALREADY_SENT, 409 SESSION_ALREADY_FINISHED(끝난 세션) |
 | SIG-04 | POST /v1/pickup-sessions/{sessionId}/child-locations | 자녀 앱 | 불필요 | at, lat(-90~90), lng(-180~180), accuracyM(선택) → 202. 범위 밖이면 422 VALIDATION_FAILED | 403 LOCATION_CONSENT_REQUIRED, 409 SESSION_ALREADY_FINISHED, 409 CHILD_NOT_CALLED |
 | SIG-05 | POST /v1/pickup-sessions/{sessionId}/help-requests | 자녀 앱 | 필요 | type(NEED_HELP · CANT_FIND_CAR · CONTACT_PARENT) → 201 nextAllowedAt | 429 HELP_REQUEST_TOO_SOON(nextAllowedAt 함께), 409 SESSION_ALREADY_FINISHED(끝난 세션) |
+| SIG-06 | POST /v1/pickup-sessions/{sessionId}/ready | 자녀 앱 | 불필요 | — → 200 childUserId, readyAt(여러 번 불러도 첫 시각) | 409 SESSION_ALREADY_FINISHED(끝난 세션), 404 NOT_FOUND(세션 자녀 아님) |
 | CALL-01 | PUT /v1/pickup-sessions/{sessionId}/call-hold | 차량 앱, GUARDIAN · CO_GUARDIAN · DELEGATE | 필요 | stateVersion → 200 SessionView | 409 CALL_ALREADY_SENT |
 | CALL-01 | DELETE /v1/pickup-sessions/{sessionId}/call-hold | 차량 앱, GUARDIAN · CO_GUARDIAN · DELEGATE | 필요 | query stateVersion → 200 SessionView | 공통 |
 | CALL-02 | POST /v1/pickup-sessions/{sessionId}/calls | 차량 앱 | 필요 | stateVersion → 201 callId, status | 422 CALL_GUARD_UNMET(unmet 함께), 409 CALL_ALREADY_SENT, 409 NOT_GUARDIAN_CONFIRM_MODE |
@@ -205,10 +209,12 @@ SES-02~07, SES-11~13, CALL-01 · 03이 성공하면 돌려주고 SES-03이 조�
 | eta.stale | boolean | 60초 넘게 갱신이 없으면 true(「시간 확인 중」) |
 | call.mode | string | AUTO · GUARDIAN_CONFIRM |
 | call.callId · held · scheduledAt | integer · boolean · datetime | 없으면 callId null |
-| call.guard.met · unmet[] | boolean · string[] | G1~G5 통과 여부와 통과하지 못한 가드 |
+| call.guard.met · unmet[] | boolean · string[] | G1~G6 통과 여부와 통과하지 못한 가드 |
 | call.progress.acceptedAt · sentAt · deliveredAt · acknowledgedAt | datetime | 호출 단계별 시각 |
 | children[].childUserId · name · phase · extraPrepMinutes · callNotBefore · acknowledgedAt · boardedAt | | 자녀별 상태 |
 | children[].location.lat · lng · at | number · number · datetime | 호출 전 · 탑승 후 · 동의 없음이면 null. 차량 · 보호자에게만 |
+| children[].readyAt | datetime | SIG-06 준비 완료 시각. 없으면 null |
+| vehicleLocation.lat · lng · at | number · number · datetime | 마지막 차량 위치. 차량 · 보호자에게 늘, 자녀에게는 700m · 180초 안일 때만. 없거나 세션이 끝났으면 null |
 | route.routeVersion · remainingMeters | integer | |
 | boarding.detectedAt · cancelableUntil · door | | 없으면 boarding = null |
 | incident.type · childUserId · openedAt | | 없으면 incident = null |
@@ -241,7 +247,7 @@ data: {"eventId":9001,"seq":42,"stateVersion":16,"occurredAt":"2026-11-05T18:09:
 ### 상태 전이 (소스 9.6)
 - sessionStatus: (시작) → ACTIVE(SES-02). ACTIVE ↔ ON_HOLD(SES-06 보류 · 해제). ACTIVE → COMPLETED(SES-11, 10초 타이머). ACTIVE · ON_HOLD → CANCELLED(SES-07). COMPLETED · CANCELLED는 끝.
 - childPhase(자녀마다 따로): WAITING → CALLED(호출 발송) → MEETING(CALL-04) → 탑승(boardedAt). CALLED → WAITING(CALL-03 철회 → 안전 대기 후 다시 대기). SIG-03은 상태를 바꾸지 않고 extraPrepMinutes만 늘린다.
-- vehiclePhase: ROUTING → APPROACHING → STOPPED(SIG-02 STOPPED) → DEPARTED(SIG-02 DEPARTED). 한 방향.
+- vehiclePhase: ROUTING → APPROACHING(SIG-01에서 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 60) → STOPPED(SIG-02 STOPPED) → DEPARTED(SIG-02 DEPARTED). DEPARTED 뒤에 다시 STOPPED가 오면 STOPPED로 돌아간다(다른 곳에 다시 정차) [사람 결정 2026-11-13: 접근 중 기준 700m 또는 1분].
 - spotStatus: SELECTED → ROUTING → CONFIRMED(SES-04) → INVALIDATED(사용 불가). SES-05는 SELECTED로 되돌린다.
 - Call.status: ACCEPTED → SENT(FCM 발송) → DELIVERED(NOTI-01) → ACKNOWLEDGED(CALL-04). 발송 뒤 언제든 CALL-03 → REVOKED. 새 호출은 prevCallId로 잇는다.
 
@@ -277,10 +283,15 @@ data: {"eventId":9001,"seq":42,"stateVersion":16,"occurredAt":"2026-11-05T18:09:
 - SES-07: 이미 완료 · 취소면 409 SESSION_ALREADY_FINISHED. 보낸 합류 안내는 자동 철회(CALL_REVOKED)하고 자녀 위치를 비운다. 이벤트 SESSION_CANCELLED.
 
 ### 차량 신호 (SIG-01 · 02)
-- SIG-01: observedAt이 마지막 값보다 오래되면 무시한다. 원본은 저장하지 않고 etaAt(= observedAt + navEtaSeconds) · remainingMeters · etaUpdatedAt만 덮어쓴다. ETA_UPDATED는 저장하지 않고 차량 SSE로만 보낸다. 그다음 「합류 호출 판정」을 돌린다.
+- SIG-01: observedAt이 마지막 값보다 오래되면 무시한다. 원본은 저장하지 않고 etaAt(= observedAt + navEtaSeconds) · remainingMeters · etaUpdatedAt만 덮어쓴다. ETA_UPDATED는 저장하지 않고 차량 SSE로만 보낸다. vehiclePhase가 ROUTING이고 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 60이면 APPROACHING으로 바꾸고 VEHICLE_APPROACHING을 한 번 저장 · 발행한다. 그다음 「합류 호출 판정」을 돌린다.
+- 차량 앱은 세션이 진행 중이면 정차한 뒤에도 SIG-01을 15초마다 보낸다(도착 뒤에는 navEtaSeconds 0 · remainingMeters 0). 이 신호가 끊기면 G4와 「신호 끊김 철회」가 동작한다.
 - SIG-02: eventId가 같으면 무시한다. 원본은 저장하지 않고 결과만 반영한다.
-  - STOPPED → vehiclePhase STOPPED, 이벤트 VEHICLE_STOPPED(occurredAt이 실제 정차 시각).
-  - DEPARTED → vehiclePhase DEPARTED, 이벤트 VEHICLE_DEPARTED.
+  - STOPPED → vehiclePhase STOPPED, 이벤트 VEHICLE_STOPPED(occurredAt이 실제 정차 시각). 그다음 저장된 최신 ETA로 「합류 호출 판정」을 다시 돌린다.
+  - DEPARTED → vehiclePhase DEPARTED, 이벤트 VEHICLE_DEPARTED. 세션이 진행 중이고 탑승 인식 전(boardingDetectedAt 없음)이면서 철회되지 않은 호출이 있으면 자동 철회(revokeReason VEHICLE_DEPARTED, CALL-03과 같은 처리: 세션 자녀 WAITING · 위치 비움 · 이벤트 CALL_REVOKED).
+  - STOP_FAILED → vehiclePhase는 그대로. 세션이 진행 중이고 탑승 인식 전이면서 철회되지 않은 호출이 있으면 자동 철회(revokeReason STOP_FAILED). 끝난 세션 · 탑승 인식 뒤에는 아무것도 바꾸지 않는다 [팀장 결정 2026-11-13, #264]. 호출이 없으면 아무것도 바꾸지 않는다.
+  - DEPARTED · STOP_FAILED 자동 철회의 revokedAt과 CALL_REVOKED의 occurredAt은 차량 이벤트의 occurredAt이다 [팀장 결정 2026-11-13].
+- 차량 앱의 정차 판단(속도 0 일정 시간 + P단 또는 주차 브레이크 + 픽업 장소 반경 안)은 차량 앱이 하고, 서버는 SIG-02 STOPPED를 정차로 본다.
+- 신호 끊김 철회(adapter/in/scheduler): pickup.call.signal-lost-check-interval(기본 PT15S)마다 철회되지 않은 호출이 있는 ACTIVE 세션 중 etaUpdatedAt이 1분(ETA 유효시간) 넘게 지났고 탑승 인식 전인 세션의 호출을 자동 철회한다(revokeReason SIGNAL_LOST, 이벤트 CALL_REVOKED). 세션마다 트랜잭션을 따로 연다.
   - DOOR_CYCLE → 「탑승 · 완료」 참고. 세션이 이미 COMPLETED면 202로 받고 무시하되 eventId는 markProcessed로 남긴다 [사람 결정 2026-11-09].
 
 ### 합류 호출 판정 (소스 9.5 플로우차트 1)
@@ -289,7 +300,7 @@ SIG-01이 들어올 때마다(15초) 이 순서로 확인하고 하나라도 걸
 1. 세션이 ACTIVE이고 callHeld가 false인가.
 2. 철회되지 않은 호출이 아직 없는가. 있으면 중복 발송하지 않는다.
 3. CallTrigger: navEtaSeconds ≤ 180이면 ETA_3MIN, remainingMeters ≤ 700이면 DIST_700M.
-4. Guard G1~G5를 모두 통과하는가. 아니면 보내지 않고 사유를 세션 뷰 call.guard.unmet에 보인다.
+4. Guard G1~G6을 모두 통과하는가. 아니면 보내지 않고 사유를 세션 뷰 call.guard.unmet에 보인다. G6(정차) 때문에 트리거가 먼저 맞아도 호출은 SIG-02 STOPPED가 온 뒤(정차 신호 때 판정을 다시 돌림)에 나간다.
 
 | 가드 | 통과 조건 |
 |---|---|
@@ -298,6 +309,7 @@ SIG-01이 들어올 때마다(15초) 이 순서로 확인하고 하나라도 걸
 | G3 경로 일치 | 확정된 경로가 지금 장소 버전의 것(현재 가정, 확인 필요) |
 | G4 ETA 유효 | etaUpdatedAt이 60초 안 |
 | G5 준비 시간 지남 | 모든 세션 자녀의 callNotBefore가 비었거나 지났음 |
+| G6 차량 정차 | vehiclePhase = STOPPED [사람 결정 2026-11-13: 기획서대로 정차 확인 뒤에만 호출. 자동 호출 · CALL-02 모두 적용] |
 
 5. 가족의 합류 안내 방식이 AUTO면 6으로. GUARDIAN_CONFIRM이면 차량 정차 · 호출 화면에 「합류 안내 보내기」를 띄우고 CALL-02를 기다린다.
 6. 한 트랜잭션으로 Call(ACCEPTED, triggerType, 지금 spotVersion) · Notification 행(type CALL, 세션 자녀 기기) · 이벤트 CALL_TRIGGERED를 저장한다. 철회된 호출 뒤면 prevCallId를 단다.
@@ -312,8 +324,12 @@ SIG-01이 들어올 때마다(15초) 이 순서로 확인하고 하나라도 걸
 
 ### 자녀 신호 (SIG-03 · 04 · 05)
 - SIG-03: 호출 전 실내 대기에서만. 합류 안내를 이미 받았으면 409 CALL_ALREADY_SENT. 누적이 15분을 넘으면 422 PREP_EXTENSION_LIMIT. extraPrepMinutes에 더하고 callNotBefore = 지금 + 누적 분(예: 18:09에 +5분 → 18:14). 이벤트 PREP_TIME_EXTENDED(차량 SSE · 보호자, Notification type PREP_EXTENDED). childPhase는 그대로.
-- SIG-04: 위치 공유 동의가 없으면 403 LOCATION_CONSENT_REQUIRED. 합류 호출을 받은 자녀(CALLED · MEETING)만 받는다. at이 저장된 값보다 오래되면 무시하고 lastLat · lastLng · lastLocatedAt만 덮어쓴다. 탑승 완료 · 호출 철회 · 픽업 취소 때 세 컬럼을 비우고, 그 뒤에 온 요청은 409(세션이 끝났으면 SESSION_ALREADY_FINISHED).
+- SIG-04: 위치 공유 동의가 없으면 403 LOCATION_CONSENT_REQUIRED. 동의는 「자녀의 LOCATION 동의(LoadChildReadinessPort.hasLocationConsent) AND 가족의 자녀 위치 사용(LoadFamilyPort.loadFamily(familyId).childLocationEnabled, 기본 꺼짐)」이다 [사람 결정 · 팀장 결정 2026-11-13]. 합류 호출을 받은 자녀(CALLED · MEETING)만 받는다. at이 저장된 값보다 오래되면 무시하고 lastLat · lastLng · lastLocatedAt만 덮어쓴다. 탑승 완료 · 호출 철회 · 픽업 취소 때 세 컬럼을 비우고, 그 뒤에 온 요청은 409(세션이 끝났으면 SESSION_ALREADY_FINISHED).
 - SIG-05: 같은 아이의 마지막 HELP_REQUESTED 뒤 60초 안이면 429 HELP_REQUEST_TOO_SOON + nextAllowedAt(마지막 시각 + 60초). 1분 제한은 아이별. 세션 행 잠금 안에서 확인 후 이벤트 HELP_REQUESTED(payload childUserId · type)로 기록하고, 보호자에게 FCM(Notification type HELP) · 차량에 SSE. 응답 nextAllowedAt = 지금 + 60초. 문구: NEED_HELP 「도움이 필요해요」, CANT_FIND_CAR 「차를 못 찾고 있어요」, CONTACT_PARENT 「연락해 달라고 해요」.
+- 접근 중 · 준비 알림의 세부 [팀장 결정 2026-11-13]: 접근 중 기준(700m · 60초)은 도메인 상수(PickupSession), 준비 알림 기준(700m · 180초)은 ReceiveTelemetryService 상수다(호출 트리거 설정값과 같은 값이지만 따로 둠. 설정값으로 합칠지는 후속). 두 이벤트의 occurredAt은 서버 시각. 「한 번만」은 VEHICLE_APPROACHING은 ROUTING → APPROACHING 전환 때(되돌아가지 않음), PREPARE_NOTICE_SENT는 그 세션에 이 이벤트가 아직 없을 때. ON_HOLD 세션에서도 접근 중 전환은 하지만(차의 실제 상태) 준비 알림은 보내지 않고, 보류가 풀린 뒤 첫 SIG-01에서 기준 안이면 보낸다. PREPARE_NOTICE_SENT payload는 DEPARTURE_NOTICE_SENT처럼 알림 기록 notificationIds를 싣고, VEHICLE_APPROACHING payload는 비운다.
+- 실내 준비 알림: SIG-01에서 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 180이 처음 되면 세션 자녀에게 준비 알림(Notification type PREPARE, 「곧 도착해요. 실내에서 준비해 주세요」)을 보내고 이벤트 PREPARE_NOTICE_SENT를 세션당 한 번 남긴다. 호출은 정차(G6) 뒤에 따로 나간다 [사람 결정 2026-11-13].
+- SIG-06(준비 완료): 자녀가 준비 알림을 받고 누른다. SessionChild.readyAt을 기록하고(여러 번 눌러도 첫 시각), 이벤트 CHILD_READY(payload childUserId)를 차량 SSE · 보호자로 보낸다. 상태(childPhase)와 호출 판정은 바꾸지 않는다(화면 표시용) [사람 결정 2026-11-13]. 첫 누름에만 stateVersion +1 · CHILD_READY를 남기고, 두 번째부터는 첫 readyAt만 돌려준다. 알림 행(Notification)은 만들지 않는다 [팀장 결정 2026-11-13]. 끝난 세션이면 409 SESSION_ALREADY_FINISHED, 세션 자녀가 아니면 404 NOT_FOUND.
+- 차량 위치: SIG-01 location을 세션의 마지막 차량 위치(vehicleLat · vehicleLng · vehicleLocatedAt)로 덮어쓴다(observedAt이 오래되면 무시). 세션 뷰 vehicleLocation은 차량 · 보호자에게 늘, 자녀에게는 remainingMeters ≤ 700 또는 남은 시간 ≤ 180초일 때만 준다. 푸시는 하지 않고 앱이 화면이 켜진 동안 SES-03을 15초마다 조회해 보여 준다(09 결정 유지) [사람 결정 2026-11-13]. 세션이 끝나면 vehicleLocation은 null.
 
 ### 탑승 · 완료 (소스 9.5 플로우차트 2)
 1. SIG-02 DOOR_CYCLE: 정차 중(STOPPED) · 운전석 제외 · 합류 안내 발송 뒤일 때만 탑승 후보. 아니면 무시(상태 변화 없음).
@@ -324,7 +340,7 @@ SIG-01이 들어올 때마다(15초) 이 순서로 확인하고 하나라도 걸
 6. 완료: sessionStatus COMPLETED, PickupOutcome(completedAt · boardingMethod · predictedStopAt · actualStopAt) 기록, 자녀 위치 비움, 이벤트 SESSION_COMPLETED.
 7. SES-13: 이미 열린 예외가 있으면 409 INCIDENT_ALREADY_OPEN. 세션 ON_HOLD, incidentType · incidentChildUserId · incidentOpenedAt 기록(childUserId가 세션 자녀가 아니면 404 NOT_FOUND), 이벤트 INCIDENT_OPENED. 차량은 예외 · 복구, 보호자는 예외 · 권한 관리, 자녀는 안전 대기 화면으로 간다.
 
-### 실시간 이벤트 21종
+### 실시간 이벤트 24종
 차량은 SSE(SES-08), 보호자 · 자녀 앱은 FCM 데이터 메시지(notification이 보냄)로 받는다. 화면은 stateVersion이 지금보다 작으면 버리고 seq가 건너뛰면 SES-09로 채운다.
 
 표의 받는 사람 「보호자」(알림 기록 포함)는 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE이고 TEACHER는 뺀다. payload의 시각 값(etaAt · predictedStopAt · callNotBefore · nextAllowedAt 등)은 +09:00 문자열로 담는다 [사람 결정 2026-11-09].
@@ -342,6 +358,7 @@ SIG-01이 들어올 때마다(15초) 이 순서로 확인하고 하나라도 걸
 | DEPARTURE_NOTICE_SENT | 출발 알림(세션당 1번) | 차량 · 보호자 | O |
 | ETA_UPDATED | SIG-01 | 차량(SSE)만 | X |
 | VEHICLE_LOCATION | SIG-01 위치 | 없음(푸시 안 함) | X |
+| VEHICLE_APPROACHING | SIG-01로 APPROACHING이 됨(세션당 1번) | 차량 · 보호자 · 자녀 | O |
 | VEHICLE_STOPPED | SIG-02 STOPPED | 차량 · 보호자 · 자녀 | O |
 | VEHICLE_DEPARTED | SIG-02 DEPARTED | 차량 · 보호자 · 자녀 | O |
 | BOARDING_DETECTED | SIG-02 DOOR_CYCLE 탑승 후보 | 차량 · 보호자 | O |
@@ -351,6 +368,8 @@ SIG-01이 들어올 때마다(15초) 이 순서로 확인하고 하나라도 걸
 | CALL_ACKNOWLEDGED | CALL-04 | 차량 · 보호자 | O |
 | CALL_REVOKED | CALL-03, 취소 때 자동 철회 | 차량 · 보호자 · 자녀 | O |
 | PREP_TIME_EXTENDED | SIG-03 | 차량 · 보호자 | O |
+| PREPARE_NOTICE_SENT | 실내 준비 알림(세션당 1번, 700m · 180초) | 차량 · 보호자 | O |
+| CHILD_READY | SIG-06 | 차량 · 보호자 | O |
 | HELP_REQUESTED | SIG-05 | 차량 · 보호자 | O |
 
 - 서비스는 트랜잭션 안에서 SessionEvent를 저장하고 PublishSessionEventPort로 스프링 이벤트를 발행한다. SSE 리스너(AFTER_COMMIT · @Async)가 그 세션의 차량 연결로 보낸다. 롤백되면 아무것도 나가지 않는다.
@@ -366,13 +385,16 @@ SIG-01이 들어올 때마다(15초) 이 순서로 확인하고 하나라도 걸
 
 | 기준 | 값 | 동작 |
 |---|---|---|
-| ETA 유효시간 | 1분 | SIG-01이 1분 동안 없으면 eta.stale = true, 호출 안 함(G4). 전송 간격의 4배 |
+| ETA 유효시간 | 1분 | SIG-01이 1분 동안 없으면 eta.stale = true, 호출 안 함(G4). 전송 간격의 4배. 이미 보낸 호출은 신호 끊김 철회로 취소 |
+| 접근 중 기준 | 700m · 60초 | SIG-01 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 60이면 APPROACHING |
+| 준비 알림 · 자녀에게 차량 위치 보이기 기준 | 700m · 180초 | 실내 준비 알림(세션당 1번), 세션 뷰 vehicleLocation을 자녀에게 보임 |
+| 신호 끊김 확인 주기 | 15초 | pickup.call.signal-lost-check-interval |
 | 호출 트리거 | 180초 · 700m | 판정 3단계 |
 | 가드 재평가 주기 | SIG-01마다(15초) | 별도 타이머 없음 |
 | 탑승 취소 창 | 10초 | SES-12 허용 시간, 자동 완료 시점 |
 | 도움 요청 간격 | 60초 | SIG-05, 아이별 |
 | 준비 시간 누적 한도 | 15분 | SIG-03 |
-| 허용 실외 대기시간 | 5분 | 호출 뒤 5분이 지나도 정차하지 않으면 보호자에게 FCM |
+| 허용 실외 대기시간 | 5분 | (G6 뒤에는 호출이 정차 뒤에만 나가므로 「호출 뒤 정차 안 함」은 생기지 않음. 2026-11-13 뒤 쓰지 않음) |
 | 지연 판정 | 10분 | 목표 픽업 시간보다 10분 넘게 늦으면 보호자 화면에 「지연」 |
 | SSE ping | 30초 | SES-08 |
 
@@ -397,6 +419,7 @@ void receive(VehicleEventCommand c);                                 // ReceiveV
 PrepExtensionResult extend(ExtendPrepTimeCommand c);                 // ExtendPrepTimeUseCase
 void report(ChildLocationCommand c);                                 // ReportChildLocationUseCase
 HelpRequestResult request(HelpRequestCommand c);                     // RequestHelpUseCase
+MarkChildReadyResult markReady(MarkChildReadyCommand c);              // MarkChildReadyUseCase (SIG-06, Command(principal, sessionId) → Result(childUserId, readyAt), 2026-11-13)
 SessionView holdCall(CallHoldCommand c); SessionView releaseCallHold(CallHoldCommand c);   // HoldCallUseCase
 CallResult send(SendCallCommand c);                                  // SendCallUseCase
 SessionView revoke(RevokeCallCommand c);                             // RevokeCallUseCase
@@ -406,13 +429,14 @@ OutcomeView getOutcome(SessionQuery q);                              // GetOutco
 OutcomeView correct(CorrectOutcomeCommand c);                        // CorrectOutcomeUseCase
 DataSettingsResult updateDataSettings(DataSettingsCommand c);        // UpdateDataSettingsUseCase
 int completeExpiredBoardings(Instant now);                           // AutoCompleteBoardingUseCase
+int revokeSignalLostCalls(Instant now);                              // RevokeSignalLostCallsUseCase (신호 끊김 철회, 2026-11-13)
 
 // in 포트 — 다른 모듈용
 boolean hasActivePickup(long vehicleId); boolean isInActivePickup(long userId); boolean isSpotInUse(long spotId); Optional<LatLng> activeChildLocation(long familyId);   // ActivePickupQueryUseCase (auth · user · place)
 void markCallSent(long callId, Instant sentAt); void markCallDelivered(long callId, Instant deliveredAt); boolean isCallAcknowledged(long callId);   // CallProgressUseCase (notification)
 
 // out 포트
-Optional<PickupSession> load(long sessionId); Optional<PickupSession> loadForUpdate(long sessionId); Optional<PickupSession> loadActiveByVehicle(long vehicleId); Optional<PickupSession> loadActiveByFamily(long familyId); Optional<PickupSession> loadActiveByChild(long childUserId); Optional<PickupSession> loadActiveBySpot(long spotId); List<PickupSession> loadBoardingExpired(Instant now);   // LoadSessionPort (loadActiveBySpot: isSpotInUse용, 팀장 결정 2026-11-09)
+Optional<PickupSession> load(long sessionId); Optional<PickupSession> loadForUpdate(long sessionId); Optional<PickupSession> loadActiveByVehicle(long vehicleId); Optional<PickupSession> loadActiveByFamily(long familyId); Optional<PickupSession> loadActiveByChild(long childUserId); Optional<PickupSession> loadActiveBySpot(long spotId); List<PickupSession> loadBoardingExpired(Instant now); List<PickupSession> loadSignalLost(Instant staleBefore);   // LoadSessionPort (loadActiveBySpot: isSpotInUse용, 팀장 결정 2026-11-09)
 PickupSession save(PickupSession s);                                 // SaveSessionPort (SessionChild 포함)
 Optional<Call> loadCall(long callId); Optional<Call> loadLiveCall(long sessionId); Optional<Call> loadLatestCall(long sessionId); Call saveCall(Call c);   // LoadCallPort · SaveCallPort (loadLatestCall: REVOKED 포함 가장 최근, prevCallId · status.call용)
 SessionEvent append(long sessionId, String type, int stateVersion, Instant at, Map<String, Object> payload); SessionEventPage loadAfter(long sessionId, long afterSeq, int limit); Optional<SessionEvent> loadLastHelpRequest(long sessionId, long childUserId); Optional<SessionEvent> loadFirst(long sessionId, String type);   // SessionEventPort
@@ -672,6 +696,28 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 - [x] [web] POST /v1/pickup-sessions에 null이 든 scheduleIds([null] · [801, null])를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다
 - [x] [web] POST /v1/pickup-sessions/{sessionId}/completion에 null이 든 notBoardedChildUserIds([null] · [131, null])를 보내면 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다
 - [x] [web] POST /v1/pickup-sessions/{sessionId}/child-locations에 범위 밖 lat(-90~90 밖) · lng(-180~180 밖)를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다
+- [x] [서비스] 차량 이벤트 DEPARTED를 받으면 철회되지 않은 호출을 철회(revokeReason VEHICLE_DEPARTED)하고 세션 자녀를 WAITING으로 돌리고 위치를 비우고 CALL_REVOKED를 저장 · 발행한다
+- [x] [서비스] 차량 이벤트 STOP_FAILED를 받으면 철회되지 않은 호출을 철회(revokeReason STOP_FAILED)하고 CALL_REVOKED를 저장 · 발행하며, 호출이 없으면 아무것도 바꾸지 않는다
+- [x] [서비스] 차량 이벤트 STOPPED를 받으면 저장된 최신 ETA로 합류 호출 판정을 다시 돌려 조건이 맞으면 호출을 만든다
+- [x] [기반] Guard는 vehiclePhase가 STOPPED가 아니면 G6을 unmet에 넣는다
+- [x] [서비스] 정차 전(vehiclePhase STOPPED 아님)에는 트리거와 G1~G5를 만족해도 자동 호출을 만들지 않고, 합류 안내 보내기(CALL-02)는 422 CALL_GUARD_UNMET(unmet에 G6)로 거절한다
+- [x] [기반] PickupSession.applyTelemetry는 vehiclePhase가 ROUTING일 때 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 60이면 APPROACHING으로 바꾸고, 그 밖의 단계에서는 바꾸지 않는다
+- [x] [서비스] 차량 ETA 수신으로 APPROACHING이 되면 VEHICLE_APPROACHING을 세션당 한 번 저장하고 차량 · 보호자 · 자녀에게 발행한다
+- [x] SessionEventType은 VEHICLE_APPROACHING · PREPARE_NOTICE_SENT · CHILD_READY를 더한 24종이다
+- [x] [서비스] 신호 끊김 철회는 철회되지 않은 호출이 있는 ACTIVE 세션 중 etaUpdatedAt이 1분 넘게 지난 세션의 호출을 철회(revokeReason SIGNAL_LOST)하고 세션 자녀를 WAITING으로 돌리고 CALL_REVOKED를 저장 · 발행한다
+- [x] [서비스] 신호 끊김 철회 스케줄러는 pickup.call.signal-lost-check-interval(기본 PT15S)마다 신호 끊김 철회를 부른다(실제 DB 통합 테스트)
+- [x] [서비스] 자녀 위치는 가족의 자녀 위치 사용(childLocationEnabled)이 꺼져 있으면 403 LOCATION_CONSENT_REQUIRED로 거절한다(LoadChildReadinessPort.hasLocationConsent가 user의 가족 설정을 읽음)
+- [x] [서비스] 차량 ETA 수신에서 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 180이 처음 되면 세션 자녀에게 실내 준비 알림(Notification type PREPARE) 기록을 요청하고 PREPARE_NOTICE_SENT를 세션당 한 번 저장해 차량 · 보호자에게 발행한다
+- [x] [기반] SessionChild.markReady는 readyAt을 기록하고 여러 번 불러도 첫 시각을 유지한다
+- [x] [서비스] 준비 완료(SIG-06)는 세션 자녀의 readyAt을 기록하고 CHILD_READY(payload childUserId)를 저장해 차량 · 보호자에게 발행하며, 끝난 세션이면 SESSION_ALREADY_FINISHED, 세션 자녀가 아니면 NOT_FOUND로 거절한다
+- [x] [web] POST /v1/pickup-sessions/{sessionId}/ready는 자녀 토큰으로 200과 childUserId · readyAt을 돌려주고, 차량 · 보호자 토큰이면 403 FORBIDDEN을 돌려준다
+- [x] [서비스] 세션 조회의 children[]는 readyAt을 담는다
+- [x] [서비스] 차량 ETA 수신은 SIG-01 location을 세션의 마지막 차량 위치(vehicleLat · vehicleLng · vehicleLocatedAt)로 저장하고 observedAt이 오래되면 무시한다
+- [x] [persistence] pickup_session의 vehicle_lat · vehicle_lng · vehicle_located_at을 저장하고 읽는다
+- [x] [서비스] 세션 조회는 vehicleLocation을 차량 · 보호자에게는 늘, 자녀에게는 remainingMeters ≤ 700 또는 남은 시간 ≤ 180초일 때만 주고, 끝난 세션이면 null로 준다
+- [x] [서비스] 끝난 세션(COMPLETED · CANCELLED)이거나 탑승을 인식한(boardingDetectedAt 있음) 세션에는 차량 이벤트 DEPARTED · STOP_FAILED와 신호 끊김 철회가 호출을 철회하지 않고 자녀 상태 · acknowledgedAt을 바꾸지 않는다(DEPARTED는 vehiclePhase · VEHICLE_DEPARTED만 남김)
+- [x] [서비스] ON_HOLD 세션에서는 준비 알림 기준을 넘어도 실내 준비 알림을 보내지 않고, 보류가 풀린 뒤 첫 차량 ETA 수신에서 기준 안이면 보낸다
+- [x] [서비스] 탑승 인식 없이 MANUAL로 완료된 세션과 CANCELLED 세션에 DEPARTED · STOP_FAILED가 와도 살아 있는 호출을 철회하지 않는다(boardingDetectedAt이 비어 있어도 끝난 세션이면 철회 안 함)
 
 ## 확인 필요 사항
 
@@ -685,7 +731,7 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 | G3 「경로 일치」의 판정 | 소스에 정의 없음. SES-04로 확정한 장소 버전과 지금 spotVersion이 같으면 통과로 가정 |
 | G5와 형제 | Call은 세션에 하나라 모든 세션 자녀의 callNotBefore가 지나야 통과로 가정. callNotBefore가 지금과 같은 시각이면 지난 것으로 본다(「이 시각 전에는 호출 안 함」) |
 | ETA_3MIN · DIST_700M이 동시에 맞을 때 triggerType | 소스에 없음. ETA_3MIN으로 가정 |
-| vehiclePhase APPROACHING 기준 | 「SIG-01 ETA · 거리 기준」만 있음. 기준값을 정해야 함 |
+| vehiclePhase APPROACHING 기준 | [사람 결정 2026-11-13] remainingMeters ≤ 700 또는 navEtaSeconds ≤ 60 |
 | spotStatus ROUTING · INVALIDATED로 바꾸는 계기 | 이 상태로 바꾸는 API가 없음. 정해야 함 |
 | navRouteId 저장 위치 | SES-04 요청에 있으나 컬럼이 없음. 저장하지 않는다고 가정 |
 | SES-05 spotVersion 불일치 오류 | 소스에 없음. 409 STATE_VERSION_CONFLICT로 가정 |
@@ -706,7 +752,7 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 | incident의 childUserId 저장 | [사람 결정 2026-11-09] pickup_session.incident_child_user_id 칸에 저장하고 세션 뷰 incident.childUserId는 거기서 읽는다(INCIDENT_OPENED payload에서 읽지 않음) |
 | 예외 해소(incidentResolvedAt) 방법 | 해소 API가 없음. SES-06 DELETE(보류 해제) 때 채운다고 가정 |
 | actualStopAt · predictedStopAt 값 | actualStopAt은 VEHICLE_STOPPED occurredAt. [사람 결정 2026-11-09] predictedStopAt은 SIG-02 STOPPED를 받을 때의 세션 etaAt(정차 직전 마지막 ETA)이고 VEHICLE_STOPPED payload에 담아 완료 때 읽는다. etaAt이 없으면 null |
-| SIG-02 STOP_FAILED 처리 | 소스에 없음. 상태 변화 없이 무시로 가정 |
+| SIG-02 STOP_FAILED 처리 | [사람 결정 2026-11-13] 상태는 그대로, 살아 있는 호출이 있으면 자동 철회(STOP_FAILED). 끝난 세션 · 탑승 인식 뒤에는 철회 안 함 |
 | SIG-02 eventId 저장 위치 | 「Idempotency-Key로 써서 중복 무시」. ~~idempotency_key 테이블에 저장한다고 가정~~ → 아래 「SIG-02 eventId와 idempotency_key 테이블」 결정(ProcessedVehicleEvent)으로 대체 |
 | 자녀에게 장소를 숨기는 「SES-04 전」 | [팀장 결정 2026-11-09, 사람 확인 전] 경로 확정을 한 번도 하지 않은 상태(routeVersion == 0)로 본다. 첫 확정 때 자녀에게 출발 알림이 가므로 SES-05로 장소가 다시 SELECTED가 돼도 자녀에게 다시 숨기지 않는다 |
 | SIG-04 WAITING · 철회 뒤 요청의 오류 코드 | [사람 결정 2026-11-09] 끝난 세션은 SESSION_ALREADY_FINISHED, 그 밖(WAITING · 철회 뒤)은 409 CHILD_NOT_CALLED |

@@ -88,7 +88,8 @@ class UserPersistenceAdapter implements LoadFamilyPort, SaveFamilyPort, LoadUser
 	}
 
 	private static FamilyEntity toEntity(Family family) {
-		return new FamilyEntity(family.getFamilyId(), family.getJoinCallMode(), family.getSettingsVersion());
+		return new FamilyEntity(family.getFamilyId(), family.getJoinCallMode(), family.getSettingsVersion(),
+				family.isChildLocationEnabled());
 	}
 
 	private static UserEntity toEntity(User user) {
@@ -101,7 +102,8 @@ class UserPersistenceAdapter implements LoadFamilyPort, SaveFamilyPort, LoadUser
 	}
 
 	private static Family toDomain(FamilyEntity entity) {
-		return Family.restore(entity.getFamilyId(), entity.getJoinCallMode(), entity.getSettingsVersion());
+		return Family.restore(entity.getFamilyId(), entity.getJoinCallMode(), entity.getSettingsVersion(),
+				entity.isChildLocationEnabled());
 	}
 
 	private static User toDomain(UserEntity entity) {

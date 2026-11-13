@@ -1,8 +1,8 @@
 # FOLLOWUP · 공유모듈 (shared)
 
-- 생성: 2026-11-13 12:40 KST · tdd-guard
+- 생성: 2026-11-13 14:11 KST · tdd-guard
 - 상태: 진행 중 (체크 59/59 · 완료 기준 0/4)
-- 테스트: ● GREEN · 2429 passed · 전체 · 219s · .\gradlew.bat test --console=plain
+- 테스트: ● RED · 2457 passed · 8 failed · 전체 · 275s · .\gradlew.bat test --console=plain
 - 설계서: C:/ilink/docs/03_공유모듈-shared.md
 
 ## 완료 항목

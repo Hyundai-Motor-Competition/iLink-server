@@ -149,6 +149,7 @@ class GuardTest {
 	@Test
 	@DisplayName("Guard는 G1~G5 다섯 조건을 모두 만족하면 met true와 빈 unmet을 돌려준다")
 	void evaluateReturnsMetWithEmptyUnmetWhenAllFiveGuardsPass() {
+		// G6(차량 정차)이 더해져 준비 상태는 정차 중(STOPPED)이다. session(...) 기본값 참고
 		PickupSession session = session(SessionStatus.ACTIVE, SpotStatus.CONFIRMED, SPOT_VERSION,
 				FRESH_ETA_UPDATED_AT);
 
@@ -156,6 +157,28 @@ class GuardTest {
 
 		assertThat(result.met()).isTrue();
 		assertThat(result.unmet()).isEmpty();
+	}
+
+	@ParameterizedTest(name = "vehiclePhase {0}")
+	@EnumSource(value = VehiclePhase.class, names = "STOPPED", mode = EnumSource.Mode.EXCLUDE)
+	@DisplayName("Guard는 vehiclePhase가 STOPPED가 아니면 G6을 unmet에 넣는다")
+	void evaluatePutsG6IntoUnmetWhenVehicleIsNotStopped(VehiclePhase vehiclePhase) {
+		PickupSession session = session(vehiclePhase);
+
+		GuardResult result = GUARD.evaluate(session, NOW);
+
+		assertThat(result.met()).isFalse();
+		assertThat(result.unmet()).containsExactly(GuardId.G6);
+	}
+
+	@Test
+	@DisplayName("Guard는 vehiclePhase가 STOPPED면 G6을 unmet에 넣지 않는다")
+	void evaluateDoesNotPutG6IntoUnmetWhenVehicleIsStopped() {
+		PickupSession session = session(VehiclePhase.STOPPED);
+
+		GuardResult result = GUARD.evaluate(session, NOW);
+
+		assertThat(result.unmet()).doesNotContain(GuardId.G6);
 	}
 
 	private static PickupSession session(SessionStatus sessionStatus, SpotStatus spotStatus,
@@ -167,12 +190,24 @@ class GuardTest {
 		return session(SessionStatus.ACTIVE, SpotStatus.CONFIRMED, SPOT_VERSION, FRESH_ETA_UPDATED_AT, children);
 	}
 
+	// G1~G5를 모두 통과하는 세션에서 차량 단계만 바꾼다
+	private static PickupSession session(VehiclePhase vehiclePhase) {
+		return session(vehiclePhase, SessionStatus.ACTIVE, SpotStatus.CONFIRMED, SPOT_VERSION, FRESH_ETA_UPDATED_AT,
+				readyChildren());
+	}
+
+	// G1~G5 판정 테스트는 다른 가드가 섞이지 않도록 차량이 정차 중(G6 통과)인 세션으로 본다
 	private static PickupSession session(SessionStatus sessionStatus, SpotStatus spotStatus,
 			Integer routeSpotVersion, Instant etaUpdatedAt, List<SessionChild> children) {
+		return session(VehiclePhase.STOPPED, sessionStatus, spotStatus, routeSpotVersion, etaUpdatedAt, children);
+	}
+
+	private static PickupSession session(VehiclePhase vehiclePhase, SessionStatus sessionStatus,
+			SpotStatus spotStatus, Integer routeSpotVersion, Instant etaUpdatedAt, List<SessionChild> children) {
 		Instant etaAt = etaUpdatedAt == null ? null : etaUpdatedAt.plusSeconds(NAV_ETA_SECONDS);
 		Integer remainingMeters = etaUpdatedAt == null ? null : REMAINING_METERS;
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT,
-				MEETING_POINT, TODAY, sessionStatus, VehiclePhase.APPROACHING, spotStatus, STATE_VERSION, SPOT_VERSION,
+				MEETING_POINT, TODAY, sessionStatus, vehiclePhase, spotStatus, STATE_VERSION, SPOT_VERSION,
 				ROUTE_VERSION, routeSpotVersion, false, etaAt, remainingMeters, etaUpdatedAt, null, null, null, null,
 				null, null, null, null, children);
 	}

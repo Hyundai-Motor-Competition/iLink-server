@@ -4,6 +4,8 @@ import com.example.pickupservice.common.idempotency.IdempotencyKeyRequired;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.pickup.adapter.in.web.doc.PickupSignalApiDoc;
 import com.example.pickupservice.pickup.application.port.in.ExtendPrepTimeUseCase;
+import com.example.pickupservice.pickup.application.port.in.MarkChildReadyCommand;
+import com.example.pickupservice.pickup.application.port.in.MarkChildReadyUseCase;
 import com.example.pickupservice.pickup.application.port.in.ReceiveTelemetryUseCase;
 import com.example.pickupservice.pickup.application.port.in.ReceiveVehicleEventUseCase;
 import com.example.pickupservice.pickup.application.port.in.ReportChildLocationUseCase;
@@ -28,6 +30,7 @@ public class PickupSignalController implements PickupSignalApiDoc {
 	private final ExtendPrepTimeUseCase extendPrepTimeUseCase;
 	private final ReportChildLocationUseCase reportChildLocationUseCase;
 	private final RequestHelpUseCase requestHelpUseCase;
+	private final MarkChildReadyUseCase markChildReadyUseCase;
 
 	@Override
 	@PreAuthorize("hasAuthority('PRINCIPAL_VEHICLE')")
@@ -84,6 +87,16 @@ public class PickupSignalController implements PickupSignalApiDoc {
 			@Valid @RequestBody HelpRequestRequest request) {
 		return ResponseEntity.status(HttpStatus.CREATED).body(HelpRequestResponse.from(
 				requestHelpUseCase.request(request.toCommand(principal, sessionId))));
+	}
+
+	@Override
+	@PreAuthorize("hasRole('CHILD')")
+	@PostMapping("/v1/pickup-sessions/{sessionId}/ready")
+	public ResponseEntity<ChildReadyResponse> markReady(
+			@AuthenticationPrincipal AuthPrincipal principal,
+			@PathVariable long sessionId) {
+		return ResponseEntity.ok(ChildReadyResponse.from(
+				markChildReadyUseCase.markReady(new MarkChildReadyCommand(principal, sessionId))));
 	}
 
 }

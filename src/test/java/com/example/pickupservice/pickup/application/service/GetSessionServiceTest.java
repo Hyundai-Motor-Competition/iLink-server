@@ -12,6 +12,7 @@ import com.example.pickupservice.pickup.application.port.in.SessionIncidentView;
 import com.example.pickupservice.pickup.application.port.in.SessionQuery;
 import com.example.pickupservice.pickup.application.port.in.SessionSpotView;
 import com.example.pickupservice.pickup.application.port.in.SessionView;
+import com.example.pickupservice.pickup.application.port.in.VehicleLocationView;
 import com.example.pickupservice.pickup.application.port.out.LoadCallPort;
 import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
 import com.example.pickupservice.pickup.application.port.out.LoadSessionPort;
@@ -32,6 +33,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -84,6 +87,13 @@ class GetSessionServiceTest {
 	private static final LatLng SEOYUN_LOCATION = new LatLng(37.501050, 127.039450);
 	private static final Instant SEOYUN_LOCATED_AT = NOW.minusSeconds(12);
 	private static final Instant MINJUN_ACKNOWLEDGED_AT = NOW.minusSeconds(30);
+	private static final Instant MINJUN_READY_AT = NOW.minusSeconds(45);
+
+	// 마지막 차량 위치(SIG-01 location)와 그 시각
+	private static final LatLng VEHICLE_LOCATION = new LatLng(37.498100, 127.027600);
+	private static final Instant VEHICLE_LOCATED_AT = NOW.minusSeconds(3);
+	private static final VehicleLocationView VEHICLE_LOCATION_VIEW = new VehicleLocationView(
+			VEHICLE_LOCATION.lat(), VEHICLE_LOCATION.lng(), VEHICLE_LOCATED_AT);
 
 	// 이 세션을 볼 수 없는 주체용
 	private static final long OTHER_FAMILY_ID = 13L;
@@ -191,6 +201,87 @@ class GetSessionServiceTest {
 								SEOYUN_LOCATED_AT)));
 	}
 
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("vehicleAndGuardians")
+	@DisplayName("세션 조회는 children[].readyAt에 자녀가 준비 완료를 누른 시각을 담고 누르지 않은 자녀는 null로 돌려준다")
+	void getSessionGivesReadyAtInChildren(AuthPrincipal principal) {
+		givenSession(afterRouteConfirmedWithReadyMinjun());
+
+		SessionView view = getSessionService.getSession(new SessionQuery(principal, SESSION_ID));
+
+		assertThat(view.children())
+				.extracting(SessionChildView::childUserId, SessionChildView::readyAt)
+				.containsExactlyInAnyOrder(tuple(MINJUN_ID, MINJUN_READY_AT), tuple(SEOYUN_ID, null));
+	}
+
+	@Test
+	@DisplayName("세션 조회는 자녀 주체에게도 자기 children[].readyAt을 준다")
+	void getSessionGivesOwnReadyAtToChildPrincipal() {
+		givenSession(afterRouteConfirmedWithReadyMinjun());
+
+		SessionView view = getSessionService.getSession(new SessionQuery(child(MINJUN_ID), SESSION_ID));
+
+		assertThat(view.children())
+				.extracting(SessionChildView::childUserId, SessionChildView::readyAt)
+				.containsExactly(tuple(MINJUN_ID, MINJUN_READY_AT));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("vehicleAndGuardians")
+	@DisplayName("세션 조회는 차량 · 보호자 주체에게 차량 위치가 있으면 남은 거리와 시간이 멀어도 vehicleLocation에 lat · lng · at을 늘 준다")
+	void getSessionAlwaysGivesVehicleLocationToVehicleAndGuardians(AuthPrincipal principal) {
+		// 남은 거리 4200m · 도착까지 720초: 자녀 기준(700m · 180초) 밖
+		givenSession(sessionWithVehicleLocation(SessionStatus.ACTIVE, ETA_AT, REMAINING_METERS));
+
+		SessionView view = getSessionService.getSession(new SessionQuery(principal, SESSION_ID));
+
+		assertThat(view.vehicleLocation()).isEqualTo(VEHICLE_LOCATION_VIEW);
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("vehicleAndGuardians")
+	@DisplayName("세션 조회는 저장된 차량 위치가 없으면 차량 · 보호자 주체에게도 vehicleLocation을 null로 준다")
+	void getSessionGivesNullVehicleLocationWithoutStoredLocation(AuthPrincipal principal) {
+		givenSession(afterRouteConfirmedWithCalledChildren());
+
+		SessionView view = getSessionService.getSession(new SessionQuery(principal, SESSION_ID));
+
+		assertThat(view.vehicleLocation()).isNull();
+	}
+
+	@ParameterizedTest(name = "남은 거리 {0}m · 도착까지 {1}초 → 자녀에게 보임 {2}")
+	@CsvSource({
+			"700, 720, true",
+			"701, 720, false",
+			"4200, 180, true",
+			"4200, 181, false",
+			"701, 181, false",
+			"650, 170, true"})
+	@DisplayName("세션 조회는 자녀 주체에게 remainingMeters ≤ 700 또는 남은 시간 ≤ 180초일 때만 vehicleLocation을 주고 둘 다 넘으면 null로 준다")
+	void getSessionGivesVehicleLocationToChildOnlyWithin700MetersOr180Seconds(int remainingMeters,
+			int remainingSeconds, boolean shown) {
+		givenSession(sessionWithVehicleLocation(SessionStatus.ACTIVE, NOW.plusSeconds(remainingSeconds),
+				remainingMeters));
+
+		SessionView view = getSessionService.getSession(new SessionQuery(child(MINJUN_ID), SESSION_ID));
+
+		assertThat(view.vehicleLocation()).isEqualTo(shown ? VEHICLE_LOCATION_VIEW : null);
+	}
+
+	@ParameterizedTest(name = "세션 {0}")
+	@EnumSource(value = SessionStatus.class, names = {"COMPLETED", "CANCELLED"})
+	@DisplayName("세션 조회는 끝난(COMPLETED · CANCELLED) 세션이면 차량 위치가 저장돼 있고 자녀 기준 안이어도 모든 주체에게 vehicleLocation을 null로 준다")
+	void getSessionGivesNullVehicleLocationForFinishedSession(SessionStatus finished) {
+		// 남은 거리 0m · 도착까지 0초: 자녀 기준 안
+		givenSession(sessionWithVehicleLocation(finished, NOW, 0));
+
+		for (AuthPrincipal principal : List.of(vehicle(), user(GUARDIAN_ID, Role.GUARDIAN), child(MINJUN_ID))) {
+			SessionView view = getSessionService.getSession(new SessionQuery(principal, SESSION_ID));
+
+			assertThat(view.vehicleLocation()).as("%s의 vehicleLocation", principal).isNull();
+		}
+	}
+
 	@Test
 	@DisplayName("세션 조회는 호출이 없으면 status.call NONE을 돌려준다")
 	void getSessionReturnsCallStatusNoneWithoutCall() {
@@ -267,9 +358,11 @@ class GetSessionServiceTest {
 		assertThat(view.call().guard()).isEqualTo(new CallGuardView(false, expectedUnmet));
 	}
 
+	// 다른 가드가 섞이지 않도록 차량 정차 중(G6 통과)으로 준비한다
 	static Stream<Arguments> guardUnmetSessions() {
 		return Stream.of(
-				Arguments.of(Named.of("장소 SELECTED · 경로 확정 전(G2 · G3)", beforeRouteConfirmed()),
+				Arguments.of(Named.of("장소 SELECTED · 경로 확정 전(G2 · G3)",
+						beforeRouteConfirmed(VehiclePhase.STOPPED)),
 						List.of("G2", "G3")),
 				Arguments.of(Named.of("민준이 준비 시간을 5분 늘려 callNotBefore 17:05(G5)",
 						afterRouteConfirmedWithExtendedPrep()), List.of("G5")));
@@ -330,7 +423,11 @@ class GetSessionServiceTest {
 
 	// SES-04 전: 장소는 SELECTED, 경로 확정 없음(routeVersion 0, routeSpotVersion null), 자녀는 호출 전이라 위치 없음
 	private static PickupSession beforeRouteConfirmed() {
-		return session(VehiclePhase.ROUTING, SpotStatus.SELECTED, 3, 0, null,
+		return beforeRouteConfirmed(VehiclePhase.ROUTING);
+	}
+
+	private static PickupSession beforeRouteConfirmed(VehiclePhase vehiclePhase) {
+		return session(vehiclePhase, SpotStatus.SELECTED, 3, 0, null,
 				SessionChild.restore(null, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.WAITING, 0, null, null, null,
 						null, null),
 				SessionChild.restore(null, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.WAITING, 0, null, null, null,
@@ -346,6 +443,30 @@ class GetSessionServiceTest {
 						SEOYUN_LOCATION, SEOYUN_LOCATED_AT, null, null));
 	}
 
+	// SES-04 뒤 두 자녀가 호출을 받은 세션에 마지막 차량 위치가 저장돼 있다. 자녀 기준(700m · 180초)을 보려고 ETA · 남은 거리를 받는다
+	private static PickupSession sessionWithVehicleLocation(SessionStatus status, Instant etaAt,
+			int remainingMeters) {
+		List<SessionChild> children = List.of(
+				SessionChild.restore(null, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.CALLED, 0, null,
+						MINJUN_LOCATION, MINJUN_LOCATED_AT, null, null),
+				SessionChild.restore(null, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.CALLED, 0, null,
+						SEOYUN_LOCATION, SEOYUN_LOCATED_AT, null, null));
+		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT,
+				MEETING_POINT, TODAY_KST, status, VehiclePhase.APPROACHING, SpotStatus.CONFIRMED, 6,
+				SPOT_VERSION, 1, SPOT_VERSION, false, etaAt, remainingMeters, ETA_UPDATED_AT, null, null, null,
+				null, null, null, null, null, VEHICLE_LOCATION, VEHICLE_LOCATED_AT, children);
+	}
+
+	// SES-04 뒤: 민준만 준비 완료(SIG-06)를 눌렀다. 두 자녀 모두 WAITING
+	private static PickupSession afterRouteConfirmedWithReadyMinjun() {
+		SessionChild minjun = SessionChild.restore(null, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.WAITING, 0, null,
+				null, null, null, null);
+		minjun.markReady(MINJUN_READY_AT);
+		return session(VehiclePhase.APPROACHING, SpotStatus.CONFIRMED, 6, 1, SPOT_VERSION, minjun,
+				SessionChild.restore(null, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.WAITING, 0, null, null, null,
+						null, null));
+	}
+
 	// SES-04 뒤: 민준은 호출을 확인해 이동 중(MEETING), 서윤은 아직 CALLED
 	private static PickupSession afterRouteConfirmedWithMeetingChild() {
 		return session(VehiclePhase.APPROACHING, SpotStatus.CONFIRMED, 7, 1, SPOT_VERSION,
@@ -355,9 +476,9 @@ class GetSessionServiceTest {
 						SEOYUN_LOCATION, SEOYUN_LOCATED_AT, null, null));
 	}
 
-	// SES-04 뒤: 장소 CONFIRMED · 경로 일치 · ETA 신선. 민준은 준비 시간을 5분 늘려 callNotBefore가 아직 오지 않았다
+	// SES-04 뒤: 장소 CONFIRMED · 경로 일치 · ETA 신선 · 차량 정차 중. 민준은 준비 시간을 5분 늘려 callNotBefore가 아직 오지 않았다
 	private static PickupSession afterRouteConfirmedWithExtendedPrep() {
-		return session(VehiclePhase.APPROACHING, SpotStatus.CONFIRMED, 6, 1, SPOT_VERSION,
+		return session(VehiclePhase.STOPPED, SpotStatus.CONFIRMED, 6, 1, SPOT_VERSION,
 				SessionChild.restore(null, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.WAITING, 5, NOW.plusSeconds(300),
 						null, null, null, null),
 				SessionChild.restore(null, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.WAITING, 0, null, null, null,

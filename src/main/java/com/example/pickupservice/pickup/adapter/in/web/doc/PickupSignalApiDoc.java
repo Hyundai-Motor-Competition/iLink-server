@@ -2,6 +2,7 @@ package com.example.pickupservice.pickup.adapter.in.web.doc;
 
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.pickup.adapter.in.web.ChildLocationRequest;
+import com.example.pickupservice.pickup.adapter.in.web.ChildReadyResponse;
 import com.example.pickupservice.pickup.adapter.in.web.HelpRequestRequest;
 import com.example.pickupservice.pickup.adapter.in.web.HelpRequestResponse;
 import com.example.pickupservice.pickup.adapter.in.web.PrepExtensionResponse;
@@ -84,5 +85,15 @@ public interface PickupSignalApiDoc {
 	@ApiResponse(responseCode = "429", description = "HELP_REQUEST_TOO_SOON (error.nextAllowedAt 함께)")
 	ResponseEntity<HelpRequestResponse> requestHelp(@Parameter(hidden = true) AuthPrincipal principal,
 			long sessionId, HelpRequestRequest request);
+
+	@Operation(summary = "준비 완료 (SIG-06)",
+			description = "자녀 앱. 본문 없음. 처음 누를 때만 readyAt을 기록하고 보호자 · 차량에 CHILD_READY를 알린다. "
+					+ "다시 눌러도 첫 readyAt을 돌려준다. Idempotency-Key는 받지 않는다")
+	@ApiResponse(responseCode = "200", description = "childUserId · readyAt")
+	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
+	@ApiResponse(responseCode = "403", description = "FORBIDDEN (자녀 토큰이 아님)")
+	@ApiResponse(responseCode = "404", description = "NOT_FOUND (세션이 없거나 다른 가족의 것 · 세션 자녀가 아님)")
+	@ApiResponse(responseCode = "409", description = "SESSION_ALREADY_FINISHED (이미 완료 · 취소된 세션)")
+	ResponseEntity<ChildReadyResponse> markReady(@Parameter(hidden = true) AuthPrincipal principal, long sessionId);
 
 }

@@ -3,6 +3,8 @@ package com.example.pickupservice.user.adapter.in.web.doc;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.user.adapter.in.web.CallModeResponse;
 import com.example.pickupservice.user.adapter.in.web.ChangeCallModeRequest;
+import com.example.pickupservice.user.adapter.in.web.ChangeChildLocationRequest;
+import com.example.pickupservice.user.adapter.in.web.ChildLocationResponse;
 import com.example.pickupservice.user.adapter.in.web.FamilyResponse;
 import com.example.pickupservice.user.adapter.in.web.MemberResponse;
 import com.example.pickupservice.user.adapter.in.web.RegisterMemberRequest;
@@ -14,7 +16,7 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
-@Tag(name = "가족", description = "가족 멤버 · 합류 안내 방식")
+@Tag(name = "가족", description = "가족 멤버 · 합류 안내 방식 · 자녀 위치 사용")
 public interface FamilyApiDoc {
 
 	@Operation(summary = "내 가족 조회 (FAM-01)", description = "GUARDIAN · CO_GUARDIAN만. 연결 중인 차량이 없으면 vehicle은 null")
@@ -56,5 +58,12 @@ public interface FamilyApiDoc {
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (joinCallMode 없음)")
 	CallModeResponse changeCallMode(@Parameter(hidden = true) AuthPrincipal principal, ChangeCallModeRequest request);
+
+	@Operation(summary = "자녀 위치 사용 변경 (SET-11)", description = "GUARDIAN · CO_GUARDIAN만. enabled가 true일 때만 픽업 중(호출 뒤) 자녀 위치를 받는다. 바꾸면 바로 적용되고 settingsVersion이 1 오른다")
+	@ApiResponse(responseCode = "200", description = "바뀐 childLocationEnabled와 settingsVersion")
+	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
+	@ApiResponse(responseCode = "403", description = "FORBIDDEN")
+	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (enabled 없음)")
+	ChildLocationResponse changeChildLocation(@Parameter(hidden = true) AuthPrincipal principal, ChangeChildLocationRequest request);
 
 }

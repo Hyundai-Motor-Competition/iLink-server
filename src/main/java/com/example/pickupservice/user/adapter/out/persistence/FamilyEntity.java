@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.ColumnDefault;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,10 +32,22 @@ public class FamilyEntity extends BaseTimeEntity {
 	@Column(nullable = false)
 	private int settingsVersion;
 
+	@Column(nullable = false)
+	@ColumnDefault("false")
+	private boolean childLocationEnabled;
+
 	public FamilyEntity(Long familyId, JoinCallMode joinCallMode, int settingsVersion) {
 		this.familyId = familyId;
 		this.joinCallMode = joinCallMode;
 		this.settingsVersion = settingsVersion;
+	}
+
+	public FamilyEntity(Long familyId, JoinCallMode joinCallMode, int settingsVersion,
+			boolean childLocationEnabled) {
+		this.familyId = familyId;
+		this.joinCallMode = joinCallMode;
+		this.settingsVersion = settingsVersion;
+		this.childLocationEnabled = childLocationEnabled;
 	}
 
 }

@@ -5,6 +5,7 @@ import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.pickup.application.port.in.ChildLocationCommand;
 import com.example.pickupservice.pickup.application.port.in.ReportChildLocationUseCase;
 import com.example.pickupservice.pickup.application.port.out.LoadChildReadinessPort;
+import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
 import com.example.pickupservice.pickup.application.port.out.LoadSessionPort;
 import com.example.pickupservice.pickup.application.port.out.SaveSessionPort;
 import com.example.pickupservice.pickup.domain.ChildPhase;
@@ -26,6 +27,7 @@ public class ReportChildLocationService implements ReportChildLocationUseCase {
 	private final LoadSessionPort loadSessionPort;
 	private final SaveSessionPort saveSessionPort;
 	private final LoadChildReadinessPort loadChildReadinessPort;
+	private final LoadFamilyPort loadFamilyPort;
 
 	@Override
 	public void report(ChildLocationCommand command) {
@@ -33,7 +35,8 @@ public class ReportChildLocationService implements ReportChildLocationUseCase {
 		PickupSession locked = loadSessionPort.loadForUpdate(command.sessionId())
 				.orElseThrow(PickupErrors::notFound);
 		SessionAccess.requireVisible(locked, principal);
-		if (!loadChildReadinessPort.hasLocationConsent(principal.id())) {
+		if (!loadChildReadinessPort.hasLocationConsent(principal.id())
+				|| !loadFamilyPort.loadFamily(locked.getFamilyId()).childLocationEnabled()) {
 			throw PickupErrors.locationConsentRequired();
 		}
 		if (isFinished(locked)) {

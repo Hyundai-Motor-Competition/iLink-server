@@ -36,21 +36,22 @@ class SessionEventTest {
 	}
 
 	@Test
-	@DisplayName("SessionEventType은 이름 21개(19종 + SESSION_HELD · SESSION_RESUMED)를 enum 선언 순서대로 갖는다")
-	void sessionEventTypeHasTwentyOneNamesFromDesignTable() {
+	@DisplayName("SessionEventType은 VEHICLE_APPROACHING · PREPARE_NOTICE_SENT · CHILD_READY를 더한 24종을 설계서 「실시간 이벤트」 표 순서대로 갖는다")
+	void sessionEventTypeHasTwentyFourNamesInDesignTableOrder() {
 		assertThat(Arrays.stream(SessionEventType.values()).map(Enum::name))
 				.containsExactly(
 						"SESSION_STARTED",
-						"SESSION_HELD",
-						"SESSION_RESUMED",
 						"SESSION_COMPLETED",
 						"SESSION_CANCELLED",
+						"SESSION_HELD",
+						"SESSION_RESUMED",
 						"INCIDENT_OPENED",
 						"SPOT_CONFIRMED",
 						"SPOT_CHANGED",
 						"DEPARTURE_NOTICE_SENT",
 						"ETA_UPDATED",
 						"VEHICLE_LOCATION",
+						"VEHICLE_APPROACHING",
 						"VEHICLE_STOPPED",
 						"VEHICLE_DEPARTED",
 						"BOARDING_DETECTED",
@@ -60,6 +61,8 @@ class SessionEventTest {
 						"CALL_ACKNOWLEDGED",
 						"CALL_REVOKED",
 						"PREP_TIME_EXTENDED",
+						"PREPARE_NOTICE_SENT",
+						"CHILD_READY",
 						"HELP_REQUESTED");
 	}
 }

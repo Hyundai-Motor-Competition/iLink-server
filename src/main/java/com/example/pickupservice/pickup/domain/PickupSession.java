@@ -14,6 +14,9 @@ import java.util.List;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class PickupSession {
 
+	private static final int APPROACHING_METERS = 700;
+	private static final int APPROACHING_ETA_SECONDS = 60;
+
 	private Long sessionId;
 	private long vehicleId;
 	private long familyId;
@@ -41,6 +44,8 @@ public class PickupSession {
 	private Long incidentChildUserId;
 	private Instant incidentOpenedAt;
 	private Instant incidentResolvedAt;
+	private LatLng vehicleLocation;
+	private Instant vehicleLocatedAt;
 	private List<SessionChild> children;
 
 	public static PickupSession start(long vehicleId, long familyId, LocalDate date, SpotSnapshot spot,
@@ -50,7 +55,7 @@ public class PickupSession {
 				.toList();
 		return new PickupSession(null, vehicleId, familyId, spot.spotId(), spot.name(), spot.stopPoint(),
 				spot.meetingPoint(), date, SessionStatus.ACTIVE, VehiclePhase.ROUTING, SpotStatus.SELECTED, 0, 0, 0,
-				null, false, null, null, null, null, null, null, null, null, null, null, null, children);
+				null, false, null, null, null, null, null, null, null, null, null, null, null, null, null, children);
 	}
 
 	public static PickupSession restore(Long sessionId, long vehicleId, long familyId, long spotId, String spotName,
@@ -60,11 +65,44 @@ public class PickupSession {
 			Instant boardingDetectedAt, Instant boardingCancelableUntil, BoardingDoor boardingDoor,
 			IncidentType incidentType, String incidentCause, Long incidentChildUserId, Instant incidentOpenedAt,
 			Instant incidentResolvedAt, List<SessionChild> children) {
+		return restore(sessionId, vehicleId, familyId, spotId, spotName, stopPoint, meetingPoint, date,
+				sessionStatus, vehiclePhase, spotStatus, stateVersion, spotVersion, routeVersion, routeSpotVersion,
+				callHeld, etaAt, remainingMeters, etaUpdatedAt, boardingDetectedAt, boardingCancelableUntil,
+				boardingDoor, incidentType, incidentCause, incidentChildUserId, incidentOpenedAt, incidentResolvedAt,
+				null, null, children);
+	}
+
+	public static PickupSession restore(Long sessionId, long vehicleId, long familyId, long spotId, String spotName,
+			LatLng stopPoint, LatLng meetingPoint, LocalDate date, SessionStatus sessionStatus,
+			VehiclePhase vehiclePhase, SpotStatus spotStatus, int stateVersion, int spotVersion, int routeVersion,
+			Integer routeSpotVersion, boolean callHeld, Instant etaAt, Integer remainingMeters, Instant etaUpdatedAt,
+			Instant boardingDetectedAt, Instant boardingCancelableUntil, BoardingDoor boardingDoor,
+			IncidentType incidentType, String incidentCause, Long incidentChildUserId, Instant incidentOpenedAt,
+			Instant incidentResolvedAt, LatLng vehicleLocation, Instant vehicleLocatedAt,
+			List<SessionChild> children) {
 		return new PickupSession(sessionId, vehicleId, familyId, spotId, spotName, stopPoint, meetingPoint, date,
 				sessionStatus, vehiclePhase, spotStatus, stateVersion, spotVersion, routeVersion, routeSpotVersion,
 				callHeld, etaAt, remainingMeters, etaUpdatedAt, boardingDetectedAt, boardingCancelableUntil,
 				boardingDoor, incidentType, incidentCause, incidentChildUserId, incidentOpenedAt, incidentResolvedAt,
-				children);
+				vehicleLocation, vehicleLocatedAt, children);
+	}
+
+	public void applyTelemetry(Instant observedAt, int navEtaSeconds, int remainingMeters, LatLng location) {
+		if (etaUpdatedAt != null && observedAt.isBefore(etaUpdatedAt)) {
+			return;
+		}
+		this.etaAt = observedAt.plusSeconds(navEtaSeconds);
+		this.remainingMeters = remainingMeters;
+		this.etaUpdatedAt = observedAt;
+		if (location != null) {
+			this.vehicleLocation = location;
+			this.vehicleLocatedAt = observedAt;
+		}
+		if (vehiclePhase == VehiclePhase.ROUTING
+				&& (remainingMeters <= APPROACHING_METERS || navEtaSeconds <= APPROACHING_ETA_SECONDS)) {
+			vehiclePhase = VehiclePhase.APPROACHING;
+			raiseStateVersion();
+		}
 	}
 
 	public void openIncident(IncidentType type, long childUserId, Instant now) {
@@ -133,12 +171,7 @@ public class PickupSession {
 	}
 
 	public void applyTelemetry(Instant observedAt, int navEtaSeconds, int remainingMeters) {
-		if (etaUpdatedAt != null && observedAt.isBefore(etaUpdatedAt)) {
-			return;
-		}
-		this.etaAt = observedAt.plusSeconds(navEtaSeconds);
-		this.remainingMeters = remainingMeters;
-		this.etaUpdatedAt = observedAt;
+		applyTelemetry(observedAt, navEtaSeconds, remainingMeters, null);
 	}
 
 	public boolean isEtaStale(Instant now, Duration validFor) {
@@ -224,6 +257,15 @@ public class PickupSession {
 
 	public void acknowledgeChild(long childUserId, Instant at) {
 		childOf(childUserId).acknowledge(at);
+		raiseStateVersion();
+	}
+
+	public void markChildReady(long childUserId, Instant at) {
+		SessionChild child = childOf(childUserId);
+		if (child.getReadyAt() != null) {
+			return;
+		}
+		child.markReady(at);
 		raiseStateVersion();
 	}
 

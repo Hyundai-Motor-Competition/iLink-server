@@ -46,6 +46,8 @@ pickup:
     help-request-interval: PT60S
     prep-extension-limit: PT15M
     data-retention-days: 90
+  call:
+    signal-lost-check-interval: PT15S
 
 logging:
   pattern:

@@ -1,8 +1,8 @@
 # FOLLOWUP · 사용자 (user)
 
-- 생성: 2026-11-11 11:38 KST · tdd-guard
-- 상태: 진행 중 (체크 73/73 · 완료 기준 0/4)
-- 테스트: ● GREEN · 2261 passed · 전체 · 90s · .\gradlew.bat test --console=plain
+- 생성: 2026-11-13 15:03 KST · tdd-guard
+- 상태: 진행 중 (체크 79/79 · 완료 기준 1/4)
+- 테스트: ● RED · 2504 passed · 12 failed · 전체 · 516s · .\gradlew.bat test --console=plain
 - 설계서: C:/ilink/docs/04_사용자-user.md
 
 ## 완료 항목
@@ -79,6 +79,12 @@
 - [x] #71 [서비스] createGuardian은 이미 가족에 연결됐거나 연결이 해제된 차량이면 409 VEHICLE_ALREADY_LINKED로 거절하고 아무것도 저장하지 않는다
 - [x] #72 멤버 목록(findMembers · FAM-01 members[])은 userId 오름차순으로 돌려준다
 - [x] #73 VEHICLE_ALREADY_LINKED는 common ErrorCode 하나로 정의되고 user · auth 모두 409 「이미 보호자가 연결된 차량입니다」로 응답한다
+- [x] #74 [기반] Family는 childLocationEnabled(기본 false)를 갖고 changeChildLocation(enabled)을 부르면 값이 바뀌고 settingsVersion이 1 오른다 ← FamilyTest.Family.changeChildLocation(true)를 부르면 childLocationEnabled가 true가 되고 settingsVersion이 1 오른다
+- [x] #75 [persistence] family 테이블의 child_location_enabled(NOT NULL, 기본 false)를 저장하고 읽는다 ← UserPersistenceAdapterTest.childLocationEnabled를 true로 저장하고 다시 읽으면 true이고 false로 바꿔 저장하면 false로 읽힌다
+- [x] #76 [서비스] 자녀 위치 사용 변경(SET-07)은 GUARDIAN · CO_GUARDIAN의 가족 childLocationEnabled를 바꾸고 settingsVersion을 1 올려 돌려준다 ← ChangeChildLocationServiceTest.자녀 위치 사용 변경은 childLocationEnabled를 바꾸고 settingsVersion을 1 올린 값을 돌려준다
+- [x] #77 [web] PUT /v1/families/me/child-location은 200과 childLocationEnabled · settingsVersion을 돌려주고, enabled가 없으면 422 VALIDATION_FAILED, CHILD · DELEGATE · TEACHER 토큰이면 403 FORBIDDEN을 돌려준다 ← FamilyControllerTest.PUT /v1/families/me/child-location는 200과 childLocationEnabled · settingsVersion을 돌려준다
+- [x] #78 [web] GET /v1/families/me와 LoadFamilyUseCase.findFamily의 FamilyInfo는 childLocationEnabled를 함께 돌려준다 ← LoadFamilyServiceTest.findFamily는 저장된 Family의 childLocationEnabled가 true이면
+- [x] #79 [서비스] 가족 조회(FAM-01)는 저장된 Family의 childLocationEnabled를 FamilyResult에 그대로 옮긴다(true면 true) ← GetMyFamilyServiceTest.가족 조회(FAM-01)는 저장된 Family의 childLocationEnabled가 true면 FamilyResult.childLocationEnabled를 true로 옮긴다
 
 ## 미완료 항목
 - 없음
@@ -87,80 +93,37 @@
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
 - [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+- [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-11 11:38 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 6 · 하 19 · 리뷰 시점 체크 73/73
-- 리뷰 시점 테스트: ● GREEN · 2261 passed · 전체 · 90s · .\gradlew.bat test --console=plain
+- 2026-11-13 15:02 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 4 · 하 10 · 리뷰 시점 체크 79/79
+- 리뷰 시점 테스트: ● RED · 2504 passed · 12 failed · 전체 · 516s · .\gradlew.bat test --console=plain
   - 결론: 조건부 통과
-  - user 쪽에서 동작을 바꿔야 하는 [상]은 없습니다. 지난 리뷰(2026-11-08 02:39)의 [중] 1건과 [하] 2건은 해소됐습니다. 다만 pickup · schedule · notification이 병합된 뒤 설계서 문장이 실제 코드와 어긋난 곳, 사람 결정이 필요한 곳이 [중] 5건 생겼습니다.
-  - **지난 리뷰 지적 해소 여부**
-  - [중] 03:100 ErrorCode 규칙 — 해소: 03:18 · :95 · :100 · :230 갱신, 02:169 추가
-  - [하] 04 「항목 #201」 — 해소: 04 확인 필요 표가 「#32 · #67」
-  - [하] FOLLOWUP 확인 필요 표 3행 — 해소: user.md:112가 04와 같음
-  - [하] 소스 문자열 검사 테스트 — 남음
-  - [하] 해제된 차량도 같은 문구 — 남음 (CreateGuardianService.java:35-36)
-  - [하] CreateGuardianServiceTest가 #71 상황을 반복 — 남음
-  - **발견 사항**
-  - [중] #64 항목 문장과 증거 테스트가 지금 코드와 정반대 — 근거 아래 3가지 → 사람 결정(테스트 케이스 문장 수정) + note
-  - 04:202 「임시 어댑터 NONE · 아무것도 안 함 · false」 문장과 증거 DisplayName(user.md:72)이 테스트에 없음
-  - 지금 UserModuleLinkAdaptersTest:62 · :90 · :107은 auth · pickup에 실제로 연결됐는지를 확인함
-  - 04:8 · 04:227 「pickup만 구현 전 임시 false」도 c08c65a 이후 사실과 다름(PickupActivityAdapter.java:13-22)
-  - [중] SET-06 「다음 세션부터 적용된다」가 지켜지지 않음 — 04:102 · FamilyApiDoc.java:53은 다음 세션부터라고 하는데, pickup은 판정할 때마다 joinCallMode를 새로 읽음(CallEngine.java:64, SendCallService.java:41, 08:681 가정) → 진행 중인 세션에 바로 반영됨 → 사람 결정(세션에 스냅샷을 둘지, 04 · Swagger 문장을 고칠지)
-  - [중] JoinCallMode · DeviceStatus가 모듈마다 따로 있고 pickup이 user.domain을 직접 import함 — 02:70 · :73 · :79와 어긋남 → 사람 결정(common 순수 타입으로 옮기고 02:70 예외 목록에 추가하거나, in 포트가 domain 타입을 내보내지 않게 함)
-  - user in 포트 FamilyInfo.java · CallModeResult.java가 user.domain.JoinCallMode를 내보냄
-  - pickup이 그대로 import: SessionCallView.java:3, CallEngine.java:20, SendCallService.java:14, SessionViewResponse.java:19
-  - schedule은 자체 복사본을 둠(schedule/domain/JoinCallMode.java, 06:8)
-  - DeviceStatus는 3벌: user · schedule · auth MemberDeviceStatus
-  - [중] ACTIVE_PICKUP_EXISTS를 두 모듈이 따로 정의하고 문구도 다름 — UserErrors.java:26-28, AuthErrors.java:20-23. 02:169 「여러 모듈이 같은 뜻으로 쓰는 도메인 오류는 common ErrorCode에 한 번」과 어긋남 → 사람 결정(같은 뜻인지) 뒤 리팩터링
-  - [중] FAM-07 실제 삭제로 고아 행이 생기는데 결정 기한이 지남 → 사람 결정(삭제 표시 방식, 자녀 일정 처리)
-  - DB FK가 없음(schema.sql, @ManyToOne 없음). 그래서 04:220 「FK 때문에 지울 수 없음」은 사실과 다름
-  - 삭제 뒤 남는 행: session_child.childUserId(SessionChildEntity.java:37), pickup_schedule, member_invite.userId(MemberInviteEntity.java:27), guardian_data_setting.userId
-  - 「pickup · schedule 구현 전 결정」(FOLLOWUP 사람 결정 2026-11-07)이었으나 둘 다 이미 병합됨
-  - [하] 설명 주석 1건 — PickupActivityAdapter.java:8 「pickup의 ActivePickupQueryUseCase에 위임한다」(02:78) → 리팩터링
-  - [하] 번호판을 채우는 경로가 없음 — Vehicle.register가 plateNumber를 null로 만들고(Vehicle.java:32) 바꾸는 코드도 없음. 그래서 FAM-01 plateNumberMasked는 늘 null. 05:308에만 확인 필요로 있고 04 확인 필요 표에는 없음 → note(04 표에 추가)
-  - [하] 「진행 중 픽업에 묶인 멤버」(04:87) 범위 — ActivePickupQueryService.isInActivePickup은 SessionChild만 봄. DELEGATE · TEACHER · CO_GUARDIAN 해제는 막히지 않음 → note(사람 확인)
-  - [하] users.family_id · vehicle.family_id 조회 인덱스 없음 — UserEntity.java:28, VehicleEntity.java:28. pickup 서비스 20곳 이상이 loadMembers → findMembers를 불러 호출이 늘었음 → 항목 추가 검토
-  - [하] 동시 요청 처리 없음 → note
-  - 5명 한도에 잠금이 없음(NonChildMemberLimit.java:13)
-  - Family에 @Version이 없음
-  - 같은 차량을 동시에 연결 해제하면 OptimisticLockingFailureException이 매핑 없이 500(UnlinkVehicleService.java:41)
-  - [하] web 테스트가 없는 오류 행 — FAM-02 403, FAM-03 403 · 자기 role 422 · MEMBER_LIMIT_EXCEEDED, FAM-07 422 · 404, LINK-05 404. 서비스 테스트만 있음 → 항목 추가(선택)
-  - [하] 03 문서에 팩토리 3개 빠짐 — 팩토리 표(03:93-98)와 시그니처(03:231-237)에 invalidField · tooManyRequests(ErrorCode,int) · stateVersionConflict 없음 → note
-  - [하] 04:21 domain에 「이름 규칙」이 있다고 적혔지만 실제 위치는 common/text/NameRule.java → note
-  - [하] README에 PHONE_ENCRYPTION_KEY 없음 — 환경 변수 표(README:32-38), 실행 명령(:57 · :63 · :74)에 없고 :85 배포 Secret에만 있음. :42 「해당 도메인을 만들 때 더한다」도 그대로. 이 키가 없으면 서버가 뜨지 않음 → note
-  - [하] 다른 모듈 테스트가 user 내부 클래스를 씀 — AuthSeed.java:39 `new VehicleEntity(...)`, VehicleLinkCodeControllerConcurrencyTest.java:8-9가 VehicleEntity · LoadVehiclePort를 씀 → note
-  - [하] notification이 멤버마다 findMember를 따로 부름(NotificationMemberNameAdapter.java:59-62). LoadMemberUseCase에 여러 id를 한 번에 찾는 메서드가 없음 → note
-  - [하] 소스 문자열 검사 테스트 — ErrorCodeTest.java:46-58, NameRuleTest.java:124-125, PlateNumberMaskerTest.java:61-63. 02:80 「ArchUnit 같은 자동 검사는 쓰지 않는다」와 결이 다름 → 사람 결정
-  - [하] 작은 정리 거리 → 리팩터링(선택)
-  - reason 문구가 다름: RegisterMemberService.java:33 「국제 형식 전화번호가 필요합니다」 vs UpdateMemberService.java:59 「전화번호가 필요합니다」
-  - 한도 5가 두 곳에 있음: UserErrors.java:13 문구, NonChildMemberLimit.java:7 상수
-  - 제약 이름 MemberRole → ValidMemberRole
-  - versionToSave 폴백(UserPersistenceAdapter.java:83-88)
-  - [하] 진행 기록이 실제와 다름 — FOLLOWUP user.md:4-6이 C:/pickup 경로 · 996 passed · 완료 기준 4/4(브리핑은 0/4). user.md:72 #64 증거는 존재하지 않음. 후속 과제에 해소된 메모가 정리되지 않음 → note
-  - 완료 기준: C1 사람 확인 필요 — 체크 73/73이고 전체 GREEN 2261. 다만 #64 증거 DisplayName이 없고 항목 문장이 지금 동작과 반대(UserModuleLinkAdaptersTest:107) / C2 사람 확인 필요 — user의 6개 API(경로 · 권한 · Idempotency-Key · 오류 코드) · 시그니처 · 정렬 · 암호화는 설계서대로. SET-06 「다음 세션부터 적용」만 pickup 쪽 동작과 어긋남(CallEngine.java:64) / C3 미충족 — [중] 공통 규칙 2건(ACTIVE_PICKUP_EXISTS 중복 02:169, JoinCallMode 노출 · 중복 02:70 · :79), [하] 주석 1건(PickupActivityAdapter.java:8…
-  - 후속 과제:
-  - 「연결 중」 정의 — 해소됨 (04:56 = 05 LINK-03)
-  - #64 임시 어댑터를 실제 연동으로 교체 — 해소됨 (AuthMemberDeviceAdapter, PickupActivityAdapter). #64 문장은 남음
-  - vehicle model · plateNumber NULL — 해소됨 (04:51-52). 번호판을 채울 시점 — 설계 결정 필요
-  - family_id DB FK — 설계 결정 필요 (04:39 · :49 「FK → Family」, schema.sql에 없음)
-  - UserSeed를 IntegrationTestSupport가 @Import — 해소됨 (IntegrationTestSupport.java:11). 02:213 픽스처 문구 — 남음
-  - README PHONE_ENCRYPTION_KEY · 키 교체 방법 — 남음
-  - VIN 인덱스 이름 — 해소됨 (uk_vehicle_vin_linked)
-  - persistence 중간 리뷰: (1) 실제 삭제 — 설계 결정 필요(기한 지남) (2) 가족당 차량 1대 — 남음(LINK-04 NEW만 연결해 구조상 1대, DB 제약 없음) (3) FK — 설계 결정 필요 (4) 정렬 — 해소됨 (#72). [하] 항목들 — 남음
-  - [설계 확인 · service] createGuardian 이름 · 연결된 차량 · LoadVehicle/Member/FamilyUseCase 구현 — 해소됨. 중복 VIN 500 — auth가 먼저 막음(RegisterVehicleDeviceService.java:47-52), 동시 요청은 남음
-  - [service 리뷰] FAM-03 role 재확인 · fields — 해소됨 (#66~#70). service가 이름 · 전화번호 형식을 직접 확인하지 않음 — 남음
-  - [web 리뷰] role 제한 · phone fields — 해소됨. familyId null 500 — 해소됨 (auth가 USER 토큰에 늘 familyId를 넣음: AcceptInviteService.java:67, ApproveLinkService.java:119, RefreshTokenService.java:50). IdempotencyKeyFilter 순서 — 남음(이번에 재현하지 않음). PATCH null과 미전송 구분 — 남음
-  - [사람 결정 2026-11-07] — 반영됨. 삭제 방식 — 설계 결정 필요(기한 지남)
-  - [도메인 리뷰 하] 동시성 · 인덱스 · web 오류 테스트 · 끝까지 잇는 테스트 — 남음. NameRule 주석 · 커밋 안 된 변경 — 해소됨
-  - [문서] 03 invalidField — 남음
-  - [재리뷰 · 문서 갱신] 04 사람 결정 반영 · 한도 상수 — 해소됨. MemberRole 이름 · 문구 통일 · CO_GUARDIAN PATCH role GUARDIAN이 403이 아니라 422 — 남음
-  - [결정 · 사람, 재리뷰 note] 정렬 · VEHICLE_ALREADY_LINKED · 주석 — 해소됨. #64 문구 · README · 동시 해제 500 · versionToSave · FAM-07 일정 행 · 02 픽스처 · 03 invalidField · FOLLOWUP 낡음 — 남음
-  - user #73 02 문서 결정 — 해소됨 (02:169). 해제된 차량 같은 문구 — 남음
-  - user #64 문장 · README · UserErrors 숫자 5 — 남음. PickupActivityAdapter 이름 — 해소됨(이제 임시가 아님)
-  - [공통] 소스 문자열 검사 테스트 — 설계 결정 필요. CreateGuardianServiceTest 반복 — 남음
-  - 테스트: `mcp__tdd-guard__tests` scope "all"(`.\gradlew.bat test --console=plain`) → GREEN 2261 passed. Gradle UP-TO-DATE라 이전 보고서 결과를 재사용했고, git status는 clean입니다. 그 밖에는 git log와 grep 같은 읽기 명령만 썼습니다.
-  - 참고 파일: C:/ilink/docs/04_사용자-user.md, C:/ilink/docs/followup/user.md, C:/ilink/src/main/java/com/example/pickupservice/user/adapter/out/pickup/PickupActivityAdapter.java, C:/ilink/src/main/java/com/example/pickupservice/user/application/service/UserErrors.java, C:/ilink/src/main/java/com/example/pickupservice/user/application/port/in/FamilyInfo.java, C:/ilink/src/main/java/com/example/pickupservic…
+  - 지난 리뷰(2026-11-13 14:48)의 [중] 3건은 모두 해소됐습니다. 새 항목 #79의 증거 테스트는 문장을 실제로 검증합니다. 동작을 바꿔야 하는 [상]은 없습니다. 남은 것은 설계서 04의 반영 누락([중] 1건)과 [하] 4건입니다.
+  - 지난 리뷰 지적 해소 여부
+  - [중] API ID SET-07 충돌 — 해소. 04:71 · :107 · :133과 FamilyApiDoc.java:62가 SET-11. 04:92 「SET-07」은 06:60 setup-summary를 가리키므로 맞음. #76 문장과 user.md:84의 SET-07은 옛 이름이라는 점이 user.md:160에 적혀 있음
+  - [중] 운영 DDL 기록 없음 — 해소. user.md:160
+  - [중] FAM-01 서비스 테스트 없음 — 해소. GetMyFamilyServiceTest:461-475
+  - [하] Swagger 문구 · Tag — 해소
+  - [하] 보조 생성자 · withChildLocation — 일부 해소(withChildLocation 0건, 보조 생성자는 main에서 안 씀, note 됨)
+  - [하] @Version 없음 — 남음(note 됨)
+  - [하] #255 pickup 연결 — 남음(note 됨)
+  - [하] 04의 다른 곳에 SET-11 반영 안 됨 — 남음, 기록 안 됨
+  - [하] child-location Idempotency-Key 불필요 테스트 없음 — 남음, 기록 안 됨
+  - 발견 사항
+  - [중] 설계서 04가 SET-11 · FAM-01 확장을 일부만 반영했고 FOLLOWUP에도 기록이 없음 — 04:3 요약 · :7 범위 · :15 구조에 SET-11 없음. 04:64 FAM-01 응답 열과 :74 응답 예시에 childLocationEnabled 없음. SET-11 응답 예시 없음. 04:237 확인 필요 행 「SET-06만 명시됨」이 낡음 → note(04 문서 갱신)
+  - [하] PUT /v1/families/me/child-location이 Idempotency-Key를 요구하지 않는다는 테스트가 없음 → 항목 추가(선택) 또는 note
+  - [하] SET-06 「다음 세션부터 적용된다」가 그대로 남음(2026-11-11 리뷰 [중]) → 사람 결정(이전 지적 유지)
+  - [하] ACTIVE_PICKUP_EXISTS를 두 모듈이 따로 정의함(2026-11-11 리뷰 [중]) → 사람 결정(이전 지적 유지)
+  - [하] 04:8 「pickup(CheckActivePickupPort)만 구현 전 임시 false」와 04:227이 pickup 연동 이후 사실과 다름 → note(이전 지적 유지)
+  - 이번 변경분의 공통 규칙: 위반 없음.
+  - 완료 기준
+  - C1 사람 확인 필요 — 체크 79/79, user 실패 0건. #64 문장과 증거가 지금 코드와 다르다는 이전 지적 남음
+  - C2 사람 확인 필요 — SET-11 · FAM-01 · FamilyInfo 확장은 설계서대로. 04:64 FAM-01 표 행에 필드 빠짐. SET-06 「다음 세션」 문제 남음
+  - C3 미충족 — ACTIVE_PICKUP_EXISTS 중복 남음
+  - C4 미충족 — 04:237 확인 필요 행 낡음, FOLLOWUP 기록 없음
+  - 테스트: scope all → RED 2504 passed · 12 failed(모두 pickup readyAt 진행 작업). user 범위 GREEN 216 passed.
+- 이전 리뷰: 2026-11-13 14:48 KST (조건부 통과), 2026-11-11 11:38 KST (조건부 통과)
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -172,7 +135,7 @@
 | 멤버 해제 때 그 자녀의 일정 · 장소 처리 | 소스에 없음. 그대로 둔다고 가정 |
 | LINK-05를 차량 앱이 부를 수 있는지 | 4.3 표의 사용 화면에 「차량 설정 요약 화면」이 있으나 4.14 호출은 GUARDIAN뿐. 4.14대로 USER 주체 GUARDIAN만 허용 |
 | LINK-05 때 차량 기기 토큰 폐기 | 결정됨(사람 결정 2026-11-07). 해제하면 그 차량의 살아 있는 기기를 모두 폐기한다. 해제된 차량 앱은 AUTH-02로 다시 등록한다. 포트도 결정됨: RevokeVehicleDevicesPort → auth RevokeVehicleDevicesUseCase |
-| settingsVersion을 올리는 변경의 범위 | SET-06만 명시됨. 일정(SET-02 · 03) · 장소(SPOT-02 · 03) · 멤버 변경도 올리는지 정해야 함(SET-08 충돌 판단에 영향) |
+| settingsVersion을 올리는 변경의 범위 | SET-06 · SET-11(자녀 위치 사용)이 올림. 일정(SET-02 · 03) · 장소(SPOT-02 · 03) · 멤버 변경도 올리는지 정해야 함(SET-08 충돌 판단에 영향) |
 | 번호판 마스킹 규칙 | 예시 「12가 ****」뿐. 마지막 숫자 4자리를 *로 바꾼다고 가정 |
 | user ↔ auth 서로 부름 | auth는 User 생성을 user에 요청하고, user는 기기 상태 · 폐기를 auth에 요청. user 쪽은 out 포트로 둔다. auth 쪽 임시 어댑터(LoadMemberDeviceStatusPort 기기 상태 · RevokeMemberDevicesPort 기기 폐기)는 auth 연동으로 교체됨 |
 | 진행 중 픽업 확인(FAM-07 · LINK-05)을 pickup in 포트로 부르는 것 | pickup이 user보다 뒤에 구현되므로 out 포트 + 테스트 대역으로 먼저 검증. pickup 쪽 CheckActivePickupPort만 아직 임시 어댑터(늘 false). pickup 구현 때 교체해야 함 |
@@ -185,6 +148,8 @@
 - 다음 도메인: 인증 (05_인증-auth.md). 시작: /tdd domain auth
 
 ## 후속 과제
+- [운영 · 2026-11-13] prod(ddl-auto validate) 배포 전에 실행: ALTER TABLE family ADD COLUMN child_location_enabled BOOLEAN NOT NULL DEFAULT false; (dev는 ddl-auto update로 자동 생성). [팀장 결정 2026-11-13] 자녀 위치 사용 API 번호는 schedule의 SET-07(setup-summary)과 겹쳐 SET-11로 바꿈(체크된 #76 문장의 「SET-07」은 옛 이름). [하 · 후속] Family @Version 없음: SET-06 · SET-11이 동시에 오면 다른 설정 값이 되돌아갈 수 있음. FamilyInfo · FamilyResult · Family.restore · FamilyEntity의 보조 생성자는 값을 false로 채우므로 main 코드에서 쓰지 말 것. #255 구현 때 「자녀 동의 AND 가족 설정」 조건과 포트 위치를 확인
+- [2026-11-13 재리뷰 처리] 04의 요약 · 범위 · 구조 · FAM-01 행 · 예시에 SET-11 · childLocationEnabled 반영, SET-11 예시 추가, 확인 필요 「settingsVersion을 올리는 변경」 행 갱신(SET-06 · SET-11). [하 · 선택] PUT /v1/families/me/child-location이 Idempotency-Key를 요구하지 않음을 보는 테스트 없음(UserIdempotencyKeyTest는 call-mode만). [사람 결정 · 이전 지적 유지] SET-06 「다음 세션부터 적용」 문구(FamilyApiDoc:55, 04:102), ACTIVE_PICKUP_EXISTS 두 모듈 중복(UserErrors:27 · AuthErrors:22), 04:8 · 04:227 「pickup 임시 false」 문장이 연동 뒤 사실과 다름, #64 문장 · 증거가 지금 코드와 다름
 - 「연결 중」 정의: 지금은 unlinkedAt IS NULL만 본다(VIN 부분 유니크 인덱스와 같음). 그래서 AUTH-02로 등록만 되고 가족 승인 전(familyId null)인 차량도 isLinked true · loadLinkedVehicleByVin 대상이 된다. 승인 전 차량을 따로 볼지 사람 확인 필요.
 - [설계 확인] #64 임시 어댑터(기기 상태 NONE · 폐기 no-op · 진행 중 픽업 false)는 auth · pickup 도메인 구현 때 실제 in 포트 호출 어댑터로 바꿔야 함. 바꾸기 전 운영 배포 금지.
 - [설계 확인] vehicle.plate_number · model의 NULL 여부가 설계서에 없음. registerVehicle(vin, model)은 plateNumber를 받지 않아 plate_number는 NULL 가능이어야 함 → 설계서 테이블에 「NULL」 표시 반영 필요. 번호판은 언제 · 어디서 채우는지도 미정.

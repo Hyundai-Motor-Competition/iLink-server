@@ -27,6 +27,9 @@ public record Guard(Duration etaValidFor) {
 		if (prepNotPassed) {
 			unmet.add(GuardId.G5);
 		}
+		if (session.getVehiclePhase() != VehiclePhase.STOPPED) {
+			unmet.add(GuardId.G6);
+		}
 		return GuardResult.of(unmet);
 	}
 }

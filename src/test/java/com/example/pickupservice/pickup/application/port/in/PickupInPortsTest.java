@@ -74,7 +74,7 @@ class PickupInPortsTest {
 	}
 
 	@Test
-	@DisplayName("SessionView와 하위 record는 세션 뷰 표의 status · spot · eta · call(guard · progress) · children[](location) · route · boarding · incident 구조를 따른다")
+	@DisplayName("SessionView와 하위 record는 세션 뷰 표의 status · spot · eta · call(guard · progress) · children[](location) · vehicleLocation · route · boarding · incident 구조를 따른다")
 	void sessionViewRecordsFollowSessionViewTable() {
 		verifySessionViewRecords();
 	}
@@ -318,6 +318,7 @@ class PickupInPortsTest {
 				"eta", SessionEtaView.class.getName(),
 				"call", SessionCallView.class.getName(),
 				"children", generic(List.class, SessionChildView.class),
+				"vehicleLocation", VehicleLocationView.class.getName(),
 				"route", SessionRouteView.class.getName(),
 				"boarding", SessionBoardingView.class.getName(),
 				"incident", SessionIncidentView.class.getName()));
@@ -359,8 +360,13 @@ class PickupInPortsTest {
 				"callNotBefore", INSTANT,
 				"acknowledgedAt", INSTANT,
 				"boardedAt", INSTANT,
-				"location", ChildLocationView.class.getName()));
+				"location", ChildLocationView.class.getName(),
+				"readyAt", INSTANT));
 		assertRecord(ChildLocationView.class, components(
+				"lat", "double",
+				"lng", "double",
+				"at", INSTANT));
+		assertRecord(VehicleLocationView.class, components(
 				"lat", "double",
 				"lng", "double",
 				"at", INSTANT));

@@ -97,7 +97,8 @@ class UserInPortsTest {
 				"familyId", "long",
 				"joinCallMode", JoinCallMode.class.getName(),
 				"vehicle", VehicleSummary.class.getName(),
-				"members", generic(List.class, MemberResult.class)));
+				"members", generic(List.class, MemberResult.class),
+				"childLocationEnabled", "boolean"));
 		assertRecord(VehicleSummary.class, components(
 				"vehicleId", "long",
 				"model", String.class.getName(),
@@ -161,7 +162,8 @@ class UserInPortsTest {
 		assertRecord(FamilyInfo.class, components(
 				"familyId", "long",
 				"joinCallMode", JoinCallMode.class.getName(),
-				"settingsVersion", "int"));
+				"settingsVersion", "int",
+				"childLocationEnabled", "boolean"));
 	}
 
 	private void verifyDeviceStatusValues() {

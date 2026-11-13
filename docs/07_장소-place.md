@@ -90,7 +90,7 @@ uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스�
 - 순서: 학원 묶음은 academyId 오름차순, 묶음 안 장소는 spotId 오름차순.
 - 학원 이름은 학원마다 한 번만 읽는다. 학원 정보가 없으면 academyName은 null.
 - near · radiusM을 주면 정차 지점이 반경 안에 있는 장소만 공간 인덱스로 조회한다(PostGIS 네이티브 쿼리, ST_DWithin). 둘 중 하나만 주면 422 VALIDATION_FAILED(빠진 쪽을 fields에).
-- walkMinutes는 계산 방법이 정해질 때까지 늘 null이다.
+- walkMinutes는 학원 출입구(없으면 학원 위치)에서 그 장소의 만남 지점까지 걷는 시간(분, 올림)이다. 직선은 건물을 가로질러 너무 짧게 나오므로, 두 점의 남북 거리와 동서 거리를 더한 「블록 우회 거리」(건물 블록을 돌아가는 길)를 초속 1.1m로 나눈다. 진행 중 세션 여부와 관계없이 늘 계산한다(#191의 「세션이 없으면 null」을 대신함) [사람 결정 2026-11-13]. 실제 도보 경로 API(카카오 도보 길찾기는 유료 제휴 필요)를 쓰게 되면 이 계산만 바꾼다.
 
 ### 추가 (SPOT-02)
 - 학원이 없으면 404 NOT_FOUND.
@@ -258,6 +258,8 @@ List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<In
 - [x] GET /v1/pickup-spot-recommendations에 ISO 형식이 아닌 arriveAt을 보내면 422 VALIDATION_FAILED와 fields의 arriveAt을 돌려준다
 - [x] 차량 시간 어댑터는 미래 운행 정보 길찾기에 summary 파라미터를 붙이지 않는다
 - [x] 참조 데이터 로더는 테이블별 적재를 한 트랜잭션으로 해서 중간에 실패하면 그 테이블에 일부 행을 남기지 않는다
+- [ ] [기반] 블록 우회 도보 거리 규칙은 두 좌표 사이 남북 거리와 동서 거리를 더한 값을 m로 돌려준다(북쪽 300m · 동쪽 400m면 직선 500m가 아니라 700m)
+- [ ] [서비스] 장소 조회는 walkMinutes를 학원 출입구(없으면 학원 위치)에서 만남 지점까지 블록 우회 도보 거리를 초속 1.1m로 나눈 시간을 분으로 올림해 돌려준다
 
 ## 확인 필요 사항
 
@@ -267,7 +269,7 @@ List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<In
 | 반경 조회 기준 좌표 | near · radiusM이 정차 지점 기준인지 만남 지점 기준인지 소스에 없음. GIST가 걸린 정차 지점 기준으로 가정 |
 | ST_MakeEnvelope(지도 범위) 조회 | 소스 2.2는 지도 범위 조회를 말하지만 API에는 near · radiusM만 있음. 범위(사각형) 파라미터는 두지 않음 |
 | near · radiusM 중 하나만 온 경우 | 결정됨: 422 VALIDATION_FAILED(빠진 쪽을 fields에) |
-| walkMinutes 계산 방법 | 걷는 속도 · 경로 계산 방법이 소스에 없음. 정해야 함. 지금은 늘 null |
+| walkMinutes 계산 방법 | [사람 결정 2026-11-13] 학원 출입구 → 만남 지점 블록 우회 거리(남북 + 동서) ÷ 초속 1.1m, 분 올림 |
 | 유일한 기본 장소를 PATCH로 isDefault false로 바꾸는 경우 | 결정됨: 남은 장소 수와 상관없이 422 DEFAULT_SPOT_REQUIRED(다른 장소를 기본으로 지정해야 바뀜) |
 | PATCH로 memo 지우기 | null은 「안 보냄」이라 지금은 못 지움. 빈 문자열을 「지움」으로 볼지 정해야 함 |
 | 기본 장소 유일성을 DB로도 막을지 | 결정됨(사람): DB 부분 유니크 인덱스 uk_pickup_spot_default + 동시 요청으로 부딪히면 409 DEFAULT_SPOT_CONFLICT |

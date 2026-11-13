@@ -5,6 +5,12 @@ import com.example.pickupservice.user.domain.JoinCallMode;
 public record FamilyInfo(
 		long familyId,
 		JoinCallMode joinCallMode,
-		int settingsVersion
+		int settingsVersion,
+		boolean childLocationEnabled
 ) {
+
+	public FamilyInfo(long familyId, JoinCallMode joinCallMode, int settingsVersion) {
+		this(familyId, joinCallMode, settingsVersion, false);
+	}
+
 }

@@ -8,6 +8,12 @@ public record FamilyResult(
 		long familyId,
 		JoinCallMode joinCallMode,
 		VehicleSummary vehicle,
-		List<MemberResult> members
+		List<MemberResult> members,
+		boolean childLocationEnabled
 ) {
+
+	public FamilyResult(long familyId, JoinCallMode joinCallMode, VehicleSummary vehicle, List<MemberResult> members) {
+		this(familyId, joinCallMode, vehicle, members, false);
+	}
+
 }

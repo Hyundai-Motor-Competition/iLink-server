@@ -4,6 +4,7 @@ import com.example.pickupservice.common.geo.GeoPoints;
 import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.pickup.application.port.out.LoadSessionPort;
 import com.example.pickupservice.pickup.application.port.out.SaveSessionPort;
+import com.example.pickupservice.pickup.domain.CallStatus;
 import com.example.pickupservice.pickup.domain.PickupSession;
 import com.example.pickupservice.pickup.domain.SessionChild;
 import com.example.pickupservice.pickup.domain.SessionStatus;
@@ -73,6 +74,14 @@ class PickupSessionPersistenceAdapter implements LoadSessionPort, SaveSessionPor
 	}
 
 	@Override
+	public List<PickupSession> loadSignalLost(Instant staleBefore) {
+		return pickupSessionJpaRepository.findSignalLost(SessionStatus.ACTIVE, staleBefore, CallStatus.REVOKED)
+				.stream()
+				.map(this::toDomainWithChildren)
+				.toList();
+	}
+
+	@Override
 	@Transactional
 	public PickupSession save(PickupSession session) {
 		PickupSessionEntity savedSession = pickupSessionJpaRepository.save(toEntity(session));
@@ -96,18 +105,19 @@ class PickupSessionPersistenceAdapter implements LoadSessionPort, SaveSessionPor
 				entity.getRemainingMeters(), entity.getEtaUpdatedAt(), entity.getBoardingDetectedAt(),
 				entity.getBoardingCancelableUntil(), entity.getBoardingDoor(), entity.getIncidentType(),
 				entity.getIncidentCause(), entity.getIncidentChildUserId(), entity.getIncidentOpenedAt(),
-				entity.getIncidentResolvedAt(),
-				children.stream().map(PickupSessionPersistenceAdapter::toDomain).toList());
+				entity.getIncidentResolvedAt(), toLatLng(entity.getVehicleLat(), entity.getVehicleLng()),
+				entity.getVehicleLocatedAt(), children.stream().map(PickupSessionPersistenceAdapter::toDomain).toList());
 	}
 
 	private static SessionChild toDomain(SessionChildEntity entity) {
 		return SessionChild.restore(entity.getSessionChildId(), entity.getChildUserId(), entity.getScheduleId(),
 				entity.getChildPhase(), entity.getExtraPrepMinutes(), entity.getCallNotBefore(),
 				toLatLng(entity.getLastLat(), entity.getLastLng()), entity.getLastLocatedAt(),
-				entity.getAcknowledgedAt(), entity.getBoardedAt());
+				entity.getAcknowledgedAt(), entity.getBoardedAt(), entity.getReadyAt());
 	}
 
 	private static PickupSessionEntity toEntity(PickupSession session) {
+		LatLng vehicleLocation = session.getVehicleLocation();
 		return new PickupSessionEntity(session.getSessionId(), session.getVehicleId(), session.getFamilyId(),
 				session.getSpotId(), session.getSpotName(),
 				GeoPoints.toPoint(session.getStopPoint().lat(), session.getStopPoint().lng()),
@@ -117,7 +127,10 @@ class PickupSessionPersistenceAdapter implements LoadSessionPort, SaveSessionPor
 				session.getRouteSpotVersion(), session.isCallHeld(), session.getEtaAt(), session.getRemainingMeters(),
 				session.getEtaUpdatedAt(), session.getBoardingDetectedAt(), session.getBoardingCancelableUntil(),
 				session.getBoardingDoor(), session.getIncidentType(), session.getIncidentCause(),
-				session.getIncidentChildUserId(), session.getIncidentOpenedAt(), session.getIncidentResolvedAt());
+				session.getIncidentChildUserId(), session.getIncidentOpenedAt(), session.getIncidentResolvedAt(),
+				vehicleLocation == null ? null : BigDecimal.valueOf(vehicleLocation.lat()),
+				vehicleLocation == null ? null : BigDecimal.valueOf(vehicleLocation.lng()),
+				session.getVehicleLocatedAt());
 	}
 
 	private static SessionChildEntity toEntity(Long sessionId, SessionChild child) {
@@ -126,7 +139,7 @@ class PickupSessionPersistenceAdapter implements LoadSessionPort, SaveSessionPor
 				child.getScheduleId(), child.getChildPhase(), (short) child.getExtraPrepMinutes(),
 				child.getCallNotBefore(), location == null ? null : BigDecimal.valueOf(location.lat()),
 				location == null ? null : BigDecimal.valueOf(location.lng()), child.getLastLocatedAt(),
-				child.getAcknowledgedAt(), child.getBoardedAt());
+				child.getAcknowledgedAt(), child.getBoardedAt(), child.getReadyAt());
 	}
 
 	private static LatLng toLatLng(BigDecimal lat, BigDecimal lng) {

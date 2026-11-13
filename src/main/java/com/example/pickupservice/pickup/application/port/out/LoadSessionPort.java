@@ -22,4 +22,6 @@ public interface LoadSessionPort {
 
 	List<PickupSession> loadBoardingExpired(Instant now);
 
+	List<PickupSession> loadSignalLost(Instant staleBefore);
+
 }

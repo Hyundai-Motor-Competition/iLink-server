@@ -59,7 +59,7 @@ class PickupPersistenceEntitiesMappingTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("pickup_session 테이블은 설계서 컬럼 27개(incident_child_user_id BIGINT NULL 포함,family_id BIGINT NOT NULL · spot_name VARCHAR(50) · date DATE · 상태 3개 VARCHAR(20) · 버전 3개 INT · call_held BOOLEAN, route_spot_version INT · ETA · 탑승 · incident 칸 NULL)와 created_at · updated_at만 갖는다")
+	@DisplayName("pickup_session 테이블은 설계서 컬럼 30개(incident_child_user_id BIGINT NULL · vehicle_lat · vehicle_lng NUMERIC NULL · vehicle_located_at NULL 포함,family_id BIGINT NOT NULL · spot_name VARCHAR(50) · date DATE · 상태 3개 VARCHAR(20) · 버전 3개 INT · call_held BOOLEAN, route_spot_version INT · ETA · 탑승 · incident 칸 NULL)와 created_at · updated_at만 갖는다")
 	void pickupSessionTableHasDesignColumns() {
 		assertThat(columnsOf("pickup_session")).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
 				Map.entry("session_id", new ColumnType(BIGINT, null, NOT_NULL)),
@@ -89,6 +89,9 @@ class PickupPersistenceEntitiesMappingTest extends IntegrationTestSupport {
 				Map.entry("incident_child_user_id", new ColumnType(BIGINT, null, NULLABLE)),
 				Map.entry("incident_opened_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE)),
 				Map.entry("incident_resolved_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE)),
+				Map.entry("vehicle_lat", new ColumnType(NUMERIC, null, NULLABLE)),
+				Map.entry("vehicle_lng", new ColumnType(NUMERIC, null, NULLABLE)),
+				Map.entry("vehicle_located_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE)),
 				Map.entry("created_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL)),
 				Map.entry("updated_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL))));
 	}
@@ -138,7 +141,7 @@ class PickupPersistenceEntitiesMappingTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("session_child 테이블은 session_child_id · session_id · child_user_id · schedule_id · child_phase VARCHAR(20) · extra_prep_minutes SMALLINT · call_not_before NULL · last_lat · last_lng NUMERIC NULL · last_located_at · acknowledged_at · boarded_at NULL과 created_at · updated_at만 갖는다")
+	@DisplayName("session_child 테이블은 session_child_id · session_id · child_user_id · schedule_id · child_phase VARCHAR(20) · extra_prep_minutes SMALLINT · call_not_before NULL · last_lat · last_lng NUMERIC NULL · last_located_at · acknowledged_at · boarded_at · ready_at NULL과 created_at · updated_at만 갖는다")
 	void sessionChildTableHasDesignColumns() {
 		assertThat(columnsOf("session_child")).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
 				Map.entry("session_child_id", new ColumnType(BIGINT, null, NOT_NULL)),
@@ -153,6 +156,7 @@ class PickupPersistenceEntitiesMappingTest extends IntegrationTestSupport {
 				Map.entry("last_located_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE)),
 				Map.entry("acknowledged_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE)),
 				Map.entry("boarded_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE)),
+				Map.entry("ready_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE)),
 				Map.entry("created_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL)),
 				Map.entry("updated_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL))));
 	}
@@ -174,6 +178,27 @@ class PickupPersistenceEntitiesMappingTest extends IntegrationTestSupport {
 					.isEqualTo(9);
 			assertThat(((Number) rows.getFirst().get("numeric_scale")).intValue())
 					.as("session_child.%s의 소수 자리", column)
+					.isEqualTo(6);
+		}
+	}
+
+	@Test
+	@DisplayName("pickup_session.vehicle_lat · vehicle_lng는 session_child.last_lat · last_lng와 같은 NUMERIC(9,6)이다")
+	void pickupSessionVehicleLatLngAreNumeric9Scale6() {
+		for (String column : List.of("vehicle_lat", "vehicle_lng")) {
+			List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+					select numeric_precision, numeric_scale
+					from information_schema.columns
+					where table_schema = current_schema()
+					  and table_name = 'pickup_session'
+					  and column_name = ?
+					""", column);
+			assertThat(rows).as("pickup_session.%s 컬럼", column).hasSize(1);
+			assertThat(((Number) rows.getFirst().get("numeric_precision")).intValue())
+					.as("pickup_session.%s의 정밀도", column)
+					.isEqualTo(9);
+			assertThat(((Number) rows.getFirst().get("numeric_scale")).intValue())
+					.as("pickup_session.%s의 소수 자리", column)
 					.isEqualTo(6);
 		}
 	}

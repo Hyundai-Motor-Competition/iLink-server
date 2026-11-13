@@ -74,7 +74,8 @@ class PickupOutPortsTest {
 				method("loadActiveByFamily", optionalSession, params(long.class)),
 				method("loadActiveByChild", optionalSession, params(long.class)),
 				method("loadActiveBySpot", optionalSession, params(long.class)),
-				method("loadBoardingExpired", generic(List.class, PickupSession.class), params(Instant.class)));
+				method("loadBoardingExpired", generic(List.class, PickupSession.class), params(Instant.class)),
+				method("loadSignalLost", generic(List.class, PickupSession.class), params(Instant.class)));
 		assertPort(SaveSessionPort.class,
 				method("save", PickupSession.class.getName(), params(PickupSession.class)));
 		assertPort(LoadCallPort.class,
