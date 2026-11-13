@@ -3,6 +3,7 @@ package com.example.pickupservice.pickup.application.port.out;
 import com.example.pickupservice.pickup.domain.PickupSession;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,5 +24,7 @@ public interface LoadSessionPort {
 	List<PickupSession> loadBoardingExpired(Instant now);
 
 	List<PickupSession> loadSignalLost(Instant staleBefore);
+
+	List<PickupSession> loadByFamilyAndDate(long familyId, LocalDate date);
 
 }

@@ -15,8 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -78,6 +81,24 @@ class PickupSessionPersistenceAdapter implements LoadSessionPort, SaveSessionPor
 		return pickupSessionJpaRepository.findSignalLost(SessionStatus.ACTIVE, staleBefore, CallStatus.REVOKED)
 				.stream()
 				.map(this::toDomainWithChildren)
+				.toList();
+	}
+
+	@Override
+	public List<PickupSession> loadByFamilyAndDate(long familyId, LocalDate date) {
+		List<PickupSessionEntity> sessions = pickupSessionJpaRepository.findByFamilyIdAndDateOrderBySessionId(familyId,
+				date);
+		if (sessions.isEmpty()) {
+			return List.of();
+		}
+		Map<Long, List<SessionChildEntity>> childrenBySession = sessionChildJpaRepository
+				.findBySessionIdInOrderBySessionChildId(
+						sessions.stream().map(PickupSessionEntity::getSessionId).toList())
+				.stream()
+				.collect(Collectors.groupingBy(SessionChildEntity::getSessionId));
+		return sessions.stream()
+				.map(session -> toDomain(session,
+						childrenBySession.getOrDefault(session.getSessionId(), List.of())))
 				.toList();
 	}
 

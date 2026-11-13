@@ -471,6 +471,56 @@ class PickupSessionPersistenceAdapterTest extends IntegrationTestSupport {
 		assertThat(loadSessionPort.loadActiveBySpot(seeded.otherSpotId())).as("세션이 없는 장소").isEmpty();
 	}
 
+	@Test
+	@DisplayName("loadByFamilyAndDate는 그 가족 · 그 날짜의 세션을 상태와 관계없이(ON_HOLD · COMPLETED · CANCELLED) 자녀(childUserId · scheduleId)와 함께 모두 돌려주고 다른 날짜 · 다른 가족 세션은 돌려주지 않는다")
+	void loadByFamilyAndDateReturnsSessionsOfThatFamilyAndDateInAnyStatusWithChildren() {
+		changeStatus(seeded.sessionId(), SessionStatus.ON_HOLD);
+		long completedId = persistSession(seeded.vehicleId(), seeded.familyId(), seeded.spotId(), seeded.date(),
+				SessionStatus.COMPLETED, List.of(minjunSchedule()));
+		long cancelledId = persistSession(seeded.vehicleId(), seeded.familyId(), seeded.otherSpotId(), seeded.date(),
+				SessionStatus.CANCELLED, List.of(new ChildSchedule(seeded.seoyunId(), seeded.seoyunScheduleId())));
+		persistSession(seeded.vehicleId(), seeded.familyId(), seeded.spotId(), seeded.date().minusDays(1),
+				SessionStatus.COMPLETED, List.of(minjunSchedule()));
+		persistSession(seeded.vehicleId(), seeded.familyId(), seeded.spotId(), seeded.date().plusDays(1),
+				SessionStatus.ACTIVE, List.of(minjunSchedule()));
+		UserSeed.Result other = seedOtherFamily();
+		long otherSessionId = persistOtherFamilySession(other, SessionStatus.ACTIVE);
+
+		List<PickupSession> found = loadSessionPort.loadByFamilyAndDate(seeded.familyId(), seeded.date());
+
+		assertThat(found).extracting(PickupSession::getSessionId, PickupSession::getFamilyId, PickupSession::getDate,
+						PickupSession::getSessionStatus)
+				.containsExactlyInAnyOrder(
+						tuple(seeded.sessionId(), seeded.familyId(), seeded.date(), SessionStatus.ON_HOLD),
+						tuple(completedId, seeded.familyId(), seeded.date(), SessionStatus.COMPLETED),
+						tuple(cancelledId, seeded.familyId(), seeded.date(), SessionStatus.CANCELLED));
+		assertThat(sessionOf(found, seeded.sessionId()).getChildren())
+				.extracting(SessionChild::getChildUserId, SessionChild::getScheduleId)
+				.containsExactlyInAnyOrder(
+						tuple(seeded.minjunId(), seeded.minjunScheduleId()),
+						tuple(seeded.seoyunId(), seeded.seoyunScheduleId()));
+		assertThat(sessionOf(found, completedId).getChildren())
+				.extracting(SessionChild::getChildUserId, SessionChild::getScheduleId)
+				.containsExactly(tuple(seeded.minjunId(), seeded.minjunScheduleId()));
+		assertThat(sessionOf(found, cancelledId).getChildren())
+				.extracting(SessionChild::getChildUserId, SessionChild::getScheduleId)
+				.containsExactly(tuple(seeded.seoyunId(), seeded.seoyunScheduleId()));
+		assertThat(loadSessionPort.loadByFamilyAndDate(other.familyId(), seeded.date())).as("다른 가족")
+				.extracting(PickupSession::getSessionId)
+				.containsExactly(otherSessionId);
+	}
+
+	@Test
+	@DisplayName("loadByFamilyAndDate는 그 가족에 그 날짜 세션이 없으면 빈 목록을 돌려준다")
+	void loadByFamilyAndDateIsEmptyWhenFamilyHasNoSessionOnThatDate() {
+		UserSeed.Result other = seedOtherFamily();
+
+		assertThat(loadSessionPort.loadByFamilyAndDate(seeded.familyId(), seeded.date().plusDays(3)))
+				.as("세션이 없는 날짜").isNotNull().isEmpty();
+		assertThat(loadSessionPort.loadByFamilyAndDate(other.familyId(), seeded.date()))
+				.as("세션이 없는 가족").isNotNull().isEmpty();
+	}
+
 	@ParameterizedTest(name = "{0}")
 	@EnumSource(SessionStatus.class)
 	@DisplayName("load는 상태와 관계없이 그 sessionId의 세션을 시드 스냅샷 · 자녀 2명(sessionChildId · scheduleId · WAITING)과 함께 돌려준다")
@@ -671,6 +721,13 @@ class PickupSessionPersistenceAdapterTest extends IntegrationTestSupport {
 	private static SessionChild childOf(PickupSession session, long childUserId) {
 		return session.getChildren().stream()
 				.filter(child -> child.getChildUserId() == childUserId)
+				.findFirst()
+				.orElseThrow();
+	}
+
+	private static PickupSession sessionOf(List<PickupSession> sessions, long sessionId) {
+		return sessions.stream()
+				.filter(session -> session.getSessionId() == sessionId)
 				.findFirst()
 				.orElseThrow();
 	}
