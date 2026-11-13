@@ -36,7 +36,7 @@ notification
 | notificationId | BIGINT | PK | |
 | sessionId | BIGINT | FK → PickupSession | |
 | callId | BIGINT | FK → Call, NULL | 합류 안내일 때만 |
-| type | VARCHAR(30) | | 예: SESSION_STARTED · DEPARTURE · CALL · PREP_EXTENDED · HELP |
+| type | VARCHAR(30) | | 예: SESSION_STARTED · DEPARTURE · PREPARE · CALL · PREP_EXTENDED · HELP |
 | deviceId | BIGINT | FK → Device | 받는 기기 |
 | sentAt | TIMESTAMPTZ | NULL | FCM 발송 성공 시각 |
 | deliveredAt | TIMESTAMPTZ | NULL | NOTI-01 |
@@ -171,6 +171,7 @@ void markCallSent(long callId, Instant at); void markCallDelivered(long callId, 
 - [x] [서비스] 재발송 작업은 묶음 시도가 3번 이상인 행을 대상 판단 전에 거른다(세션별 조회 · 멈춤 확인을 부르지 않는다)
 - [x] [서비스] 다시 보내기는 세션이 끝났거나 호출이 철회됐으면 409로 거절하고 새 행을 만들지 않는다
 - [x] [서비스] 다시 보내기의 1분 제한은 묶음 마지막 행의 sentAt(없으면 그 행의 createdAt) 기준이다(재발송 작업과 같은 규칙)
+- [ ] [서비스] PREPARE_NOTICE_SENT 이벤트의 알림은 세션 자녀에게 type PREPARE(제목 「준비 알림」, 본문 「곧 도착해요. 실내에서 준비해 주세요」)로 기록 · 발송한다
 
 ## 확인 필요 사항
 

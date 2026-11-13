@@ -1,10 +1,10 @@
 # 04. 사용자 (user)
 
-보호자 · 자녀 · 선생님 · 대리보호자와 전화번호, 가족과 역할(role), 차량(VIN), 차량 연결 해제, 합류 안내 방식. 차량은 가족이 소유한 자산이라 Family 아래에 둔다.
+보호자 · 자녀 · 선생님 · 대리보호자와 전화번호, 가족과 역할(role), 차량(VIN), 차량 연결 해제, 합류 안내 방식, 자녀 위치 사용. 차량은 가족이 소유한 자산이라 Family 아래에 둔다.
 
 | 항목 | 내용 |
 |---|---|
-| 범위 | 엔티티 Family · User · Vehicle. API FAM-01~03 · FAM-07(가족 멤버), LINK-05(차량 연결 해제), SET-06(합류 안내 방식). 다른 모듈용 in 포트(보호자 · 가족 생성, 차량 등록 · 조회, 멤버 · 가족 조회) |
+| 범위 | 엔티티 Family · User · Vehicle. API FAM-01~03 · FAM-07(가족 멤버), LINK-05(차량 연결 해제), SET-06(합류 안내 방식), SET-11(자녀 위치 사용). 다른 모듈용 in 포트(보호자 · 가족 생성, 차량 등록 · 조회, 멤버 · 가족 조회) |
 | 의존 | 03_공유모듈-shared. auth의 in 포트(멤버 기기 상태 조회, 멤버 해제 때 기기 · 토큰 폐기, LINK-05 차량 기기 폐기), pickup의 in 포트(진행 중 픽업 여부). 둘 다 user out 포트로 둔다. auth는 연동됨(기기 상태 · 기기 폐기), pickup(CheckActivePickupPort)만 구현 전 임시 false |
 | 진행 | 계층 병렬 |
 
@@ -12,7 +12,7 @@
 
 ```text
 user
-├─ adapter/in/web          FamilyController(FAM-01~03 · FAM-07 · SET-06), VehicleLinkController(LINK-05), doc 인터페이스 2개
+├─ adapter/in/web          FamilyController(FAM-01~03 · FAM-07 · SET-06 · SET-11), VehicleLinkController(LINK-05), doc 인터페이스 2개
 ├─ adapter/out/persistence FamilyEntity · UserEntity(users) · VehicleEntity, 저장소, 전화번호 암호화 변환기, out 포트 구현
 ├─ adapter/out/(모듈 연결) auth · pickup in 포트를 부르는 out 포트 구현
 ├─ application/port/in     아래 「시그니처」
@@ -29,6 +29,7 @@ user
 |---|---|---|---|
 | familyId | BIGINT | PK | |
 | joinCallMode | VARCHAR(20) | 기본 AUTO | AUTO · GUARDIAN_CONFIRM |
+| childLocationEnabled | BOOLEAN | NOT NULL, 기본 false | 자녀 위치 사용. 켜져 있을 때만 픽업 중(호출 뒤) 자녀 위치를 받는다 [사람 결정 2026-11-13] |
 | settingsVersion | INT | 기본 0 | 설정이 바뀔 때마다 +1 |
 
 사용자 (User, 테이블 users)
@@ -61,17 +62,19 @@ user
 
 | ID | Method · 경로 | 호출 | Idempotency-Key | 요청 → 응답 | 오류 |
 |---|---|---|---|---|---|
-| FAM-01 | GET /v1/families/me | GUARDIAN · CO_GUARDIAN | 불필요 | — → 200 familyId, joinCallMode, vehicle(vehicleId · model · plateNumberMasked, 없으면 null), members[](userId · role · name · phone · deviceStatus) | 공통 |
+| FAM-01 | GET /v1/families/me | GUARDIAN · CO_GUARDIAN | 불필요 | — → 200 familyId, joinCallMode, childLocationEnabled, vehicle(vehicleId · model · plateNumberMasked, 없으면 null), members[](userId · role · name · phone · deviceStatus) | 공통 |
 | FAM-02 | POST /v1/families/me/members | GUARDIAN · CO_GUARDIAN | 필요 | role(CHILD · CO_GUARDIAN · DELEGATE · TEACHER), name(1~20자, 이모지 · 제어문자 불가), phone(국제 형식, 자녀 외 필수) → 201 userId | 422 MEMBER_LIMIT_EXCEEDED(자녀 외 멤버가 이미 5명), 403 FORBIDDEN(공동 보호자가 공동 보호자를 추가) |
 | FAM-03 | PATCH /v1/families/me/members/{userId} | GUARDIAN · CO_GUARDIAN | 불필요 | name, phone, role(모두 선택, 보낸 필드만 바뀜) → 200 userId · role · name · phone · deviceStatus | 422 VALIDATION_FAILED(role GUARDIAN 지정 · GUARDIAN 자신의 role 변경 → fields role, 전화번호 형식 오류, phone 없는 CHILD를 자녀 외 role로 변경 → fields phone), 422 MEMBER_LIMIT_EXCEEDED(CHILD를 자녀 외 role로 바꿀 때 자녀 외 멤버가 이미 5명), 403 FORBIDDEN(GUARDIAN이 아닌 멤버가 role 변경) |
 | FAM-07 | DELETE /v1/families/me/members/{userId} | GUARDIAN | 필요 | — → 204 | 409 MEMBER_IN_ACTIVE_PICKUP, 422 CANNOT_REMOVE_GUARDIAN |
 | LINK-05 | DELETE /v1/vehicle-links/{vehicleId} | GUARDIAN | 필요 | — → 204 | 409 ACTIVE_PICKUP_EXISTS |
 | SET-06 | PUT /v1/families/me/call-mode | GUARDIAN · CO_GUARDIAN | 불필요 | joinCallMode(AUTO · GUARDIAN_CONFIRM) → 200 joinCallMode, settingsVersion | 공통 |
+| SET-11 | PUT /v1/families/me/child-location | GUARDIAN · CO_GUARDIAN | 불필요 | enabled(필수, true · false) → 200 childLocationEnabled, settingsVersion | 422 VALIDATION_FAILED(enabled 없음) |
 
 응답 예시
-- FAM-01: `{"familyId":12,"joinCallMode":"AUTO","vehicle":{"vehicleId":77,"model":"아이오닉 5","plateNumberMasked":"12가 ****"},"members":[{"userId":101,"role":"GUARDIAN","name":"김보호","phone":"+821012345678","deviceStatus":"CONNECTED"},{"userId":131,"role":"CHILD","name":"민준","phone":null,"deviceStatus":"INVITE_PENDING"}]}`
+- FAM-01: `{"familyId":12,"joinCallMode":"AUTO","childLocationEnabled":false,"vehicle":{"vehicleId":77,"model":"아이오닉 5","plateNumberMasked":"12가 ****"},"members":[{"userId":101,"role":"GUARDIAN","name":"김보호","phone":"+821012345678","deviceStatus":"CONNECTED"},{"userId":131,"role":"CHILD","name":"민준","phone":null,"deviceStatus":"INVITE_PENDING"}]}`
 - FAM-03: `{"userId":131,"role":"CHILD","name":"민준","phone":null,"deviceStatus":"CONNECTED"}`
 - SET-06: `{"joinCallMode":"GUARDIAN_CONFIRM","settingsVersion":8}`
+- SET-11: `{"childLocationEnabled":true,"settingsVersion":9}`
 
 ## 핵심 로직
 
@@ -101,6 +104,11 @@ user
 - SET-06은 GUARDIAN · CO_GUARDIAN만. Family.joinCallMode를 바꾸고 settingsVersion을 1 올린다.
 - 기본값이 AUTO라 처음 설정 흐름에서는 부르지 않는다. 다음 세션부터 적용된다.
 
+### 자녀 위치 사용
+- SET-11은 GUARDIAN · CO_GUARDIAN만. Family.childLocationEnabled를 바꾸고 settingsVersion을 1 올린다. 기본은 꺼짐(false).
+- FAM-01 응답과 LoadFamilyUseCase의 FamilyInfo에 childLocationEnabled를 담는다. pickup은 SIG-04(자녀 위치)를 받기 전에 이 값을 보고, 꺼져 있으면 403 LOCATION_CONSENT_REQUIRED로 거절한다.
+- 자녀 앱 가입 때 받는 LOCATION 동의(auth)는 그대로 둔다. 실제로 위치를 받으려면 자녀 동의와 이 설정이 모두 있어야 한다.
+
 ### 전화번호 암호화
 - users.phone은 AES-256-GCM 암호문(nonce · 태그 포함, Base64)으로 저장하고, 키는 환경 변수로 받는다. JPA 변환기로 저장 때 암호화, 읽을 때 복호화한다.
 
@@ -122,7 +130,8 @@ Optional<VehicleInfo> findVehicle(long vehicleId);                // LoadVehicle
 Optional<VehicleInfo> findLinkedVehicleByVin(String vin);         // LoadVehicleUseCase
 Optional<MemberInfo> findMember(long userId);                     // LoadMemberUseCase
 List<MemberInfo> findMembers(long familyId);                      // LoadMemberUseCase
-FamilyInfo findFamily(long familyId);                             // LoadFamilyUseCase (joinCallMode · settingsVersion)
+FamilyInfo findFamily(long familyId);                             // LoadFamilyUseCase (joinCallMode · settingsVersion · childLocationEnabled)
+ChildLocationResult changeChildLocation(ChangeChildLocationCommand command); // ChangeChildLocationUseCase (SET-11). Command(familyId, enabled) → Result(childLocationEnabled, settingsVersion). FAM-01의 FamilyResult도 childLocationEnabled를 담는다
 
 // out 포트
 Optional<Family> loadFamily(long familyId);  Family saveFamily(Family family);          // LoadFamilyPort · SaveFamilyPort
@@ -209,6 +218,12 @@ boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);
 - [x] [서비스] createGuardian은 이미 가족에 연결됐거나 연결이 해제된 차량이면 409 VEHICLE_ALREADY_LINKED로 거절하고 아무것도 저장하지 않는다
 - [x] 멤버 목록(findMembers · FAM-01 members[])은 userId 오름차순으로 돌려준다
 - [x] VEHICLE_ALREADY_LINKED는 common ErrorCode 하나로 정의되고 user · auth 모두 409 「이미 보호자가 연결된 차량입니다」로 응답한다
+- [x] [기반] Family는 childLocationEnabled(기본 false)를 갖고 changeChildLocation(enabled)을 부르면 값이 바뀌고 settingsVersion이 1 오른다
+- [x] [persistence] family 테이블의 child_location_enabled(NOT NULL, 기본 false)를 저장하고 읽는다
+- [x] [서비스] 자녀 위치 사용 변경(SET-07)은 GUARDIAN · CO_GUARDIAN의 가족 childLocationEnabled를 바꾸고 settingsVersion을 1 올려 돌려준다
+- [x] [web] PUT /v1/families/me/child-location은 200과 childLocationEnabled · settingsVersion을 돌려주고, enabled가 없으면 422 VALIDATION_FAILED, CHILD · DELEGATE · TEACHER 토큰이면 403 FORBIDDEN을 돌려준다
+- [x] [web] GET /v1/families/me와 LoadFamilyUseCase.findFamily의 FamilyInfo는 childLocationEnabled를 함께 돌려준다
+- [x] [서비스] 가족 조회(FAM-01)는 저장된 Family의 childLocationEnabled를 FamilyResult에 그대로 옮긴다(true면 true)
 
 ## 확인 필요 사항
 
@@ -221,7 +236,7 @@ boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);
 | 멤버 해제 때 그 자녀의 일정 · 장소 처리 | 소스에 없음. 그대로 둔다고 가정 |
 | LINK-05를 차량 앱이 부를 수 있는지 | 4.3 표의 사용 화면에 「차량 설정 요약 화면」이 있으나 4.14 호출은 GUARDIAN뿐. 4.14대로 USER 주체 GUARDIAN만 허용 |
 | LINK-05 때 차량 기기 토큰 폐기 | 결정됨(사람 결정 2026-11-07). 해제하면 그 차량의 살아 있는 기기를 모두 폐기한다. 해제된 차량 앱은 AUTH-02로 다시 등록한다. 포트도 결정됨: RevokeVehicleDevicesPort → auth RevokeVehicleDevicesUseCase |
-| settingsVersion을 올리는 변경의 범위 | SET-06만 명시됨. 일정(SET-02 · 03) · 장소(SPOT-02 · 03) · 멤버 변경도 올리는지 정해야 함(SET-08 충돌 판단에 영향) |
+| settingsVersion을 올리는 변경의 범위 | SET-06 · SET-11(자녀 위치 사용)이 올림. 일정(SET-02 · 03) · 장소(SPOT-02 · 03) · 멤버 변경도 올리는지 정해야 함(SET-08 충돌 판단에 영향) |
 | 번호판 마스킹 규칙 | 예시 「12가 ****」뿐. 마지막 숫자 4자리를 *로 바꾼다고 가정 |
 | user ↔ auth 서로 부름 | auth는 User 생성을 user에 요청하고, user는 기기 상태 · 폐기를 auth에 요청. user 쪽은 out 포트로 둔다. auth 쪽 임시 어댑터(LoadMemberDeviceStatusPort 기기 상태 · RevokeMemberDevicesPort 기기 폐기)는 auth 연동으로 교체됨 |
 | 진행 중 픽업 확인(FAM-07 · LINK-05)을 pickup in 포트로 부르는 것 | pickup이 user보다 뒤에 구현되므로 out 포트 + 테스트 대역으로 먼저 검증. pickup 쪽 CheckActivePickupPort만 아직 임시 어댑터(늘 false). pickup 구현 때 교체해야 함 |
