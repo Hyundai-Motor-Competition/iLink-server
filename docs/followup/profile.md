@@ -1,8 +1,8 @@
 # FOLLOWUP · 프로필사진 (profile)
 
-- 생성: 2026-11-13 21:05 KST · tdd-guard
+- 생성: 2026-11-13 22:01 KST · tdd-guard
 - 상태: 완료 (체크 39/39 · 완료 기준 4/4)
-- 테스트: ● RED · 0 passed · 46 failed · 전체 · 14s · .\gradlew.bat test --console=plain
+- 테스트: ● GREEN · 2687 passed · 전체 · 135s · .\gradlew.bat test --console=plain
 - 설계서: C:/pickup/docs/10_프로필사진-profile.md
 
 ## 완료 항목
@@ -95,3 +95,11 @@
 - docs/followup/TODO.md 진행 기록이 pickup · notification(완료 4/4)과 다르게 「대기 · 완료 기준 0/4」로 나온다(shared~place도 같은 문제, pickup.md에 기록). TODO 수동 정리 또는 리뷰 기록 복원 필요
 - dev 배포 뒤 확인: 실제 MinIO 업로드 · 서명 URL 열람, ingress(img-dev.chisanw.com)가 Host 헤더를 그대로 넘겨 서명이 맞는지, prod는 ALTER TABLE users ADD COLUMN profile_image_key VARCHAR(200) NULL 선행
 - 해소된 후속 과제(재리뷰 확인): StorageUnavailableException cause 생성자 · 픽스처 주석 정리 · RELINK AFTER_COMMIT 삭제(#36) · 스웨거 문서 정리 · 통합 테스트 reset(). PNG 상수는 TestImages로 합쳤고 FamilyControllerTest · VehicleLinkCodeControllerTest · RequestHasherTest의 같은 값 로컬 상수 3곳만 남음(선택)
+- [사람 결정 2026-11-13] D4: 「다음 세션부터 적용」 문구를 코드(매번 최신 값 읽음)에 맞춰 04 · 06 설계서와 FamilyApiDoc · ScheduleApiDoc 문구를 「바로 적용」으로 고친다. D5: 08 SIG-04 403 LOCATION_CONSENT_REQUIRED 행에 「동의 철회 기능 전까지 나지 않음」 표시, 임시 어댑터 유지. D6: spring.task.scheduling.pool.size=4 (shared 항목 추가 필요). SES-11: notBoardedChildUserIds에 세션 밖 childUserId가 오면 404 NOT_FOUND (pickup 항목 추가 필요)
+- [사람 결정 2026-11-13] D1: JoinCallMode · DeviceStatus · Platform · ScheduleStatus는 코드 그대로 두고 02 공통 규칙 L70 예외 목록에 추가. D2: ACTIVE_PICKUP_EXISTS · SETUP_INCOMPLETE를 common ErrorCode 하나 · 문구 하나로 합침(응답 code 그대로). D3: 모든 429에 retryAfterSeconds를 채우는 도메인 code용 팩토리 하나로 통일, HELP의 nextAllowedAt은 추가 키로 유지. D7: 02에 「DB FK 없음」 관례 명시, FAM-07 멤버 해제는 실제 삭제 대신 삭제 표시(removedAt)로 바꾸고 조회에서 해제 멤버 제외(user 항목 추가 필요)
+- [사람 결정 2026-11-13] D8: 임시 어댑터 체크 항목 5개(04 #64 · 05 #98 · 06 #58 · 07 #44 · 08 #204) 문장을 지금 실제 연동 동작에 맞게 고침 승인. D9: 다른 모듈 호출은 in 포트 직접 주입 · out 포트+adapter/out 둘 다 허용, 02에 적고 02:19 의존 방향 목록을 실제에 맞춤. D10: DRAFT 일정은 SET-09 · SES-02 모두 missing SCHEDULE, 판정 코드 한 곳(schedule 항목 추가 필요). D11: 리뷰가 「사람 확인 필요」로 남긴 완료 기준은 체크하지 않음(pickup C2 · notification C3 체크 해제 검토)
+- [팀장 가정 2026-11-13 · 사람 확인 필요] 최종디자인 11/13 반영 항목: (1) 추천 장소 · 여기로 부르기는 서버가 임시 장소(temporary)를 만드는 방식 (2) 여기로 부르기는 장소 변경 + 합류 안내를 서버가 한 번에 (3) 번호판은 디자인(전체 표시)과 달리 지금 규칙대로 가려서 보여줌 — 전체 표시로 바꿀지 확인 (4) 디자인 미완: 부모 일정 · 기록 · 마이 탭, 알림함(종 아이콘, 가족 전체 알림 목록 API 필요 여부), 차량 마무리 화면, 자녀 연결 확인 팝업. 진행 단계 문구 「합류 안내 발송」/「탑승 안내 발송」 통일 필요. C04 화면이 빠져 도움 요청(help-requests)을 쓰는 화면이 없음
+- [사람 결정 2026-11-13] 최종디자인 11/13 반영: (1) 추천 장소 · 여기로 부르기는 서버가 임시 장소를 만드는 방식으로 확정 (2) 여기로 부르기는 장소 변경 + 합류 안내를 서버가 한 번에 처리로 확정 (3) 번호판(plateNumber)은 서버가 받지 않음 — 차대번호(VIN) 조회로 나중에 불러올 수 있어 이번에는 생략, 05 auth의 번호판 항목은 삭제함. 연결 확인 화면의 번호판 칸은 당분간 비어 있음
+- [사람 결정 2026-11-13] (1) 이름 없는 길가 추천 후보는 name 「이름 없는 길」로 줌(place 항목 추가) (2) 학원은 가족마다 따로 둠: Academy에 familyId, (familyId, externalPlaceId) 유니크(schedule 항목 2건 추가). 기존 academy 행의 familyId 채우기 · 유니크 인덱스 교체는 배포 전 이전 작업 필요 (3) LINK-04 NEW로 만드는 보호자의 phone은 받지 않음 — null 허용으로 확정, 「자녀 외 phone 필수」 규칙의 예외 (4) 알림을 받는 「보호자」는 GUARDIAN · CO_GUARDIAN · DELEGATE 모두(pickup 항목 추가) (5) 최종디자인_11/ · 13(금).png · iLink_Project_Package/는 .gitignore에 넣어 커밋하지 않음 (6) 백업 stash 삭제함. 남은 미결: access · refresh 토큰 유효 기간, 운영 DB 중복 기본 장소 정리 기준
+- [사람 결정 2026-11-13] (1) 운영 DB에 같은 가족 · 학원의 기본 장소가 2개 이상이면 가장 최근에 수정한 것만 기본으로 남긴다. 운영 배포 전에 중복을 조회하고 있으면 이 기준으로 정리(정리 SQL은 ops에 둘 것) (2) 토큰 유효 기간: access 30분(PT30M), refresh 14일(P14D). refresh 만료는 아직 구현 안 됨 — auth 항목 추가 필요(설계서 문구 수정 에이전트가 05를 고치는 중이라 끝난 뒤 추가)
+- [설계서 문구 수정 2026-11-13 후속] (1) Swagger 「다음 세션부터」 문구가 src에 남음: FamilyApiDoc.java(약 53행) · ScheduleApiDoc.java:38 — 「바로 적용」으로 고칠 것(리뷰어 리팩터링) (2) 04 확인 필요 「멤버 해제 때 User 행 처리 … FK 때문에 못 지움」 근거가 D7(FK 없음 · 삭제 표시)과 다름 — user 삭제 표시 항목 처리 때 갱신 (3) 03 본문 약 102행 「도메인 코드 429 … 확인 필요」가 확인 필요 표(결정됨)와 어긋남 — 429 항목 처리 때 갱신 (4) 04 · 05 · 08 · 09 테이블의 「FK →」 표기는 02 관례(FK 없음)와 다르게 남음 (5) 06 체크 항목 「joinCallMode는 schedule 자체 enum」 — D1로 import가 허용돼 복사본 enum을 지울지 미정 (6) 02:20 의존 방향 17개는 src/main import grep으로 확인함(일치). PickupChildReadinessAdapter.hasLocationConsent는 늘 true임을 코드로 확인함
