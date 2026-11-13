@@ -1,18 +1,17 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-13 10:38 KST · tdd-guard
+- 생성: 2026-11-13 12:40 KST · tdd-guard
 - 설계서: C:/ilink/docs
 - 프로젝트: gradle · C:/ilink
 - 테스트: ● GREEN · 2429 passed · 전체 · 219s
-- 진행: 공유모듈 57/59 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 96/96 · 픽업 244/244 · 알림 64/64 · 남은 항목 2/733
-- 현재 도메인: 픽업 (08_픽업-pickup.md) · 진행 시작: /tdd go
+- 진행: 공유모듈 59/59 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 96/96 · 픽업 244/244 · 알림 64/64 · 남은 항목 0/733
+- 현재 도메인: 공유모듈 (03_공유모듈-shared.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
 
-## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 대기 · 항목 57/59 · 완료 기준 0/4 · 리뷰 11-11 11:48 조건부 통과 (상 0 · 중 8 · 하 22) · 재리뷰 필요
-### 테스트 케이스
-- [ ] #58 [web] GlobalExceptionHandler는 클라이언트가 연결을 끊어 난 예외(AsyncRequestNotUsableException · Broken pipe IOException 등 DisconnectedClientHelper.isClientDisconnectedException이 true인 것)를 ERROR로 기록하지 않고 DEBUG로만 남기며 응답 본문을 쓰지 않는다
-- [ ] #59 [web] GlobalExceptionHandler는 클라이언트 끊김이 아닌 처리하지 않은 예외는 지금처럼 ERROR로 기록하고 500 INTERNAL_SERVER_ERROR 본문을 돌려준다
+## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 진행 중 · 항목 59/59 · 완료 기준 0/4 · 리뷰 11-11 11:48 조건부 통과 (상 0 · 중 8 · 하 22) · 재리뷰 필요
+### 도메인 리뷰
+- [ ] 2026-11-11 11:48 KST 리뷰 뒤에 체크 · 추가된 항목 #58, #59 → /tdd review shared
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치

@@ -301,8 +301,8 @@ class BusinessException extends RuntimeException {   // 공개 생성자 없음
 - [x] [web] 각 도메인이 PublicEndpoints 빈으로 등록한 메서드 · 경로는 토큰 없이 부를 수 있고 만료된 Bearer 토큰을 붙여도 401이 아니라 그대로 처리된다
 - [x] [web] dev API 문서(/v3/api-docs)는 Bearer JWT 보안 스키마를 담는다
 - [x] [web] 공통 오류 코드(ErrorCode)로 BusinessException을 만들어 던지면 그 코드의 HTTP 상태 · code · 문구로 응답한다(429는 retryAfterSeconds 포함)
-- [ ] [web] GlobalExceptionHandler는 클라이언트가 연결을 끊어 난 예외(AsyncRequestNotUsableException · Broken pipe IOException 등 DisconnectedClientHelper.isClientDisconnectedException이 true인 것)를 ERROR로 기록하지 않고 DEBUG로만 남기며 응답 본문을 쓰지 않는다
-- [ ] [web] GlobalExceptionHandler는 클라이언트 끊김이 아닌 처리하지 않은 예외는 지금처럼 ERROR로 기록하고 500 INTERNAL_SERVER_ERROR 본문을 돌려준다
+- [x] [web] GlobalExceptionHandler는 클라이언트가 연결을 끊어 난 예외(AsyncRequestNotUsableException · Broken pipe IOException 등 DisconnectedClientHelper.isClientDisconnectedException이 true인 것)를 ERROR로 기록하지 않고 DEBUG로만 남기며 응답 본문을 쓰지 않는다
+- [x] [web] GlobalExceptionHandler는 클라이언트 끊김이 아닌 처리하지 않은 예외는 지금처럼 ERROR로 기록하고 500 INTERNAL_SERVER_ERROR 본문을 돌려준다
 
 ## 확인 필요 사항
 
