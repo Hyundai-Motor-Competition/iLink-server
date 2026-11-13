@@ -1,6 +1,7 @@
 package com.example.pickupservice.common.idempotency;
 
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
+import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.AfterEach;
@@ -50,7 +51,7 @@ class IdempotencyKeyRepositoryTest extends IntegrationTestSupport {
 	void savedKeyIsReadBackByPrincipalAndKeyWithSameHashStatusAndBody() throws Exception {
 		String requestHash = sha256Hex(REQUEST_BODY);
 		idempotencyKeyRepository.save(
-				new IdempotencyKeyEntity(PrincipalType.USER, USER_ID, KEY, requestHash, CREATED, RESPONSE_BODY));
+				completedRow(PrincipalType.USER, USER_ID, KEY, requestHash, CREATED, RESPONSE_BODY));
 
 		IdempotencyKeyEntity found = findByPrincipalAndKey(PrincipalType.USER, USER_ID, KEY);
 
@@ -70,7 +71,7 @@ class IdempotencyKeyRepositoryTest extends IntegrationTestSupport {
 	void responseWithoutBodyIsReadBackAsStatus204AndNullBody() {
 		String requestHash = sha256Hex("DELETE /v1/families/me/members/201");
 		idempotencyKeyRepository.save(
-				new IdempotencyKeyEntity(PrincipalType.USER, USER_ID, KEY, requestHash, NO_CONTENT, null));
+				completedRow(PrincipalType.USER, USER_ID, KEY, requestHash, NO_CONTENT, null));
 
 		IdempotencyKeyEntity found = findByPrincipalAndKey(PrincipalType.USER, USER_ID, KEY);
 
@@ -86,11 +87,11 @@ class IdempotencyKeyRepositoryTest extends IntegrationTestSupport {
 		String otherUserHash = sha256Hex("USER 102 " + REQUEST_BODY);
 		String vehicleHash = sha256Hex("VEHICLE 101 " + REQUEST_BODY);
 		idempotencyKeyRepository.save(
-				new IdempotencyKeyEntity(PrincipalType.USER, USER_ID, KEY, userHash, CREATED, RESPONSE_BODY));
+				completedRow(PrincipalType.USER, USER_ID, KEY, userHash, CREATED, RESPONSE_BODY));
 		idempotencyKeyRepository.save(
-				new IdempotencyKeyEntity(PrincipalType.USER, OTHER_USER_ID, KEY, otherUserHash, CREATED, RESPONSE_BODY));
+				completedRow(PrincipalType.USER, OTHER_USER_ID, KEY, otherUserHash, CREATED, RESPONSE_BODY));
 		idempotencyKeyRepository.save(
-				new IdempotencyKeyEntity(PrincipalType.VEHICLE, VEHICLE_ID, KEY, vehicleHash, CREATED, RESPONSE_BODY));
+				completedRow(PrincipalType.VEHICLE, VEHICLE_ID, KEY, vehicleHash, CREATED, RESPONSE_BODY));
 
 		assertThat(countRowsWithKey(KEY)).isEqualTo(3);
 		assertThat(findByPrincipalAndKey(PrincipalType.USER, USER_ID, KEY).getRequestHash()).isEqualTo(userHash);
@@ -104,10 +105,10 @@ class IdempotencyKeyRepositoryTest extends IntegrationTestSupport {
 		String firstHash = sha256Hex(REQUEST_BODY);
 		String secondHash = sha256Hex(REQUEST_BODY.replace("정문 앞", "후문 앞"));
 		idempotencyKeyRepository.save(
-				new IdempotencyKeyEntity(PrincipalType.USER, USER_ID, KEY, firstHash, CREATED, RESPONSE_BODY));
+				completedRow(PrincipalType.USER, USER_ID, KEY, firstHash, CREATED, RESPONSE_BODY));
 
 		assertThatThrownBy(() -> idempotencyKeyRepository.save(
-				new IdempotencyKeyEntity(PrincipalType.USER, USER_ID, KEY, secondHash, CREATED, RESPONSE_BODY)))
+				completedRow(PrincipalType.USER, USER_ID, KEY, secondHash, CREATED, RESPONSE_BODY)))
 				.isInstanceOf(DataIntegrityViolationException.class);
 
 		assertThat(countRowsWithKey(KEY)).isEqualTo(1);
@@ -145,6 +146,14 @@ class IdempotencyKeyRepositoryTest extends IntegrationTestSupport {
 				.containsEntry("is_nullable", "YES");
 		assertThat(columnByName.get("created_at")).containsEntry("data_type", "timestamp with time zone");
 		assertThat(columnByName.get("updated_at")).containsEntry("data_type", "timestamp with time zone");
+	}
+
+	private static IdempotencyKeyEntity completedRow(PrincipalType principalType, long principalId, String key,
+			String requestHash, int responseStatus, String responseBody) {
+		AuthPrincipal principal = new AuthPrincipal(principalType, principalId, null, null);
+		IdempotencyKeyEntity row = new IdempotencyKeyEntity(new IdempotentRequest(principal, key, requestHash));
+		row.complete(responseStatus, responseBody);
+		return row;
 	}
 
 	private IdempotencyKeyEntity findByPrincipalAndKey(PrincipalType principalType, long principalId, String key) {
