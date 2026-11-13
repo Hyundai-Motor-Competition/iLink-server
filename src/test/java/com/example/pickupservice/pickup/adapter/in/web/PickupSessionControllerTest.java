@@ -1242,7 +1242,7 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 				base.call(),
 				base.children(),
 				base.vehicleLocation(),
-				SessionRouteView.of(2, 4200, 5800),
+				new SessionRouteView(2, 4200, 5800),
 				base.boarding(),
 				base.incident(),
 				base.driver());

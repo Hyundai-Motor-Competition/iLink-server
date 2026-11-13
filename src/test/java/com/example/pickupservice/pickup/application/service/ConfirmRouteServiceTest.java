@@ -508,7 +508,7 @@ class ConfirmRouteServiceTest {
 	}
 
 	private static ConfirmRouteCommand commandWithTotalMeters(long spotId, int stateVersion, int totalMeters) {
-		return ConfirmRouteCommand.of(vehicle(VEHICLE_ID), SESSION_ID, spotId, NAV_ROUTE_ID, stateVersion,
+		return new ConfirmRouteCommand(vehicle(VEHICLE_ID), SESSION_ID, spotId, NAV_ROUTE_ID, stateVersion,
 				totalMeters);
 	}
 

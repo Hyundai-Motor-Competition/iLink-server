@@ -15,9 +15,4 @@ public record ConfirmRouteCommand(
 			int stateVersion) {
 		this(principal, sessionId, spotId, navRouteId, stateVersion, null);
 	}
-
-	public static ConfirmRouteCommand of(AuthPrincipal principal, long sessionId, long spotId, String navRouteId,
-			int stateVersion, Integer totalMeters) {
-		return new ConfirmRouteCommand(principal, sessionId, spotId, navRouteId, stateVersion, totalMeters);
-	}
 }

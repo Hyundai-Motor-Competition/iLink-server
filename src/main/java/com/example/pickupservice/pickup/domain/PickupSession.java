@@ -244,16 +244,12 @@ public class PickupSession {
 		raiseStateVersion();
 	}
 
-	public void confirmRoute() {
+	public void confirmRoute(Integer totalMeters) {
 		spotStatus = SpotStatus.CONFIRMED;
 		routeVersion++;
 		routeSpotVersion = spotVersion;
-		raiseStateVersion();
-	}
-
-	public void confirmRoute(Integer totalMeters) {
-		confirmRoute();
 		routeTotalMeters = totalMeters;
+		raiseStateVersion();
 	}
 
 	public void changeSpot(SpotSnapshot spot) {
