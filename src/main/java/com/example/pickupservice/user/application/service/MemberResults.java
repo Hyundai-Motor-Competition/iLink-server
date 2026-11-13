@@ -32,6 +32,6 @@ final class MemberResults {
 	private static MemberResult toResult(User user, Map<Long, DeviceStatus> deviceStatuses, String profileImageUrl) {
 		DeviceStatus deviceStatus = deviceStatuses.getOrDefault(user.getUserId(), DeviceStatus.NONE);
 		return new MemberResult(user.getUserId(), user.getRole(), user.getName(), user.getPhone(), deviceStatus,
-				profileImageUrl);
+				profileImageUrl, user.getGrade());
 	}
 }

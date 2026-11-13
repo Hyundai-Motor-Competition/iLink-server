@@ -1,6 +1,7 @@
 package com.example.pickupservice.user.domain;
 
 import com.example.pickupservice.common.security.Role;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -15,9 +16,11 @@ public class User {
 	private String name;
 	private String phone;
 	private String profileImageKey;
+	private Instant removedAt;
+	private String grade;
 
 	public static User create(long familyId, Role role, String name, String phone) {
-		return new User(null, familyId, role, name, phone, null);
+		return new User(null, familyId, role, name, phone, null, null, null);
 	}
 
 	public static User restore(Long userId, Long familyId, Role role, String name, String phone) {
@@ -26,7 +29,29 @@ public class User {
 
 	public static User restore(Long userId, Long familyId, Role role, String name, String phone,
 			String profileImageKey) {
-		return new User(userId, familyId, role, name, phone, profileImageKey);
+		return restore(userId, familyId, role, name, phone, profileImageKey, null);
+	}
+
+	public static User restore(Long userId, Long familyId, Role role, String name, String phone,
+			String profileImageKey, Instant removedAt) {
+		return restore(userId, familyId, role, name, phone, profileImageKey, removedAt, null);
+	}
+
+	public static User restore(Long userId, Long familyId, Role role, String name, String phone,
+			String profileImageKey, Instant removedAt, String grade) {
+		return new User(userId, familyId, role, name, phone, profileImageKey, removedAt, grade);
+	}
+
+	public void changeGrade(String grade) {
+		this.grade = grade;
+	}
+
+	public boolean isRemoved() {
+		return removedAt != null;
+	}
+
+	public void remove(Instant removedAt) {
+		this.removedAt = removedAt;
 	}
 
 	public void changeProfileImageKey(String profileImageKey) {

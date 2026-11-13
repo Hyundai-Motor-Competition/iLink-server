@@ -231,4 +231,25 @@ class GetMyFamilyServiceTest {
 		assertThat(result.members()).extracting(MemberResult::profileImageUrl).containsOnlyNulls();
 		verify(profileImageStorage, never()).put(anyString(), any(), anyString());
 	}
+
+	@Test
+	@DisplayName("가족 조회는 members[]마다 User의 grade를 담고 grade가 없는 멤버는 null로 준다")
+	void fillsEachMemberGradeFromUser() {
+		given(loadFamilyPort.loadFamily(FAMILY_ID))
+				.willReturn(Optional.of(Family.restore(FAMILY_ID, JoinCallMode.AUTO, 0)));
+		List<User> users = List.of(
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678"),
+				User.restore(CHILD_MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", null, null, null, "중학교 2학년"));
+		given(loadUserPort.loadUsers(FAMILY_ID)).willReturn(users);
+		lenient().when(loadVehiclePort.loadLinkedVehicleOfFamily(FAMILY_ID)).thenReturn(Optional.empty());
+		given(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList())).willReturn(Map.of());
+
+		FamilyResult result = getMyFamilyService.getMyFamily(new GetMyFamilyQuery(FAMILY_ID));
+
+		assertThat(result.members())
+				.extracting(MemberResult::userId, MemberResult::grade)
+				.containsExactly(
+						tuple(GUARDIAN_ID, null),
+						tuple(CHILD_MINJUN_ID, "중학교 2학년"));
+	}
 }
