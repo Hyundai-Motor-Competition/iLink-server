@@ -73,4 +73,36 @@ class TimeUtilsTest {
 		assertThat(today).isEqualTo(LocalDate.of(2026, 11, 5));
 	}
 
+	private static final Instant NOW = Instant.parse("2026-11-13T09:00:00Z");
+
+	@Test
+	@DisplayName("TimeUtils.secondsUntil은 허용 시각까지 1ms 남았으면 1초로 올린다")
+	void secondsUntilRoundsUpOneMillisecondToOneSecond() {
+		assertThat(TimeUtils.secondsUntil(NOW, NOW.plusMillis(1))).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("TimeUtils.secondsUntil은 지금이 허용 시각과 같으면(0ms 남음) 최소값 1을 돌려준다")
+	void secondsUntilReturnsOneWhenNoTimeLeft() {
+		assertThat(TimeUtils.secondsUntil(NOW, NOW)).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("TimeUtils.secondsUntil은 허용 시각이 이미 지났으면 최소값 1을 돌려준다")
+	void secondsUntilReturnsOneWhenUntilIsInThePast() {
+		assertThat(TimeUtils.secondsUntil(NOW, NOW.minusSeconds(5))).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("TimeUtils.secondsUntil은 허용 시각까지 29.5초 남았으면 30초로 올린다")
+	void secondsUntilRoundsUpTwentyNinePointFiveSecondsToThirty() {
+		assertThat(TimeUtils.secondsUntil(NOW, NOW.plusMillis(29_500))).isEqualTo(30);
+	}
+
+	@Test
+	@DisplayName("TimeUtils.secondsUntil은 허용 시각까지 딱 60초 남았으면 60초를 돌려준다")
+	void secondsUntilReturnsExactSecondsWhenNoFraction() {
+		assertThat(TimeUtils.secondsUntil(NOW, NOW.plusSeconds(60))).isEqualTo(60);
+	}
+
 }

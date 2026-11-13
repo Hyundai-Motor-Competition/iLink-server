@@ -82,7 +82,7 @@ public interface PickupSignalApiDoc {
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (세션이 없거나 다른 가족의 것)")
 	@ApiResponse(responseCode = "409", description = "SESSION_ALREADY_FINISHED (이미 완료 · 취소된 세션)")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (Idempotency-Key 없음 · 입력값 오류)")
-	@ApiResponse(responseCode = "429", description = "HELP_REQUEST_TOO_SOON (error.nextAllowedAt 함께)")
+	@ApiResponse(responseCode = "429", description = "HELP_REQUEST_TOO_SOON (retryAfterSeconds 포함, error.nextAllowedAt 함께)")
 	ResponseEntity<HelpRequestResponse> requestHelp(@Parameter(hidden = true) AuthPrincipal principal,
 			long sessionId, HelpRequestRequest request);
 

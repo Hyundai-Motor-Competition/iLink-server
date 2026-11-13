@@ -1,9 +1,12 @@
 package com.example.pickupservice.auth.application.service;
 
 import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.error.ErrorCode;
 import org.springframework.http.HttpStatus;
 
 final class AuthErrors {
+
+	private static final int REISSUE_LIMIT_RETRY_AFTER_SECONDS = 300;
 
 	private AuthErrors() {
 	}
@@ -19,13 +22,12 @@ final class AuthErrors {
 	}
 
 	static BusinessException activePickupExists() {
-		return BusinessException.of(HttpStatus.CONFLICT, "ACTIVE_PICKUP_EXISTS",
-				"진행 중인 픽업이 있어 로그아웃할 수 없습니다");
+		return BusinessException.of(ErrorCode.ACTIVE_PICKUP_EXISTS);
 	}
 
 	static BusinessException linkCodeReissueLimit() {
-		return BusinessException.of(HttpStatus.TOO_MANY_REQUESTS, "LINK_CODE_REISSUE_LIMIT",
-				"연결 코드 재발급 한도를 넘었습니다");
+		return BusinessException.tooManyRequests("LINK_CODE_REISSUE_LIMIT",
+				"연결 코드 재발급 한도를 넘었습니다", REISSUE_LIMIT_RETRY_AFTER_SECONDS);
 	}
 
 	static BusinessException linkCodeInvalid() {
@@ -38,9 +40,9 @@ final class AuthErrors {
 				"연결 코드가 만료됐거나 이미 사용됐습니다");
 	}
 
-	static BusinessException linkCodeAttemptLimit() {
-		return BusinessException.of(HttpStatus.TOO_MANY_REQUESTS, "LINK_CODE_ATTEMPT_LIMIT",
-				"연결 코드 확인 실패가 많아 잠시 뒤에 다시 시도해 주세요");
+	static BusinessException linkCodeAttemptLimit(int retryAfterSeconds) {
+		return BusinessException.tooManyRequests("LINK_CODE_ATTEMPT_LIMIT",
+				"연결 코드 확인 실패가 많아 잠시 뒤에 다시 시도해 주세요", retryAfterSeconds);
 	}
 
 	static BusinessException linkModeMismatch() {

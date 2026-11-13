@@ -171,6 +171,41 @@ class CheckLinkCodeServiceTest {
 	}
 
 	@Test
+	@DisplayName("연결 코드 확인이 5번 실패로 막힌 뒤 20초 지나 부르면 LINK_CODE_ATTEMPT_LIMIT과 retryAfterSeconds 40(차단 시각 + 60초 - 지금)을 담는다")
+	void checkLinkCodeAttemptLimitCarriesSecondsLeftUntilUnblocked() {
+		failFiveTimes(CLIENT_KEY);
+		when(clock.instant()).thenReturn(NOW.plusSeconds(20));
+
+		assertThatThrownBy(() -> checkLinkCodeService.checkLinkCode(CODE, CLIENT_KEY))
+				.isInstanceOfSatisfying(BusinessException.class, e -> {
+					assertThat(e.status()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+					assertThat(e.code()).isEqualTo("LINK_CODE_ATTEMPT_LIMIT");
+					assertThat(e.getMessage()).isEqualTo("연결 코드 확인 실패가 많아 잠시 뒤에 다시 시도해 주세요");
+					assertThat(e.retryAfterSeconds()).isEqualTo(40);
+				});
+	}
+
+	@Test
+	@DisplayName("연결 코드 확인이 5번 실패로 막힌 바로 그 시각에 부르면 retryAfterSeconds 60을 담는다")
+	void checkLinkCodeAttemptLimitRightAfterBlockCarriesSixtySeconds() {
+		failFiveTimes(CLIENT_KEY);
+
+		assertAttemptLimitRetryAfter(() -> checkLinkCodeService.checkLinkCode(CODE, CLIENT_KEY), 60);
+	}
+
+	@Test
+	@DisplayName("연결 코드 확인의 retryAfterSeconds는 남은 시간을 초 단위로 올림한다 — 차단 20.3초 뒤면 39.7초 남아 40, 59.5초 뒤면 0.5초 남아 1")
+	void checkLinkCodeAttemptLimitRoundsRemainingSecondsUp() {
+		failFiveTimes(CLIENT_KEY);
+
+		when(clock.instant()).thenReturn(NOW.plusMillis(20_300));
+		assertAttemptLimitRetryAfter(() -> checkLinkCodeService.checkLinkCode(CODE, CLIENT_KEY), 40);
+
+		when(clock.instant()).thenReturn(NOW.plusMillis(59_500));
+		assertAttemptLimitRetryAfter(() -> checkLinkCodeService.checkLinkCode(CODE, CLIENT_KEY), 1);
+	}
+
+	@Test
 	@DisplayName("연결 코드 확인은 4번 실패한 기기의 5번째 시도는 막지 않는다")
 	void checkLinkCodeAllowsFifthAttemptAfterFourFailures() {
 		for (int i = 0; i < 4; i++) {
@@ -255,6 +290,14 @@ class CheckLinkCodeServiceTest {
 
 	private static void assertAttemptLimit(ThrowingCallable call) {
 		assertError(call, HttpStatus.TOO_MANY_REQUESTS, "LINK_CODE_ATTEMPT_LIMIT");
+	}
+
+	private static void assertAttemptLimitRetryAfter(ThrowingCallable call, int retryAfterSeconds) {
+		assertThatThrownBy(call).isInstanceOfSatisfying(BusinessException.class, e -> {
+			assertThat(e.status()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+			assertThat(e.code()).isEqualTo("LINK_CODE_ATTEMPT_LIMIT");
+			assertThat(e.retryAfterSeconds()).isEqualTo(retryAfterSeconds);
+		});
 	}
 
 	private static void assertError(ThrowingCallable call, HttpStatus status, String code) {

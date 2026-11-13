@@ -1,5 +1,6 @@
 package com.example.pickupservice.auth.application.service;
 
+import com.example.pickupservice.common.time.TimeUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -20,17 +21,19 @@ public class LinkCodeAttemptLimiter {
 	private final Map<String, Integer> failureCounts = new ConcurrentHashMap<>();
 	private final Map<String, Instant> blockedAts = new ConcurrentHashMap<>();
 
-	public boolean isBlocked(String clientKey) {
+	public int secondsUntilUnblocked(String clientKey) {
 		Instant blockedAt = blockedAts.get(clientKey);
 		if (blockedAt == null) {
-			return false;
+			return 0;
 		}
-		if (Instant.now(clock).isBefore(blockedAt.plus(BLOCK_DURATION))) {
-			return true;
+		Instant now = Instant.now(clock);
+		Instant unblockedAt = blockedAt.plus(BLOCK_DURATION);
+		if (now.isBefore(unblockedAt)) {
+			return TimeUtils.secondsUntil(now, unblockedAt);
 		}
 		blockedAts.remove(clientKey);
 		failureCounts.remove(clientKey);
-		return false;
+		return 0;
 	}
 
 	public void recordFailure(String clientKey) {

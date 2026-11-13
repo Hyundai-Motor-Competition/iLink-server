@@ -138,13 +138,14 @@ class VehicleDeviceControllerTest extends AuthWebTestSupport {
 	}
 
 	@Test
-	@DisplayName("DELETE /v1/vehicle-devices/me/session이 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS를 돌려준다")
+	@DisplayName("DELETE /v1/vehicle-devices/me/session이 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS와 common ErrorCode 문구(차량 연결 해제와 같은 문구)를 돌려준다")
 	void logoutVehicleWithActivePickupReturns409() throws Exception {
-		willThrow(BusinessException.of(HttpStatus.CONFLICT, "ACTIVE_PICKUP_EXISTS", "진행 중인 픽업이 있습니다"))
+		willThrow(BusinessException.of(ErrorCode.ACTIVE_PICKUP_EXISTS))
 				.given(logoutVehicleUseCase).logoutVehicle(anyLong());
 
 		mockMvc.perform(logoutRequest(vehicleTokenWithDeviceId(VEHICLE_ID, DEVICE_ID)))
-				.andExpect(commonError(HttpStatus.CONFLICT, "ACTIVE_PICKUP_EXISTS"));
+				.andExpect(commonError(HttpStatus.CONFLICT, "ACTIVE_PICKUP_EXISTS"))
+				.andExpect(jsonPath("$.error.message").value("진행 중인 픽업이 있어 처리할 수 없습니다"));
 	}
 
 	@Test

@@ -30,10 +30,12 @@ public final class ResendPolicy {
 	}
 
 	public static void ensureResendAllowed(Instant lastSentAt, Instant now) {
-		long elapsed = now.getEpochSecond() - lastSentAt.getEpochSecond();
-		if (elapsed < RESEND_INTERVAL_SECONDS) {
-			throw new NotificationRuleException(NotificationViolation.RESEND_TOO_SOON,
-					(int) (RESEND_INTERVAL_SECONDS - elapsed));
+		if (now.isBefore(nextResendAllowedAt(lastSentAt))) {
+			throw new NotificationRuleException(NotificationViolation.RESEND_TOO_SOON);
 		}
+	}
+
+	public static Instant nextResendAllowedAt(Instant lastSentAt) {
+		return lastSentAt.plusSeconds(RESEND_INTERVAL_SECONDS);
 	}
 }

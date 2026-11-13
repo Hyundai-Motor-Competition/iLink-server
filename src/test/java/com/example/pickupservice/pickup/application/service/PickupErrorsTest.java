@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -36,6 +37,7 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonError;
+import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.tooManyRequestsError;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 import static org.hamcrest.Matchers.aMapWithSize;
@@ -80,6 +82,8 @@ class PickupErrorsTest extends IntegrationTestSupport {
 	private static final List<String> UNMET = List.of("G2", "G4");
 	private static final Instant NEXT_ALLOWED_AT_UTC = Instant.parse("2026-11-05T09:10:00Z");
 	private static final String NEXT_ALLOWED_AT_KST = "2026-11-05T18:10:00+09:00";
+	private static final Instant HELP_REQUESTED_AT = NEXT_ALLOWED_AT_UTC.minusSeconds(30);
+	private static final int HELP_RETRY_AFTER_SECONDS = 30;
 
 	private static final long LATEST_SESSION_ID = 1024L;
 	private static final int LATEST_STATE_VERSION = 15;
@@ -150,21 +154,34 @@ class PickupErrorsTest extends IntegrationTestSupport {
 		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
 		assertThat(exception.code()).isEqualTo("SETUP_INCOMPLETE");
 		assertThat(exception.getMessage()).isEqualTo(SETUP_INCOMPLETE_MESSAGE);
+		assertThat(exception.getMessage()).isEqualTo(ErrorCode.SETUP_INCOMPLETE.getMessage());
+		assertThat(exception.status()).isEqualTo(ErrorCode.SETUP_INCOMPLETE.getStatus());
 		assertThat(exception.details()).containsOnly(entry("missing", MISSING));
 		assertThat(exception.session()).isNull();
 	}
 
 	@Test
-	@DisplayName("helpRequestTooSoon(2026-11-05T09:10:00Z)는 429 HELP_REQUEST_TOO_SOON · 한국어 message이고 error 추가 키 nextAllowedAt 하나에 받은 Instant를 담으며 retryAfterSeconds는 비어 있다")
-	void helpRequestTooSoonCarriesNextAllowedAtInstantAsErrorDetail() {
-		BusinessException exception = PickupErrors.helpRequestTooSoon(NEXT_ALLOWED_AT_UTC);
+	@DisplayName("helpRequestTooSoon(nextAllowedAt 2026-11-05T09:10:00Z · 지금 30초 전)은 429 HELP_REQUEST_TOO_SOON · 한국어 message · retryAfterSeconds 30이고 error 추가 키 nextAllowedAt 하나에 받은 Instant를 담는다")
+	void helpRequestTooSoonCarriesRetryAfterSecondsAndNextAllowedAtInstantAsErrorDetail() {
+		BusinessException exception = PickupErrors.helpRequestTooSoon(NEXT_ALLOWED_AT_UTC, HELP_REQUESTED_AT);
 
 		assertThat(exception.status()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
 		assertThat(exception.code()).isEqualTo("HELP_REQUEST_TOO_SOON");
 		assertThat(exception.getMessage()).isEqualTo(HELP_REQUEST_TOO_SOON_MESSAGE);
 		assertThat(exception.details()).containsOnly(entry("nextAllowedAt", NEXT_ALLOWED_AT_UTC));
-		assertThat(exception.retryAfterSeconds()).isNull();
+		assertThat(exception.retryAfterSeconds()).isEqualTo(HELP_RETRY_AFTER_SECONDS);
 		assertThat(exception.session()).isNull();
+	}
+
+	@ParameterizedTest(name = "nextAllowedAt까지 {0}ms 남으면 {1}초")
+	@CsvSource({"29500, 30", "1, 1", "0, 1", "60000, 60"})
+	@DisplayName("helpRequestTooSoon의 retryAfterSeconds는 nextAllowedAt - 지금을 초 단위로 올림하고 최소 1이다")
+	void helpRequestTooSoonRoundsRetryAfterSecondsUpWithMinimumOne(long millisLeft, int expectedSeconds) {
+		BusinessException exception = PickupErrors.helpRequestTooSoon(NEXT_ALLOWED_AT_UTC,
+				NEXT_ALLOWED_AT_UTC.minusMillis(millisLeft));
+
+		assertThat(exception.retryAfterSeconds()).isEqualTo(expectedSeconds);
+		assertThat(exception.details()).containsOnly(entry("nextAllowedAt", NEXT_ALLOWED_AT_UTC));
 	}
 
 	@Test
@@ -243,10 +260,10 @@ class PickupErrorsTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("컨트롤러가 PickupErrors.helpRequestTooSoon(2026-11-05T09:10:00Z)를 던지면 429 응답의 error.code HELP_REQUEST_TOO_SOON · error.message이고 error.nextAllowedAt은 한국 시각 2026-11-05T18:10:00+09:00이다")
-	void helpRequestTooSoonResponseHasKstNextAllowedAtInsideError() throws Exception {
+	@DisplayName("컨트롤러가 PickupErrors.helpRequestTooSoon(2026-11-05T09:10:00Z · 지금 30초 전)을 던지면 429 응답의 error.code HELP_REQUEST_TOO_SOON · error.message · error.retryAfterSeconds 30이고 error.nextAllowedAt은 한국 시각 2026-11-05T18:10:00+09:00이다")
+	void helpRequestTooSoonResponseHasRetryAfterSecondsAndKstNextAllowedAtInsideError() throws Exception {
 		mockMvc.perform(get(HELP_REQUEST_TOO_SOON_PATH))
-				.andExpect(commonError(HttpStatus.TOO_MANY_REQUESTS, "HELP_REQUEST_TOO_SOON"))
+				.andExpect(tooManyRequestsError("HELP_REQUEST_TOO_SOON", HELP_RETRY_AFTER_SECONDS))
 				.andExpect(jsonPath("$.error.message").value(HELP_REQUEST_TOO_SOON_MESSAGE))
 				.andExpect(jsonPath("$.error.nextAllowedAt").value(NEXT_ALLOWED_AT_KST))
 				.andExpect(jsonPath("$", aMapWithSize(1)));
@@ -310,7 +327,7 @@ class PickupErrorsTest extends IntegrationTestSupport {
 
 		@GetMapping(HELP_REQUEST_TOO_SOON_PATH)
 		public String throwHelpRequestTooSoon() {
-			throw PickupErrors.helpRequestTooSoon(NEXT_ALLOWED_AT_UTC);
+			throw PickupErrors.helpRequestTooSoon(NEXT_ALLOWED_AT_UTC, HELP_REQUESTED_AT);
 		}
 
 		@GetMapping(STATE_VERSION_CONFLICT_PATH)

@@ -2,6 +2,7 @@ package com.example.pickupservice.pickup.application.service;
 
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.error.ErrorCode;
+import com.example.pickupservice.common.time.TimeUtils;
 import com.example.pickupservice.pickup.application.port.in.SessionView;
 import com.example.pickupservice.pickup.domain.PickupRuleException;
 import org.springframework.http.HttpStatus;
@@ -25,8 +26,7 @@ public final class PickupErrors {
 	}
 
 	public static BusinessException setupIncomplete(List<String> missing) {
-		return BusinessException.of(HttpStatus.UNPROCESSABLE_CONTENT, "SETUP_INCOMPLETE",
-				"픽업 준비가 끝나지 않았습니다")
+		return BusinessException.of(ErrorCode.SETUP_INCOMPLETE)
 				.withDetail("missing", missing);
 	}
 
@@ -84,9 +84,9 @@ public final class PickupErrors {
 				"위치 정보 제공 동의가 필요합니다");
 	}
 
-	public static BusinessException helpRequestTooSoon(Instant nextAllowedAt) {
-		return BusinessException.of(HttpStatus.TOO_MANY_REQUESTS, "HELP_REQUEST_TOO_SOON",
-				"잠시 후 다시 요청해 주세요")
+	public static BusinessException helpRequestTooSoon(Instant nextAllowedAt, Instant now) {
+		return BusinessException.tooManyRequests("HELP_REQUEST_TOO_SOON",
+				"잠시 후 다시 요청해 주세요", TimeUtils.secondsUntil(now, nextAllowedAt))
 				.withDetail("nextAllowedAt", nextAllowedAt);
 	}
 

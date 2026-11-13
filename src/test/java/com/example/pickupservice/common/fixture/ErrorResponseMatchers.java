@@ -25,6 +25,19 @@ public final class ErrorResponseMatchers {
 		};
 	}
 
+	// 429 응답: code · message · retryAfterSeconds 키가 있고 retryAfterSeconds는 다시 시도할 초(null 아님), fields는 없다
+	public static ResultMatcher tooManyRequestsError(String expectedCode, int expectedRetryAfterSeconds) {
+		return result -> {
+			status().isTooManyRequests().match(result);
+			jsonPath("$.error", allOf(hasKey("code"), hasKey("message"), hasKey("retryAfterSeconds"))).match(result);
+			content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON).match(result);
+			jsonPath("$.error.code").value(expectedCode).match(result);
+			jsonPath("$.error.message").isNotEmpty().match(result);
+			jsonPath("$.error.retryAfterSeconds").value(expectedRetryAfterSeconds).match(result);
+			jsonPath("$.error.fields").doesNotExist().match(result);
+		};
+	}
+
 	public static ResultMatcher commonErrorKeys() {
 		return result -> {
 			jsonPath("$.error", allOf(hasKey("code"), hasKey("message"), hasKey("retryAfterSeconds"))).match(result);

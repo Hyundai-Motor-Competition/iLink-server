@@ -54,7 +54,7 @@ public class RequestHelpService implements RequestHelpUseCase {
 						.map(SessionEvent::getOccurredAt),
 				now, pickupProperties.helpRequestInterval());
 		if (!decision.allowed()) {
-			throw PickupErrors.helpRequestTooSoon(decision.nextAllowedAt());
+			throw PickupErrors.helpRequestTooSoon(decision.nextAllowedAt(), now);
 		}
 		SessionEvent event = sessionEventPort.append(session.getSessionId(), HELP_REQUESTED,
 				session.getStateVersion(), now, Map.of("childUserId", childUserId, "type", command.type()));

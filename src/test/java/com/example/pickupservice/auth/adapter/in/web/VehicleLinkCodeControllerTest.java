@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static com.example.pickupservice.common.fixture.AccessTokenFixture.bearer;
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonError;
+import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.tooManyRequestsError;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.nullValue;
@@ -148,15 +149,16 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	}
 
 	@Test
-	@DisplayName("POST /v1/vehicle-link-codes가 한도를 넘으면 429 LINK_CODE_REISSUE_LIMIT을 돌려준다")
-	void issueLinkCodeOverReissueLimitReturns429() throws Exception {
+	@DisplayName("POST /v1/vehicle-link-codes가 한도를 넘으면 429 LINK_CODE_REISSUE_LIMIT과 retryAfterSeconds 300을 돌려준다")
+	void issueLinkCodeOverReissueLimitReturns429WithRetryAfterSeconds() throws Exception {
 		long vehicleId = nextVehicleId();
 		given(issueLinkCodeUseCase.issueLinkCode(any()))
-				.willThrow(BusinessException.of(
-						HttpStatus.TOO_MANY_REQUESTS, "LINK_CODE_REISSUE_LIMIT", "연결 코드 재발급 한도를 넘었습니다"));
+				.willThrow(BusinessException.tooManyRequests(
+						"LINK_CODE_REISSUE_LIMIT", "연결 코드 재발급 한도를 넘었습니다", 300));
 
 		mockMvc.perform(issueRequest(linkedVehicleToken(vehicleId)))
-				.andExpect(commonError(HttpStatus.TOO_MANY_REQUESTS, "LINK_CODE_REISSUE_LIMIT"));
+				.andExpect(tooManyRequestsError("LINK_CODE_REISSUE_LIMIT", 300))
+				.andExpect(jsonPath("$.error.message").value("연결 코드 재발급 한도를 넘었습니다"));
 	}
 
 	@Test

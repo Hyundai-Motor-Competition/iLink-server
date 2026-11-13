@@ -231,6 +231,35 @@ class RequestHelpServiceTest {
 	}
 
 	@Test
+	@DisplayName("도움 요청 60초 안 재요청의 HELP_REQUEST_TOO_SOON은 retryAfterSeconds 30(nextAllowedAt 18:09:30 - 지금 18:09:00)을 담고 추가 키 nextAllowedAt도 그대로 담는다")
+	void requestTooSoonCarriesRetryAfterSecondsAndKeepsNextAllowedAt() {
+		givenLastHelpRequest(MINJUN_ID, NOW.minusSeconds(30));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> requestHelpService.request(command(MINJUN_ID, "NEED_HELP")));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+		assertThat(exception.code()).isEqualTo("HELP_REQUEST_TOO_SOON");
+		assertThat(exception.retryAfterSeconds()).isEqualTo(30);
+		assertThat(exception.details())
+				.containsOnly(entry("nextAllowedAt", Instant.parse("2026-11-09T09:09:30Z")));
+	}
+
+	@Test
+	@DisplayName("도움 요청의 retryAfterSeconds는 남은 시간을 초 단위로 올림한다 — 마지막 요청 30.5초 뒤면 29.5초 남아 30")
+	void requestTooSoonRoundsRetryAfterSecondsUp() {
+		givenLastHelpRequest(MINJUN_ID, NOW.minusMillis(30_500));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> requestHelpService.request(command(MINJUN_ID, "NEED_HELP")));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.code()).isEqualTo("HELP_REQUEST_TOO_SOON");
+		assertThat(exception.retryAfterSeconds()).isEqualTo(30);
+	}
+
+	@Test
 	@DisplayName("도움 요청 1분 제한은 형제의 요청에 영향을 받지 않는다 — 민준이 10초 전에 요청했어도 서윤의 요청은 받아 서윤의 HELP_REQUESTED를 저장하고 지금 + 60초를 돌려준다")
 	void requestIsNotLimitedBySiblingRecentRequest() {
 		givenLastHelpRequest(MINJUN_ID, NOW.minusSeconds(10));

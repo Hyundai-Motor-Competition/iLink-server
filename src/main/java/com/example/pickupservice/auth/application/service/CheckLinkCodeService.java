@@ -25,8 +25,9 @@ public class CheckLinkCodeService implements CheckLinkCodeUseCase {
 	@Override
 	@Transactional(readOnly = true)
 	public LinkCodeInfo checkLinkCode(String code, String clientKey) {
-		if (linkCodeAttemptLimiter.isBlocked(clientKey)) {
-			throw AuthErrors.linkCodeAttemptLimit();
+		int retryAfterSeconds = linkCodeAttemptLimiter.secondsUntilUnblocked(clientKey);
+		if (retryAfterSeconds > 0) {
+			throw AuthErrors.linkCodeAttemptLimit(retryAfterSeconds);
 		}
 		LinkCode linkCode = loadUsableCode(code, clientKey);
 		VehicleInfo vehicle = loadVehicleUseCase.findVehicle(linkCode.getVehicleId())

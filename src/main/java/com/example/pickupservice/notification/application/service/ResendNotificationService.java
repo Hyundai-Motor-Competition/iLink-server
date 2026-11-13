@@ -2,6 +2,7 @@ package com.example.pickupservice.notification.application.service;
 
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.error.ErrorCode;
+import com.example.pickupservice.common.time.TimeUtils;
 import com.example.pickupservice.notification.application.port.in.ResendCommand;
 import com.example.pickupservice.notification.application.port.in.ResendNotificationUseCase;
 import com.example.pickupservice.notification.application.port.out.CallProgressPort;
@@ -55,10 +56,12 @@ public class ResendNotificationService implements ResendNotificationUseCase {
 		}
 		Instant lastSentAt = lastAttemptAt(original);
 		if (lastSentAt != null) {
+			Instant now = clock.instant();
 			try {
-				ResendPolicy.ensureResendAllowed(lastSentAt, clock.instant());
+				ResendPolicy.ensureResendAllowed(lastSentAt, now);
 			} catch (NotificationRuleException e) {
-				throw BusinessException.tooManyRequests(ErrorCode.RESEND_TOO_SOON, e.retryAfterSeconds());
+				throw BusinessException.tooManyRequests(ErrorCode.RESEND_TOO_SOON,
+						TimeUtils.secondsUntil(now, ResendPolicy.nextResendAllowedAt(lastSentAt)));
 			}
 		}
 		Notification created = saveNotificationPort.save(Notification.create(original.getSessionId(),

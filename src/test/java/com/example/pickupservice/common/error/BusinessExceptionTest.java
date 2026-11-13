@@ -6,6 +6,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -99,6 +100,85 @@ class BusinessExceptionTest {
 		assertThat(exception.getMessage()).isEqualTo("잠시 뒤에 다시 보내 주세요");
 		assertThat(exception.retryAfterSeconds()).isEqualTo(30);
 		assertThat(exception.fields()).isNull();
+	}
+
+	@Test
+	@DisplayName("도메인 code용 tooManyRequests(LINK_CODE_REISSUE_LIMIT · 메시지 · 300)로 만든 예외는 status 429 · code LINK_CODE_REISSUE_LIMIT · 메시지 그대로 · retryAfterSeconds 300 · fields null · overlapScheduleIds null · details 비어 있음이다")
+	void tooManyRequestsWithDomainCodeCarriesCodeMessageAndRetryAfterSeconds() {
+		BusinessException exception = BusinessException.tooManyRequests(
+				"LINK_CODE_REISSUE_LIMIT", "연결 코드 재발급 한도를 넘었습니다", 300);
+
+		assertThat(exception.status()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+		assertThat(exception.code()).isEqualTo("LINK_CODE_REISSUE_LIMIT");
+		assertThat(exception.getMessage()).isEqualTo("연결 코드 재발급 한도를 넘었습니다");
+		assertThat(exception.retryAfterSeconds()).isEqualTo(300);
+		assertThat(exception.fields()).isNull();
+		assertThat(exception.overlapScheduleIds()).isNull();
+		assertThat(exception.details()).isEmpty();
+	}
+
+	@Test
+	@DisplayName("도메인 code용 tooManyRequests로 만든 예외에도 withDetail로 추가 키(nextAllowedAt)를 붙일 수 있고 retryAfterSeconds는 그대로다")
+	void tooManyRequestsWithDomainCodeKeepsRetryAfterSecondsWithExtraDetail() {
+		Instant nextAllowedAt = Instant.parse("2026-11-05T09:10:00Z");
+
+		BusinessException exception = BusinessException.tooManyRequests(
+				"HELP_REQUEST_TOO_SOON", "잠시 후 다시 요청해 주세요", 30)
+				.withDetail("nextAllowedAt", nextAllowedAt);
+
+		assertThat(exception.retryAfterSeconds()).isEqualTo(30);
+		assertThat(exception.details()).containsOnly(entry("nextAllowedAt", nextAllowedAt));
+	}
+
+	@Test
+	@DisplayName("of(429 · HELP_REQUEST_TOO_SOON · 메시지)처럼 of(HttpStatus, code, message)에 429를 넣으면 IllegalArgumentException으로 막아 retryAfterSeconds 없는 429를 만들 수 없다(429는 tooManyRequests로만, D3)")
+	void ofWithTooManyRequestsStatusIsRejected() {
+		assertThatThrownBy(() -> BusinessException.of(HttpStatus.TOO_MANY_REQUESTS, "HELP_REQUEST_TOO_SOON",
+				"잠시 후 다시 요청해 주세요"))
+				.isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@Test
+	@DisplayName("of(HttpStatus, code, message)는 429가 아닌 상태(502 · MAP_API_UNAVAILABLE)는 지금처럼 막지 않고 넣은 상태 · code · message로 만든다")
+	void ofWithNonTooManyRequestsStatusIsStillAllowed() {
+		BusinessException exception = BusinessException.of(HttpStatus.BAD_GATEWAY, "MAP_API_UNAVAILABLE",
+				"지도 검색을 잠시 사용할 수 없습니다");
+
+		assertThat(exception.status()).isEqualTo(HttpStatus.BAD_GATEWAY);
+		assertThat(exception.code()).isEqualTo("MAP_API_UNAVAILABLE");
+		assertThat(exception.getMessage()).isEqualTo("지도 검색을 잠시 사용할 수 없습니다");
+		assertThat(exception.retryAfterSeconds()).isNull();
+	}
+
+	@Test
+	@DisplayName("of(ErrorCode)에 429 코드(TOO_MANY_REQUESTS)를 넣으면 IllegalArgumentException으로 막는다(D3)")
+	void ofErrorCodeWithTooManyRequestsIsRejected() {
+		assertThatThrownBy(() -> BusinessException.of(ErrorCode.TOO_MANY_REQUESTS))
+				.isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@Test
+	@DisplayName("of(ErrorCode)에 429 코드(RESEND_TOO_SOON)를 넣으면 IllegalArgumentException으로 막는다(D3)")
+	void ofErrorCodeWithResendTooSoonIsRejected() {
+		assertThatThrownBy(() -> BusinessException.of(ErrorCode.RESEND_TOO_SOON))
+				.isInstanceOf(IllegalArgumentException.class);
+	}
+
+	@Test
+	@DisplayName("of(ErrorCode.NOT_FOUND)처럼 429가 아닌 코드는 지금처럼 만들어진다")
+	void ofErrorCodeWithNonTooManyRequestsIsStillAllowed() {
+		BusinessException exception = BusinessException.of(ErrorCode.NOT_FOUND);
+
+		assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
+		assertThat(exception.code()).isEqualTo("NOT_FOUND");
+		assertThat(exception.retryAfterSeconds()).isNull();
+	}
+
+	@Test
+	@DisplayName("tooManyRequests(ErrorCode, int)에 429가 아닌 코드(NOT_FOUND)를 넣으면 IllegalArgumentException으로 막는다(D3)")
+	void tooManyRequestsWithNon429ErrorCodeIsRejected() {
+		assertThatThrownBy(() -> BusinessException.tooManyRequests(ErrorCode.NOT_FOUND, 30))
+				.isInstanceOf(IllegalArgumentException.class);
 	}
 
 	@Test

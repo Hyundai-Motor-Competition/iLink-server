@@ -45,6 +45,7 @@ import java.util.List;
 
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonError;
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonErrorKeys;
+import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.tooManyRequestsError;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.aMapWithSize;
 import static org.hamcrest.Matchers.allOf;
@@ -80,6 +81,7 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	private static final String TOO_MANY_REQUESTS_PATH = "/test/common-error/business-too-many-requests";
 	private static final String RESEND_TOO_SOON_PATH = "/test/common-error/business-resend-too-soon";
 	private static final String DOMAIN_CODE_PATH = "/test/common-error/business-domain-code";
+	private static final String DOMAIN_TOO_MANY_REQUESTS_PATH = "/test/common-error/business-domain-too-many-requests";
 	private static final String COMMON_NOT_FOUND_PATH = "/test/common-error/business-common-not-found";
 	private static final String COMMON_ERROR_CODE_PATH = "/test/common-error/business-common-code/{code}";
 	private static final String INVALID_FIELD_PATH = "/test/common-error/business-invalid-field";
@@ -122,6 +124,9 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	private static final int RETRY_AFTER_SECONDS = 30;
 	private static final String DOMAIN_CODE = "SOME_DOMAIN_CODE";
 	private static final String DOMAIN_CODE_MESSAGE = "도메인 규칙에 맞지 않는 요청입니다";
+	private static final String DOMAIN_TOO_MANY_CODE = "LINK_CODE_ATTEMPT_LIMIT";
+	private static final String DOMAIN_TOO_MANY_MESSAGE = "연결 코드 확인 실패가 많아 잠시 뒤에 다시 시도해 주세요";
+	private static final int DOMAIN_RETRY_AFTER_SECONDS = 40;
 	private static final String OVERLAP_CODE = "SCHEDULE_OVERLAP";
 	private static final String OVERLAP_MESSAGE = "겹치는 일정이 있습니다";
 	private static final long OVERLAP_SCHEDULE_ID_1 = 801L;
@@ -426,6 +431,14 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	@DisplayName("컨트롤러가 도메인 code용 BusinessException.tooManyRequests(LINK_CODE_ATTEMPT_LIMIT · 메시지 · 40)을 던지면 429와 JSON 본문의 error.code LINK_CODE_ATTEMPT_LIMIT · 던진 메시지 그대로의 error.message · error.retryAfterSeconds 40을 돌려주고 error.fields는 채우지 않는다")
+	void domainCodeTooManyRequestsReturns429WithCodeMessageAndRetryAfterSeconds() throws Exception {
+		mockMvc.perform(get(DOMAIN_TOO_MANY_REQUESTS_PATH))
+				.andExpect(tooManyRequestsError(DOMAIN_TOO_MANY_CODE, DOMAIN_RETRY_AFTER_SECONDS))
+				.andExpect(jsonPath("$.error.message").value(DOMAIN_TOO_MANY_MESSAGE));
+	}
+
+	@Test
 	@DisplayName("필수 요청 헤더 X-Test-Header를 빼고 부르면 500이 아니라 400과 JSON 본문의 error.code INVALID_REQUEST · error.message · error.retryAfterSeconds(null) 키를 돌려주고 error.fields는 채우지 않는다")
 	void missingRequiredHeaderReturns400WithInvalidRequestError() throws Exception {
 		mockMvc.perform(get(REQUIRED_HEADER_PATH))
@@ -516,10 +529,10 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("컨트롤러가 BusinessException.of(429 · HELP_REQUEST_TOO_SOON · 메시지).withDetail(nextAllowedAt, UTC Instant 2026-11-05T09:10:00Z)를 던지면 429와 error.nextAllowedAt을 한국 시각 문자열 2026-11-05T18:10:00+09:00으로 돌려준다")
+	@DisplayName("컨트롤러가 BusinessException.tooManyRequests(HELP_REQUEST_TOO_SOON · 메시지 · 30).withDetail(nextAllowedAt, UTC Instant 2026-11-05T09:10:00Z)를 던지면 429와 error.retryAfterSeconds 30 · error.nextAllowedAt을 한국 시각 문자열 2026-11-05T18:10:00+09:00으로 돌려준다")
 	void businessExceptionWithInstantDetailReturnsKstOffsetString() throws Exception {
 		mockMvc.perform(get(HELP_TOO_SOON_PATH))
-				.andExpect(commonError(HttpStatus.TOO_MANY_REQUESTS, HELP_TOO_SOON_CODE))
+				.andExpect(tooManyRequestsError(HELP_TOO_SOON_CODE, RETRY_AFTER_SECONDS))
 				.andExpect(jsonPath("$.error.message").value(HELP_TOO_SOON_MESSAGE))
 				.andExpect(jsonPath("$.error.nextAllowedAt").value(NEXT_ALLOWED_AT_KST));
 	}
@@ -690,6 +703,12 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 			throw BusinessException.tooManyRequests(ErrorCode.RESEND_TOO_SOON, RETRY_AFTER_SECONDS);
 		}
 
+		@GetMapping(DOMAIN_TOO_MANY_REQUESTS_PATH)
+		public String throwDomainTooManyRequests() {
+			throw BusinessException.tooManyRequests(DOMAIN_TOO_MANY_CODE, DOMAIN_TOO_MANY_MESSAGE,
+					DOMAIN_RETRY_AFTER_SECONDS);
+		}
+
 		@GetMapping(DOMAIN_CODE_PATH)
 		public String throwDomainCode() {
 			throw BusinessException.of(HttpStatus.CONFLICT, DOMAIN_CODE, DOMAIN_CODE_MESSAGE);
@@ -730,7 +749,7 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 
 		@GetMapping(HELP_TOO_SOON_PATH)
 		public String throwHelpTooSoon() {
-			throw BusinessException.of(HttpStatus.TOO_MANY_REQUESTS, HELP_TOO_SOON_CODE, HELP_TOO_SOON_MESSAGE)
+			throw BusinessException.tooManyRequests(HELP_TOO_SOON_CODE, HELP_TOO_SOON_MESSAGE, RETRY_AFTER_SECONDS)
 					.withDetail("nextAllowedAt", NEXT_ALLOWED_AT_UTC);
 		}
 
