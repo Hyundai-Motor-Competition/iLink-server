@@ -7,12 +7,17 @@ import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.pickup.application.port.in.ChangeSpotCommand;
 import com.example.pickupservice.pickup.application.port.in.SessionView;
+import com.example.pickupservice.pickup.application.port.in.SpotCandidate;
 import com.example.pickupservice.pickup.application.port.out.LoadCallPort;
 import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
 import com.example.pickupservice.pickup.application.port.out.LoadSessionPort;
 import com.example.pickupservice.pickup.application.port.out.LoadSpotPort;
+import com.example.pickupservice.pickup.application.port.out.NotificationRequest;
 import com.example.pickupservice.pickup.application.port.out.PublishSessionEventPort;
+import com.example.pickupservice.pickup.application.port.out.RecordNotificationPort;
+import com.example.pickupservice.pickup.application.port.out.SaveCallPort;
 import com.example.pickupservice.pickup.application.port.out.SaveSessionPort;
+import com.example.pickupservice.pickup.application.port.out.SaveTemporarySpotPort;
 import com.example.pickupservice.pickup.application.port.out.SessionEventMessage;
 import com.example.pickupservice.pickup.application.port.out.SessionEventPort;
 import com.example.pickupservice.pickup.domain.Call;
@@ -35,7 +40,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -52,9 +59,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
+import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -63,8 +72,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class ChangeSpotServiceTest {
@@ -98,11 +109,27 @@ class ChangeSpotServiceTest {
 	private static final LatLng BACK_STOP_POINT = new LatLng(37.500800, 127.040300);
 	private static final LatLng BACK_MEETING_POINT = new LatLng(37.500750, 127.040250);
 
+	// 추천 장소 candidate(#270): 장소 변경 때 임시 장소로 만든다
+	private static final long TEMPORARY_SPOT_ID = 30L;
+	private static final String CANDIDATE_NAME = "학원 옆 편의점 앞";
+	private static final LatLng CANDIDATE_LOCATION = new LatLng(37.500900, 127.040500);
+
+	// 여기로 부르기(#271 · #272): 마지막으로 받은 차량 위치로 임시 장소 「차량 정차 위치」를 만들고 바로 호출한다
+	private static final String HERE_SPOT_NAME = "차량 정차 위치";
+	private static final LatLng VEHICLE_LOCATION = new LatLng(37.501050, 127.040120);
+	private static final Instant VEHICLE_LOCATED_AT = NOW.minusSeconds(10);
+	private static final int ROUTE_TOTAL_METERS = 1850;
+	private static final long NEW_CALL_ID = 3101L;
+	private static final List<Long> NOTIFICATION_IDS = List.of(6001L, 6002L);
+
 	@Mock
 	private LoadSessionPort loadSessionPort;
 
 	@Mock
 	private LoadSpotPort loadSpotPort;
+
+	@Mock
+	private SaveTemporarySpotPort saveTemporarySpotPort;
 
 	@Mock
 	private SaveSessionPort saveSessionPort;
@@ -119,6 +146,12 @@ class ChangeSpotServiceTest {
 	@Mock
 	private PublishSessionEventPort publishSessionEventPort;
 
+	@Mock
+	private SaveCallPort saveCallPort;
+
+	@Mock
+	private RecordNotificationPort recordNotificationPort;
+
 	private ChangeSpotService changeSpotService;
 
 	private final AtomicLong nextSeq = new AtomicLong(LAST_SEQ);
@@ -128,8 +161,19 @@ class ChangeSpotServiceTest {
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, clock);
-		changeSpotService = new ChangeSpotService(loadSessionPort, loadSpotPort, saveSessionPort, loadFamilyPort,
-				loadCallPort, sessionEventPort, publishSessionEventPort, sessionAccess, clock);
+		CallEngine callEngine = new CallEngine(loadCallPort, saveCallPort, loadFamilyPort, sessionEventPort,
+				publishSessionEventPort, recordNotificationPort, PickupProperties.defaults(), clock);
+		changeSpotService = new ChangeSpotService(loadSessionPort, loadSpotPort, saveTemporarySpotPort,
+				saveSessionPort, loadFamilyPort, loadCallPort, sessionEventPort, publishSessionEventPort, sessionAccess,
+				callEngine, clock);
+		lenient().when(saveCallPort.saveCall(any(Call.class))).thenAnswer(invocation -> {
+			Call call = invocation.getArgument(0);
+			return Call.restore(NEW_CALL_ID, call.getSessionId(), call.getPrevCallId(), call.getTriggerType(),
+					call.getStatus(), call.getSpotVersion(), call.getAcceptedAt(), call.getSentAt(),
+					call.getDeliveredAt(), call.getAcknowledgedAt(), call.getRevokedAt(), call.getRevokeReason());
+		});
+		lenient().when(recordNotificationPort.recordNotifications(any(NotificationRequest.class)))
+				.thenReturn(NOTIFICATION_IDS);
 		lenient().when(loadSpotPort.loadSpot(FRONT_GATE_SPOT_ID)).thenReturn(Optional.of(
 				new SpotInfo(FRONT_GATE_SPOT_ID, FAMILY_ID, ACADEMY_ID, "정문 앞", FRONT_STOP_POINT,
 						FRONT_MEETING_POINT)));
@@ -275,6 +319,462 @@ class ChangeSpotServiceTest {
 		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
 		assertThat(exception.code()).isEqualTo("SESSION_ALREADY_FINISHED");
 		verifyNoInteractions(saveSessionPort, sessionEventPort, publishSessionEventPort);
+	}
+
+	@Test
+	@DisplayName("candidate 장소 변경은 세션 가족 · 세션 지금 장소의 academyId · candidate 이름 · 정차 지점=만남 지점=candidate 좌표로 임시 장소를 한 번 만든다")
+	void changeSpotWithCandidateSavesTemporarySpotOnceWithSessionFamilyAndCurrentSpotAcademy() {
+		givenLockedSession(confirmedFrontGate(waitingChildren()));
+		givenTemporarySpotSaved();
+
+		changeSpotService.changeSpot(candidateCommand(STATE_VERSION, SPOT_VERSION));
+
+		verify(saveTemporarySpotPort).saveTemporarySpot(FAMILY_ID, ACADEMY_ID, CANDIDATE_NAME, CANDIDATE_LOCATION,
+				CANDIDATE_LOCATION);
+		verifyNoMoreInteractions(saveTemporarySpotPort);
+	}
+
+	@Test
+	@DisplayName("candidate 장소 변경은 세션 장소를 받은 임시 spotId로 바꿔(SELECTED, spotVersion +1, 스냅샷 이름 · 좌표가 candidate 값, stateVersion +1) 저장하고 그 세션 뷰를 돌려준다")
+	void changeSpotWithCandidateChangesSessionSpotToTemporarySpot() {
+		givenLockedSession(confirmedFrontGate(waitingChildren()));
+		givenTemporarySpotSaved();
+
+		SessionView view = changeSpotService.changeSpot(candidateCommand(STATE_VERSION, SPOT_VERSION));
+
+		PickupSession saved = savedSession();
+		assertThat(saved.getSpotId()).isEqualTo(TEMPORARY_SPOT_ID);
+		assertThat(saved.getSpotName()).isEqualTo(CANDIDATE_NAME);
+		assertThat(saved.getStopPoint()).isEqualTo(CANDIDATE_LOCATION);
+		assertThat(saved.getMeetingPoint()).isEqualTo(CANDIDATE_LOCATION);
+		assertThat(saved.getSpotStatus()).isEqualTo(SpotStatus.SELECTED);
+		assertThat(saved.getSpotVersion()).isEqualTo(SPOT_VERSION + 1);
+		assertThat(saved.getStateVersion()).isEqualTo(STATE_VERSION + 1);
+		assertThat(view.stateVersion()).isEqualTo(STATE_VERSION + 1);
+		assertThat(view.status().spot()).isEqualTo(SpotStatus.SELECTED);
+		assertThat(view.spot().spotId()).isEqualTo(TEMPORARY_SPOT_ID);
+		assertThat(view.spot().name()).isEqualTo(CANDIDATE_NAME);
+		assertThat(view.spot().spotVersion()).isEqualTo(SPOT_VERSION + 1);
+	}
+
+	@Test
+	@DisplayName("candidate 장소 변경은 SPOT_CHANGED만 저장한 세션의 stateVersion · 지금 시각으로 한 번 저장하고 보호자와 세션 자녀에게 발행한다")
+	void changeSpotWithCandidateAppendsAndPublishesSpotChanged() {
+		givenLockedSession(confirmedFrontGate(waitingChildren()));
+		givenTemporarySpotSaved();
+
+		changeSpotService.changeSpot(candidateCommand(STATE_VERSION, SPOT_VERSION));
+
+		verify(sessionEventPort)
+				.append(eq(SESSION_ID), eq("SPOT_CHANGED"), eq(STATE_VERSION + 1), eq(NOW), any());
+		assertThat(appendedEvents)
+				.extracting(event -> event.getType().name())
+				.containsExactly("SPOT_CHANGED");
+		SessionEventMessage message = publishedMessageOf("SPOT_CHANGED");
+		assertThat(message.eventId()).isEqualTo(appendedEventOf("SPOT_CHANGED").getEventId());
+		assertThat(message.receiverUserIds()).containsExactlyInAnyOrder(GUARDIAN_ID, MINJUN_ID, SEOYUN_ID);
+	}
+
+	@Test
+	@DisplayName("candidate 장소 변경은 만든 임시 spotId를 place에서 다시 읽어 SPOT_NOT_SAVED 검사를 하지 않는다")
+	void changeSpotWithCandidateSkipsSpotNotSavedCheckForTemporarySpot() {
+		givenLockedSession(confirmedFrontGate(waitingChildren()));
+		lenient().when(saveTemporarySpotPort.saveTemporarySpot(anyLong(), anyLong(), anyString(), any(), any()))
+				.thenReturn(TEMPORARY_SPOT_ID);
+		lenient().when(loadSpotPort.loadSpot(TEMPORARY_SPOT_ID)).thenReturn(Optional.empty());
+
+		SessionView view = changeSpotService.changeSpot(candidateCommand(STATE_VERSION, SPOT_VERSION));
+
+		assertThat(view.spot().spotId()).isEqualTo(TEMPORARY_SPOT_ID);
+		verify(loadSpotPort, never()).loadSpot(TEMPORARY_SPOT_ID);
+	}
+
+	@ParameterizedTest(name = "요청 spotVersion {0} · 서버 0")
+	@ValueSource(ints = {1, 2})
+	@DisplayName("candidate 장소 변경은 요청 spotVersion이 서버와 다르면 STATE_VERSION_CONFLICT와 최신 세션 뷰로 거절하고 임시 장소를 만들지 않으며 아무것도 저장 · 발행하지 않는다")
+	void changeSpotWithCandidateRejectsDifferentSpotVersionWithoutSavingTemporarySpot(int requestedSpotVersion) {
+		givenLockedSession(confirmedFrontGate(waitingChildren()));
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> changeSpotService.changeSpot(candidateCommand(STATE_VERSION, requestedSpotVersion)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("STATE_VERSION_CONFLICT");
+		assertThat(exception.session()).isInstanceOfSatisfying(SessionView.class, latest -> {
+			assertThat(latest.spot().spotId()).isEqualTo(FRONT_GATE_SPOT_ID);
+			assertThat(latest.spot().spotVersion()).isEqualTo(SPOT_VERSION);
+		});
+		verifyNoInteractions(saveTemporarySpotPort, saveSessionPort, sessionEventPort, publishSessionEventPort);
+	}
+
+	@ParameterizedTest(name = "세션 {0}")
+	@EnumSource(value = SessionStatus.class, names = {"COMPLETED", "CANCELLED"})
+	@DisplayName("candidate 장소 변경은 끝난(COMPLETED · CANCELLED) 세션이면 SESSION_ALREADY_FINISHED로 거절하고 임시 장소를 만들지 않으며 아무것도 저장 · 발행하지 않는다")
+	void changeSpotWithCandidateRejectsFinishedSessionWithoutSavingTemporarySpot(SessionStatus finishedStatus) {
+		givenLockedSession(finishedFrontGate(finishedStatus));
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> changeSpotService.changeSpot(candidateCommand(STATE_VERSION, SPOT_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("SESSION_ALREADY_FINISHED");
+		verifyNoInteractions(saveTemporarySpotPort, saveSessionPort, sessionEventPort, publishSessionEventPort);
+	}
+
+	@Test
+	@DisplayName("candidate 장소 변경은 이동 중(MEETING) 자녀가 있으면 CHILD_ALREADY_MOVING으로 거절하고 임시 장소를 만들지 않으며 아무것도 저장 · 발행하지 않는다")
+	void changeSpotWithCandidateRejectsMovingChildWithoutSavingTemporarySpot() {
+		givenLockedSession(confirmedFrontGate(meetingChildren()));
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> changeSpotService.changeSpot(candidateCommand(STATE_VERSION, SPOT_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("CHILD_ALREADY_MOVING");
+		verifyNoInteractions(saveTemporarySpotPort, saveSessionPort, sessionEventPort, publishSessionEventPort);
+	}
+
+	@ParameterizedTest(name = "호출 status {0}")
+	@EnumSource(value = CallStatus.class, names = {"ACCEPTED", "SENT", "DELIVERED"})
+	@DisplayName("candidate 장소 변경은 철회되지 않은 호출이 있으면 CALL_ALREADY_SENT로 거절하고 임시 장소를 만들지 않으며 아무것도 저장 · 발행하지 않는다")
+	void changeSpotWithCandidateRejectsLiveCallWithoutSavingTemporarySpot(CallStatus liveStatus) {
+		givenLockedSession(confirmedFrontGate(calledChildren()));
+		givenCalls(liveCall(liveStatus));
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> changeSpotService.changeSpot(candidateCommand(STATE_VERSION, SPOT_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("CALL_ALREADY_SENT");
+		verifyNoInteractions(saveTemporarySpotPort, saveSessionPort, sessionEventPort, publishSessionEventPort);
+	}
+
+	@Test
+	@DisplayName("여기로 부르기(here=true)는 세션 가족 · 지금 장소의 academyId · 이름 「차량 정차 위치」 · 정차 지점=만남 지점=마지막 차량 위치로 임시 장소를 한 번 만든다")
+	void changeSpotWithHereSavesTemporarySpotOnceAtLastVehicleLocation() {
+		givenLockedSession(stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.STOPPED, VEHICLE_LOCATION,
+				NOW.minusSeconds(10), readyChildren()));
+		givenTemporarySpotSaved();
+
+		changeSpotService.changeSpot(hereCommand(SPOT_VERSION));
+
+		verify(saveTemporarySpotPort).saveTemporarySpot(FAMILY_ID, ACADEMY_ID, HERE_SPOT_NAME, VEHICLE_LOCATION,
+				VEHICLE_LOCATION);
+		verifyNoMoreInteractions(saveTemporarySpotPort);
+	}
+
+	@Test
+	@DisplayName("여기로 부르기는 세션 장소를 임시 spotId · 「차량 정차 위치」 · 차량 위치로 바꾸고 바로 확정해(CONFIRMED, spotVersion +1, routeVersion +1, routeTotalMeters 그대로, stateVersion +2) 저장하고 그 세션 뷰를 돌려준다")
+	void changeSpotWithHereChangesSpotToTemporarySpotAndConfirmsRoute() {
+		givenLockedSession(stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.STOPPED, VEHICLE_LOCATION,
+				NOW.minusSeconds(10), readyChildren()));
+		givenTemporarySpotSaved();
+
+		SessionView view = changeSpotService.changeSpot(hereCommand(SPOT_VERSION));
+
+		PickupSession saved = savedSession();
+		assertThat(saved.getSpotId()).isEqualTo(TEMPORARY_SPOT_ID);
+		assertThat(saved.getSpotName()).isEqualTo(HERE_SPOT_NAME);
+		assertThat(saved.getStopPoint()).isEqualTo(VEHICLE_LOCATION);
+		assertThat(saved.getMeetingPoint()).isEqualTo(VEHICLE_LOCATION);
+		assertThat(saved.getSpotStatus()).isEqualTo(SpotStatus.CONFIRMED);
+		assertThat(saved.getSpotVersion()).isEqualTo(SPOT_VERSION + 1);
+		assertThat(saved.getRouteVersion()).isEqualTo(2);
+		assertThat(saved.getRouteSpotVersion()).isEqualTo(SPOT_VERSION + 1);
+		assertThat(saved.getRouteTotalMeters()).isEqualTo(ROUTE_TOTAL_METERS);
+		assertThat(saved.getStateVersion()).isEqualTo(STATE_VERSION + 2);
+		assertThat(view.stateVersion()).isEqualTo(STATE_VERSION + 2);
+		assertThat(view.status().spot()).isEqualTo(SpotStatus.CONFIRMED);
+		assertThat(view.spot().spotId()).isEqualTo(TEMPORARY_SPOT_ID);
+		assertThat(view.spot().name()).isEqualTo(HERE_SPOT_NAME);
+		assertThat(view.spot().spotVersion()).isEqualTo(SPOT_VERSION + 1);
+	}
+
+	@ParameterizedTest(name = "합류 안내 방식 {0}")
+	@EnumSource(JoinCallMode.class)
+	@DisplayName("여기로 부르기는 가족의 합류 안내 방식(AUTO · GUARDIAN_CONFIRM)과 상관없이 바뀐 spotVersion으로 triggerType MANUAL · ACCEPTED 호출을 한 번 저장한다")
+	void changeSpotWithHereSavesManualAcceptedCallRegardlessOfJoinCallMode(JoinCallMode joinCallMode) {
+		lenient().when(loadFamilyPort.loadFamily(FAMILY_ID)).thenReturn(new FamilyInfo(FAMILY_ID, joinCallMode, 0));
+		givenLockedSession(stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.STOPPED, VEHICLE_LOCATION,
+				NOW.minusSeconds(10), readyChildren()));
+		givenTemporarySpotSaved();
+
+		changeSpotService.changeSpot(hereCommand(SPOT_VERSION));
+
+		ArgumentCaptor<Call> captor = ArgumentCaptor.forClass(Call.class);
+		verify(saveCallPort).saveCall(captor.capture());
+		Call call = captor.getValue();
+		assertThat(call.getSessionId()).isEqualTo(SESSION_ID);
+		assertThat(call.getTriggerType()).isEqualTo(CallTriggerType.MANUAL);
+		assertThat(call.getStatus()).isEqualTo(CallStatus.ACCEPTED);
+		assertThat(call.getSpotVersion()).isEqualTo(SPOT_VERSION + 1);
+		assertThat(call.getPrevCallId()).isNull();
+	}
+
+	@Test
+	@DisplayName("여기로 부르기는 저장한 호출의 callId로 세션 자녀 둘에게 CALL 알림 기록을 한 번 요청한다")
+	void changeSpotWithHereRecordsCallNotificationForSessionChildren() {
+		givenLockedSession(stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.STOPPED, VEHICLE_LOCATION,
+				NOW.minusSeconds(10), readyChildren()));
+		givenTemporarySpotSaved();
+
+		changeSpotService.changeSpot(hereCommand(SPOT_VERSION));
+
+		ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
+		verify(recordNotificationPort).recordNotifications(captor.capture());
+		NotificationRequest request = captor.getValue();
+		assertThat(request.sessionId()).isEqualTo(SESSION_ID);
+		assertThat(request.callId()).isEqualTo(NEW_CALL_ID);
+		assertThat(request.type()).isEqualTo("CALL");
+		assertThat(request.receiverUserIds()).containsExactlyInAnyOrder(MINJUN_ID, SEOYUN_ID);
+	}
+
+	@Test
+	@DisplayName("여기로 부르기는 SPOT_CHANGED(stateVersion +1) · SPOT_CONFIRMED(+2) · CALL_TRIGGERED(+2, callId · trigger MANUAL) 순서로 지금 시각에 저장하고 같은 순서로 발행한다")
+	void changeSpotWithHereAppendsAndPublishesSpotChangedSpotConfirmedCallTriggeredInOrder() {
+		givenLockedSession(stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.STOPPED, VEHICLE_LOCATION,
+				NOW.minusSeconds(10), readyChildren()));
+		givenTemporarySpotSaved();
+
+		changeSpotService.changeSpot(hereCommand(SPOT_VERSION));
+
+		assertThat(appendedEvents)
+				.extracting(event -> event.getType().name())
+				.containsExactly("SPOT_CHANGED", "SPOT_CONFIRMED", "CALL_TRIGGERED");
+		assertThat(appendedEvents)
+				.extracting(SessionEvent::getStateVersion)
+				.containsExactly(STATE_VERSION + 1, STATE_VERSION + 2, STATE_VERSION + 2);
+		assertThat(appendedEvents).extracting(SessionEvent::getOccurredAt).containsOnly(NOW);
+		assertThat(appendedEventOf("CALL_TRIGGERED").getPayload())
+				.containsEntry("callId", NEW_CALL_ID)
+				.containsEntry("trigger", "MANUAL");
+		ArgumentCaptor<SessionEventMessage> captor = ArgumentCaptor.forClass(SessionEventMessage.class);
+		verify(publishSessionEventPort, atLeastOnce()).publish(captor.capture());
+		assertThat(captor.getAllValues())
+				.extracting(SessionEventMessage::type)
+				.containsExactly("SPOT_CHANGED", "SPOT_CONFIRMED", "CALL_TRIGGERED");
+		assertThat(publishedMessageOf("SPOT_CONFIRMED").receiverUserIds())
+				.containsExactlyInAnyOrder(GUARDIAN_ID, MINJUN_ID, SEOYUN_ID);
+		assertThat(publishedMessageOf("CALL_TRIGGERED").payload()).containsEntry("notificationIds", NOTIFICATION_IDS);
+	}
+
+	@Test
+	@DisplayName("여기로 부르기는 지금 장소가 확정 전(SELECTED · 경로가 이전 장소 버전)이어도 바로 확정하므로 G2 · G3을 통과로 보고 MANUAL 호출을 만든다")
+	void changeSpotWithHereOnSelectedSpotTreatsG2AndG3AsMetAndSavesCall() {
+		givenLockedSession(selectedStoppedFrontGate());
+		givenTemporarySpotSaved();
+
+		changeSpotService.changeSpot(hereCommand(SPOT_VERSION + 1));
+
+		PickupSession saved = savedSession();
+		assertThat(saved.getSpotStatus()).isEqualTo(SpotStatus.CONFIRMED);
+		assertThat(saved.getSpotVersion()).isEqualTo(SPOT_VERSION + 2);
+		assertThat(saved.getRouteSpotVersion()).isEqualTo(SPOT_VERSION + 2);
+		ArgumentCaptor<Call> captor = ArgumentCaptor.forClass(Call.class);
+		verify(saveCallPort).saveCall(captor.capture());
+		assertThat(captor.getValue().getTriggerType()).isEqualTo(CallTriggerType.MANUAL);
+		assertThat(captor.getValue().getSpotVersion()).isEqualTo(SPOT_VERSION + 2);
+	}
+
+	@Test
+	@DisplayName("여기로 부르기는 받은 차량 위치가 없으면 422 VALIDATION_FAILED(fields here)로 거절하고 임시 장소 · 세션 · 호출 · 알림 · 이벤트를 만들지 않는다")
+	void changeSpotWithHereWithoutVehicleLocationRejectsWithValidationFailed() {
+		givenLockedSession(stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.STOPPED, null, NOW.minusSeconds(10),
+				readyChildren()));
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> changeSpotService.changeSpot(hereCommand(SPOT_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		assertThat(exception.code()).isEqualTo("VALIDATION_FAILED");
+		assertThat(exception.fields()).extracting(field -> field.field()).containsExactly("here");
+		verifyNothingSaved();
+	}
+
+	@Test
+	@DisplayName("여기로 부르기는 차량 위치가 없고 정차 중도 아니면 가드보다 차량 위치를 먼저 보아 422 VALIDATION_FAILED로 거절한다")
+	void changeSpotWithHereChecksVehicleLocationBeforeCallGuard() {
+		givenLockedSession(stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.APPROACHING, null,
+				NOW.minusSeconds(10), readyChildren()));
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> changeSpotService.changeSpot(hereCommand(SPOT_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		assertThat(exception.code()).isEqualTo("VALIDATION_FAILED");
+		verifyNothingSaved();
+	}
+
+	static Stream<Arguments> hereGuardUnmetSessions() {
+		return Stream.of(
+				Arguments.of("차량 ROUTING", stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.ROUTING,
+						VEHICLE_LOCATION, NOW.minusSeconds(10), readyChildren()), List.of("G6")),
+				Arguments.of("차량 APPROACHING", stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.APPROACHING,
+						VEHICLE_LOCATION, NOW.minusSeconds(10), readyChildren()), List.of("G6")),
+				Arguments.of("차량 DEPARTED", stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.DEPARTED,
+						VEHICLE_LOCATION, NOW.minusSeconds(10), readyChildren()), List.of("G6")),
+				Arguments.of("세션 ON_HOLD", stoppedFrontGate(SessionStatus.ON_HOLD, VehiclePhase.STOPPED,
+						VEHICLE_LOCATION, NOW.minusSeconds(10), readyChildren()), List.of("G1")),
+				Arguments.of("ETA 61초 전", stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.STOPPED,
+						VEHICLE_LOCATION, NOW.minusSeconds(61), readyChildren()), List.of("G4")),
+				Arguments.of("준비 시간 안 지남", stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.STOPPED,
+						VEHICLE_LOCATION, NOW.minusSeconds(10), preparingChildren()), List.of("G5")));
+	}
+
+	@ParameterizedTest(name = "{0} → unmet {2}")
+	@MethodSource("hereGuardUnmetSessions")
+	@DisplayName("여기로 부르기는 장소를 바꾼 뒤 상태로 본 가드(G1 · G4 · G5 · G6)를 못 넘으면 409 CALL_GUARD_UNMET(error.unmet)로 거절하고 세션 장소를 그대로 두며 임시 장소 · 세션 · 호출 · 알림 · 이벤트를 만들지 않는다")
+	void changeSpotWithHereRejectsUnmetCallGuardWithConflict(String caseName, PickupSession session,
+			List<String> expectedUnmet) {
+		givenLockedSession(session);
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> changeSpotService.changeSpot(hereCommand(SPOT_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("CALL_GUARD_UNMET");
+		assertThat(exception.details()).containsOnly(entry("unmet", expectedUnmet));
+		assertThat(session.getSpotId()).isEqualTo(FRONT_GATE_SPOT_ID);
+		assertThat(session.getSpotName()).isEqualTo("정문 앞");
+		assertThat(session.getSpotVersion()).isEqualTo(SPOT_VERSION);
+		assertThat(session.getSpotStatus()).isEqualTo(SpotStatus.CONFIRMED);
+		assertThat(session.getStateVersion()).isEqualTo(STATE_VERSION);
+		verifyNothingSaved();
+	}
+
+	@ParameterizedTest(name = "호출 status {0}")
+	@EnumSource(value = CallStatus.class, names = {"ACCEPTED", "SENT", "DELIVERED"})
+	@DisplayName("여기로 부르기는 철회되지 않은 호출이 있으면 409 CALL_ALREADY_SENT로 거절하고 임시 장소 · 세션 · 호출 · 알림 · 이벤트를 만들지 않는다")
+	void changeSpotWithHereRejectsLiveCallWithCallAlreadySent(CallStatus liveStatus) {
+		givenLockedSession(stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.STOPPED, VEHICLE_LOCATION,
+				NOW.minusSeconds(10), calledChildren()));
+		givenCalls(liveCall(liveStatus));
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> changeSpotService.changeSpot(hereCommand(SPOT_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("CALL_ALREADY_SENT");
+		verifyNothingSaved();
+	}
+
+	@Test
+	@DisplayName("여기로 부르기는 이동 중(MEETING) 자녀가 있으면 409 CHILD_ALREADY_MOVING으로 거절하고 임시 장소 · 세션 · 호출 · 알림 · 이벤트를 만들지 않는다")
+	void changeSpotWithHereRejectsMovingChildWithChildAlreadyMoving() {
+		givenLockedSession(stoppedFrontGate(SessionStatus.ACTIVE, VehiclePhase.STOPPED, VEHICLE_LOCATION,
+				NOW.minusSeconds(10), meetingChildren()));
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> changeSpotService.changeSpot(hereCommand(SPOT_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("CHILD_ALREADY_MOVING");
+		verifyNothingSaved();
+	}
+
+	@ParameterizedTest(name = "세션 {0}")
+	@EnumSource(value = SessionStatus.class, names = {"COMPLETED", "CANCELLED"})
+	@DisplayName("여기로 부르기는 끝난(COMPLETED · CANCELLED) 세션이면 409 SESSION_ALREADY_FINISHED로 거절하고 아무것도 만들지 않는다")
+	void changeSpotWithHereRejectsFinishedSession(SessionStatus finishedStatus) {
+		givenLockedSession(stoppedFrontGate(finishedStatus, VehiclePhase.STOPPED, VEHICLE_LOCATION,
+				NOW.minusSeconds(10), readyChildren()));
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> changeSpotService.changeSpot(hereCommand(SPOT_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("SESSION_ALREADY_FINISHED");
+		verifyNothingSaved();
+	}
+
+	private void verifyNothingSaved() {
+		verifyNoInteractions(saveTemporarySpotPort, saveSessionPort, saveCallPort, recordNotificationPort,
+				sessionEventPort, publishSessionEventPort);
+	}
+
+	private static ChangeSpotCommand hereCommand(int spotVersion) {
+		AuthPrincipal vehicle = new AuthPrincipal(PrincipalType.VEHICLE, VEHICLE_ID, FAMILY_ID, null);
+		return ChangeSpotCommand.ofHere(vehicle, SESSION_ID, STATE_VERSION, spotVersion);
+	}
+
+	// 정문으로 확정(CONFIRMED, spotVersion 0, routeVersion 1, 경로 총 1850m)한 세션. 차량 위치 · 정차 · ETA를 고른다
+	private static PickupSession stoppedFrontGate(SessionStatus sessionStatus, VehiclePhase vehiclePhase,
+			LatLng vehicleLocation, Instant etaUpdatedAt, List<SessionChild> children) {
+		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
+				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, sessionStatus, vehiclePhase, SpotStatus.CONFIRMED,
+				STATE_VERSION, SPOT_VERSION, 1, SPOT_VERSION, false, etaUpdatedAt, 0, etaUpdatedAt, null, null, null,
+				null, null, null, null, null, vehicleLocation, vehicleLocation == null ? null : VEHICLE_LOCATED_AT,
+				ROUTE_TOTAL_METERS, children);
+	}
+
+	// 정문으로 확정한 뒤 장소를 바꿔 아직 확정 전: SELECTED, spotVersion 1, 경로는 spotVersion 0의 것. 정차 · ETA 신선
+	private static PickupSession selectedStoppedFrontGate() {
+		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
+				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.STOPPED,
+				SpotStatus.SELECTED, STATE_VERSION, SPOT_VERSION + 1, 1, SPOT_VERSION, false, NOW.minusSeconds(10), 0,
+				NOW.minusSeconds(10), null, null, null, null, null, null, null, null, VEHICLE_LOCATION,
+				VEHICLE_LOCATED_AT, ROUTE_TOTAL_METERS, readyChildren());
+	}
+
+	// 준비 시간이 지났거나(민준 1분 전) 없는(서윤) 대기 자녀
+	private static List<SessionChild> readyChildren() {
+		return List.of(
+				SessionChild.restore(7001L, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.WAITING, 0,
+						NOW.minus(Duration.ofMinutes(1)), null, null, null, null),
+				SessionChild.restore(7002L, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.WAITING, 0, null, null, null,
+						null, null));
+	}
+
+	// 서윤의 준비 시간(callNotBefore)이 2분 뒤라 아직 안 지남
+	private static List<SessionChild> preparingChildren() {
+		return List.of(
+				SessionChild.restore(7001L, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.WAITING, 0,
+						NOW.minus(Duration.ofMinutes(1)), null, null, null, null),
+				SessionChild.restore(7002L, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.WAITING, 0,
+						NOW.plus(Duration.ofMinutes(2)), null, null, null, null));
+	}
+
+	// 임시 장소 포트가 TEMPORARY_SPOT_ID를 돌려주고, 그 id를 place에서 다시 읽으면 candidate 값의 임시 장소가 나온다
+	private void givenTemporarySpotSaved() {
+		lenient().when(saveTemporarySpotPort.saveTemporarySpot(anyLong(), anyLong(), anyString(), any(), any()))
+				.thenReturn(TEMPORARY_SPOT_ID);
+		lenient().when(loadSpotPort.loadSpot(TEMPORARY_SPOT_ID)).thenReturn(Optional.of(
+				new SpotInfo(TEMPORARY_SPOT_ID, FAMILY_ID, ACADEMY_ID, CANDIDATE_NAME, CANDIDATE_LOCATION,
+						CANDIDATE_LOCATION)));
+	}
+
+	private static ChangeSpotCommand candidateCommand(int stateVersion, int spotVersion) {
+		AuthPrincipal vehicle = new AuthPrincipal(PrincipalType.VEHICLE, VEHICLE_ID, FAMILY_ID, null);
+		return ChangeSpotCommand.ofCandidate(vehicle, SESSION_ID, new SpotCandidate(CANDIDATE_NAME, CANDIDATE_LOCATION),
+				stateVersion, spotVersion);
+	}
+
+	private static List<SessionChild> meetingChildren() {
+		return List.of(
+				SessionChild.restore(7001L, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.MEETING, 0, null, null, null,
+						null, null),
+				SessionChild.restore(7002L, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.WAITING, 0, null, null, null,
+						null, null));
 	}
 
 	private void givenLockedSession(PickupSession session) {

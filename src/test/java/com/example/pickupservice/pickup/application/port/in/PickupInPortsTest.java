@@ -171,9 +171,11 @@ class PickupInPortsTest {
 		assertRecord(ChangeSpotCommand.class, components(
 				"principal", PRINCIPAL,
 				"sessionId", "long",
-				"spotId", "long",
+				"spotId", LONG_OR_NULL,
 				"stateVersion", "int",
-				"spotVersion", "int"));
+				"spotVersion", "int",
+				"candidate", SpotCandidate.class.getName(),
+				"here", "boolean"));
 		assertRecord(HoldCommand.class, components(
 				"principal", PRINCIPAL,
 				"sessionId", "long",

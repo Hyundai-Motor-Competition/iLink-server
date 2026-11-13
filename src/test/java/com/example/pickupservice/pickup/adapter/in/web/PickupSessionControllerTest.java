@@ -159,6 +159,14 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 	private static final String SPOT_CHANGE_BODY = """
 			{"spotId":22,"stateVersion":15,"spotVersion":4}
 			""";
+	private static final String CANDIDATE_SPOT_CHANGE_BODY = """
+			{"candidate":{"name":"학원 옆 편의점 앞","location":{"lat":37.500900,"lng":127.040500}},\
+			"stateVersion":15,"spotVersion":4}
+			""";
+	// 여기로 부르기(#271): spotId · candidate 없이 here true
+	private static final String HERE_SPOT_CHANGE_BODY = """
+			{"here":true,"stateVersion":15,"spotVersion":4}
+			""";
 	private static final String HOLD_REASON = "아이 수업이 늦게 끝나요";
 	private static final String HOLD_BODY = """
 			{"stateVersion":15,"reason":"아이 수업이 늦게 끝나요"}
@@ -677,6 +685,165 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 				.andExpect(commonError(HttpStatus.FORBIDDEN, "FORBIDDEN"));
 
 		then(changeSpotUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes에 spotId 없이 candidate {name, location}을 보내면 Command에 candidate를 담고 spotId는 null로 두어 200을 돌려준다")
+	void changeSpotWithCandidatePassesCandidateAndNullSpotIdToCommand() throws Exception {
+		given(changeSpotUseCase.changeSpot(any())).willReturn(spotChangedSessionView());
+
+		mockMvc.perform(changeSpotRequest(VEHICLE, CANDIDATE_SPOT_CHANGE_BODY))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.sessionId").value(SESSION_ID))
+				.andExpect(jsonPath("$.status.spot").value("SELECTED"));
+
+		ArgumentCaptor<ChangeSpotCommand> captor = ArgumentCaptor.forClass(ChangeSpotCommand.class);
+		then(changeSpotUseCase).should().changeSpot(captor.capture());
+		ChangeSpotCommand command = captor.getValue();
+		assertThat(command.candidate()).isEqualTo(new SpotCandidate(CANDIDATE_NAME, CANDIDATE_LOCATION));
+		assertThat(command.spotId()).isNull();
+		assertThat(command.principal()).isEqualTo(VEHICLE);
+		assertThat(command.sessionId()).isEqualTo(SESSION_ID);
+		assertThat(command.stateVersion()).isEqualTo(STATE_VERSION);
+		assertThat(command.spotVersion()).isEqualTo(SPOT_VERSION);
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes의 candidate name이 50자면 받아서 Command에 그대로 담는다")
+	void changeSpotWithFiftyCharCandidateNameIsAccepted() throws Exception {
+		given(changeSpotUseCase.changeSpot(any())).willReturn(spotChangedSessionView());
+		String name50 = "가".repeat(50);
+
+		mockMvc.perform(changeSpotRequest(VEHICLE,
+						candidateSpotChangeBody("\"" + name50 + "\"", "37.5009", "127.0405")))
+				.andExpect(status().isOk());
+
+		ArgumentCaptor<ChangeSpotCommand> captor = ArgumentCaptor.forClass(ChangeSpotCommand.class);
+		then(changeSpotUseCase).should().changeSpot(captor.capture());
+		assertThat(captor.getValue().candidate()).isEqualTo(new SpotCandidate(name50, CANDIDATE_LOCATION));
+	}
+
+	static Stream<Arguments> spotChangeBodiesWithBothOrNeitherSpotIdAndCandidate() {
+		return Stream.of(
+				Arguments.of("spotId · candidate 둘 다", """
+						{"spotId":22,"candidate":{"name":"학원 옆 편의점 앞","location":{"lat":37.5009,"lng":127.0405}},\
+						"stateVersion":15,"spotVersion":4}
+						"""),
+				Arguments.of("spotId · candidate 둘 다 없음", """
+						{"stateVersion":15,"spotVersion":4}
+						"""));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("spotChangeBodiesWithBothOrNeitherSpotIdAndCandidate")
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes에 spotId와 candidate를 둘 다 보내거나 둘 다 빼면 422 VALIDATION_FAILED(fields spotId)를 돌려주고 유스케이스를 부르지 않는다")
+	void changeSpotWithBothOrNeitherSpotIdAndCandidateReturns422ValidationFailed(String caseName, String body)
+			throws Exception {
+		mockMvc.perform(changeSpotRequest(VEHICLE, body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", hasSize(1)))
+				.andExpect(jsonPath("$.error.fields[0].field").value("spotId"))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(changeSpotUseCase).shouldHaveNoInteractions();
+	}
+
+	static Stream<Arguments> spotChangeBodiesWithInvalidCandidate() {
+		return Stream.of(
+				Arguments.of("name 빈 값", candidateSpotChangeBody("\"\"", "37.5009", "127.0405")),
+				Arguments.of("name 공백만", candidateSpotChangeBody("\"   \"", "37.5009", "127.0405")),
+				Arguments.of("name 없음", candidateSpotChangeBody("null", "37.5009", "127.0405")),
+				Arguments.of("name 51자", candidateSpotChangeBody("\"" + "가".repeat(51) + "\"", "37.5009", "127.0405")),
+				Arguments.of("lat 90 초과", candidateSpotChangeBody("\"편의점 앞\"", "90.000001", "127.0405")),
+				Arguments.of("lat -90 미만", candidateSpotChangeBody("\"편의점 앞\"", "-90.000001", "127.0405")),
+				Arguments.of("lng 180 초과", candidateSpotChangeBody("\"편의점 앞\"", "37.5009", "180.000001")),
+				Arguments.of("lng -180 미만", candidateSpotChangeBody("\"편의점 앞\"", "37.5009", "-180.000001")),
+				Arguments.of("lat 없음", candidateSpotChangeBody("\"편의점 앞\"", "null", "127.0405")),
+				Arguments.of("location 없음", """
+						{"candidate":{"name":"편의점 앞"},"stateVersion":15,"spotVersion":4}
+						"""));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("spotChangeBodiesWithInvalidCandidate")
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes의 candidate name이 비었거나 50자를 넘거나 location이 없거나 범위 밖이면 422 VALIDATION_FAILED(fields candidate.*)를 돌려주고 유스케이스를 부르지 않는다")
+	void changeSpotWithInvalidCandidateReturns422ValidationFailedOnCandidateField(String caseName, String body)
+			throws Exception {
+		mockMvc.perform(changeSpotRequest(VEHICLE, body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", hasSize(1)))
+				.andExpect(jsonPath("$.error.fields[0].field", startsWith("candidate.")))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(changeSpotUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes에 spotId · candidate 없이 {here: true, stateVersion, spotVersion}을 보내면 Command에 here true · spotId null · candidate null을 담아 200을 돌려준다")
+	void changeSpotWithHerePassesHereTrueAndNullSpotIdAndCandidateToCommand() throws Exception {
+		given(changeSpotUseCase.changeSpot(any())).willReturn(spotChangedSessionView());
+
+		mockMvc.perform(changeSpotRequest(VEHICLE, HERE_SPOT_CHANGE_BODY))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.sessionId").value(SESSION_ID));
+
+		ArgumentCaptor<ChangeSpotCommand> captor = ArgumentCaptor.forClass(ChangeSpotCommand.class);
+		then(changeSpotUseCase).should().changeSpot(captor.capture());
+		ChangeSpotCommand command = captor.getValue();
+		assertThat(command.here()).isTrue();
+		assertThat(command.spotId()).isNull();
+		assertThat(command.candidate()).isNull();
+		assertThat(command.principal()).isEqualTo(VEHICLE);
+		assertThat(command.sessionId()).isEqualTo(SESSION_ID);
+		assertThat(command.stateVersion()).isEqualTo(STATE_VERSION);
+		assertThat(command.spotVersion()).isEqualTo(SPOT_VERSION);
+	}
+
+	static Stream<Arguments> spotChangeBodiesWithHereAndSpotIdOrCandidate() {
+		return Stream.of(
+				Arguments.of("here true · spotId", """
+						{"here":true,"spotId":22,"stateVersion":15,"spotVersion":4}
+						"""),
+				Arguments.of("here true · candidate", """
+						{"here":true,"candidate":{"name":"학원 옆 편의점 앞","location":{"lat":37.5009,"lng":127.0405}},\
+						"stateVersion":15,"spotVersion":4}
+						"""));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("spotChangeBodiesWithHereAndSpotIdOrCandidate")
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes에 here true와 spotId 또는 candidate를 함께 보내면 422 VALIDATION_FAILED를 돌려주고 유스케이스를 부르지 않는다")
+	void changeSpotWithHereAndSpotIdOrCandidateReturns422ValidationFailed(String caseName, String body)
+			throws Exception {
+		mockMvc.perform(changeSpotRequest(VEHICLE, body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", hasSize(1)))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(changeSpotUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes(here true)가 가드 미충족이면 409 CALL_GUARD_UNMET과 error.unmet [G6]을 돌려준다")
+	void changeSpotWithHereGuardUnmetReturns409CallGuardUnmetWithUnmet() throws Exception {
+		given(changeSpotUseCase.changeSpot(any())).willThrow(PickupErrors.callGuardUnmetConflict(List.of("G6")));
+
+		mockMvc.perform(changeSpotRequest(VEHICLE, HERE_SPOT_CHANGE_BODY))
+				.andExpect(commonError(HttpStatus.CONFLICT, "CALL_GUARD_UNMET"))
+				.andExpect(jsonPath("$.error.unmet", contains("G6")))
+				.andExpect(jsonPath("$", not(hasKey("unmet"))));
+	}
+
+	private static String candidateSpotChangeBody(String nameJson, String lat, String lng) {
+		return """
+				{"candidate":{"name":%s,"location":{"lat":%s,"lng":%s}},"stateVersion":15,"spotVersion":4}
+				""".formatted(nameJson, lat, lng);
 	}
 
 	@ParameterizedTest(name = "{0}")
@@ -1265,6 +1432,14 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 				.header(IDEMPOTENCY_KEY_HEADER, UUID.randomUUID().toString())
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(SPOT_CHANGE_BODY);
+	}
+
+	private MockHttpServletRequestBuilder changeSpotRequest(AuthPrincipal principal, String body) {
+		return post(SPOT_CHANGES_PATH, SESSION_ID)
+				.header(HttpHeaders.AUTHORIZATION, bearerOf(principal))
+				.header(IDEMPOTENCY_KEY_HEADER, UUID.randomUUID().toString())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body);
 	}
 
 	private MockHttpServletRequestBuilder holdRequest(AuthPrincipal principal) {

@@ -13,7 +13,7 @@ public record ConfirmRouteRequest(
 		String navRouteId,
 		@NotNull Integer stateVersion,
 		@PositiveOrZero Integer totalMeters
-) {
+) implements SpotChoiceRequest {
 
 	public ConfirmRouteCommand toCommand(AuthPrincipal principal, long sessionId) {
 		if (candidate != null) {
