@@ -15,7 +15,7 @@ final class DeviceTokenRotator {
 
 	IssuedTokens issueTo(Device device, TokenSubject subject) {
 		IssuedTokens tokens = issueTokenPort.issueTokens(subject);
-		device.rotateRefreshToken(tokens.refreshTokenHash());
+		device.rotateRefreshToken(tokens.refreshTokenHash(), tokens.refreshTokenExpiresAt());
 		saveDevicePort.saveDevice(device);
 		return tokens;
 	}

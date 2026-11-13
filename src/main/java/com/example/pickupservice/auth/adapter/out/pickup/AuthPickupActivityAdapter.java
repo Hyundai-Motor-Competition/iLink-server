@@ -5,7 +5,6 @@ import com.example.pickupservice.pickup.application.port.in.ActivePickupQueryUse
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-// pickup의 ActivePickupQueryUseCase에 위임한다
 @Component
 @RequiredArgsConstructor
 class AuthPickupActivityAdapter implements CheckActivePickupPort {

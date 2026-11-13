@@ -57,6 +57,7 @@ class RegisterVehicleDeviceServiceTest {
 	private static final byte[] SECRET_BYTES = "pickup-test-jwt-secret-0123456789abcdef".getBytes(StandardCharsets.UTF_8);
 	private static final String SECRET = Base64.getEncoder().encodeToString(SECRET_BYTES);
 	private static final Duration ACCESS_TTL = Duration.ofMinutes(30);
+	private static final Duration REFRESH_TTL = Duration.ofDays(14);
 	private static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 	private static final String VIN = "KMHJ381ABNU123456";
 	private static final String MODEL = "아이오닉 5";
@@ -72,7 +73,8 @@ class RegisterVehicleDeviceServiceTest {
 	private SaveDevicePort saveDevicePort;
 
 	@Spy
-	private JwtTokenIssuer issueTokenPort = new JwtTokenIssuer(SECRET, ACCESS_TTL, Clock.fixed(NOW, ZoneOffset.UTC));
+	private JwtTokenIssuer issueTokenPort = new JwtTokenIssuer(SECRET, ACCESS_TTL, REFRESH_TTL,
+			Clock.fixed(NOW, ZoneOffset.UTC));
 
 	@Mock
 	private Clock clock;
@@ -159,6 +161,21 @@ class RegisterVehicleDeviceServiceTest {
 	}
 
 	@Test
+	@DisplayName("차량 기기 등록이 만든 Device의 refresh 토큰 만료 시각은 발급자가 준 refreshTokenExpiresAt(발급 시각 + 14일)이다")
+	void registerVehicleDeviceStoresRefreshTokenExpiryFromIssuedTokens() {
+		when(loadVehicleUseCase.findLinkedVehicleByVin(VIN)).thenReturn(Optional.empty());
+		when(registerVehicleUseCase.registerVehicle(VIN, MODEL)).thenReturn(99L);
+		givenDeviceStore();
+		recordIssuedTokens();
+
+		registerVehicleDeviceService.registerVehicleDevice(command());
+
+		assertThat(lastSavedDevice().getRefreshTokenExpiresAt())
+				.isEqualTo(lastIssuedTokens().refreshTokenExpiresAt())
+				.isEqualTo(NOW.plus(REFRESH_TTL));
+	}
+
+	@Test
 	@DisplayName("차량 기기 등록이 준 deviceToken은 familyId가 빈 연결 전 VEHICLE 토큰이고 저장된 deviceId가 들어 있다")
 	void registerVehicleDeviceReturnsUnlinkedVehicleAccessTokenWithSavedDeviceId() {
 		when(loadVehicleUseCase.findLinkedVehicleByVin(VIN)).thenReturn(Optional.of(
@@ -187,7 +204,7 @@ class RegisterVehicleDeviceServiceTest {
 			Device saved = device.getDeviceId() != null ? device
 					: Device.restore(SAVED_DEVICE_ID, device.getOwnerType(), device.getOwnerId(),
 							device.getPlatform(), device.getPushToken(), device.getPushUpdatedAt(),
-							device.getRefreshTokenHash(), device.getRevokedAt());
+							device.getRefreshTokenHash(), device.getRevokedAt(), device.getRefreshTokenExpiresAt());
 			savedDevices.add(saved);
 			return saved;
 		});

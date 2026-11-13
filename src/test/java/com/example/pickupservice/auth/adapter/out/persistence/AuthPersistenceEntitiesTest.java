@@ -5,6 +5,7 @@ import com.example.pickupservice.auth.domain.LinkMode;
 import com.example.pickupservice.auth.domain.OwnerType;
 import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.common.persistence.BaseTimeEntity;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +70,22 @@ class AuthPersistenceEntitiesTest {
 			GeneratedValue generatedValue = idField.getAnnotation(GeneratedValue.class);
 			assertThat(generatedValue).as("%s의 @GeneratedValue", entity.getSimpleName()).isNotNull();
 			assertThat(generatedValue.strategy()).isEqualTo(GenerationType.IDENTITY);
+		}
+	}
+
+	@Test
+	@DisplayName("DeviceEntity는 NULL을 허용하는 Instant 필드 refreshTokenExpiresAt을 갖는다")
+	void deviceEntityHasNullableRefreshTokenExpiresAt() {
+		List<Field> fields = Arrays.stream(DeviceEntity.class.getDeclaredFields())
+				.filter(field -> field.getName().equals("refreshTokenExpiresAt"))
+				.toList();
+
+		assertThat(fields).as("DeviceEntity.refreshTokenExpiresAt 필드").hasSize(1);
+		Field field = fields.getFirst();
+		assertThat(field.getType()).isEqualTo(Instant.class);
+		Column column = field.getAnnotation(Column.class);
+		if (column != null) {
+			assertThat(column.nullable()).as("refreshTokenExpiresAt은 NULL을 허용해야 한다").isTrue();
 		}
 	}
 
