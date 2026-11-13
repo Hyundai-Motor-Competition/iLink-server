@@ -29,7 +29,7 @@ public class CreateScheduleService implements CreateScheduleUseCase {
 	public ScheduleResult createSchedule(CreateScheduleCommand command) {
 		FamilyChildGuard.requireChildOfFamily(loadMemberUseCase, command.familyId(), command.childId());
 
-		Academy academy = ScheduleWriteRules.academyOf(loadAcademyPort, command.academy());
+		Academy academy = ScheduleWriteRules.academyOf(loadAcademyPort, command.familyId(), command.academy());
 		ScheduleWriteRules.rejectConflicts(scheduleOf(command, academy),
 				loadSchedulePort.loadSchedulesOfChild(command.childId()));
 

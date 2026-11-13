@@ -9,21 +9,21 @@ import java.util.Optional;
 
 interface AcademyJpaRepository extends JpaRepository<AcademyEntity, Long> {
 
-	Optional<AcademyEntity> findByExternalPlaceId(String externalPlaceId);
+	Optional<AcademyEntity> findByFamilyIdAndExternalPlaceId(long familyId, String externalPlaceId);
 
 	/**
-	 * 같은 external_place_id 행이 이미 있으면(동시 등록 포함) 유니크 위반 없이 그 행을 갱신한다.
+	 * 같은 가족의 같은 external_place_id 행이 이미 있으면(동시 등록 포함) 유니크 위반 없이 그 행을 갱신한다.
 	 * entrance · phone은 새 값이 비어 있으면 기존 값을 유지한다. 좌표는 EWKT 문자열로 받는다.
 	 */
 	@Transactional
 	@Query(value = """
-			INSERT INTO academy (external_place_id, name, address, location, entrance, phone, created_at, updated_at)
-			VALUES (:externalPlaceId, :name, :address,
+			INSERT INTO academy (family_id, external_place_id, name, address, location, entrance, phone, created_at, updated_at)
+			VALUES (:familyId, :externalPlaceId, :name, :address,
 			        ST_GeogFromText(CAST(:location AS text)),
 			        ST_GeogFromText(CAST(:entrance AS text)),
 			        CAST(:phone AS varchar),
 			        now(), now())
-			ON CONFLICT (external_place_id) DO UPDATE SET
+			ON CONFLICT (family_id, external_place_id) DO UPDATE SET
 			    name = EXCLUDED.name,
 			    address = EXCLUDED.address,
 			    location = EXCLUDED.location,
@@ -32,7 +32,7 @@ interface AcademyJpaRepository extends JpaRepository<AcademyEntity, Long> {
 			    updated_at = EXCLUDED.updated_at
 			RETURNING academy_id
 			""", nativeQuery = true)
-	Long upsertByExternalPlaceId(@Param("externalPlaceId") String externalPlaceId, @Param("name") String name,
-			@Param("address") String address, @Param("location") String location, @Param("entrance") String entrance,
-			@Param("phone") String phone);
+	Long upsertByFamilyIdAndExternalPlaceId(@Param("familyId") long familyId, @Param("externalPlaceId") String externalPlaceId,
+			@Param("name") String name, @Param("address") String address, @Param("location") String location,
+			@Param("entrance") String entrance, @Param("phone") String phone);
 }

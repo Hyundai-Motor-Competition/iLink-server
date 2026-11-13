@@ -38,8 +38,9 @@ class SchedulePersistenceAdapter implements LoadAcademyPort, SaveAcademyPort, Lo
 	}
 
 	@Override
-	public Optional<Academy> loadAcademyByExternalPlaceId(String externalPlaceId) {
-		return academyJpaRepository.findByExternalPlaceId(externalPlaceId).map(SchedulePersistenceAdapter::toDomain);
+	public Optional<Academy> loadAcademyByExternalPlaceId(long familyId, String externalPlaceId) {
+		return academyJpaRepository.findByFamilyIdAndExternalPlaceId(familyId, externalPlaceId)
+				.map(SchedulePersistenceAdapter::toDomain);
 	}
 
 	@Override
@@ -47,8 +48,9 @@ class SchedulePersistenceAdapter implements LoadAcademyPort, SaveAcademyPort, Lo
 		if (academy.getAcademyId() != null) {
 			return toDomain(academyJpaRepository.save(toEntity(academy)));
 		}
-		Long academyId = academyJpaRepository.upsertByExternalPlaceId(academy.getExternalPlaceId(), academy.getName(),
-				academy.getAddress(), toEwkt(academy.getLocation()), toEwkt(academy.getEntrance()), academy.getPhone());
+		Long academyId = academyJpaRepository.upsertByFamilyIdAndExternalPlaceId(academy.getFamilyId(),
+				academy.getExternalPlaceId(), academy.getName(), academy.getAddress(), toEwkt(academy.getLocation()),
+				toEwkt(academy.getEntrance()), academy.getPhone());
 		return findAcademy(academyId);
 	}
 
@@ -120,13 +122,14 @@ class SchedulePersistenceAdapter implements LoadAcademyPort, SaveAcademyPort, Lo
 	}
 
 	private static Academy toDomain(AcademyEntity entity) {
-		return Academy.restore(entity.getAcademyId(), entity.getExternalPlaceId(), entity.getName(),
-				entity.getAddress(), toLatLng(entity.getLocation()), toLatLng(entity.getEntrance()), entity.getPhone());
+		return Academy.restore(entity.getAcademyId(), entity.getFamilyId(), entity.getExternalPlaceId(),
+				entity.getName(), entity.getAddress(), toLatLng(entity.getLocation()), toLatLng(entity.getEntrance()),
+				entity.getPhone());
 	}
 
 	private static AcademyEntity toEntity(Academy academy) {
-		return new AcademyEntity(academy.getAcademyId(), academy.getExternalPlaceId(), academy.getName(),
-				academy.getAddress(),
+		return new AcademyEntity(academy.getAcademyId(), academy.getFamilyId(), academy.getExternalPlaceId(),
+				academy.getName(), academy.getAddress(),
 				toPoint(academy.getLocation()), toPoint(academy.getEntrance()), academy.getPhone());
 	}
 

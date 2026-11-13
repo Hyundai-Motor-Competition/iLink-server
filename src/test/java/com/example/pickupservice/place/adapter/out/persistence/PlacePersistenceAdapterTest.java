@@ -404,7 +404,7 @@ class PlacePersistenceAdapterTest extends IntegrationTestSupport {
 
 	private long persistOtherAcademy() {
 		long id = transactionTemplate.execute(status -> {
-			AcademyEntity academy = new AcademyEntity(null, "kakao:place-test-" + UUID.randomUUID(), "다른학원",
+			AcademyEntity academy = new AcademyEntity(null, familyId, "kakao:place-test-" + UUID.randomUUID(), "다른학원",
 					"서울 강남구 강남대로 396",
 					toPoint(OTHER_ACADEMY_LOCATION), toPoint(OTHER_ACADEMY_LOCATION), null);
 			entityManager.persist(academy);

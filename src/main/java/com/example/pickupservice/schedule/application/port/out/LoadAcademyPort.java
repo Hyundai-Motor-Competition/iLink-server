@@ -8,5 +8,5 @@ public interface LoadAcademyPort {
 
 	Optional<Academy> loadAcademy(long academyId);
 
-	Optional<Academy> loadAcademyByExternalPlaceId(String externalPlaceId);
+	Optional<Academy> loadAcademyByExternalPlaceId(long familyId, String externalPlaceId);
 }

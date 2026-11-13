@@ -10,6 +10,7 @@ import lombok.Getter;
 public class Academy {
 
 	private final Long academyId;
+	private final long familyId;
 	private final String externalPlaceId;
 	private final String name;
 	private final String address;
@@ -17,18 +18,18 @@ public class Academy {
 	private final LatLng entrance;
 	private final String phone;
 
-	public static Academy create(String externalPlaceId, String name, String address, LatLng location,
-			LatLng entrance, String phone) {
-		return new Academy(null, externalPlaceId, name, address, location, entrance, phone);
+	public static Academy create(long familyId, String externalPlaceId, String name, String address,
+			LatLng location, LatLng entrance, String phone) {
+		return new Academy(null, familyId, externalPlaceId, name, address, location, entrance, phone);
 	}
 
-	public static Academy restore(Long academyId, String externalPlaceId, String name, String address,
-			LatLng location, LatLng entrance, String phone) {
-		return new Academy(academyId, externalPlaceId, name, address, location, entrance, phone);
+	public static Academy restore(Long academyId, long familyId, String externalPlaceId, String name,
+			String address, LatLng location, LatLng entrance, String phone) {
+		return new Academy(academyId, familyId, externalPlaceId, name, address, location, entrance, phone);
 	}
 
 	public Academy updateInfo(String name, String address, LatLng location, LatLng entrance, String phone) {
-		return new Academy(academyId, externalPlaceId, name, address, location,
+		return new Academy(academyId, familyId, externalPlaceId, name, address, location,
 				entrance != null ? entrance : this.entrance, phone != null ? phone : this.phone);
 	}
 

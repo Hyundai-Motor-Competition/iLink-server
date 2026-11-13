@@ -19,11 +19,11 @@ final class ScheduleWriteRules {
 	private ScheduleWriteRules() {
 	}
 
-	static Academy academyOf(LoadAcademyPort loadAcademyPort, AcademyInput input) {
-		return loadAcademyPort.loadAcademyByExternalPlaceId(input.externalPlaceId())
+	static Academy academyOf(LoadAcademyPort loadAcademyPort, long familyId, AcademyInput input) {
+		return loadAcademyPort.loadAcademyByExternalPlaceId(familyId, input.externalPlaceId())
 				.map(existing -> existing.updateInfo(input.name(), input.address(), input.location(), input.entrance(),
 						input.phone()))
-				.orElseGet(() -> Academy.create(input.externalPlaceId(), input.name(), input.address(),
+				.orElseGet(() -> Academy.create(familyId, input.externalPlaceId(), input.name(), input.address(),
 						input.location(), input.entrance(), input.phone()));
 	}
 

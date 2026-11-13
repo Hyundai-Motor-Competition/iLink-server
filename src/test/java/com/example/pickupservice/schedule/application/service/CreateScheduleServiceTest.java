@@ -132,9 +132,9 @@ class CreateScheduleServiceTest {
 	@DisplayName("일정 등록은 같은 externalPlaceId의 학원이 있으면 새로 만들지 않고 그 academyId로 저장하며 학원 정보는 요청 값으로 갱신하고 그 academyId를 돌려준다")
 	void createScheduleReusesExistingAcademyWithSameExternalPlaceIdAndUpdatesItsInfo() {
 		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
-		Academy existingAcademy = Academy.restore(EXISTING_ACADEMY_ID, EXTERNAL_PLACE_ID, "해솔영어", "서울 강남구 옛 주소 1",
+		Academy existingAcademy = Academy.restore(EXISTING_ACADEMY_ID, FAMILY_ID, EXTERNAL_PLACE_ID, "해솔영어", "서울 강남구 옛 주소 1",
 				OLD_LOCATION, null, null);
-		given(loadAcademyPort.loadAcademyByExternalPlaceId(EXTERNAL_PLACE_ID)).willReturn(Optional.of(existingAcademy));
+		given(loadAcademyPort.loadAcademyByExternalPlaceId(FAMILY_ID, EXTERNAL_PLACE_ID)).willReturn(Optional.of(existingAcademy));
 		givenSavePortsAssignIds();
 
 		ScheduleResult result = createScheduleService.createSchedule(command(ENTRANCE));
@@ -164,9 +164,9 @@ class CreateScheduleServiceTest {
 	@DisplayName("일정 등록은 같은 학원을 다시 쓸 때 요청의 entrance · phone이 비어 있으면 기존 entrance · phone을 유지해 저장하고 status는 READY다")
 	void createScheduleKeepsExistingEntranceAndPhoneWhenRequestLeavesThemEmpty() {
 		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
-		Academy existingAcademy = Academy.restore(EXISTING_ACADEMY_ID, EXTERNAL_PLACE_ID, "해솔영어", "서울 강남구 옛 주소 1",
+		Academy existingAcademy = Academy.restore(EXISTING_ACADEMY_ID, FAMILY_ID, EXTERNAL_PLACE_ID, "해솔영어", "서울 강남구 옛 주소 1",
 				OLD_LOCATION, ENTRANCE, "02-555-0000");
-		given(loadAcademyPort.loadAcademyByExternalPlaceId(EXTERNAL_PLACE_ID)).willReturn(Optional.of(existingAcademy));
+		given(loadAcademyPort.loadAcademyByExternalPlaceId(FAMILY_ID, EXTERNAL_PLACE_ID)).willReturn(Optional.of(existingAcademy));
 		givenSavePortsAssignIds();
 		AcademyInput withoutEntranceAndPhone = new AcademyInput(EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152",
 				LOCATION, null, null);
@@ -199,17 +199,18 @@ class CreateScheduleServiceTest {
 	@DisplayName("일정 등록은 같은 externalPlaceId의 학원이 없으면 academyId 없는 새 학원을 externalPlaceId와 함께 저장한다")
 	void createScheduleCreatesNewAcademyWhenNoAcademyHasSameExternalPlaceId() {
 		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
-		given(loadAcademyPort.loadAcademyByExternalPlaceId(EXTERNAL_PLACE_ID)).willReturn(Optional.empty());
+		given(loadAcademyPort.loadAcademyByExternalPlaceId(FAMILY_ID, EXTERNAL_PLACE_ID)).willReturn(Optional.empty());
 		givenSavePortsAssignIds();
 
 		ScheduleResult result = createScheduleService.createSchedule(command(ENTRANCE));
 
-		verify(loadAcademyPort).loadAcademyByExternalPlaceId(EXTERNAL_PLACE_ID);
+		verify(loadAcademyPort).loadAcademyByExternalPlaceId(FAMILY_ID, EXTERNAL_PLACE_ID);
 		assertThat(result).isEqualTo(new ScheduleResult(SAVED_SCHEDULE_ID, SAVED_ACADEMY_ID, ScheduleStatus.READY));
 		ArgumentCaptor<Academy> academyCaptor = ArgumentCaptor.forClass(Academy.class);
 		verify(saveAcademyPort).saveAcademy(academyCaptor.capture());
 		Academy newAcademy = academyCaptor.getValue();
 		assertThat(newAcademy.getAcademyId()).as("새 학원의 academyId").isNull();
+		assertThat(newAcademy.getFamilyId()).as("새 학원의 familyId (자녀의 가족)").isEqualTo(FAMILY_ID);
 		assertThat(newAcademy.getExternalPlaceId()).isEqualTo(EXTERNAL_PLACE_ID);
 		assertThat(newAcademy.getName()).isEqualTo("해솔영어학원");
 		assertThat(newAcademy.getAddress()).isEqualTo("서울 강남구 테헤란로 152");
@@ -219,12 +220,12 @@ class CreateScheduleServiceTest {
 	}
 
 	@Test
-	@DisplayName("일정 등록은 저장한 학원 기준으로 status를 판정한다 (다른 가족이 먼저 출입구와 함께 저장한 새 학원이면 요청 entrance가 없어도 READY)")
-	void createScheduleJudgesStatusBySavedAcademyKeepingEntranceSavedFirstByAnotherFamily() {
+	@DisplayName("일정 등록은 저장한 학원 기준으로 status를 판정한다 (같은 가족의 동시 등록이 먼저 출입구와 함께 저장한 새 학원이면 요청 entrance가 없어도 READY)")
+	void createScheduleJudgesStatusBySavedAcademyKeepingEntranceSavedFirstByConcurrentRequest() {
 		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
-		given(loadAcademyPort.loadAcademyByExternalPlaceId(EXTERNAL_PLACE_ID)).willReturn(Optional.empty());
+		given(loadAcademyPort.loadAcademyByExternalPlaceId(FAMILY_ID, EXTERNAL_PLACE_ID)).willReturn(Optional.empty());
 		given(saveAcademyPort.saveAcademy(any(Academy.class))).willReturn(Academy.restore(EXISTING_ACADEMY_ID,
-				EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE, "02-555-1234"));
+				FAMILY_ID, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE, "02-555-1234"));
 		willAnswer(invocation -> {
 			PickupSchedule schedule = invocation.getArgument(0);
 			return PickupSchedule.restore(SAVED_SCHEDULE_ID, schedule.getChildUserId(), schedule.getAcademy(),
@@ -361,7 +362,7 @@ class CreateScheduleServiceTest {
 	}
 
 	private static PickupSchedule existingSchedule(long scheduleId, Set<DayOfWeek> weekdays, LocalTime classEndTime) {
-		Academy academy = Academy.restore(SAVED_ACADEMY_ID, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE,
+		Academy academy = Academy.restore(SAVED_ACADEMY_ID, FAMILY_ID, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE,
 				"02-555-1234");
 		return PickupSchedule.restore(scheduleId, CHILD_ID, academy, weekdays, classEndTime, TARGET_PICKUP,
 				ScheduleStatus.READY);
@@ -378,7 +379,7 @@ class CreateScheduleServiceTest {
 			if (academy.getAcademyId() != null) {
 				return academy;
 			}
-			return Academy.restore(SAVED_ACADEMY_ID, academy.getExternalPlaceId(), academy.getName(),
+			return Academy.restore(SAVED_ACADEMY_ID, academy.getFamilyId(), academy.getExternalPlaceId(), academy.getName(),
 					academy.getAddress(), academy.getLocation(), academy.getEntrance(), academy.getPhone());
 		}).given(saveAcademyPort).saveAcademy(any(Academy.class));
 		willAnswer(invocation -> {

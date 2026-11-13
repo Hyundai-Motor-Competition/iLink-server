@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AcademyTest {
 
+	private static final long FAMILY_ID = 7L;
 	private static final String EXTERNAL_PLACE_ID = "kakao:12345";
 	private static final LatLng LOCATION = new LatLng(37.501234, 127.039876);
 	private static final LatLng ENTRANCE = new LatLng(37.501150, 127.039790);
@@ -17,7 +18,7 @@ class AcademyTest {
 	@Test
 	@DisplayName("Academy.create는 academyId 없이 externalPlaceId와 받은 이름 · 주소 · 위치 · 출입구 · 전화를 가진 학원을 만든다")
 	void createKeepsExternalPlaceIdAndGivenInfoWithoutAcademyId() {
-		Academy academy = Academy.create(EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE,
+		Academy academy = Academy.create(FAMILY_ID, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE,
 				"02-555-1234");
 
 		assertThat(academy.getAcademyId()).as("새로 만든 학원의 academyId").isNull();
@@ -31,9 +32,33 @@ class AcademyTest {
 	}
 
 	@Test
+	@DisplayName("Academy.create · restore에 familyId를 주면 학원이 그 familyId를 갖고 updateInfo 뒤에도 familyId는 그대로다")
+	void academyKeepsFamilyIdThroughCreateRestoreAndUpdateInfo() {
+		Academy created = Academy.create(FAMILY_ID, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION,
+				ENTRANCE, "02-555-1234");
+		Academy restored = Academy.restore(301L, FAMILY_ID, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152",
+				LOCATION, null, null);
+		Academy updated = restored.updateInfo("해솔영어학원 본관", "서울 강남구 테헤란로 200", NEW_LOCATION, NEW_ENTRANCE,
+				"02-555-9999");
+
+		assertThat(created.getFamilyId()).as("create로 만든 학원의 familyId").isEqualTo(FAMILY_ID);
+		assertThat(created.getAcademyId()).as("create로 만든 학원의 academyId").isNull();
+		assertThat(created.getExternalPlaceId()).isEqualTo(EXTERNAL_PLACE_ID);
+		assertThat(created.getName()).isEqualTo("해솔영어학원");
+		assertThat(created.getEntrance()).isEqualTo(ENTRANCE);
+		assertThat(created.getPhone()).isEqualTo("02-555-1234");
+		assertThat(restored.getFamilyId()).as("restore로 되살린 학원의 familyId").isEqualTo(FAMILY_ID);
+		assertThat(restored.getAcademyId()).isEqualTo(301L);
+		assertThat(restored.getExternalPlaceId()).isEqualTo(EXTERNAL_PLACE_ID);
+		assertThat(updated.getFamilyId()).as("updateInfo로 갱신한 학원의 familyId").isEqualTo(FAMILY_ID);
+		assertThat(updated.getAcademyId()).isEqualTo(301L);
+		assertThat(updated.getName()).isEqualTo("해솔영어학원 본관");
+	}
+
+	@Test
 	@DisplayName("Academy.restore는 academyId와 externalPlaceId를 그대로 가진 학원을 되살린다")
 	void restoreKeepsAcademyIdAndExternalPlaceId() {
-		Academy academy = Academy.restore(301L, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, null,
+		Academy academy = Academy.restore(301L, FAMILY_ID, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, null,
 				null);
 
 		assertThat(academy.getAcademyId()).isEqualTo(301L);
@@ -49,7 +74,7 @@ class AcademyTest {
 	@Test
 	@DisplayName("updateInfo는 academyId · externalPlaceId는 그대로 두고 이름 · 주소 · 위치 · 출입구 · 전화를 받은 값으로 바꾼 학원을 돌려주며 원래 학원은 바뀌지 않는다")
 	void updateInfoReturnsAcademyWithSameIdsAndNewInfo() {
-		Academy original = Academy.restore(301L, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION,
+		Academy original = Academy.restore(301L, FAMILY_ID, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION,
 				null, null);
 
 		Academy updated = original.updateInfo("해솔영어학원 본관", "서울 강남구 테헤란로 200", NEW_LOCATION, NEW_ENTRANCE,
@@ -74,7 +99,7 @@ class AcademyTest {
 	@Test
 	@DisplayName("updateInfo는 받은 entrance · phone이 비어 있으면(null) 기존 entrance · phone을 유지하고 이름 · 주소 · 위치는 받은 값으로 바꾼다")
 	void updateInfoKeepsExistingEntranceAndPhoneWhenGivenValuesAreNull() {
-		Academy original = Academy.restore(301L, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION,
+		Academy original = Academy.restore(301L, FAMILY_ID, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION,
 				ENTRANCE, "02-555-1234");
 
 		Academy updated = original.updateInfo("해솔영어학원 본관", "서울 강남구 테헤란로 200", NEW_LOCATION, null, null);
@@ -92,7 +117,7 @@ class AcademyTest {
 	@Test
 	@DisplayName("updateInfo는 기존 entrance · phone이 있어도 받은 entrance · phone이 있으면 받은 값으로 바꾼다")
 	void updateInfoReplacesExistingEntranceAndPhoneWhenGivenValuesArePresent() {
-		Academy original = Academy.restore(301L, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION,
+		Academy original = Academy.restore(301L, FAMILY_ID, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION,
 				ENTRANCE, "02-555-1234");
 
 		Academy updated = original.updateInfo("해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, NEW_ENTRANCE,
@@ -105,7 +130,7 @@ class AcademyTest {
 	@Test
 	@DisplayName("updateInfo는 받은 entrance만 비어 있으면 entrance는 유지하고 phone은 받은 값으로 바꾼다 (두 값은 따로 판단한다)")
 	void updateInfoJudgesEntranceAndPhoneSeparately() {
-		Academy original = Academy.restore(301L, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION,
+		Academy original = Academy.restore(301L, FAMILY_ID, EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION,
 				ENTRANCE, "02-555-1234");
 
 		Academy updated = original.updateInfo("해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, null, "02-555-9999");
