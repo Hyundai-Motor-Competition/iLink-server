@@ -309,6 +309,44 @@ class ConfirmRouteServiceTest {
 	}
 
 	@Test
+	@DisplayName("경로 확정은 요청의 totalMeters를 세션 routeTotalMeters에 저장하고 돌려주는 세션 뷰 route.totalMeters에 그 값을 담는다")
+	void confirmRouteStoresTotalMetersAndShowsItInRouteView() {
+		givenLockedSession(beforeFirstConfirm());
+
+		SessionView view = confirmRouteService.confirmRoute(
+				commandWithTotalMeters(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION, 4_200));
+
+		assertThat(savedSession().getRouteTotalMeters()).isEqualTo(4_200);
+		assertThat(view.route().totalMeters()).isEqualTo(4_200);
+		assertThat(view.route().routeVersion()).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("경로 확정 요청에 totalMeters가 없으면 세션 routeTotalMeters와 세션 뷰 route.totalMeters가 null이다")
+	void confirmRouteWithoutTotalMetersLeavesRouteTotalMetersNull() {
+		givenLockedSession(beforeFirstConfirm());
+
+		SessionView view = confirmRouteService.confirmRoute(command(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION));
+
+		assertThat(savedSession().getRouteTotalMeters()).isNull();
+		assertThat(view.route().totalMeters()).isNull();
+	}
+
+	@Test
+	@DisplayName("두 번째 경로 확정은 세션 routeTotalMeters와 세션 뷰 route.totalMeters를 새 totalMeters로 덮어쓴다")
+	void secondConfirmRouteOverwritesTotalMetersWithNewValue() {
+		givenLockedSession(beforeFirstConfirm());
+		confirmRouteService.confirmRoute(commandWithTotalMeters(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION, 4_200));
+
+		SessionView view = confirmRouteService.confirmRoute(
+				commandWithTotalMeters(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION + 1, 3_100));
+
+		assertThat(savedSession().getRouteTotalMeters()).isEqualTo(3_100);
+		assertThat(view.route().totalMeters()).isEqualTo(3_100);
+		assertThat(view.route().routeVersion()).isEqualTo(2);
+	}
+
+	@Test
 	@DisplayName("경로 확정은 저장한 SPOT_CONFIRMED를 append가 준 seq로 보호자와 세션 자녀에게 발행한다")
 	void confirmRoutePublishesSpotConfirmedToGuardianAndChildren() {
 		givenLockedSession(beforeFirstConfirm());
@@ -467,6 +505,11 @@ class ConfirmRouteServiceTest {
 
 	private static ConfirmRouteCommand command(AuthPrincipal principal, long spotId, int stateVersion) {
 		return new ConfirmRouteCommand(principal, SESSION_ID, spotId, NAV_ROUTE_ID, stateVersion);
+	}
+
+	private static ConfirmRouteCommand commandWithTotalMeters(long spotId, int stateVersion, int totalMeters) {
+		return ConfirmRouteCommand.of(vehicle(VEHICLE_ID), SESSION_ID, spotId, NAV_ROUTE_ID, stateVersion,
+				totalMeters);
 	}
 
 	private static AuthPrincipal vehicle(long vehicleId) {

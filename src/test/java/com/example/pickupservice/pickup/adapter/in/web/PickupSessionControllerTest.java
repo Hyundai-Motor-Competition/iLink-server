@@ -19,6 +19,7 @@ import com.example.pickupservice.pickup.application.port.in.RejectBoardingComman
 import com.example.pickupservice.pickup.application.port.in.SessionBoardingView;
 import com.example.pickupservice.pickup.application.port.in.SessionCallView;
 import com.example.pickupservice.pickup.application.port.in.SessionChildView;
+import com.example.pickupservice.pickup.application.port.in.SessionDriverView;
 import com.example.pickupservice.pickup.application.port.in.SessionEtaView;
 import com.example.pickupservice.pickup.application.port.in.SessionEventPage;
 import com.example.pickupservice.pickup.application.port.in.SessionIncidentView;
@@ -31,6 +32,8 @@ import com.example.pickupservice.pickup.application.port.in.StartPickupCommand;
 import com.example.pickupservice.pickup.application.port.in.StartPickupResult;
 import com.example.pickupservice.pickup.application.service.PickupErrors;
 import com.example.pickupservice.pickup.domain.ChildPhase;
+import com.example.pickupservice.pickup.domain.PickupRuleException;
+import com.example.pickupservice.pickup.domain.PickupViolation;
 import com.example.pickupservice.pickup.domain.SessionEvent;
 import com.example.pickupservice.pickup.domain.SessionEventType;
 import com.example.pickupservice.pickup.domain.SessionStatus;
@@ -45,6 +48,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -68,10 +72,12 @@ import static com.example.pickupservice.pickup.adapter.in.web.SessionViewFixture
 import static com.example.pickupservice.pickup.adapter.in.web.SessionViewFixture.SESSION_VIEW_JSON;
 import static com.example.pickupservice.pickup.adapter.in.web.SessionViewFixture.STATE_VERSION;
 import static com.example.pickupservice.pickup.adapter.in.web.SessionViewFixture.sessionView;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
@@ -97,6 +103,8 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 	private static final String ACTIVE_SESSION_PATH = "/v1/pickup-sessions/active";
 	private static final String SESSIONS_PATH = "/v1/pickup-sessions";
 	private static final String SESSION_PATH = "/v1/pickup-sessions/{sessionId}";
+	private static final String MINJUN_PROFILE_IMAGE_URL = "https://storage.example.com/profiles/31.jpg?sig=c";
+	private static final String GUARDIAN_PROFILE_IMAGE_URL = "https://storage.example.com/profiles/101.jpg?sig=a";
 	private static final String ROUTE_PATH = "/v1/pickup-sessions/{sessionId}/route";
 	private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 	private static final long SAVED_SPOT_ID = 21L;
@@ -111,6 +119,12 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 			""";
 	private static final String STALE_ROUTE_BODY = """
 			{"spotId":21,"navRouteId":"nav-route-7f3a","stateVersion":14}
+			""";
+	private static final String ROUTE_WITH_TOTAL_METERS_BODY = """
+			{"spotId":21,"navRouteId":"nav-route-7f3a","stateVersion":15,"totalMeters":4200}
+			""";
+	private static final String NEGATIVE_TOTAL_METERS_ROUTE_BODY = """
+			{"spotId":21,"navRouteId":"nav-route-7f3a","stateVersion":15,"totalMeters":-1}
 			""";
 	private static final long FAMILY_ID = 12L;
 	private static final long VEHICLE_ID = 77L;
@@ -381,6 +395,35 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 	}
 
 	@Test
+	@DisplayName("GET /v1/pickup-sessions/{sessionId}는 children[].profileImageUrl과 운전 중인 보호자 driver.name · driver.profileImageUrl을 돌려준다")
+	void getSessionWritesChildProfileImageUrlAndDriver() throws Exception {
+		given(getSessionUseCase.getSession(any())).willReturn(sessionViewWithProfileImagesAndDriver());
+
+		mockMvc.perform(get(SESSION_PATH, SESSION_ID)
+						.header(HttpHeaders.AUTHORIZATION, bearerOf(VEHICLE)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.children[0].childUserId").value(31))
+				.andExpect(jsonPath("$.children[0].profileImageUrl").value(MINJUN_PROFILE_IMAGE_URL))
+				.andExpect(jsonPath("$.children[1].childUserId").value(32))
+				.andExpect(jsonPath("$.children[1].profileImageUrl").value(nullValue()))
+				.andExpect(jsonPath("$.children[1]", hasKey("profileImageUrl")))
+				.andExpect(jsonPath("$.driver.name").value("김보호"))
+				.andExpect(jsonPath("$.driver.profileImageUrl").value(GUARDIAN_PROFILE_IMAGE_URL));
+	}
+
+	@Test
+	@DisplayName("GET /v1/pickup-sessions/{sessionId}는 driver가 없으면 driver를 null로 돌려준다")
+	void getSessionWritesNullDriverWithoutGuardian() throws Exception {
+		given(getSessionUseCase.getSession(any())).willReturn(sessionView());
+
+		mockMvc.perform(get(SESSION_PATH, SESSION_ID)
+						.header(HttpHeaders.AUTHORIZATION, bearerOf(VEHICLE)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$", hasKey("driver")))
+				.andExpect(jsonPath("$.driver").value(nullValue()));
+	}
+
+	@Test
 	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route는 200과 SessionView를 돌려준다")
 	void confirmRouteReturns200WithSessionView() throws Exception {
 		given(confirmRouteUseCase.confirmRoute(any())).willReturn(sessionView());
@@ -391,6 +434,63 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 
 		then(confirmRouteUseCase).should().confirmRoute(new ConfirmRouteCommand(
 				VEHICLE, SESSION_ID, SAVED_SPOT_ID, NAV_ROUTE_ID, STATE_VERSION));
+	}
+
+	@Test
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route 본문의 totalMeters 4200을 유스케이스 Command의 totalMeters에 담고 200을 돌려준다")
+	void confirmRoutePassesTotalMetersToCommand() throws Exception {
+		given(confirmRouteUseCase.confirmRoute(any())).willReturn(sessionView());
+
+		mockMvc.perform(confirmRouteRequest(VEHICLE, ROUTE_WITH_TOTAL_METERS_BODY))
+				.andExpect(status().isOk());
+
+		ArgumentCaptor<ConfirmRouteCommand> captor = ArgumentCaptor.forClass(ConfirmRouteCommand.class);
+		then(confirmRouteUseCase).should().confirmRoute(captor.capture());
+		ConfirmRouteCommand command = captor.getValue();
+		assertThat(command.totalMeters()).isEqualTo(4_200);
+		assertThat(command.spotId()).isEqualTo(SAVED_SPOT_ID);
+		assertThat(command.navRouteId()).isEqualTo(NAV_ROUTE_ID);
+		assertThat(command.stateVersion()).isEqualTo(STATE_VERSION);
+	}
+
+	@Test
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route 본문에 totalMeters가 없으면 Command의 totalMeters를 null로 담고 200을 돌려준다")
+	void confirmRouteWithoutTotalMetersPassesNullTotalMeters() throws Exception {
+		given(confirmRouteUseCase.confirmRoute(any())).willReturn(sessionView());
+
+		mockMvc.perform(confirmRouteRequest(VEHICLE, ROUTE_BODY))
+				.andExpect(status().isOk());
+
+		ArgumentCaptor<ConfirmRouteCommand> captor = ArgumentCaptor.forClass(ConfirmRouteCommand.class);
+		then(confirmRouteUseCase).should().confirmRoute(captor.capture());
+		assertThat(captor.getValue().totalMeters()).isNull();
+	}
+
+	@Test
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route의 totalMeters가 음수(-1)면 422 VALIDATION_FAILED(fields totalMeters)를 돌려주고 유스케이스를 부르지 않는다")
+	void confirmRouteWithNegativeTotalMetersReturns422ValidationFailed() throws Exception {
+		mockMvc.perform(confirmRouteRequest(VEHICLE, NEGATIVE_TOTAL_METERS_ROUTE_BODY))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", hasSize(1)))
+				.andExpect(jsonPath("$.error.fields[0].field").value("totalMeters"))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(confirmRouteUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("GET /v1/pickup-sessions/{sessionId}는 세션 뷰 route.totalMeters를 route.totalMeters로 돌려준다")
+	void getSessionWritesRouteTotalMeters() throws Exception {
+		given(getSessionUseCase.getSession(any())).willReturn(sessionViewWithRouteTotalMeters());
+
+		mockMvc.perform(get(SESSION_PATH, SESSION_ID)
+						.header(HttpHeaders.AUTHORIZATION, bearerOf(VEHICLE)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.route.routeVersion").value(2))
+				.andExpect(jsonPath("$.route.remainingMeters").value(4200))
+				.andExpect(jsonPath("$.route.totalMeters").value(5800));
 	}
 
 	@Test
@@ -637,6 +737,20 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 
 		then(completePickupUseCase).should().complete(new CompletePickupCommand(
 				VEHICLE, SESSION_ID, "IMMEDIATE", STATE_VERSION, List.of()));
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/completion에 세션에 없는 childUserId를 notBoardedChildUserIds로 보내면 404 NOT_FOUND를 돌려준다")
+	void completeWithChildNotInSessionReturns404NotFound() throws Exception {
+		given(completePickupUseCase.complete(any()))
+				.willThrow(PickupErrors.from(new PickupRuleException(PickupViolation.CHILD_NOT_IN_SESSION)));
+
+		mockMvc.perform(completionRequest(VEHICLE,
+						"{\"mode\":\"MANUAL\",\"stateVersion\":15,\"notBoardedChildUserIds\":[999]}"))
+				.andExpect(commonError(HttpStatus.NOT_FOUND, "NOT_FOUND"));
+
+		then(completePickupUseCase).should().complete(new CompletePickupCommand(
+				VEHICLE, SESSION_ID, "MANUAL", STATE_VERSION, List.of(999L)));
 	}
 
 	@ParameterizedTest(name = "mode \"{0}\"")
@@ -1092,6 +1206,46 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 				.header(IDEMPOTENCY_KEY_HEADER, UUID.randomUUID().toString())
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(body);
+	}
+
+	/** 민준(31)은 사진 URL이 있고 서윤(32)은 없다. 운전 중인 보호자는 GUARDIAN 김보호. */
+	private static SessionView sessionViewWithProfileImagesAndDriver() {
+		SessionView base = sessionView();
+		return new SessionView(
+				base.sessionId(),
+				base.stateVersion(),
+				base.status(),
+				base.spot(),
+				base.eta(),
+				base.call(),
+				List.of(
+						new SessionChildView(31L, "민준", ChildPhase.WAITING, 10,
+								Instant.parse("2026-11-05T09:10:00Z"), null, null, null, null,
+								MINJUN_PROFILE_IMAGE_URL),
+						new SessionChildView(32L, "서윤", ChildPhase.WAITING, 0, null, null, null, null, null, null)),
+				null,
+				base.route(),
+				base.boarding(),
+				base.incident(),
+				new SessionDriverView("김보호", GUARDIAN_PROFILE_IMAGE_URL));
+	}
+
+	/** 경로 확정 때 전체 거리 5800m, 남은 거리 4200m. */
+	private static SessionView sessionViewWithRouteTotalMeters() {
+		SessionView base = sessionView();
+		return new SessionView(
+				base.sessionId(),
+				base.stateVersion(),
+				base.status(),
+				base.spot(),
+				base.eta(),
+				base.call(),
+				base.children(),
+				base.vehicleLocation(),
+				SessionRouteView.of(2, 4200, 5800),
+				base.boarding(),
+				base.incident(),
+				base.driver());
 	}
 
 	private static SessionView sessionViewWithEveryTimeField() {

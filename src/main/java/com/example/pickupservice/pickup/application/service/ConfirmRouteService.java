@@ -57,7 +57,7 @@ public class ConfirmRouteService implements ConfirmRouteUseCase {
 		requireSavedByFamily(command.spotId(), locked.getFamilyId());
 		requireSessionSpot(locked, command);
 		boolean firstConfirm = locked.getRouteVersion() == 0;
-		locked.confirmRoute();
+		locked.confirmRoute(command.totalMeters());
 		PickupSession session = saveSessionPort.save(locked);
 		Instant now = clock.instant();
 		long familyId = session.getFamilyId();

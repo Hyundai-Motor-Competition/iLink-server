@@ -82,6 +82,9 @@ class StartPickupServiceTest {
 	private static final long FAMILY_ID = 12L;
 	private static final long VEHICLE_ID = 77L;
 	private static final long GUARDIAN_ID = 31L;
+	private static final long CO_GUARDIAN_ID = 32L;
+	private static final long DELEGATE_ID = 35L;
+	private static final long TEACHER_ID = 36L;
 	private static final long MINJUN_ID = 33L;
 	private static final long SEOYUN_ID = 34L;
 	private static final long ACADEMY_ID = 55L;
@@ -535,6 +538,31 @@ class StartPickupServiceTest {
 		assertThat(request.callId()).isNull();
 		assertThat(request.type()).isEqualTo("SESSION_STARTED");
 		assertThat(request.receiverUserIds()).containsExactlyInAnyOrder(GUARDIAN_ID, MINJUN_ID, SEOYUN_ID);
+	}
+
+	@Test
+	@DisplayName("SESSION_STARTED 알림 기록과 발행의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE와 세션 자녀이고 TEACHER는 빠진다")
+	void startNotifiesGuardianCoGuardianDelegateAndChildrenWithoutTeacher() {
+		givenNewSessionSaved();
+		givenEventAppended();
+		when(loadFamilyPort.loadMembers(FAMILY_ID)).thenReturn(List.of(
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1234-5678"),
+				new MemberInfo(CO_GUARDIAN_ID, FAMILY_ID, Role.CO_GUARDIAN, "이공동", "010-3333-4444"),
+				new MemberInfo(DELEGATE_ID, FAMILY_ID, Role.DELEGATE, "박대리", "010-5555-6666"),
+				new MemberInfo(TEACHER_ID, FAMILY_ID, Role.TEACHER, "최선생", "010-7777-8888"),
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", null),
+				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", null)));
+
+		startPickupService.start(command(TODAY_KST));
+
+		ArgumentCaptor<NotificationRequest> requestCaptor = ArgumentCaptor.forClass(NotificationRequest.class);
+		verify(recordNotificationPort).recordNotifications(requestCaptor.capture());
+		assertThat(requestCaptor.getValue().receiverUserIds()).containsExactlyInAnyOrder(
+				GUARDIAN_ID, CO_GUARDIAN_ID, DELEGATE_ID, MINJUN_ID, SEOYUN_ID);
+		ArgumentCaptor<SessionEventMessage> publishedCaptor = ArgumentCaptor.forClass(SessionEventMessage.class);
+		verify(publishSessionEventPort).publish(publishedCaptor.capture());
+		assertThat(publishedCaptor.getValue().receiverUserIds()).containsExactlyInAnyOrder(
+				GUARDIAN_ID, CO_GUARDIAN_ID, DELEGATE_ID, MINJUN_ID, SEOYUN_ID);
 	}
 
 	@Test

@@ -13,8 +13,17 @@ public record SessionView(
 		VehicleLocationView vehicleLocation,
 		SessionRouteView route,
 		SessionBoardingView boarding,
-		SessionIncidentView incident
+		SessionIncidentView incident,
+		SessionDriverView driver
 ) {
+
+	public SessionView(long sessionId, int stateVersion, SessionStatusView status, SessionSpotView spot,
+			SessionEtaView eta, SessionCallView call, List<SessionChildView> children,
+			VehicleLocationView vehicleLocation, SessionRouteView route, SessionBoardingView boarding,
+			SessionIncidentView incident) {
+		this(sessionId, stateVersion, status, spot, eta, call, children, vehicleLocation, route, boarding, incident,
+				null);
+	}
 
 	public SessionView(long sessionId, int stateVersion, SessionStatusView status, SessionSpotView spot,
 			SessionEtaView eta, SessionCallView call, List<SessionChildView> children, SessionRouteView route,
