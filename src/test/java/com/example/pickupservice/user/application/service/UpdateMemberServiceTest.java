@@ -76,7 +76,7 @@ class UpdateMemberServiceTest {
 		assertThat(savedUser.getValue().getRole()).isEqualTo(Role.DELEGATE);
 		assertThat(savedUser.getValue().getPhone()).isEqualTo("+821077778888");
 		assertThat(result).isEqualTo(new MemberResult(
-				DELEGATE_ID, Role.DELEGATE, "최대리인", "+821077778888", DeviceStatus.CONNECTED));
+				DELEGATE_ID, Role.DELEGATE, "최대리인", "+821077778888", DeviceStatus.CONNECTED, null));
 	}
 
 	@Test
@@ -97,7 +97,7 @@ class UpdateMemberServiceTest {
 		assertThat(savedUser.getValue().getRole()).isEqualTo(Role.DELEGATE);
 		assertThat(savedUser.getValue().getPhone()).isEqualTo("+821011112222");
 		assertThat(result).isEqualTo(new MemberResult(
-				DELEGATE_ID, Role.DELEGATE, "최대리", "+821011112222", DeviceStatus.NONE));
+				DELEGATE_ID, Role.DELEGATE, "최대리", "+821011112222", DeviceStatus.NONE, null));
 	}
 
 	@Test
@@ -133,7 +133,7 @@ class UpdateMemberServiceTest {
 		MemberResult result = updateMemberService.updateMember(command);
 
 		assertThat(result).isEqualTo(new MemberResult(
-				CHILD_ID, Role.CHILD, "김민준", null, DeviceStatus.INVITE_PENDING));
+				CHILD_ID, Role.CHILD, "김민준", null, DeviceStatus.INVITE_PENDING, null));
 		verify(saveUserPort).saveUser(any());
 	}
 
@@ -239,7 +239,7 @@ class UpdateMemberServiceTest {
 		assertThat(savedUser.getValue().getRole()).isEqualTo(Role.TEACHER);
 		assertThat(savedUser.getValue().getPhone()).isEqualTo("+821012345678");
 		assertThat(result).isEqualTo(new MemberResult(
-				CHILD_ID, Role.TEACHER, "민준", "+821012345678", DeviceStatus.NONE));
+				CHILD_ID, Role.TEACHER, "민준", "+821012345678", DeviceStatus.NONE, null));
 	}
 
 	@Test

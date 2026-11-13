@@ -50,9 +50,9 @@ class UserIdempotencyKeyTest extends FamilyWebTestSupport {
 	@DisplayName("Idempotency-Key는 POST /v1/families/me/members · DELETE /v1/families/me/members/{userId} · DELETE /v1/vehicle-links/{vehicleId}에만 요구된다")
 	void idempotencyKeyIsRequiredOnlyForRegisterRemoveMemberAndUnlinkVehicle() {
 		given(getMyFamilyUseCase.getMyFamily(any())).willReturn(new FamilyResult(FAMILY_ID, JoinCallMode.AUTO, null,
-				List.of(new MemberResult(GUARDIAN_USER_ID, Role.GUARDIAN, "김보호", "+821012345678", DeviceStatus.CONNECTED))));
+				List.of(new MemberResult(GUARDIAN_USER_ID, Role.GUARDIAN, "김보호", "+821012345678", DeviceStatus.CONNECTED, null))));
 		given(updateMemberUseCase.updateMember(any())).willReturn(
-				new MemberResult(CHILD_USER_ID, Role.CHILD, "민준", null, DeviceStatus.CONNECTED));
+				new MemberResult(CHILD_USER_ID, Role.CHILD, "민준", null, DeviceStatus.CONNECTED, null));
 		given(changeCallModeUseCase.changeCallMode(any())).willReturn(
 				new CallModeResult(JoinCallMode.GUARDIAN_CONFIRM, 8));
 

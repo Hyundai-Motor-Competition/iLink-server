@@ -1,5 +1,6 @@
 package com.example.pickupservice.user.application.port.in;
 
+import com.example.pickupservice.common.image.ProfileImage;
 import com.example.pickupservice.common.security.Role;
 
 public record RegisterMemberCommand(
@@ -7,6 +8,15 @@ public record RegisterMemberCommand(
 		Role requesterRole,
 		Role role,
 		String name,
-		String phone
+		String phone,
+		ProfileImage profileImage
 ) {
+
+	public RegisterMemberCommand(long familyId, Role requesterRole, Role role, String name, String phone) {
+		this(familyId, requesterRole, role, name, phone, null);
+	}
+
+	public RegisterMemberCommand withProfileImage(ProfileImage profileImage) {
+		return new RegisterMemberCommand(familyId, requesterRole, role, name, phone, profileImage);
+	}
 }
