@@ -146,6 +146,9 @@ public class PickupSession {
 
 	public void complete(BoardingMethod method, List<Long> notBoardedChildUserIds, Instant now) {
 		rejectIfFinished();
+		for (Long notBoardedId : notBoardedChildUserIds) {
+			childOf(notBoardedId);
+		}
 		boolean manual = method == BoardingMethod.MANUAL;
 		if (manual && vehiclePhase != VehiclePhase.STOPPED) {
 			throw new PickupRuleException(PickupViolation.VEHICLE_NOT_STOPPED);

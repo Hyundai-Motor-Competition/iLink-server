@@ -78,6 +78,9 @@ class RequestHelpServiceTest {
 	private static final long VEHICLE_ID = 77L;
 	private static final long FAMILY_ID = 12L;
 	private static final long GUARDIAN_ID = 31L;
+	private static final long CO_GUARDIAN_ID = 32L;
+	private static final long DELEGATE_ID = 35L;
+	private static final long TEACHER_ID = 36L;
 	private static final long MINJUN_ID = 33L;
 	private static final long SEOYUN_ID = 34L;
 	private static final long MINJUN_SCHEDULE_ID = 801L;
@@ -194,6 +197,27 @@ class RequestHelpServiceTest {
 		assertThat(request.callId()).isNull();
 		assertThat(request.type()).isEqualTo("HELP");
 		assertThat(request.receiverUserIds()).containsExactly(GUARDIAN_ID);
+	}
+
+	@Test
+	@DisplayName("HELP 알림 기록과 HELP_REQUESTED 발행의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE 모두이고 TEACHER · CHILD는 빠진다")
+	void requestNotifiesGuardianCoGuardianAndDelegateWithoutTeacher() {
+		when(loadFamilyPort.loadMembers(FAMILY_ID)).thenReturn(List.of(
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1234-5678"),
+				new MemberInfo(CO_GUARDIAN_ID, FAMILY_ID, Role.CO_GUARDIAN, "이공동", "010-3333-4444"),
+				new MemberInfo(DELEGATE_ID, FAMILY_ID, Role.DELEGATE, "박대리", "010-5555-6666"),
+				new MemberInfo(TEACHER_ID, FAMILY_ID, Role.TEACHER, "최선생", "010-7777-8888"),
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", null),
+				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", null)));
+
+		requestHelpService.request(command(MINJUN_ID, "NEED_HELP"));
+
+		ArgumentCaptor<NotificationRequest> captor = ArgumentCaptor.forClass(NotificationRequest.class);
+		verify(recordNotificationPort).recordNotifications(captor.capture());
+		assertThat(captor.getValue().receiverUserIds())
+				.containsExactlyInAnyOrder(GUARDIAN_ID, CO_GUARDIAN_ID, DELEGATE_ID);
+		assertThat(publishedMessageOf("HELP_REQUESTED").receiverUserIds())
+				.containsExactlyInAnyOrder(GUARDIAN_ID, CO_GUARDIAN_ID, DELEGATE_ID);
 	}
 
 	static Stream<Arguments> acceptedLastRequests() {
