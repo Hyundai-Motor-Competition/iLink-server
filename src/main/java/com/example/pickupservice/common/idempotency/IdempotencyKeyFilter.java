@@ -49,7 +49,21 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
 			errorResponseWriter.write(response, ErrorCode.VALIDATION_FAILED, List.of(keyViolation.get()));
 			return;
 		}
-		filterIdempotently(new CachedBodyRequest(request), response, filterChain);
+		CachedBodyRequest cachedRequest = new CachedBodyRequest(request);
+		if (cachedRequest.multipart() && !partsReadable(cachedRequest)) {
+			filterChain.doFilter(request, response);
+			return;
+		}
+		filterIdempotently(cachedRequest, response, filterChain);
+	}
+
+	private static boolean partsReadable(HttpServletRequest request) {
+		try {
+			request.getParts();
+			return true;
+		} catch (IllegalStateException | IOException | ServletException unreadable) {
+			return false;
+		}
 	}
 
 	private void filterIdempotently(CachedBodyRequest request, HttpServletResponse response, FilterChain filterChain)
