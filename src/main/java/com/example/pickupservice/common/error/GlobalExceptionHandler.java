@@ -26,6 +26,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.util.DisconnectedClientHelper;
 
 import java.util.List;
 import java.util.Optional;
@@ -92,6 +93,10 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ErrorResponse> handleUnexpected(Exception exception) {
+		if (DisconnectedClientHelper.isClientDisconnectedException(exception)) {
+			log.debug("Client disconnected", exception);
+			return null;
+		}
 		if (exception instanceof org.springframework.web.ErrorResponse clientError
 				&& clientError.getStatusCode().is4xxClientError()) {
 			return toClientErrorResponse(clientError);

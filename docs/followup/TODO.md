@@ -1,15 +1,18 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-12 23:42 KST · tdd-guard
+- 생성: 2026-11-13 08:37 KST · tdd-guard
 - 설계서: C:/ilink/docs
 - 프로젝트: gradle · C:/ilink
 - 테스트: ● GREEN · 2415 passed · 전체 · 279s
-- 진행: 공유모듈 57/57 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 96/96 · 픽업 241/241 · 알림 64/64 · 남은 항목 0/728
+- 진행: 공유모듈 57/59 · 사용자 73/73 · 인증 120/120 · 일정 77/77 · 장소 96/96 · 픽업 241/242 · 알림 64/64 · 남은 항목 3/731
 - 현재 도메인: 장소 (07_장소-place.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
 
-## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 대기 · 항목 57/57 · 완료 기준 0/4 · 리뷰 11-11 11:48 조건부 통과 (상 0 · 중 8 · 하 22)
+## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 대기 · 항목 57/59 · 완료 기준 0/4 · 리뷰 11-11 11:48 조건부 통과 (상 0 · 중 8 · 하 22) · 재리뷰 필요
+### 테스트 케이스
+- [ ] #58 [web] GlobalExceptionHandler는 클라이언트가 연결을 끊어 난 예외(AsyncRequestNotUsableException · Broken pipe IOException 등 DisconnectedClientHelper.isClientDisconnectedException이 true인 것)를 ERROR로 기록하지 않고 DEBUG로만 남기며 응답 본문을 쓰지 않는다
+- [ ] #59 [web] GlobalExceptionHandler는 클라이언트 끊김이 아닌 처리하지 않은 예외는 지금처럼 ERROR로 기록하고 500 INTERNAL_SERVER_ERROR 본문을 돌려준다
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
@@ -42,8 +45,9 @@
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
 
-## 6. 픽업 (pickup) · 08_픽업-pickup.md · 완료 · 항목 241/241 · 완료 기준 4/4 · 리뷰 11-11 12:06 조건부 통과 (상 0 · 중 5 · 하 10)
-- 남은 할 일 없음
+## 6. 픽업 (pickup) · 08_픽업-pickup.md · 대기 · 항목 241/242 · 완료 기준 4/4 · 리뷰 11-11 12:06 조건부 통과 (상 0 · 중 5 · 하 10) · 재리뷰 필요
+### 테스트 케이스
+- [ ] #242 [web] POST /v1/pickup-sessions에 null이 든 scheduleIds([null] · [801, null])를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다
 
 ## 7. 알림 (notification) · 09_알림-notification.md · 완료 · 항목 64/64 · 완료 기준 4/4 · 리뷰 11-11 12:11 조건부 통과 (상 0 · 중 1 · 하 17)
 - 남은 할 일 없음

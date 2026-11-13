@@ -9,7 +9,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record StartPickupRequest(
-		@NotEmpty List<Long> scheduleIds,
+		@NotEmpty List<@NotNull Long> scheduleIds,
 		@NotNull LocalDate date
 ) {
 

@@ -75,6 +75,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -309,6 +310,24 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 				.andExpect(jsonPath("$.error.fields[*].field", hasItem("scheduleIds")))
 				.andExpect(jsonPath("$.error.fields[?(@.field == 'scheduleIds')].reason",
 						everyItem(not(emptyOrNullString()))));
+
+		then(startPickupUseCase).shouldHaveNoInteractions();
+	}
+
+	@ParameterizedTest(name = "본문 {0}")
+	@ValueSource(strings = {
+			"{\"scheduleIds\":[null],\"date\":\"2026-11-05\"}",
+			"{\"scheduleIds\":[801,null],\"date\":\"2026-11-05\"}"
+	})
+	@DisplayName("POST /v1/pickup-sessions에 scheduleIds 원소가 null이면 422 VALIDATION_FAILED(fields scheduleIds)를 돌려주고 유스케이스를 부르지 않는다")
+	void startWithNullScheduleIdElementReturns422ValidationFailedOnScheduleIds(String body) throws Exception {
+		mockMvc.perform(startRequest(VEHICLE, body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields").isNotEmpty())
+				.andExpect(jsonPath("$.error.fields[*].field", everyItem(startsWith("scheduleIds"))))
+				.andExpect(jsonPath("$.error.fields[*].reason", everyItem(not(emptyOrNullString()))));
 
 		then(startPickupUseCase).shouldHaveNoInteractions();
 	}
