@@ -30,8 +30,8 @@ class PlacePersistenceAdapter implements LoadSpotPort, SaveSpotPort {
 	@Override
 	public List<PickupSpot> loadSpots(long familyId, Long academyId) {
 		List<PickupSpotEntity> entities = academyId == null
-				? pickupSpotJpaRepository.findByFamilyId(familyId)
-				: pickupSpotJpaRepository.findByFamilyIdAndAcademyId(familyId, academyId);
+				? pickupSpotJpaRepository.findByFamilyIdAndTemporaryFalse(familyId)
+				: pickupSpotJpaRepository.findByFamilyIdAndAcademyIdAndTemporaryFalse(familyId, academyId);
 		return entities.stream().map(PlacePersistenceAdapter::toDomain).toList();
 	}
 
@@ -45,7 +45,7 @@ class PlacePersistenceAdapter implements LoadSpotPort, SaveSpotPort {
 
 	@Override
 	public Optional<PickupSpot> loadDefaultSpot(long familyId, long academyId) {
-		return pickupSpotJpaRepository.findByFamilyIdAndAcademyIdAndIsDefaultTrue(familyId, academyId)
+		return pickupSpotJpaRepository.findByFamilyIdAndAcademyIdAndIsDefaultTrueAndTemporaryFalse(familyId, academyId)
 				.map(PlacePersistenceAdapter::toDomain);
 	}
 
@@ -78,14 +78,15 @@ class PlacePersistenceAdapter implements LoadSpotPort, SaveSpotPort {
 	private static PickupSpot toDomain(PickupSpotEntity entity) {
 		return PickupSpot.restore(entity.getSpotId(), entity.getFamilyId(), entity.getAcademyId(), entity.getName(),
 				entity.getMemo(), GeoPoints.toLatLng(entity.getStopPoint()),
-				GeoPoints.toLatLng(entity.getMeetingPoint()), entity.isDefault(), entity.getCreatedBy());
+				GeoPoints.toLatLng(entity.getMeetingPoint()), entity.isDefault(), entity.getCreatedBy(),
+				entity.isTemporary());
 	}
 
 	private static PickupSpotEntity toEntity(PickupSpot spot) {
 		return new PickupSpotEntity(spot.getSpotId(), spot.getFamilyId(), spot.getAcademyId(), spot.getName(),
 				spot.getMemo(), GeoPoints.toPoint(spot.getStopPoint().lat(), spot.getStopPoint().lng()),
 				GeoPoints.toPoint(spot.getMeetingPoint().lat(), spot.getMeetingPoint().lng()), spot.isDefault(),
-				spot.getCreatedBy());
+				spot.getCreatedBy(), spot.isTemporary());
 	}
 
 }

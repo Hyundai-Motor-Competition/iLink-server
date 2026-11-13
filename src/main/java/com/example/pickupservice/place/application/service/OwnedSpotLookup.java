@@ -12,7 +12,7 @@ final class OwnedSpotLookup {
 
 	static PickupSpot load(LoadSpotPort loadSpotPort, long familyId, long spotId) {
 		return loadSpotPort.loadSpot(spotId)
-				.filter(spot -> spot.getFamilyId() == familyId)
+				.filter(spot -> spot.getFamilyId() == familyId && !spot.isTemporary())
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
 	}
 }
