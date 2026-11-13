@@ -35,6 +35,7 @@ class UserPersistenceAdapterTest extends IntegrationTestSupport {
 
 	private static final String PHONE = "+821012345678";
 	private static final Instant UNLINKED_AT = Instant.parse("2026-11-03T09:12:34.123456Z");
+	private static final Instant REMOVED_AT = Instant.parse("2026-11-13T08:30:15.654321Z");
 
 	private final SaveFamilyPort saveFamilyPort;
 	private final LoadFamilyPort loadFamilyPort;
@@ -345,6 +346,67 @@ class UserPersistenceAdapterTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	@DisplayName("loadUsers는 removedAt이 있는 멤버를 빼고 그 가족의 해제되지 않은 멤버만 돌려준다")
+	void loadUsersExcludesRemovedMembers() {
+		long familyId = newFamilyId();
+		User guardian = saveUserPort.saveUser(User.create(familyId, Role.GUARDIAN, "김보호", PHONE));
+		User activeChild = saveUserPort.saveUser(User.create(familyId, Role.CHILD, "민준", null));
+		User removedDelegate = saveUserPort.saveUser(removed(familyId, Role.DELEGATE, "이대리", "+821011112222"));
+		User removedChild = saveUserPort.saveUser(removed(familyId, Role.CHILD, "서윤", null));
+		clearPersistenceContext();
+
+		assertThat(loadUserPort.loadUsers(familyId))
+				.as("해제된 멤버(%d · %d)는 빠진다", removedDelegate.getUserId(), removedChild.getUserId())
+				.extracting(User::getUserId)
+				.containsExactlyInAnyOrder(guardian.getUserId(), activeChild.getUserId());
+	}
+
+	@Test
+	@DisplayName("loadUsers는 멤버가 모두 해제된 가족이면 빈 목록을 돌려준다")
+	void loadUsersReturnsEmptyWhenAllMembersAreRemoved() {
+		long familyId = newFamilyId();
+		saveUserPort.saveUser(removed(familyId, Role.TEACHER, "박선생", "+821033334444"));
+		saveUserPort.saveUser(removed(familyId, Role.CHILD, "민준", null));
+		clearPersistenceContext();
+
+		assertThat(loadUserPort.loadUsers(familyId)).isEmpty();
+	}
+
+	@Test
+	@DisplayName("countNonChildMembers는 removedAt이 있는 자녀 외 멤버를 세지 않는다")
+	void countNonChildMembersExcludesRemovedMembers() {
+		long familyId = newFamilyId();
+		saveUserPort.saveUser(User.create(familyId, Role.GUARDIAN, "김보호", PHONE));
+		saveUserPort.saveUser(User.create(familyId, Role.CO_GUARDIAN, "이공동", "+821011112222"));
+		saveUserPort.saveUser(removed(familyId, Role.TEACHER, "박선생", "+821033334444"));
+		saveUserPort.saveUser(removed(familyId, Role.DELEGATE, "최대리", "+821055556666"));
+		saveUserPort.saveUser(User.create(familyId, Role.CHILD, "민준", null));
+		clearPersistenceContext();
+
+		assertThat(loadUserPort.countNonChildMembers(familyId)).as("해제되지 않은 자녀 외 멤버 2명만").isEqualTo(2L);
+	}
+
+	@Test
+	@DisplayName("removedAt이 있는 User도 loadUser(userId)로 읽으면 이름 · role · removedAt이 그대로 나온다")
+	void loadUserReadsRemovedMemberAsIs() {
+		long familyId = newFamilyId();
+		User removedTeacher = saveUserPort.saveUser(removed(familyId, Role.TEACHER, "박선생", "+821033334444"));
+		User removedChild = saveUserPort.saveUser(removed(familyId, Role.CHILD, "서윤", null));
+		clearPersistenceContext();
+
+		assertThat(loadUserPort.loadUser(removedTeacher.getUserId())).get()
+				.usingRecursiveComparison()
+				.isEqualTo(User.restore(removedTeacher.getUserId(), familyId, Role.TEACHER, "박선생", "+821033334444",
+						null, REMOVED_AT));
+		assertThat(loadUserPort.loadUser(removedChild.getUserId())).get()
+				.satisfies(user -> {
+					assertThat(user.getName()).isEqualTo("서윤");
+					assertThat(user.getRole()).isEqualTo(Role.CHILD);
+					assertThat(user.isRemoved()).isTrue();
+				});
+	}
+
+	@Test
 	@DisplayName("User의 profileImageKey는 넣지 않으면 NULL로 저장되고 다시 읽어도 비어 있다")
 	void profileImageKeyIsStoredAsNullWhenNotSet() {
 		long familyId = newFamilyId();
@@ -376,11 +438,60 @@ class UserPersistenceAdapterTest extends IntegrationTestSupport {
 				.isEqualTo(key);
 	}
 
+	@Test
+	@DisplayName("User의 grade에 값을 넣어 저장하면 users.grade에 남고 loadUser · loadUsers로 다시 읽었을 때 같은 값이다")
+	void gradeIsLoadedWithSameValueAfterSave() {
+		long familyId = newFamilyId();
+		String grade = "중학교 2학년";
+		User user = User.create(familyId, Role.CHILD, "민준", null);
+		user.changeGrade(grade);
+		User saved = saveUserPort.saveUser(user);
+		assertThat(saved.getGrade()).as("저장 결과의 grade").isEqualTo(grade);
+		clearPersistenceContext();
+
+		assertThat(gradeColumn(saved.getUserId())).as("users.grade 컬럼 값").isEqualTo(grade);
+		assertThat(loadUserPort.loadUser(saved.getUserId())).get()
+				.extracting(User::getGrade)
+				.as("loadUser로 다시 읽은 grade")
+				.isEqualTo(grade);
+		assertThat(loadUserPort.loadUsers(familyId))
+				.extracting(User::getGrade)
+				.as("loadUsers로 다시 읽은 grade")
+				.containsExactly(grade);
+	}
+
+	@Test
+	@DisplayName("User의 grade를 넣지 않으면 users.grade가 NULL로 저장되고 다시 읽어도 비어 있다")
+	void gradeIsStoredAsNullWhenNotSet() {
+		long familyId = newFamilyId();
+		User saved = saveUserPort.saveUser(User.create(familyId, Role.CHILD, "서윤", null));
+		clearPersistenceContext();
+
+		assertThat(gradeColumn(saved.getUserId())).as("users.grade 컬럼 값").isNull();
+		assertThat(loadUserPort.loadUser(saved.getUserId())).get()
+				.extracting(User::getGrade)
+				.as("다시 읽은 grade")
+				.isNull();
+	}
+
+	private Object gradeColumn(long userId) {
+		return transactionTemplate.execute(status -> entityManager
+				.createNativeQuery("select grade from users where user_id = :id")
+				.setParameter("id", userId)
+				.getSingleResult());
+	}
+
 	private Object profileImageKeyColumn(long userId) {
 		return transactionTemplate.execute(status -> entityManager
 				.createNativeQuery("select profile_image_key from users where user_id = :id")
 				.setParameter("id", userId)
 				.getSingleResult());
+	}
+
+	private static User removed(long familyId, Role role, String name, String phone) {
+		User user = User.create(familyId, role, name, phone);
+		user.remove(REMOVED_AT);
+		return user;
 	}
 
 	private long newFamilyId() {
