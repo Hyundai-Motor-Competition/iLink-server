@@ -166,7 +166,7 @@ pickup
 | SES-01 | GET /v1/pickup-sessions/active | 모든 앱 | 불필요 | — → 200 sessionId · status(ACTIVE · ON_HOLD) · stateVersion, 없으면 204 | 공통 |
 | SES-02 | POST /v1/pickup-sessions | 차량 앱 | 필요 | scheduleIds[](1개 이상, null 원소가 있으면 422 VALIDATION_FAILED), date(한국 날짜) → 201 새 세션 · 200 진행 중인 같은 세션, SessionView | 422 NOT_TODAY, 422 SCHEDULES_NOT_GROUPABLE, 422 SETUP_INCOMPLETE(missing 함께), 409 ANOTHER_SESSION_ACTIVE |
 | SES-03 | GET /v1/pickup-sessions/{sessionId} | 그 세션의 차량, 가족 사용자 | 불필요 | — → 200 SessionView(주체별 필드) | 공통 |
-| SES-04 | PUT /v1/pickup-sessions/{sessionId}/route | 차량 앱 | 필요 | spotId, navRouteId, stateVersion → 200 SessionView | 422 SPOT_NOT_SAVED, 409 STATE_VERSION_CONFLICT(stateVersion 다름 · spotId가 세션 장소와 다름, 순서는 SPOT_NOT_SAVED 먼저), 409 SESSION_ALREADY_FINISHED(끝난 세션) |
+| SES-04 | PUT /v1/pickup-sessions/{sessionId}/route | 차량 앱 | 필요 | spotId, navRouteId, totalMeters(선택, 0 이상), stateVersion → 200 SessionView | 422 SPOT_NOT_SAVED, 409 STATE_VERSION_CONFLICT(stateVersion 다름 · spotId가 세션 장소와 다름, 순서는 SPOT_NOT_SAVED 먼저), 409 SESSION_ALREADY_FINISHED(끝난 세션) |
 | SES-05 | POST /v1/pickup-sessions/{sessionId}/spot-changes | 차량 앱, GUARDIAN · CO_GUARDIAN | 필요 | spotId, stateVersion, spotVersion → 200 SessionView | 409 CALL_ALREADY_SENT, 409 CHILD_ALREADY_MOVING, 409 SESSION_ALREADY_FINISHED(끝난 세션) |
 | SES-06 | PUT /v1/pickup-sessions/{sessionId}/hold | 차량 앱, GUARDIAN · CO_GUARDIAN · DELEGATE | 필요 | stateVersion, reason(0~100자) → 200 SessionView | 공통 |
 | SES-06 | DELETE /v1/pickup-sessions/{sessionId}/hold | 차량 앱, GUARDIAN · CO_GUARDIAN · DELEGATE | 필요 | query stateVersion → 200 SessionView | 공통 |
@@ -727,6 +727,7 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 - [ ] [web] 세션 뷰 children[]에 profileImageUrl을, 세션 뷰에 운전 중인 보호자 driver {name, profileImageUrl}을 담는다(V03 · C03 아바타, C02 「엄마가 출발했어요」)
 - [ ] [web] 세션 뷰 route에 경로 확정 때 전체 거리 totalMeters를 담는다(부모 메인 출발→도착 진행 막대)
 - [ ] [서비스] 보호자에게 보내는 알림(출발 알림 · 준비 시간 추가 · 도움 요청 · 탑승 · 완료 등)의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE 모두다(GUARDIAN만이 아님, 사람 결정 2026-11-13)
+- [ ] user의 LoadMemberService가 pickup에 주는 MemberInfo.profileImageUrl을 가족 조회(GetMyFamilyService · MemberResults)와 같은 방식의 URL로 채워, 세션 뷰 children[].profileImageUrl · driver.profileImageUrl에 실제 값이 나간다(#273 후속, 팀장 결정 2026-11-14)
 
 ## 확인 필요 사항
 
@@ -778,6 +779,9 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 | 받는 사람 「보호자」 | [사람 결정 2026-11-09] 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE. TEACHER는 뺀다(알림 기록 · 실시간 이벤트 모두). 보호자에게 가는 FCM 알림도 GUARDIAN만이 아니라 세 role 모두에게 보낸다(사람 결정 2026-11-13) |
 | SES-11 notBoardedChildUserIds에 세션 밖 childUserId | 결정됨: 404 NOT_FOUND로 거절하고 세션 · 자녀 상태를 바꾸지 않는다(사람 결정 2026-11-13) |
 | 여기로 부르기(장소 변경 here=true) | 결정됨: 서버가 한 번에 처리한다. 마지막 차량 위치로 임시 장소를 만들어 세션 장소를 바꾸고 바로 합류 안내(CALL)를 보낸다(사람 결정 2026-11-13) |
+| 추천 장소 · 여기로 부르기의 임시 장소 저장 순서 | 결정됨: place #264(임시 장소 저장 in 포트) · #265(목록 · 기본 장소에서 제외)를 픽업 진행 중 메인 폴더에서 먼저 처리한 뒤 #269~#272를 진행한다(사람 결정 2026-11-14) |
+| 세션 뷰 driver(#273) | 결정됨: 세션 familyId의 role GUARDIAN 멤버 1명의 name · profileImageUrl. 없으면 null(사람 결정 2026-11-14) |
+| 세션 뷰 route.totalMeters(#274) | 결정됨: SES-04 요청에 totalMeters(0 이상 정수, 선택)를 더하고 pickup_session.route_total_meters에 저장한다. 확정 전이나 값이 없으면 null(사람 결정 2026-11-14). 다시 확정하면 요청 값으로 덮어쓰고 값이 없으면 null(팀장 결정 2026-11-14) |
 | 이벤트 payload의 시각 값 | [사람 결정 2026-11-09] etaAt · predictedStopAt · callNotBefore · nextAllowedAt 등은 +09:00 문자열 |
 | 끝난 세션의 SES-04 · SES-05 · SIG-03 · SIG-05 | [사람 결정 2026-11-09] 409 SESSION_ALREADY_FINISHED로 거절하고 저장 · 알림 · 발행하지 않음 |
 | 완료 뒤 SIG-02 DOOR_CYCLE | [사람 결정 2026-11-09] 202로 받고 무시한다. markProcessed로 eventId는 남김 |

@@ -42,6 +42,7 @@ place
 | meetingPoint | geography(Point,4326) | | 만남 지점(WGS84) |
 | isDefault | BOOLEAN | 부분 유니크 인덱스 uk_pickup_spot_default (family_id, academy_id) WHERE is_default | 가족 · 학원마다 하나만 true |
 | createdBy | BIGINT | | User 참조(DB FK 제약 없음) |
+| temporary | BOOLEAN | NOT NULL, 기본 false | 차량 세션용 임시 장소면 true. 가족 장소 목록 · 기본 장소 판정에서 빠지고 spotId 단건 조회로는 읽힌다(사람 결정 2026-11-13) |
 
 familyId · academyId · createdBy는 프로젝트 관례대로 DB FK 제약 없이 컬럼만 둔다.
 uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스라 02_공통-규칙-global 관례대로 src/main/resources/schema.sql에 CREATE UNIQUE INDEX IF NOT EXISTS로 적는다.
@@ -294,6 +295,7 @@ List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<In
 | SPOT-04 카카오 결과 저장 | 카카오 DevTalk 답변 기준 장소 ID · place_url만 저장 가능. 추천 결과는 저장하지 않음 |
 | 도로 이름이 빈 길가 후보의 name | 결정됨: null 대신 「이름 없는 길」로 준다(사람 결정 2026-11-13) |
 | 추천 장소 선택 · 여기로 부르기의 장소 저장 | 결정됨: 차량 앱이 추천 장소를 고르거나 「여기로 부르기」를 하면 서버가 임시 장소(temporary=true인 PickupSpot)를 만든다. 임시 장소는 가족 장소 목록 · 기본 장소 판정에서 빠진다(사람 결정 2026-11-13) |
+| 임시 장소 저장 in 포트 모양 | [팀장 결정 2026-11-14] SaveTemporarySpotUseCase.saveTemporarySpot(SaveTemporarySpotCommand(familyId, academyId, createdBy, name, stopPoint, meetingPoint)) → long spotId. createdBy는 pickup이 넘기는 가족 GUARDIAN userId(세션 뷰 driver와 같은 사람). memo는 null. 학원 거리 검사(SPOT_TOO_FAR) · 기본 장소 자동 지정 · 강등 · 개수 제한은 임시 장소에 걸지 않는다(추천 장소 · 차량 정차 위치라 사용자가 고른 값이 아님) |
 | SPOT-04 참조 데이터 갱신 | CSV를 손으로 다시 만들어 넣음. 자동 갱신 없음 |
 | SPOT-04 origin | 클라이언트가 차량 현재 좌표를 보냄. 서버가 가진 SIG-01 위치는 쓰지 않음 |
 | SPOT-04 학원 위치 | 결정됨(사람 2026-11-12): 저장된 Academy를 academyId로 조회해 location을 씀. 출입구 좌표(entrance)는 아직 쓰지 않음. 저장된 값이 카카오 검색에서 온 것이라 저장 방식은 06_일정-schedule에서 따로 정함(미정) |

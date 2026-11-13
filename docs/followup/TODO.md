@@ -1,16 +1,22 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-14 00:02 KST · tdd-guard
-- 설계서: C:/pickup/docs
-- 프로젝트: gradle · C:/pickup
-- 테스트: ● GREEN · 2738 passed · 전체 · 161s
-- 진행: 공유모듈 72/72 · 사용자 79/85 · 인증 120/124 · 일정 77/83 · 장소 99/104 · 픽업 266/275 · 알림 65/65 · 프로필사진 39/39 · 남은 항목 30/847
-- 현재 도메인: 공유모듈 (03_공유모듈-shared.md) · 진행 시작: /tdd go
+- 생성: 2026-11-14 00:34 KST · tdd-guard
+- 설계서: C:/pw/pickup/docs
+- 프로젝트: gradle · C:/pw/pickup
+- 테스트: ● GREEN · 579 passed · *, * · 79s
+- 진행: 공유모듈 72/72 · 사용자 79/85 · 인증 120/124 · 일정 77/83 · 장소 99/104 · 픽업 266/276 · 알림 65/65 · 프로필사진 39/39 · 남은 항목 31/848
+- 현재 도메인: 픽업 (08_픽업-pickup.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
 
-## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 완료 · 항목 72/72 · 완료 기준 4/4 · 리뷰 11-14 00:02 조건부 통과 (상 0 · 중 3 · 하 7)
-- 남은 할 일 없음
+## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 대기 · 항목 72/72 · 완료 기준 0/4
+### 도메인 리뷰
+- [ ] 기록 없음 → /tdd review shared
+### 완료 기준
+- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
+- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 2. 사용자 (user) · 04_사용자-user.md · 대기 · 항목 79/85 · 완료 기준 0/4
 ### 테스트 케이스
@@ -65,7 +71,7 @@
 - [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
 - [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
-## 6. 픽업 (pickup) · 08_픽업-pickup.md · 대기 · 항목 266/275 · 완료 기준 0/4
+## 6. 픽업 (pickup) · 08_픽업-pickup.md · 진행 중 · 항목 266/276 · 완료 기준 0/4
 ### 테스트 케이스
 - [ ] #267 [서비스] 픽업 완료(SES-11)는 notBoardedChildUserIds에 세션에 없는 childUserId가 있으면 404 NOT_FOUND로 거절하고 세션 상태 · 자녀 탑승 상태를 바꾸지 않는다(사람 결정 2026-11-13)
 - [ ] #268 [web] POST 픽업 완료(SES-11)에 세션에 없는 childUserId를 notBoardedChildUserIds로 보내면 404 NOT_FOUND를 돌려준다
@@ -76,6 +82,7 @@
 - [ ] #273 [web] 세션 뷰 children[]에 profileImageUrl을, 세션 뷰에 운전 중인 보호자 driver {name, profileImageUrl}을 담는다(V03 · C03 아바타, C02 「엄마가 출발했어요」)
 - [ ] #274 [web] 세션 뷰 route에 경로 확정 때 전체 거리 totalMeters를 담는다(부모 메인 출발→도착 진행 막대)
 - [ ] #275 [서비스] 보호자에게 보내는 알림(출발 알림 · 준비 시간 추가 · 도움 요청 · 탑승 · 완료 등)의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE 모두다(GUARDIAN만이 아님, 사람 결정 2026-11-13)
+- [ ] #276 user의 LoadMemberService가 pickup에 주는 MemberInfo.profileImageUrl을 가족 조회(GetMyFamilyService · MemberResults)와 같은 방식의 URL로 채워, 세션 뷰 children[].profileImageUrl · driver.profileImageUrl에 실제 값이 나간다(#273 후속, 팀장 결정 2026-11-14)
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치

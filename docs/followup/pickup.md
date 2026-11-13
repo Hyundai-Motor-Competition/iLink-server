@@ -1,9 +1,9 @@
 # FOLLOWUP · 픽업 (pickup)
 
-- 생성: 2026-11-13 16:14 KST · tdd-guard
-- 상태: 완료 (체크 266/266 · 완료 기준 4/4)
-- 테스트: ● GREEN · 2588 passed · 전체 · 275s · .\gradlew.bat test --console=plain
-- 설계서: C:/ilink/docs/08_픽업-pickup.md
+- 생성: 2026-11-14 00:34 KST · tdd-guard
+- 상태: 진행 중 (체크 266/276 · 완료 기준 0/4)
+- 테스트: ● GREEN · 579 passed · *, * · 79s · .\gradlew.bat test --tests com.example.pickupservice.place.* --tests com.example.pickupservice.schedule.* --console=plain
+- 설계서: C:/pw/pickup/docs/08_픽업-pickup.md
 
 ## 완료 항목
 - [x] #1 [기반] PickupSession.start는 ACTIVE · ROUTING · SELECTED · stateVersion 0인 세션과 자녀마다 WAITING인 SessionChild를 만든다
@@ -57,164 +57,164 @@
 - [x] #49 [기반] JPA 엔티티 5개가 BaseTimeEntity를 상속하고 테이블 정의대로 매핑된다(PickupOutcome PK는 sessionId)
 - [x] #50 [기반] 테스트 시드로 차량 1대 · 자녀 2명 · 기본 장소가 있는 ACTIVE 세션 1개를 만든다
 - [x] #51 [persistence] PickupSession을 SessionChild와 함께 저장하고 읽으면 스냅샷 좌표와 자녀 상태가 같다
-- [x] #52 [persistence] 같은 세션에 같은 childUserId의 SessionChild를 두 번 저장하면 유니크 위반이 난다 ← PickupSessionPersistenceAdapterTest.같은 세션에 같은 childUserId의 SessionChild를 두 번 저장하면
+- [x] #52 [persistence] 같은 세션에 같은 childUserId의 SessionChild를 두 번 저장하면 유니크 위반이 난다
 - [x] #53 [persistence] loadActiveByVehicle은 그 차량의 ACTIVE · ON_HOLD 세션만 찾는다
 - [x] #54 [persistence] loadActiveByChild는 그 자녀가 포함된 진행 중 세션을 찾는다
 - [x] #55 [persistence] loadForUpdate로 잠근 세션을 다른 트랜잭션이 loadForUpdate하면 앞 트랜잭션이 끝날 때까지 기다린다
 - [x] #56 [persistence] append는 세션 안 seq를 1부터 1씩 늘려 저장한다
 - [x] #57 [persistence] 같은 세션에 같은 seq의 SessionEvent를 저장하면 유니크 위반이 난다
-- [x] #58 [persistence] loadAfter는 afterSeq보다 큰 이벤트를 seq 오름차순으로 limit개 돌려주고 남으면 hasMore true다 ← SessionEventPersistenceAdapterTest.loadAfter(afterSeq 1, limit 2)는
+- [x] #58 [persistence] loadAfter는 afterSeq보다 큰 이벤트를 seq 오름차순으로 limit개 돌려주고 남으면 hasMore true다
 - [x] #59 [persistence] loadLastHelpRequest는 payload의 childUserId로 그 아이의 마지막 HELP_REQUESTED를 찾는다
 - [x] #60 [persistence] loadBoardingExpired는 boardingCancelableUntil이 지난 ACTIVE 세션만 돌려준다
 - [x] #61 [persistence] loadLiveCall은 그 세션의 REVOKED가 아닌 가장 최근 Call을 돌려준다
 - [x] #62 [persistence] PickupOutcome은 sessionId를 PK로 저장되고 같은 세션에 두 번째 행은 저장되지 않는다
 - [x] #63 [persistence] loadHistory는 그 자녀가 포함된 세션 중 기간 안의 COMPLETED · CANCELLED 세션만 돌려준다
 - [x] #64 [persistence] markProcessed는 처음 eventId에 true, 같은 eventId에 false를 돌려준다
-- [x] #65 [서비스] 픽업 시작은 date가 한국 날짜로 오늘이 아니면 NOT_TODAY로 거절한다 ← StartPickupServiceTest.픽업 시작은 date가 한국 날짜로
-- [x] #66 [서비스] 픽업 시작은 학원이 다른 일정이 섞이면 SCHEDULES_NOT_GROUPABLE로 거절한다 ← StartPickupServiceTest.픽업 시작은 학원이 다른 일정이
-- [x] #67 [서비스] 픽업 시작은 시간대가 다른 일정이 섞이면 SCHEDULES_NOT_GROUPABLE로 거절한다 ← StartPickupServiceTest.픽업 시작은 목표 픽업 시각이
-- [x] #68 [서비스] 픽업 시작은 기본 장소가 없으면 SETUP_INCOMPLETE와 missing PICKUP_SPOT으로 거절한다 ← StartPickupServiceTest.픽업 시작은 기본 장소가 없으면
-- [x] #69 [서비스] 픽업 시작은 자녀 기기가 없으면 SETUP_INCOMPLETE와 missing CHILD_DEVICE로 거절한다 ← StartPickupServiceTest.픽업 시작은 자녀 기기 상태가
-- [x] #70 [서비스] 픽업 시작은 DRAFT 일정이 있으면 SETUP_INCOMPLETE로 거절한다 ← StartPickupServiceTest.픽업 시작은 DRAFT 일정이 하나라도
-- [x] #71 [서비스] 픽업 시작은 그 차량에 다른 진행 중 세션이 있으면 ANOTHER_SESSION_ACTIVE로 거절한다 ← StartPickupServiceTest.픽업 시작은 그 차량에 다른 일정
-- [x] #72 [서비스] 픽업 시작은 같은 일정의 진행 중 세션이 있으면 새로 만들지 않고 그 세션을 created false로 돌려준다 ← StartPickupServiceTest.픽업 시작은 같은 차량 · 같은 date
-- [x] #73 [서비스] 픽업 시작은 SESSION_STARTED를 seq 1로 저장하고 SESSION_STARTED 알림 기록을 요청한다 ← StartPickupServiceTest.픽업 시작은 저장한 새 세션의
-- [x] #74 [서비스] 진행 중 세션 찾기는 차량 주체에 그 차량의 세션, 자녀 주체에 자기가 포함된 세션을 돌려준다 ← FindActiveSessionServiceTest.진행 중 세션 찾기는 차량 주체에 그 차량의
-- [x] #75 [서비스] 진행 중 세션 찾기는 세션이 없으면 빈 값을 돌려준다 ← FindActiveSessionServiceTest.진행 중 세션 찾기는 보호자 주체에
-- [x] #76 [서비스] 세션 조회는 자녀 주체에게 자기 children 항목만 돌려준다 ← GetSessionServiceTest.세션 조회는 자녀 주체에게 자기 children
-- [x] #77 [서비스] 세션 조회는 SES-04 전이면 자녀 주체에게 spot을 null로 주고 eta.stopEtaAt은 준다 ← GetSessionServiceTest.세션 조회는 SES-04 전이면
-- [x] #78 [서비스] 세션 조회는 자녀 주체에게 children[].location을 주지 않고 차량 · 보호자 주체에게는 준다 ← GetSessionServiceTest.세션 조회는 자녀 주체에게 children[].location
-- [x] #79 [서비스] 세션 조회는 호출이 없으면 status.call NONE을 돌려준다 ← GetSessionServiceTest.세션 조회는 호출이 없으면
-- [x] #80 [서비스] 세션 조회는 MEETING 자녀가 있으면 spot.locked true를 돌려준다 ← GetSessionServiceTest.세션 조회는 MEETING 자녀가 있으면
-- [x] #81 [서비스] 다른 가족의 세션을 조회하면 NOT_FOUND로 거절한다 ← GetSessionServiceTest.다른 가족의 차량
-- [x] #82 [서비스] 세션을 바꾸는 요청의 stateVersion이 서버와 다르면 STATE_VERSION_CONFLICT와 최신 세션 뷰로 거절한다 ← SessionAccessTest.요청 5 · 서버 6
-- [x] #83 [서비스] 경로 확정은 가족이 저장하지 않은 spotId면 SPOT_NOT_SAVED로 거절한다 ← ConfirmRouteServiceTest.경로 확정은 어느 가족도 저장하
-- [x] #84 [서비스] 첫 경로 확정은 자녀에게 DEPARTURE 알림 기록을 요청하고 DEPARTURE_NOTICE_SENT를 저장한다 ← ConfirmRouteServiceTest.첫 경로 확정은 세션 자녀 모두에
-- [x] #85 [서비스] 두 번째 경로 확정은 출발 알림을 다시 요청하지 않는다 ← ConfirmRouteServiceTest.두 번째 경로 확정은
-- [x] #86 [서비스] 경로 확정은 SPOT_CONFIRMED를 저장한다 ← ConfirmRouteServiceTest.경로 확정은 저장한 SPOT_CONFIRMED를
-- [x] #87 [서비스] 장소 변경은 철회되지 않은 발송 호출이 있으면 CALL_ALREADY_SENT로 거절한다 ← ChangeSpotServiceTest.호출 status SENT
-- [x] #88 [서비스] 장소 변경이 성공하면 SPOT_CHANGED를 저장한다 ← ChangeSpotServiceTest.장소 변경은 저장한 SPOT_CHANGED를
-- [x] #89 [서비스] 픽업 취소는 철회되지 않은 호출을 REVOKED로 바꾸고 CALL_REVOKED와 SESSION_CANCELLED를 저장한다 ← CancelSessionServiceTest.픽업 취소는 CALL_REVOKED 다음에
-- [x] #90 [서비스] 픽업 취소는 자녀 위치 세 컬럼을 비운다 ← CancelSessionServiceTest.픽업 취소는 세션을 CANCELLED로
-- [x] #91 [서비스] 연락처는 전화번호가 있는 가족 멤버(CHILD 제외)와 role ACADEMY인 학원 대표번호를 돌려준다 ← GetContactsServiceTest.가족 보호자
-- [x] #92 [서비스] 차량 ETA 수신은 ETA_UPDATED를 저장하지 않고 발행만 한다 ← ReceiveTelemetryServiceTest.차량 ETA 수신은 ETA_UPDATED를
-- [x] #93 [서비스] AUTO 가족에서 트리거와 가드를 통과하면 Call ACCEPTED · CALL 알림 기록 요청 · CALL_TRIGGERED를 한 트랜잭션으로 저장한다 ← ReceiveTelemetryServiceTest.AUTO 가족에서 ETA 180초 안
-- [x] #94 [서비스] 호출 저장 중 예외가 나면 Call · SessionEvent가 남지 않고 이벤트도 발행되지 않는다 ← ReceiveTelemetryServiceIntegrationTest.호출 저장 중 CALL_TRIGGERED
-- [x] #95 [서비스] ON_HOLD 세션에서는 트리거를 만족해도 호출을 만들지 않는다 ← ReceiveTelemetryServiceTest.ON_HOLD 세션에서는
-- [x] #96 [서비스] callHeld가 true면 트리거를 만족해도 호출을 만들지 않는다 ← ReceiveTelemetryServiceTest.callHeld가 true면
-- [x] #97 [서비스] 철회되지 않은 호출이 있으면 새 호출을 만들지 않는다 ← ReceiveTelemetryServiceTest.ACKNOWLEDGED
-- [x] #98 [서비스] 가드를 통과하지 못하면 호출을 만들지 않고 세션 뷰 call.guard.unmet에 그 가드를 보인다 ← ReceiveTelemetryServiceTest.70초 전에 잰 ETA가
-- [x] #99 [서비스] GUARDIAN_CONFIRM 가족에서는 트리거와 가드를 통과해도 호출을 자동으로 만들지 않는다 ← ReceiveTelemetryServiceTest.GUARDIAN_CONFIRM 가족에서는
-- [x] #100 [서비스] callNotBefore 전에는 트리거를 만족해도 호출을 만들지 않고 callNotBefore 뒤 첫 SIG-01에서 만든다 ← ReceiveTelemetryServiceTest.callNotBefore 18:09:10
-- [x] #101 [서비스] 철회된 호출 뒤 조건이 다시 맞으면 prevCallId를 단 새 호출을 만든다 ← ReceiveTelemetryServiceTest.가장 최근 호출이 철회됐고
-- [x] #102 [서비스] markCallSent는 Call을 SENT로, 세션 자녀를 CALLED로 바꾸고 CALL_SENT를 저장한다 ← CallProgressServiceTest.markCallSent는 ACCEPTED Call을
-- [x] #103 [서비스] markCallDelivered는 Call을 DELIVERED로 바꾸고 CALL_DELIVERED를 저장한다 ← CallProgressServiceTest.markCallDelivered는 SENT Call을
-- [x] #104 [서비스] 차량 이벤트 수신은 같은 eventId를 두 번째로 받으면 무시한다 ← ReceiveVehicleEventServiceTest.차량 이벤트 수신은 같은 eventId를
-- [x] #105 [서비스] 차량 이벤트 STOPPED는 vehiclePhase를 STOPPED로 바꾸고 VEHICLE_STOPPED를 저장한다 ← ReceiveVehicleEventServiceTest.차량 이벤트 STOPPED는
-- [x] #106 [서비스] 차량 이벤트 DEPARTED는 vehiclePhase를 DEPARTED로 바꾸고 VEHICLE_DEPARTED를 저장한다 ← ReceiveVehicleEventServiceTest.차량 이벤트 DEPARTED는
-- [x] #107 [서비스] 탑승 후보가 된 DOOR_CYCLE은 BOARDING_DETECTED를 저장한다 ← ReceiveVehicleEventServiceTest.탑승 후보가 된 DOOR_CYCLE은
-- [x] #108 [서비스] 호출 보류는 이미 보낸 호출이 있으면 CALL_ALREADY_SENT로 거절한다 ← HoldCallServiceTest.호출 status SENT
-- [x] #109 [서비스] 호출 보류 해제는 callHeld를 false로 바꾸고 저장된 ETA로 판정을 다시 돌려 조건이 맞으면 호출을 만든다 ← HoldCallServiceTest.호출 보류 해제는 callHeld false
-- [x] #110 [서비스] 합류 안내 보내기는 AUTO 가족이면 NOT_GUARDIAN_CONFIRM_MODE로 거절한다 ← SendCallServiceTest.합류 안내 보내기는 AUTO 가족이면
-- [x] #111 [서비스] 합류 안내 보내기는 가드를 통과하지 못하면 CALL_GUARD_UNMET과 unmet 목록으로 거절한다 ← SendCallServiceTest.가드 G4 미충족
-- [x] #112 [서비스] 합류 안내 보내기는 이미 보낸 호출이 있으면 CALL_ALREADY_SENT로 거절한다 ← SendCallServiceTest.살아 있는 호출 status ACCEPTED
-- [x] #113 [서비스] 합류 안내 보내기가 성공하면 triggerType MANUAL인 Call을 만든다 ← SendCallServiceTest.합류 안내 보내기가 성공하면 Call
-- [x] #114 [서비스] 호출 철회는 세션 자녀를 WAITING으로 되돌리고 위치를 비우고 CALL_REVOKED를 저장한다 ← RevokeCallServiceTest.호출 철회는 CALLED · MEETING 세션
-- [x] #115 [서비스] 호출 확인은 형제가 모두 확인했을 때만 CALL_ACKNOWLEDGED를 저장한다 ← AcknowledgeCallServiceTest.호출 확인은 형제 중 아직 확인하
-- [x] #116 [서비스] 철회된 호출을 확인하면 CALL_ALREADY_REVOKED로 거절한다 ← AcknowledgeCallServiceTest.철회된 호출을 확인하면 409
-- [x] #117 [서비스] 준비 시간 추가는 합류 안내를 이미 받은 자녀면 CALL_ALREADY_SENT로 거절한다 ← ExtendPrepTimeServiceTest.자녀 CALLED · 호출 SENT
-- [x] #118 [서비스] 준비 시간 추가는 PREP_TIME_EXTENDED를 저장하고 보호자에게 PREP_EXTENDED 알림 기록을 요청한다 ← ExtendPrepTimeServiceTest.준비 시간 추가는 그 자녀의 extraPr
-- [x] #119 [서비스] 자녀 위치는 위치 동의가 없으면 LOCATION_CONSENT_REQUIRED로 거절한다 ← ReportChildLocationServiceTest.자녀 위치는 위치 동의가 없으면
-- [x] #120 [서비스] 자녀 위치는 끝난 세션이면 SESSION_ALREADY_FINISHED로 거절한다 ← ReportChildLocationServiceTest.세션 COMPLETED
-- [x] #121 [서비스] 자녀 위치는 WAITING 자녀면 409로 거절한다 ← ReportChildLocationServiceTest.자녀 위치는 WAITING 자녀면
-- [x] #122 [서비스] 자녀 위치는 CALLED 자녀의 lastLat · lastLng · lastLocatedAt을 덮어쓴다 ← ReportChildLocationServiceTest.자녀 위치는 CALLED 자녀의
-- [x] #123 [서비스] 도움 요청은 HELP_REQUESTED(payload childUserId · type)를 저장하고 보호자에게 HELP 알림 기록을 요청하고 nextAllowedAt = 지금 + 60초를 돌려준다 ← RequestHelpServiceTest.type "NEED_HELP"
-- [x] #124 [서비스] 도움 요청 1분 제한은 형제의 요청에 영향을 받지 않는다 ← RequestHelpServiceTest.도움 요청 1분 제한은 형제의
-- [x] #125 [서비스] 탑승 완료 IMMEDIATE는 PickupOutcome을 boardingMethod IMMEDIATE로 저장하고 SESSION_COMPLETED를 저장한다 ← CompletePickupServiceTest.탑승 완료 IMMEDIATE는 PickupOutcome을
-- [x] #126 [서비스] 탑승 완료 MANUAL은 미탑승 지정 외 자녀의 boardedAt을 채우고 boardingMethod MANUAL로 저장한다 ← CompletePickupServiceTest.탑승 완료 MANUAL은 PickupOutcome을
-- [x] #127 [서비스] 탑승 완료는 PickupOutcome.actualStopAt에 VEHICLE_STOPPED의 occurredAt을 넣는다 ← CompletePickupServiceTest.탑승 완료는 PickupOutcome.actualStopAt
-- [x] #128 [서비스] 자동 완료 작업은 취소 창이 지나고 모든 자녀가 탄 세션을 boardingMethod DOOR로 완료한다 ← AutoCompleteBoardingServiceTest.자동 완료 작업은 PickupOutcome을
-- [x] #129 [서비스] 자동 완료 작업은 SES-12로 boardedAt이 비워진 자녀가 있는 세션을 완료하지 않는다 ← AutoCompleteBoardingServiceTest.자동 완료 작업은 SES-12로
-- [x] #130 [서비스] 탑승 취소는 자녀가 여러 명인데 childUserId가 없으면 VALIDATION_FAILED로 거절한다 ← RejectBoardingServiceTest.탑승 취소는 자녀가 여러 명인데
-- [x] #131 [서비스] 탑승 예외는 INCIDENT_OPENED를 저장한다 ← OpenIncidentServiceTest.탑승 예외는 INCIDENT_OPENED를
-- [x] #132 [서비스] 픽업 이력은 month 2026-11에 한국 날짜 11월 1일~30일 세션을 돌려준다 ← GetPickupHistoryServiceTest.[1] guardianRole = GUARDIAN
-- [x] #133 [서비스] 픽업 결과는 예상 18:11:00 · 실제 18:11:50이면 diffSeconds 50을 돌려준다 ← GetOutcomeServiceTest.픽업 결과는 예상 18:11:00
-- [x] #134 [서비스] 결과 정정은 actualStopAt을 그대로 두고 correctedStopAt · correctionReason · correctionStatus REQUESTED · correctedBy를 채운다 ← CorrectOutcomeServiceTest.결과 정정은 actualStopAt 18:11:50을
-- [x] #135 [서비스] 결과 정정은 correctedStopAt이 세션 날짜 밖이면 VALIDATION_FAILED로 거절한다 ← CorrectOutcomeServiceTest.[3] correctedStopAt = "2026-11-10T00:11:20Z"
-- [x] #136 [서비스] 데이터 설정 변경은 learningConsent와 retentionDays 90을 돌려준다 ← UpdateDataSettingsServiceTest.데이터 설정 변경은 설정 행이 없
-- [x] #137 [서비스] SSE 리스너는 커밋된 세션 이벤트를 그 세션 차량의 연결로 보낸다 ← SessionEventStreamListenerTest.세션 A의 이벤트는 세션 A의 연결로만
-- [x] #138 [web] GET /v1/pickup-sessions/active는 진행 중 세션이 있으면 200과 sessionId · status · stateVersion을 돌려준다 ← PickupIdempotencyKeyTest.SES-01 GET active
-- [x] #139 [web] GET /v1/pickup-sessions/active는 진행 중 세션이 없으면 204를 돌려준다 ← PickupSessionControllerTest.GET /v1/pickup-sessions/active는 진행 중 세션이 없으면
-- [x] #140 [web] POST /v1/pickup-sessions는 새 세션이면 201과 SessionView를 돌려준다 ← PickupSessionControllerTest.POST /v1/pickup-sessions는 새 세션이면 201
-- [x] #141 [web] POST /v1/pickup-sessions는 진행 중인 같은 세션이면 200을 돌려준다 ← PickupSessionControllerTest.POST /v1/pickup-sessions는 진행 중인 같은 세션이면
-- [x] #142 [web] POST /v1/pickup-sessions가 오늘이 아니면 422 NOT_TODAY를 돌려준다 ← PickupSessionControllerTest.POST /v1/pickup-sessions가 오늘이 아니면
-- [x] #143 [web] POST /v1/pickup-sessions에 빈 scheduleIds를 보내면 422 VALIDATION_FAILED를 돌려준다 ← PickupSessionControllerTest.POST /v1/pickup-sessions에 빈 scheduleIds를
-- [x] #144 [web] POST /v1/pickup-sessions를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupSessionControllerTest.AuthPrincipal[type=USER, id=101, familyId=12, role=GUAR
-- [x] #145 [web] GET /v1/pickup-sessions/{sessionId}는 200과 SessionView 필드를 돌려준다 ← PickupIdempotencyKeyTest.SES-03 GET session
-- [x] #146 [web] GET /v1/pickup-sessions/{sessionId}의 시각 필드는 +09:00으로 내려간다 ← PickupSessionControllerTest.GET /v1/pickup-sessions/{sessionId}의 시각 필드는
-- [x] #147 [web] PUT /v1/pickup-sessions/{sessionId}/route는 200과 SessionView를 돌려준다 ← PickupSessionControllerTest.PUT /v1/pickup-sessions/{sessionId}/route는 200과
-- [x] #148 [web] PUT /v1/pickup-sessions/{sessionId}/route가 저장하지 않은 장소면 422 SPOT_NOT_SAVED를 돌려준다 ← PickupSessionControllerTest.PUT /v1/pickup-sessions/{sessionId}/route가 저장하지 않은
-- [x] #149 [web] PUT /v1/pickup-sessions/{sessionId}/route의 stateVersion이 다르면 409 STATE_VERSION_CONFLICT와 최신 세션 뷰를 돌려준다 ← PickupSessionControllerTest.PUT /v1/pickup-sessions/{sessionId}/route의 stateVersion이
-- [x] #150 [web] POST /v1/pickup-sessions/{sessionId}/spot-changes는 200과 SessionView를 돌려준다 ← PickupIdempotencyKeyTest.SES-05 POST spot-changes
-- [x] #151 [web] POST /v1/pickup-sessions/{sessionId}/spot-changes가 자녀 이동 중이면 409 CHILD_ALREADY_MOVING을 돌려준다 ← PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/spot-changes가 자녀 이동 중이면
-- [x] #152 [web] POST /v1/pickup-sessions/{sessionId}/spot-changes를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/spot-changes를 DELEGATE
-- [x] #153 [web] PUT /v1/pickup-sessions/{sessionId}/hold는 200과 status.session ON_HOLD인 SessionView를 돌려준다 ← PickupIdempotencyKeyTest.SES-06 PUT hold
-- [x] #154 [web] DELETE /v1/pickup-sessions/{sessionId}/hold는 쿼리 stateVersion을 받아 200과 status.session ACTIVE인 SessionView를 돌려준다 ← PickupIdempotencyKeyTest.SES-06 DELETE hold
-- [x] #155 [web] POST /v1/pickup-sessions/{sessionId}/cancellation은 200과 status.session CANCELLED인 SessionView를 돌려준다 ← PickupIdempotencyKeyTest.SES-07 POST cancellation
-- [x] #156 [web] POST /v1/pickup-sessions/{sessionId}/cancellation이 끝난 세션이면 409 SESSION_ALREADY_FINISHED를 돌려준다 ← PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/cancellation이 끝난 세션이면
-- [x] #157 [web] POST /v1/pickup-sessions/{sessionId}/cancellation을 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/cancellation을 DELEGATE
-- [x] #158 [web] GET /v1/pickup-sessions/{sessionId}/stream은 그 세션 차량 토큰에 text/event-stream으로 응답한다 ← PickupStreamControllerTest.GET /v1/pickup-sessions/{sessionId}/stream은 그 세션 차량 토큰에
-- [x] #159 [web] GET /v1/pickup-sessions/{sessionId}/stream을 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupStreamControllerTest.GET /v1/pickup-sessions/{sessionId}/stream을 USER 토큰으로
-- [x] #160 [web] GET /v1/pickup-sessions/{sessionId}/stream에 Last-Event-ID 41을 보내면 seq 42 이후 저장 이벤트부터 보낸다 ← PickupStreamControllerTest.GET /v1/pickup-sessions/{sessionId}/stream에 Last-Event-ID
-- [x] #161 [web] GET /v1/pickup-sessions/{sessionId}/stream은 이벤트를 event · id(seq) · data(eventId · seq · stateVersion · occurredAt · payload) 형식으로 보낸다 ← PickupStreamControllerTest.GET /v1/pickup-sessions/{sessionId}/stream은 이어 받는 이벤트를
-- [x] #162 [web] GET /v1/pickup-sessions/{sessionId}/stream은 ping 간격마다 빈 주석 `: ping`을 보낸다 ← PickupStreamControllerTest.GET /v1/pickup-sessions/{sessionId}/stream은 ping 간격마다
-- [x] #163 [web] GET /v1/pickup-sessions/{sessionId}/events는 200과 items[] · hasMore를 돌려준다 ← PickupIdempotencyKeyTest.SES-09 GET events
-- [x] #164 [web] GET /v1/pickup-sessions/{sessionId}/events에 limit 101을 보내면 422 VALIDATION_FAILED를 돌려준다 ← PickupSessionControllerTest.GET /v1/pickup-sessions/{sessionId}/events에 limit 101
-- [x] #165 [web] GET /v1/pickup-sessions/{sessionId}/contacts는 200과 items[](name · role · phone)를 돌려준다 ← PickupIdempotencyKeyTest.SES-10 GET contacts
-- [x] #166 [web] POST /v1/pickup-sessions/{sessionId}/completion은 200과 status.session COMPLETED인 SessionView를 돌려준다 ← PickupSessionControllerTest.mode "IMMEDIATE"
-- [x] #167 [web] POST /v1/pickup-sessions/{sessionId}/completion이 MANUAL인데 정차 중이 아니면 422 VEHICLE_NOT_STOPPED를 돌려준다 ← PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/completion이 MANUAL인데
-- [x] #168 [web] POST /v1/pickup-sessions/{sessionId}/completion이 빠진 자녀가 있으면 422 CHILDREN_NOT_ALL_BOARDED를 돌려준다 ← PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/completion이 빠진 자녀가
-- [x] #169 [web] POST /v1/pickup-sessions/{sessionId}/boarding-rejection은 200과 SessionView를 돌려준다 ← PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/boarding-rejection은 200과
-- [x] #170 [web] POST /v1/pickup-sessions/{sessionId}/boarding-rejection이 10초가 지났으면 409 REJECTION_WINDOW_CLOSED를 돌려준다 ← PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/boarding-rejection이 10초가
-- [x] #171 [web] PUT /v1/pickup-sessions/{sessionId}/incident는 200과 incident가 채워진 SessionView를 돌려준다 ← PickupSessionControllerTest.PUT /v1/pickup-sessions/{sessionId}/incident는 200과
-- [x] #172 [web] PUT /v1/pickup-sessions/{sessionId}/incident가 이미 열린 예외면 409 INCIDENT_ALREADY_OPEN을 돌려준다 ← PickupSessionControllerTest.PUT /v1/pickup-sessions/{sessionId}/incident가 이미
-- [x] #173 [web] POST /v1/pickup-sessions/{sessionId}/vehicle-telemetry는 202를 돌려준다 ← PickupSignalControllerTest."선택 필드 모두"
-- [x] #174 [web] POST /v1/pickup-sessions/{sessionId}/vehicle-telemetry에 음수 navEtaSeconds를 보내면 422 VALIDATION_FAILED를 돌려준다 ← PickupSignalControllerTest.POST /v1/pickup-sessions/{sessionId}/vehicle-telemetry에 음수
-- [x] #175 [web] POST /v1/pickup-sessions/{sessionId}/vehicle-events는 202를 돌려준다 ← PickupSignalControllerTest.type "STOPPED", door null
-- [x] #176 [web] POST /v1/pickup-sessions/{sessionId}/vehicle-events에 door 없는 DOOR_CYCLE을 보내면 422 VALIDATION_FAILED를 돌려준다 ← PickupSignalControllerTest.POST /v1/pickup-sessions/{sessionId}/vehicle-events에 door 없는
-- [x] #177 [web] POST /v1/pickup-sessions/{sessionId}/prep-time-extensions는 200과 extraPrepMinutes · callNotBefore를 돌려준다 ← PickupSignalControllerTest.POST /v1/pickup-sessions/{sessionId}/prep-time-extensions는 200과
-- [x] #178 [web] POST /v1/pickup-sessions/{sessionId}/prep-time-extensions에 minutes 7을 보내면 422 VALIDATION_FAILED를 돌려준다 ← PickupSignalControllerTest.POST /v1/pickup-sessions/{sessionId}/prep-time-extensions에 minutes 7을
-- [x] #179 [web] POST /v1/pickup-sessions/{sessionId}/prep-time-extensions가 누적 15분을 넘으면 422 PREP_EXTENSION_LIMIT을 돌려준다 ← PickupSignalControllerTest.POST /v1/pickup-sessions/{sessionId}/prep-time-extensions가 누적
-- [x] #180 [web] POST /v1/pickup-sessions/{sessionId}/prep-time-extensions를 GUARDIAN 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupSignalControllerTest.POST /v1/pickup-sessions/{sessionId}/prep-time-extensions를 GUARDIAN
-- [x] #181 [web] POST /v1/pickup-sessions/{sessionId}/child-locations는 202를 돌려준다 ← PickupSignalControllerTest."accuracyM 있음"
-- [x] #182 [web] POST /v1/pickup-sessions/{sessionId}/child-locations가 동의 없으면 403 LOCATION_CONSENT_REQUIRED를 돌려준다 ← PickupSignalControllerTest.POST /v1/pickup-sessions/{sessionId}/child-locations가
-- [x] #183 [web] POST /v1/pickup-sessions/{sessionId}/help-requests는 201과 nextAllowedAt을 돌려준다 ← PickupSignalControllerTest.POST /v1/pickup-sessions/{sessionId}/help-requests는 201과
-- [x] #184 [web] POST /v1/pickup-sessions/{sessionId}/help-requests가 1분 안 재요청이면 429 HELP_REQUEST_TOO_SOON과 nextAllowedAt을 돌려준다 ← PickupSignalControllerTest.POST /v1/pickup-sessions/{sessionId}/help-requests가 1분 안
-- [x] #185 [web] PUT /v1/pickup-sessions/{sessionId}/call-hold는 200과 call.held true인 SessionView를 돌려준다 ← PickupIdempotencyKeyTest.CALL-01 PUT call-hold
-- [x] #186 [web] PUT /v1/pickup-sessions/{sessionId}/call-hold가 발송 뒤면 409 CALL_ALREADY_SENT를 돌려준다 ← PickupCallControllerTest.PUT /v1/pickup-sessions/{sessionId}/call-hold가 발송
-- [x] #187 [web] DELETE /v1/pickup-sessions/{sessionId}/call-hold는 쿼리 stateVersion을 받아 200과 call.held false인 SessionView를 돌려준다 ← PickupIdempotencyKeyTest.CALL-01 DELETE call-hold
-- [x] #188 [web] POST /v1/pickup-sessions/{sessionId}/calls는 201과 callId · status를 돌려준다 ← PickupCallControllerTest.POST /v1/pickup-sessions/{sessionId}/calls는 201과
-- [x] #189 [web] POST /v1/pickup-sessions/{sessionId}/calls가 가드 미충족이면 422 CALL_GUARD_UNMET과 unmet을 돌려준다 ← PickupCallControllerTest.POST /v1/pickup-sessions/{sessionId}/calls가 가드 미충족이면
-- [x] #190 [web] POST /v1/pickup-sessions/{sessionId}/calls가 AUTO 가족이면 409 NOT_GUARDIAN_CONFIRM_MODE를 돌려준다 ← PickupCallControllerTest.POST /v1/pickup-sessions/{sessionId}/calls가 AUTO
-- [x] #191 [web] POST /v1/calls/{callId}/revocation은 200과 status.call REVOKED인 SessionView를 돌려준다 ← PickupIdempotencyKeyTest.CALL-03 POST revocation
-- [x] #192 [web] POST /v1/calls/{callId}/revocation이 이미 철회된 호출이면 409 CALL_ALREADY_REVOKED를 돌려준다 ← PickupCallControllerTest.POST /v1/calls/{callId}/revocation이 이미 철회된
-- [x] #193 [web] POST /v1/calls/{callId}/revocation을 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupCallControllerTest.POST /v1/calls/{callId}/revocation을 TEACHER 토큰으
-- [x] #194 [web] POST /v1/calls/{callId}/acknowledgement는 200과 callId · status · acknowledgedAt을 돌려준다 ← PickupCallControllerTest.POST /v1/calls/{callId}/acknowledgement는 200과
-- [x] #195 [web] POST /v1/calls/{callId}/acknowledgement를 차량 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupCallControllerTest.POST /v1/calls/{callId}/acknowledgement를 차량
-- [x] #196 [web] GET /v1/children/{childId}/pickup-history는 200과 items[](date · sessionId · status · completedAt)를 돌려준다 ← PickupIdempotencyKeyTest.OUT-01 GET pickup-history
-- [x] #197 [web] GET /v1/children/{childId}/pickup-history에 month 2026-13을 보내면 422 VALIDATION_FAILED를 돌려준다 ← PickupOutcomeControllerTest.GET /v1/children/{childId}/pickup-history에 month 2026
-- [x] #198 [web] GET /v1/pickup-sessions/{sessionId}/outcome은 200과 completedAt · spotName · boardingMethod · predictedStopAt · actualStopAt · diffSeconds · correction을 돌려준다 ← PickupIdempotencyKeyTest.OUT-02 GET outcome
-- [x] #199 [web] PUT /v1/pickup-sessions/{sessionId}/outcome/correction은 200과 correction.status REQUESTED를 돌려준다 ← PickupIdempotencyKeyTest.OUT-03 PUT outcome/correction
-- [x] #200 [web] PUT /v1/pickup-sessions/{sessionId}/outcome/correction에 201자 note를 보내면 422 VALIDATION_FAILED를 돌려준다 ← PickupOutcomeControllerTest.PUT /v1/pickup-sessions/{sessionId}/outcome/correction에 201자
-- [x] #201 [web] PUT /v1/guardians/me/data-settings는 200과 learningConsent · retentionDays를 돌려준다 ← PickupDataSettingsControllerTest.learningConsent true
-- [x] #202 [web] PUT /v1/guardians/me/data-settings를 CO_GUARDIAN 토큰으로 부르면 403 FORBIDDEN을 돌려준다 ← PickupDataSettingsControllerTest.PUT /v1/guardians/me/data-settings를 CO_GUARDIAN
-- [x] #203 [web] Idempotency-Key는 SES-02 · 04~07 · 11~13, SIG-03 · 05, CALL-01~04에만 요구되고 SIG-01 · 02 · 04와 조회 · OUT API에는 요구되지 않는다 ← PickupIdempotencyKeyTest.SIG-01 POST vehicle-telemetry
-- [x] #204 [기반] 모듈 연결 out 포트의 어댑터가 있다: LoadSchedulePort는 schedule, LoadSpotPort는 place, LoadFamilyPort는 user, LoadChildReadinessPort는 auth의 in 포트로 읽고, RecordNotificationPort는 notification 구현 전 임시로 빈 목록을 돌려준다
+- [x] #65 [서비스] 픽업 시작은 date가 한국 날짜로 오늘이 아니면 NOT_TODAY로 거절한다
+- [x] #66 [서비스] 픽업 시작은 학원이 다른 일정이 섞이면 SCHEDULES_NOT_GROUPABLE로 거절한다
+- [x] #67 [서비스] 픽업 시작은 시간대가 다른 일정이 섞이면 SCHEDULES_NOT_GROUPABLE로 거절한다
+- [x] #68 [서비스] 픽업 시작은 기본 장소가 없으면 SETUP_INCOMPLETE와 missing PICKUP_SPOT으로 거절한다
+- [x] #69 [서비스] 픽업 시작은 자녀 기기가 없으면 SETUP_INCOMPLETE와 missing CHILD_DEVICE로 거절한다
+- [x] #70 [서비스] 픽업 시작은 DRAFT 일정이 있으면 SETUP_INCOMPLETE로 거절한다
+- [x] #71 [서비스] 픽업 시작은 그 차량에 다른 진행 중 세션이 있으면 ANOTHER_SESSION_ACTIVE로 거절한다
+- [x] #72 [서비스] 픽업 시작은 같은 일정의 진행 중 세션이 있으면 새로 만들지 않고 그 세션을 created false로 돌려준다
+- [x] #73 [서비스] 픽업 시작은 SESSION_STARTED를 seq 1로 저장하고 SESSION_STARTED 알림 기록을 요청한다
+- [x] #74 [서비스] 진행 중 세션 찾기는 차량 주체에 그 차량의 세션, 자녀 주체에 자기가 포함된 세션을 돌려준다
+- [x] #75 [서비스] 진행 중 세션 찾기는 세션이 없으면 빈 값을 돌려준다
+- [x] #76 [서비스] 세션 조회는 자녀 주체에게 자기 children 항목만 돌려준다
+- [x] #77 [서비스] 세션 조회는 SES-04 전이면 자녀 주체에게 spot을 null로 주고 eta.stopEtaAt은 준다
+- [x] #78 [서비스] 세션 조회는 자녀 주체에게 children[].location을 주지 않고 차량 · 보호자 주체에게는 준다
+- [x] #79 [서비스] 세션 조회는 호출이 없으면 status.call NONE을 돌려준다
+- [x] #80 [서비스] 세션 조회는 MEETING 자녀가 있으면 spot.locked true를 돌려준다
+- [x] #81 [서비스] 다른 가족의 세션을 조회하면 NOT_FOUND로 거절한다
+- [x] #82 [서비스] 세션을 바꾸는 요청의 stateVersion이 서버와 다르면 STATE_VERSION_CONFLICT와 최신 세션 뷰로 거절한다
+- [x] #83 [서비스] 경로 확정은 가족이 저장하지 않은 spotId면 SPOT_NOT_SAVED로 거절한다
+- [x] #84 [서비스] 첫 경로 확정은 자녀에게 DEPARTURE 알림 기록을 요청하고 DEPARTURE_NOTICE_SENT를 저장한다
+- [x] #85 [서비스] 두 번째 경로 확정은 출발 알림을 다시 요청하지 않는다
+- [x] #86 [서비스] 경로 확정은 SPOT_CONFIRMED를 저장한다
+- [x] #87 [서비스] 장소 변경은 철회되지 않은 발송 호출이 있으면 CALL_ALREADY_SENT로 거절한다
+- [x] #88 [서비스] 장소 변경이 성공하면 SPOT_CHANGED를 저장한다
+- [x] #89 [서비스] 픽업 취소는 철회되지 않은 호출을 REVOKED로 바꾸고 CALL_REVOKED와 SESSION_CANCELLED를 저장한다
+- [x] #90 [서비스] 픽업 취소는 자녀 위치 세 컬럼을 비운다
+- [x] #91 [서비스] 연락처는 전화번호가 있는 가족 멤버(CHILD 제외)와 role ACADEMY인 학원 대표번호를 돌려준다
+- [x] #92 [서비스] 차량 ETA 수신은 ETA_UPDATED를 저장하지 않고 발행만 한다
+- [x] #93 [서비스] AUTO 가족에서 트리거와 가드를 통과하면 Call ACCEPTED · CALL 알림 기록 요청 · CALL_TRIGGERED를 한 트랜잭션으로 저장한다
+- [x] #94 [서비스] 호출 저장 중 예외가 나면 Call · SessionEvent가 남지 않고 이벤트도 발행되지 않는다
+- [x] #95 [서비스] ON_HOLD 세션에서는 트리거를 만족해도 호출을 만들지 않는다
+- [x] #96 [서비스] callHeld가 true면 트리거를 만족해도 호출을 만들지 않는다
+- [x] #97 [서비스] 철회되지 않은 호출이 있으면 새 호출을 만들지 않는다
+- [x] #98 [서비스] 가드를 통과하지 못하면 호출을 만들지 않고 세션 뷰 call.guard.unmet에 그 가드를 보인다
+- [x] #99 [서비스] GUARDIAN_CONFIRM 가족에서는 트리거와 가드를 통과해도 호출을 자동으로 만들지 않는다
+- [x] #100 [서비스] callNotBefore 전에는 트리거를 만족해도 호출을 만들지 않고 callNotBefore 뒤 첫 SIG-01에서 만든다
+- [x] #101 [서비스] 철회된 호출 뒤 조건이 다시 맞으면 prevCallId를 단 새 호출을 만든다
+- [x] #102 [서비스] markCallSent는 Call을 SENT로, 세션 자녀를 CALLED로 바꾸고 CALL_SENT를 저장한다
+- [x] #103 [서비스] markCallDelivered는 Call을 DELIVERED로 바꾸고 CALL_DELIVERED를 저장한다
+- [x] #104 [서비스] 차량 이벤트 수신은 같은 eventId를 두 번째로 받으면 무시한다
+- [x] #105 [서비스] 차량 이벤트 STOPPED는 vehiclePhase를 STOPPED로 바꾸고 VEHICLE_STOPPED를 저장한다
+- [x] #106 [서비스] 차량 이벤트 DEPARTED는 vehiclePhase를 DEPARTED로 바꾸고 VEHICLE_DEPARTED를 저장한다
+- [x] #107 [서비스] 탑승 후보가 된 DOOR_CYCLE은 BOARDING_DETECTED를 저장한다
+- [x] #108 [서비스] 호출 보류는 이미 보낸 호출이 있으면 CALL_ALREADY_SENT로 거절한다
+- [x] #109 [서비스] 호출 보류 해제는 callHeld를 false로 바꾸고 저장된 ETA로 판정을 다시 돌려 조건이 맞으면 호출을 만든다
+- [x] #110 [서비스] 합류 안내 보내기는 AUTO 가족이면 NOT_GUARDIAN_CONFIRM_MODE로 거절한다
+- [x] #111 [서비스] 합류 안내 보내기는 가드를 통과하지 못하면 CALL_GUARD_UNMET과 unmet 목록으로 거절한다
+- [x] #112 [서비스] 합류 안내 보내기는 이미 보낸 호출이 있으면 CALL_ALREADY_SENT로 거절한다
+- [x] #113 [서비스] 합류 안내 보내기가 성공하면 triggerType MANUAL인 Call을 만든다
+- [x] #114 [서비스] 호출 철회는 세션 자녀를 WAITING으로 되돌리고 위치를 비우고 CALL_REVOKED를 저장한다
+- [x] #115 [서비스] 호출 확인은 형제가 모두 확인했을 때만 CALL_ACKNOWLEDGED를 저장한다
+- [x] #116 [서비스] 철회된 호출을 확인하면 CALL_ALREADY_REVOKED로 거절한다
+- [x] #117 [서비스] 준비 시간 추가는 합류 안내를 이미 받은 자녀면 CALL_ALREADY_SENT로 거절한다
+- [x] #118 [서비스] 준비 시간 추가는 PREP_TIME_EXTENDED를 저장하고 보호자에게 PREP_EXTENDED 알림 기록을 요청한다
+- [x] #119 [서비스] 자녀 위치는 위치 동의가 없으면 LOCATION_CONSENT_REQUIRED로 거절한다
+- [x] #120 [서비스] 자녀 위치는 끝난 세션이면 SESSION_ALREADY_FINISHED로 거절한다
+- [x] #121 [서비스] 자녀 위치는 WAITING 자녀면 409로 거절한다
+- [x] #122 [서비스] 자녀 위치는 CALLED 자녀의 lastLat · lastLng · lastLocatedAt을 덮어쓴다
+- [x] #123 [서비스] 도움 요청은 HELP_REQUESTED(payload childUserId · type)를 저장하고 보호자에게 HELP 알림 기록을 요청하고 nextAllowedAt = 지금 + 60초를 돌려준다
+- [x] #124 [서비스] 도움 요청 1분 제한은 형제의 요청에 영향을 받지 않는다
+- [x] #125 [서비스] 탑승 완료 IMMEDIATE는 PickupOutcome을 boardingMethod IMMEDIATE로 저장하고 SESSION_COMPLETED를 저장한다
+- [x] #126 [서비스] 탑승 완료 MANUAL은 미탑승 지정 외 자녀의 boardedAt을 채우고 boardingMethod MANUAL로 저장한다
+- [x] #127 [서비스] 탑승 완료는 PickupOutcome.actualStopAt에 VEHICLE_STOPPED의 occurredAt을 넣는다
+- [x] #128 [서비스] 자동 완료 작업은 취소 창이 지나고 모든 자녀가 탄 세션을 boardingMethod DOOR로 완료한다
+- [x] #129 [서비스] 자동 완료 작업은 SES-12로 boardedAt이 비워진 자녀가 있는 세션을 완료하지 않는다
+- [x] #130 [서비스] 탑승 취소는 자녀가 여러 명인데 childUserId가 없으면 VALIDATION_FAILED로 거절한다
+- [x] #131 [서비스] 탑승 예외는 INCIDENT_OPENED를 저장한다
+- [x] #132 [서비스] 픽업 이력은 month 2026-11에 한국 날짜 11월 1일~30일 세션을 돌려준다
+- [x] #133 [서비스] 픽업 결과는 예상 18:11:00 · 실제 18:11:50이면 diffSeconds 50을 돌려준다
+- [x] #134 [서비스] 결과 정정은 actualStopAt을 그대로 두고 correctedStopAt · correctionReason · correctionStatus REQUESTED · correctedBy를 채운다
+- [x] #135 [서비스] 결과 정정은 correctedStopAt이 세션 날짜 밖이면 VALIDATION_FAILED로 거절한다
+- [x] #136 [서비스] 데이터 설정 변경은 learningConsent와 retentionDays 90을 돌려준다
+- [x] #137 [서비스] SSE 리스너는 커밋된 세션 이벤트를 그 세션 차량의 연결로 보낸다
+- [x] #138 [web] GET /v1/pickup-sessions/active는 진행 중 세션이 있으면 200과 sessionId · status · stateVersion을 돌려준다
+- [x] #139 [web] GET /v1/pickup-sessions/active는 진행 중 세션이 없으면 204를 돌려준다
+- [x] #140 [web] POST /v1/pickup-sessions는 새 세션이면 201과 SessionView를 돌려준다
+- [x] #141 [web] POST /v1/pickup-sessions는 진행 중인 같은 세션이면 200을 돌려준다
+- [x] #142 [web] POST /v1/pickup-sessions가 오늘이 아니면 422 NOT_TODAY를 돌려준다
+- [x] #143 [web] POST /v1/pickup-sessions에 빈 scheduleIds를 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] #144 [web] POST /v1/pickup-sessions를 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #145 [web] GET /v1/pickup-sessions/{sessionId}는 200과 SessionView 필드를 돌려준다
+- [x] #146 [web] GET /v1/pickup-sessions/{sessionId}의 시각 필드는 +09:00으로 내려간다
+- [x] #147 [web] PUT /v1/pickup-sessions/{sessionId}/route는 200과 SessionView를 돌려준다
+- [x] #148 [web] PUT /v1/pickup-sessions/{sessionId}/route가 저장하지 않은 장소면 422 SPOT_NOT_SAVED를 돌려준다
+- [x] #149 [web] PUT /v1/pickup-sessions/{sessionId}/route의 stateVersion이 다르면 409 STATE_VERSION_CONFLICT와 최신 세션 뷰를 돌려준다
+- [x] #150 [web] POST /v1/pickup-sessions/{sessionId}/spot-changes는 200과 SessionView를 돌려준다
+- [x] #151 [web] POST /v1/pickup-sessions/{sessionId}/spot-changes가 자녀 이동 중이면 409 CHILD_ALREADY_MOVING을 돌려준다
+- [x] #152 [web] POST /v1/pickup-sessions/{sessionId}/spot-changes를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #153 [web] PUT /v1/pickup-sessions/{sessionId}/hold는 200과 status.session ON_HOLD인 SessionView를 돌려준다
+- [x] #154 [web] DELETE /v1/pickup-sessions/{sessionId}/hold는 쿼리 stateVersion을 받아 200과 status.session ACTIVE인 SessionView를 돌려준다
+- [x] #155 [web] POST /v1/pickup-sessions/{sessionId}/cancellation은 200과 status.session CANCELLED인 SessionView를 돌려준다
+- [x] #156 [web] POST /v1/pickup-sessions/{sessionId}/cancellation이 끝난 세션이면 409 SESSION_ALREADY_FINISHED를 돌려준다
+- [x] #157 [web] POST /v1/pickup-sessions/{sessionId}/cancellation을 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #158 [web] GET /v1/pickup-sessions/{sessionId}/stream은 그 세션 차량 토큰에 text/event-stream으로 응답한다
+- [x] #159 [web] GET /v1/pickup-sessions/{sessionId}/stream을 USER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #160 [web] GET /v1/pickup-sessions/{sessionId}/stream에 Last-Event-ID 41을 보내면 seq 42 이후 저장 이벤트부터 보낸다
+- [x] #161 [web] GET /v1/pickup-sessions/{sessionId}/stream은 이벤트를 event · id(seq) · data(eventId · seq · stateVersion · occurredAt · payload) 형식으로 보낸다
+- [x] #162 [web] GET /v1/pickup-sessions/{sessionId}/stream은 ping 간격마다 빈 주석 `: ping`을 보낸다
+- [x] #163 [web] GET /v1/pickup-sessions/{sessionId}/events는 200과 items[] · hasMore를 돌려준다
+- [x] #164 [web] GET /v1/pickup-sessions/{sessionId}/events에 limit 101을 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] #165 [web] GET /v1/pickup-sessions/{sessionId}/contacts는 200과 items[](name · role · phone)를 돌려준다
+- [x] #166 [web] POST /v1/pickup-sessions/{sessionId}/completion은 200과 status.session COMPLETED인 SessionView를 돌려준다
+- [x] #167 [web] POST /v1/pickup-sessions/{sessionId}/completion이 MANUAL인데 정차 중이 아니면 422 VEHICLE_NOT_STOPPED를 돌려준다
+- [x] #168 [web] POST /v1/pickup-sessions/{sessionId}/completion이 빠진 자녀가 있으면 422 CHILDREN_NOT_ALL_BOARDED를 돌려준다
+- [x] #169 [web] POST /v1/pickup-sessions/{sessionId}/boarding-rejection은 200과 SessionView를 돌려준다
+- [x] #170 [web] POST /v1/pickup-sessions/{sessionId}/boarding-rejection이 10초가 지났으면 409 REJECTION_WINDOW_CLOSED를 돌려준다
+- [x] #171 [web] PUT /v1/pickup-sessions/{sessionId}/incident는 200과 incident가 채워진 SessionView를 돌려준다
+- [x] #172 [web] PUT /v1/pickup-sessions/{sessionId}/incident가 이미 열린 예외면 409 INCIDENT_ALREADY_OPEN을 돌려준다
+- [x] #173 [web] POST /v1/pickup-sessions/{sessionId}/vehicle-telemetry는 202를 돌려준다
+- [x] #174 [web] POST /v1/pickup-sessions/{sessionId}/vehicle-telemetry에 음수 navEtaSeconds를 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] #175 [web] POST /v1/pickup-sessions/{sessionId}/vehicle-events는 202를 돌려준다
+- [x] #176 [web] POST /v1/pickup-sessions/{sessionId}/vehicle-events에 door 없는 DOOR_CYCLE을 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] #177 [web] POST /v1/pickup-sessions/{sessionId}/prep-time-extensions는 200과 extraPrepMinutes · callNotBefore를 돌려준다
+- [x] #178 [web] POST /v1/pickup-sessions/{sessionId}/prep-time-extensions에 minutes 7을 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] #179 [web] POST /v1/pickup-sessions/{sessionId}/prep-time-extensions가 누적 15분을 넘으면 422 PREP_EXTENSION_LIMIT을 돌려준다
+- [x] #180 [web] POST /v1/pickup-sessions/{sessionId}/prep-time-extensions를 GUARDIAN 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #181 [web] POST /v1/pickup-sessions/{sessionId}/child-locations는 202를 돌려준다
+- [x] #182 [web] POST /v1/pickup-sessions/{sessionId}/child-locations가 동의 없으면 403 LOCATION_CONSENT_REQUIRED를 돌려준다
+- [x] #183 [web] POST /v1/pickup-sessions/{sessionId}/help-requests는 201과 nextAllowedAt을 돌려준다
+- [x] #184 [web] POST /v1/pickup-sessions/{sessionId}/help-requests가 1분 안 재요청이면 429 HELP_REQUEST_TOO_SOON과 nextAllowedAt을 돌려준다
+- [x] #185 [web] PUT /v1/pickup-sessions/{sessionId}/call-hold는 200과 call.held true인 SessionView를 돌려준다
+- [x] #186 [web] PUT /v1/pickup-sessions/{sessionId}/call-hold가 발송 뒤면 409 CALL_ALREADY_SENT를 돌려준다
+- [x] #187 [web] DELETE /v1/pickup-sessions/{sessionId}/call-hold는 쿼리 stateVersion을 받아 200과 call.held false인 SessionView를 돌려준다
+- [x] #188 [web] POST /v1/pickup-sessions/{sessionId}/calls는 201과 callId · status를 돌려준다
+- [x] #189 [web] POST /v1/pickup-sessions/{sessionId}/calls가 가드 미충족이면 422 CALL_GUARD_UNMET과 unmet을 돌려준다
+- [x] #190 [web] POST /v1/pickup-sessions/{sessionId}/calls가 AUTO 가족이면 409 NOT_GUARDIAN_CONFIRM_MODE를 돌려준다
+- [x] #191 [web] POST /v1/calls/{callId}/revocation은 200과 status.call REVOKED인 SessionView를 돌려준다
+- [x] #192 [web] POST /v1/calls/{callId}/revocation이 이미 철회된 호출이면 409 CALL_ALREADY_REVOKED를 돌려준다
+- [x] #193 [web] POST /v1/calls/{callId}/revocation을 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #194 [web] POST /v1/calls/{callId}/acknowledgement는 200과 callId · status · acknowledgedAt을 돌려준다
+- [x] #195 [web] POST /v1/calls/{callId}/acknowledgement를 차량 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #196 [web] GET /v1/children/{childId}/pickup-history는 200과 items[](date · sessionId · status · completedAt)를 돌려준다
+- [x] #197 [web] GET /v1/children/{childId}/pickup-history에 month 2026-13을 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] #198 [web] GET /v1/pickup-sessions/{sessionId}/outcome은 200과 completedAt · spotName · boardingMethod · predictedStopAt · actualStopAt · diffSeconds · correction을 돌려준다
+- [x] #199 [web] PUT /v1/pickup-sessions/{sessionId}/outcome/correction은 200과 correction.status REQUESTED를 돌려준다
+- [x] #200 [web] PUT /v1/pickup-sessions/{sessionId}/outcome/correction에 201자 note를 보내면 422 VALIDATION_FAILED를 돌려준다
+- [x] #201 [web] PUT /v1/guardians/me/data-settings는 200과 learningConsent · retentionDays를 돌려준다
+- [x] #202 [web] PUT /v1/guardians/me/data-settings를 CO_GUARDIAN 토큰으로 부르면 403 FORBIDDEN을 돌려준다
+- [x] #203 [web] Idempotency-Key는 SES-02 · 04~07 · 11~13, SIG-03 · 05, CALL-01~04에만 요구되고 SIG-01 · 02 · 04와 조회 · OUT API에는 요구되지 않는다
+- [x] #204 [기반] 모듈 연결 out 포트의 어댑터가 있다: LoadSchedulePort는 schedule, LoadSpotPort는 place, LoadFamilyPort는 user, LoadChildReadinessPort는 auth의 in 포트로 읽고, RecordNotificationPort는 notification RecordNotificationUseCase.record를 불러 만든 notificationId 목록을 돌려준다(사람 결정 2026-11-13)
 - [x] #205 [기반] 공통 오류 본문은 도메인 오류가 error 안에 추가 키(unmet · missing · nextAllowedAt)를 더할 수 있고, STATE_VERSION_CONFLICT는 error와 나란히 session에 최신 세션 뷰를 싣는다
 - [x] #206 [기반] PickupErrors는 API 명세의 픽업 오류 코드마다 상태 · code · 한국어 메시지를 담은 예외를 만든다
-- [x] #207 user · auth · place의 진행 중 픽업 확인 어댑터가 임시 false · 빈 값 대신 pickup ActivePickupQueryUseCase를 부른다 ← AuthModuleLinkAdaptersTest.auth의 CheckActivePickupPort.hasActivePickup은 pickup ActivePickupQueryUseCase.hasActivePickup 결과를 그대로 돌려준다
+- [x] #207 user · auth · place의 진행 중 픽업 확인 어댑터가 임시 false · 빈 값 대신 pickup ActivePickupQueryUseCase를 부른다
 - [x] #208 [기반] GuardianDataSetting 엔티티는 userId PK · learningConsent로 매핑되고 PickupOutcome 엔티티는 correctionNote VARCHAR(200)을 갖고, out 포트에 LoadDataSettingPort · SaveDataSettingPort가 있다
-- [x] #209 [persistence] GuardianDataSetting을 저장하고 읽으면 learningConsent가 같고 행이 없는 보호자는 빈 값을 돌려준다 ← GuardianDataSettingPersistenceAdapterTest.learningConsent true
+- [x] #209 [persistence] GuardianDataSetting을 저장하고 읽으면 learningConsent가 같고 행이 없는 보호자는 빈 값을 돌려준다
 - [x] #210 [기반] SessionEvent 도메인은 eventId · sessionId · seq · type(SessionEventType 19종) · stateVersion · occurredAt · payload를 담고 restore로 다시 만들어진다
 - [x] #211 [기반] PickupOutcome 도메인은 완료 때 completedAt · boardingMethod · predictedStopAt · actualStopAt으로 만들어지고, 정정은 actualStopAt을 두고 correctedStopAt · correctionReason · correctionStatus REQUESTED · correctedBy · correctionNote를 채우며, diffSeconds는 둘 중 하나가 없으면 비어 있다
 - [x] #212 [기반] GuardianDataSetting 도메인은 행이 없으면 learningConsent false로 만들어지고 동의 값을 바꿀 수 있다
@@ -224,80 +224,75 @@
 - [x] #216 [기반] 끝난 세션의 hold · releaseHold · complete · detectBoarding · openIncident는 SESSION_ALREADY_FINISHED로 거절되고, releaseHold는 열린 예외의 incidentResolvedAt을 채우며, 탑승 인식 전 rejectBoarding은 REJECTION_WINDOW_CLOSED로 거절된다
 - [x] #217 [기반] PickupSession은 familyId를 start · restore로 담고 pickup_session은 family_id 컬럼을 가지며, LoadSessionPort에 loadActiveBySpot · LoadCallPort에 loadLatestCall(REVOKED 포함) · LoadFamilyPort에 loadMember(userId)가 있다
 - [x] #218 [기반] PickupErrors는 CHILD_NOT_CALLED 409를 만들고 PickupViolation CHILD_NOT_IN_SESSION을 NOT_FOUND로 바꾼다
-- [x] #219 [web] 세션을 바꾸는 요청 본문에 stateVersion이 없으면 422 VALIDATION_FAILED(fields stateVersion)를 돌려준다 ← PickupSessionControllerTest.POST "/v1/pickup-sessions/{sessionId}/boarding-rejectio
-- [x] #220 [서비스] 호출 발송 · 전달 · 철회 · 확인은 세션 행을 잠근 뒤 Call을 다시 읽어, 그 사이 철회된 호출을 SENT · DELIVERED · ACKNOWLEDGED로 덮어쓰지 않는다 ← RevokeCallServiceTest.호출 철회는 세션 행을 잠근 뒤
-- [x] #221 [서비스] isCallAcknowledged는 Call이 ACKNOWLEDGED면 true, 아니면 false를 돌려준다 ← CallProgressServiceTest.isCallAcknowledged는 Call이 ACKNOWLEDGED면
-- [x] #222 [서비스] 세션 보류는 ACTIVE를 ON_HOLD로, 보류 해제는 ON_HOLD를 ACTIVE로 바꿔 저장하고 세션 뷰를 돌려준다 ← HoldSessionServiceTest.세션 보류는 잠가 읽은 ACTIVE 세션
-- [x] #223 [서비스] 이벤트 목록은 세션을 볼 수 있는 주체에게 afterSeq 뒤 이벤트를 limit개와 hasMore로 돌려준다 ← ListSessionEventsServiceTest.이벤트 목록은 afterSeq 뒤 남은
-- [x] #224 [서비스] 진행 중 픽업 확인(ActivePickupQueryUseCase)은 진행 중(ACTIVE · ON_HOLD) 세션이 있는지를 포트 시그니처대로 돌려준다 ← ActivePickupQueryServiceTest.sessionStatus ON_HOLD
-- [x] #225 [web] 요청 필수 값(SES-02 date, SES-04 · 05 spotId, OUT-03 correctedStopAt, SIG-02 eventId · type · occurredAt)이 없거나 reason이 100자를 넘으면(SES-06 · 07, CALL-03) 422 VALIDATION_FAILED를 돌려준다 ← PickupSessionControllerTest."SES-06 reason 101자"
-- [x] #226 [서비스] 자동 완료 스케줄러는 10초마다 completeExpiredBoardings를 불러, 취소 창이 지나고 모든 자녀가 탄 세션을 DOOR로 완료한다(실제 DB 통합 테스트) ← AutoCompleteBoardingSchedulerTest.completeExpiredBoardings에는 @Scheduled
-- [x] #227 [서비스] 호출 철회가 커밋된 뒤 다른 트랜잭션의 markCallSent · acknowledge가 세션 잠금을 얻으면 DB의 최신 Call을 읽어 REVOKED를 덮어쓰지 않는다(두 트랜잭션 통합 테스트) ← CallProgressServiceIntegrationTest.markCallSent가 첫 loadCall 뒤 세션 잠금을
-- [x] #228 [서비스] 픽업 시작은 다른 가족의 scheduleId가 섞이면 NOT_FOUND로 거절한다 ← StartPickupServiceTest.픽업 시작은 다른 가족
-- [x] #229 [서비스] 픽업 시작은 오늘 요일이 아닌 일정 · 없는 scheduleId · 같은 자녀의 일정 2개가 섞이면 거절한다(500이 나지 않는다) ← StartPickupServiceTest.픽업 시작은 오늘 요일이 아닌 일정이 섞이면
-- [x] #230 [서비스] 장소 변경은 요청 spotVersion이 서버와 다르면 STATE_VERSION_CONFLICT와 최신 세션 뷰로 거절한다 ← ChangeSpotServiceTest.장소 변경은 stateVersion이 같아도 요청 spotVersion
-- [x] #231 [서비스] 차량 ETA 수신은 끝난(COMPLETED · CANCELLED) 세션이면 ETA를 저장하지 않고 발행하지 않는다 ← ReceiveTelemetryServiceTest.세션 CANCELLED
-- [x] #232 [web] SIG-05 type이 NEED_HELP · CANT_FIND_CAR · CONTACT_PARENT 밖이거나 SIG-02 eventId가 UUID가 아니거나 type이 STOPPED · DEPARTED · STOP_FAILED · DOOR_CYCLE 밖이면 422 VALIDATION_FAILED를 돌려준다 ← PickupSignalControllerTest.POST /v1/pickup-sessions/{sessionId}/vehicle-events에 UUID
-- [x] #233 [서비스] 알림 기록 · 실시간 이벤트의 받는 사람 「보호자」는 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE이고 TEACHER는 빠진다 ← SessionReceiversTest.보호자와 세션 자녀에게 보낼 때 받는
-- [x] #234 [서비스] 탑승 예외를 열면 대상 자녀를 세션에 저장하고(pickup_session.incident_child_user_id), 세션 뷰 incident에 type · childUserId · openedAt을 채운다 ← GetSessionServiceTest.세션 조회는 자녀 주체에게도 열린 예외의
-- [x] #235 [서비스] 세션 보류 · 해제는 SESSION_HELD · SESSION_RESUMED를 저장 · 발행하고, 해제 뒤 저장된 ETA로 호출 판정을 다시 돌린다 ← HoldSessionServiceTest.세션 보류는 SESSION_HELD를 저장한 세션의
-- [x] #236 [서비스] 실시간 이벤트 payload의 시각 값(etaAt · predictedStopAt · callNotBefore · nextAllowedAt 등)은 +09:00 문자열로 담긴다 ← ExtendPrepTimeServiceTest.PREP_TIME_EXTENDED payload의 callNotBefore는
-- [x] #237 [web] SES-05 spotVersion이 없으면 422 VALIDATION_FAILED(fields spotVersion)를 돌려준다 ← PickupSessionControllerTest."SES-05 spotVersion 없음"
-- [x] #238 [서비스] 탑승 예외의 childUserId가 세션 자녀가 아니면 NOT_FOUND로 거절하고 저장하지 않는다 ← OpenIncidentServiceTest.탑승 예외는 childUserId가 세션 자녀가 아니면(같은 가족 자녀여도) NOT_FOUND로 거절하고 아무것도 저장 · 발행하지 않는다
-- [x] #239 [서비스] 끝난(COMPLETED · CANCELLED) 세션에 경로 확정 · 장소 변경 · 준비 시간 추가 · 도움 요청이 오면 SESSION_ALREADY_FINISHED로 거절하고 저장 · 알림 · 발행하지 않는다 ← ConfirmRouteServiceTest.세션 COMPLETED
-- [x] #240 [서비스] 완료된 세션에 온 차량 이벤트 DOOR_CYCLE은 오류 없이 무시하고 eventId는 처리한 것으로 남긴다 ← ReceiveVehicleEventServiceTest.완료(COMPLETED)된 세션에 온 DOOR_CYCLE은
-- [x] #241 SessionEventType은 SESSION_HELD · SESSION_RESUMED를 더한 21종이다 ← SessionEventTest.SessionEventType은 설계서 「실시간 이벤트」 표의 이름 21개(19종 + SESSION_HELD · SESSION_RESUMED)를 enum 선언 순서대로 갖는다
-- [x] #242 [web] POST /v1/pickup-sessions에 null이 든 scheduleIds([null] · [801, null])를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다 ← PickupSessionControllerTest.본문 "{\"scheduleIds\":[null]
-- [x] #243 [web] POST /v1/pickup-sessions/{sessionId}/completion에 null이 든 notBoardedChildUserIds([null] · [131, null])를 보내면 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다 ← PickupSessionControllerTest.본문 "{\"mode\":\"MANUAL\",\"stateVersion\":15,\"notBoardedChildUserIds\":[null]
-- [x] #244 [web] POST /v1/pickup-sessions/{sessionId}/child-locations에 범위 밖 lat(-90~90 밖) · lng(-180~180 밖)를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다 ← PickupSignalControllerTest."lat 1000"
-- [x] #245 [서비스] 차량 이벤트 DEPARTED를 받으면 철회되지 않은 호출을 철회(revokeReason VEHICLE_DEPARTED)하고 세션 자녀를 WAITING으로 돌리고 위치를 비우고 CALL_REVOKED를 저장 · 발행한다 ← ReceiveVehicleEventServiceTest.차량 이벤트 DEPARTED로 호출을 철회하면 세션 자녀를 모두 WAITING으로 돌리고
-- [x] #246 [서비스] 차량 이벤트 STOP_FAILED를 받으면 철회되지 않은 호출을 철회(revokeReason STOP_FAILED)하고 CALL_REVOKED를 저장 · 발행하며, 호출이 없으면 아무것도 바꾸지 않는다 ← ReceiveVehicleEventServiceTest.차량 이벤트 STOP_FAILED로 호출을 철회하면 CALL_REVOKED만 저장하고
-- [x] #247 [서비스] 차량 이벤트 STOPPED를 받으면 저장된 최신 ETA로 합류 호출 판정을 다시 돌려 조건이 맞으면 호출을 만든다 ← ReceiveVehicleEventServiceTest.차량 이벤트 STOPPED는 저장된 ETA가 180초 안이고 가드를 통과하는 AUTO 가족 세션이면
-- [x] #248 [기반] Guard는 vehiclePhase가 STOPPED가 아니면 G6을 unmet에 넣는다 ← GuardTest.vehiclePhase ROUTING
-- [x] #249 [서비스] 정차 전(vehiclePhase STOPPED 아님)에는 트리거와 G1~G5를 만족해도 자동 호출을 만들지 않고, 합류 안내 보내기(CALL-02)는 422 CALL_GUARD_UNMET(unmet에 G6)로 거절한다 ← SendCallServiceTest.가드 G6 미충족
-- [x] #250 [기반] PickupSession.applyTelemetry는 vehiclePhase가 ROUTING일 때 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 60이면 APPROACHING으로 바꾸고, 그 밖의 단계에서는 바꾸지 않는다 ← PickupSessionTest.applyTelemetry는 observedAt이 마지막 값보다 오래되면
-- [x] #251 [서비스] 차량 ETA 수신으로 APPROACHING이 되면 VEHICLE_APPROACHING을 세션당 한 번 저장하고 차량 · 보호자 · 자녀에게 발행한다 ← ReceiveTelemetryServiceTest.차량 ETA 수신으로 APPROACHING이 되면 저장한 VEHICLE_APPROACHING을
-- [x] #252 SessionEventType은 VEHICLE_APPROACHING · PREPARE_NOTICE_SENT · CHILD_READY를 더한 24종이다 ← SessionEventTest.SessionEventType은 VEHICLE_APPROACHING · PREPARE_NOTICE_SENT · CHILD_READY를 더한 24종
-- [x] #253 [서비스] 신호 끊김 철회는 철회되지 않은 호출이 있는 ACTIVE 세션 중 etaUpdatedAt이 1분 넘게 지난 세션의 호출을 철회(revokeReason SIGNAL_LOST)하고 세션 자녀를 WAITING으로 돌리고 CALL_REVOKED를 저장 · 발행한다 ← RevokeSignalLostCallsServiceTest.신호 끊김 철회로 호출을 철회하면 세션 자녀를 모두 WAITING으로 돌리고
-- [x] #254 [서비스] 신호 끊김 철회 스케줄러는 pickup.call.signal-lost-check-interval(기본 PT15S)마다 신호 끊김 철회를 부른다(실제 DB 통합 테스트) ← RevokeSignalLostCallsSchedulerTest.신호가 1분 넘게 끊기고 철회되지 않은 호출이 있는 ACTIVE 세션은 스케줄러 실행 뒤
-- [x] #255 [서비스] 자녀 위치는 가족의 자녀 위치 사용(childLocationEnabled)이 꺼져 있으면 403 LOCATION_CONSENT_REQUIRED로 거절한다(LoadChildReadinessPort.hasLocationConsent가 user의 가족 설정을 읽음) ← ReportChildLocationServiceTest.자녀 위치는 가족의 자녀 위치 사용이 꺼져 있으면 403 LOCATION_CONSENT_REQUIRED로 거절한다
-- [x] #256 [서비스] 차량 ETA 수신에서 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 180이 처음 되면 세션 자녀에게 실내 준비 알림(Notification type PREPARE) 기록을 요청하고 PREPARE_NOTICE_SENT를 세션당 한 번 저장해 차량 · 보호자에게 발행한다 ← ReceiveTelemetryServiceTest.차량 ETA 수신에서 준비 알림 기준(700m · 180초)이 처음 되면
-- [x] #257 [기반] SessionChild.markReady는 readyAt을 기록하고 여러 번 불러도 첫 시각을 유지한다 ← SessionChildTest.SessionChild.markReady를 두 번 부르면 첫 readyAt이 유지된다
-- [x] #258 [서비스] 준비 완료(SIG-06)는 세션 자녀의 readyAt을 기록하고 CHILD_READY(payload childUserId)를 저장해 차량 · 보호자에게 발행하며, 끝난 세션이면 SESSION_ALREADY_FINISHED, 세션 자녀가 아니면 NOT_FOUND로 거절한다 ← MarkChildReadyServiceTest.준비 완료는 세션 행을 잠그고 그 자녀의 readyAt에
-- [x] #259 [web] POST /v1/pickup-sessions/{sessionId}/ready는 자녀 토큰으로 200과 childUserId · readyAt을 돌려주고, 차량 · 보호자 토큰이면 403 FORBIDDEN을 돌려준다 ← PickupSignalControllerTest.POST /v1/pickup-sessions/{sessionId}/ready는 자녀 토큰으로
-- [x] #260 [서비스] 세션 조회의 children[]는 readyAt을 담는다 ← GetSessionServiceTest.세션 조회는 자녀 주체에게도 자기 children[].readyAt을 준다
-- [x] #261 [서비스] 차량 ETA 수신은 SIG-01 location을 세션의 마지막 차량 위치(vehicleLat · vehicleLng · vehicleLocatedAt)로 저장하고 observedAt이 오래되면 무시한다 ← ReceiveTelemetryServiceTest.차량 ETA 수신은 SIG-01 location을 세션의 마지막 차량 위치 vehicleLocation으로
-- [x] #262 [persistence] pickup_session의 vehicle_lat · vehicle_lng · vehicle_located_at을 저장하고 읽는다 ← PickupSessionPersistenceAdapterTest.마지막 차량 위치가 있는 세션을 저장하면
-- [x] #263 [서비스] 세션 조회는 vehicleLocation을 차량 · 보호자에게는 늘, 자녀에게는 remainingMeters ≤ 700 또는 남은 시간 ≤ 180초일 때만 주고, 끝난 세션이면 null로 준다 ← GetSessionServiceTest.남은 거리 "700"m · 도착까지 "720"초 → 자녀에게 보임 "true"
-- [x] #264 [서비스] 끝난 세션(COMPLETED · CANCELLED)이거나 탑승을 인식한(boardingDetectedAt 있음) 세션에는 차량 이벤트 DEPARTED · STOP_FAILED와 신호 끊김 철회가 호출을 철회하지 않고 자녀 상태 · acknowledgedAt을 바꾸지 않는다(DEPARTED는 vehiclePhase · VEHICLE_DEPARTED만 남김) ← RevokeSignalLostCallsServiceTest.신호 끊김 철회는 잠가 다시 읽은 ACTIVE 세션에 boardingDetectedAt이 있으면(탑승 인식) 호출을
-- [x] #265 [서비스] ON_HOLD 세션에서는 준비 알림 기준을 넘어도 실내 준비 알림을 보내지 않고, 보류가 풀린 뒤 첫 차량 ETA 수신에서 기준 안이면 보낸다 ← ReceiveTelemetryServiceTest.ON_HOLD 세션은 준비 알림 기준을 넘어도 PREPARE 알림 기록 요청 · PREPARE_NOTICE_SENT를 하지 않고
-- [x] #266 [서비스] 탑승 인식 없이 MANUAL로 완료된 세션과 CANCELLED 세션에 DEPARTED · STOP_FAILED가 와도 살아 있는 호출을 철회하지 않는다(boardingDetectedAt이 비어 있어도 끝난 세션이면 철회 안 함) ← ReceiveVehicleEventServiceTest.MANUAL로 완료된 세션(boardingDetectedAt 없음) · 호출 SENT
+- [x] #219 [web] 세션을 바꾸는 요청 본문에 stateVersion이 없으면 422 VALIDATION_FAILED(fields stateVersion)를 돌려준다
+- [x] #220 [서비스] 호출 발송 · 전달 · 철회 · 확인은 세션 행을 잠근 뒤 Call을 다시 읽어, 그 사이 철회된 호출을 SENT · DELIVERED · ACKNOWLEDGED로 덮어쓰지 않는다
+- [x] #221 [서비스] isCallAcknowledged는 Call이 ACKNOWLEDGED면 true, 아니면 false를 돌려준다
+- [x] #222 [서비스] 세션 보류는 ACTIVE를 ON_HOLD로, 보류 해제는 ON_HOLD를 ACTIVE로 바꿔 저장하고 세션 뷰를 돌려준다
+- [x] #223 [서비스] 이벤트 목록은 세션을 볼 수 있는 주체에게 afterSeq 뒤 이벤트를 limit개와 hasMore로 돌려준다
+- [x] #224 [서비스] 진행 중 픽업 확인(ActivePickupQueryUseCase)은 진행 중(ACTIVE · ON_HOLD) 세션이 있는지를 포트 시그니처대로 돌려준다
+- [x] #225 [web] 요청 필수 값(SES-02 date, SES-04 · 05 spotId, OUT-03 correctedStopAt, SIG-02 eventId · type · occurredAt)이 없거나 reason이 100자를 넘으면(SES-06 · 07, CALL-03) 422 VALIDATION_FAILED를 돌려준다
+- [x] #226 [서비스] 자동 완료 스케줄러는 10초마다 completeExpiredBoardings를 불러, 취소 창이 지나고 모든 자녀가 탄 세션을 DOOR로 완료한다(실제 DB 통합 테스트)
+- [x] #227 [서비스] 호출 철회가 커밋된 뒤 다른 트랜잭션의 markCallSent · acknowledge가 세션 잠금을 얻으면 DB의 최신 Call을 읽어 REVOKED를 덮어쓰지 않는다(두 트랜잭션 통합 테스트)
+- [x] #228 [서비스] 픽업 시작은 다른 가족의 scheduleId가 섞이면 NOT_FOUND로 거절한다
+- [x] #229 [서비스] 픽업 시작은 오늘 요일이 아닌 일정 · 없는 scheduleId · 같은 자녀의 일정 2개가 섞이면 거절한다(500이 나지 않는다)
+- [x] #230 [서비스] 장소 변경은 요청 spotVersion이 서버와 다르면 STATE_VERSION_CONFLICT와 최신 세션 뷰로 거절한다
+- [x] #231 [서비스] 차량 ETA 수신은 끝난(COMPLETED · CANCELLED) 세션이면 ETA를 저장하지 않고 발행하지 않는다
+- [x] #232 [web] SIG-05 type이 NEED_HELP · CANT_FIND_CAR · CONTACT_PARENT 밖이거나 SIG-02 eventId가 UUID가 아니거나 type이 STOPPED · DEPARTED · STOP_FAILED · DOOR_CYCLE 밖이면 422 VALIDATION_FAILED를 돌려준다
+- [x] #233 [서비스] 알림 기록 · 실시간 이벤트의 받는 사람 「보호자」는 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE이고 TEACHER는 빠진다
+- [x] #234 [서비스] 탑승 예외를 열면 대상 자녀를 세션에 저장하고(pickup_session.incident_child_user_id), 세션 뷰 incident에 type · childUserId · openedAt을 채운다
+- [x] #235 [서비스] 세션 보류 · 해제는 SESSION_HELD · SESSION_RESUMED를 저장 · 발행하고, 해제 뒤 저장된 ETA로 호출 판정을 다시 돌린다
+- [x] #236 [서비스] 실시간 이벤트 payload의 시각 값(etaAt · predictedStopAt · callNotBefore · nextAllowedAt 등)은 +09:00 문자열로 담긴다
+- [x] #237 [web] SES-05 spotVersion이 없으면 422 VALIDATION_FAILED(fields spotVersion)를 돌려준다
+- [x] #238 [서비스] 탑승 예외의 childUserId가 세션 자녀가 아니면 NOT_FOUND로 거절하고 저장하지 않는다
+- [x] #239 [서비스] 끝난(COMPLETED · CANCELLED) 세션에 경로 확정 · 장소 변경 · 준비 시간 추가 · 도움 요청이 오면 SESSION_ALREADY_FINISHED로 거절하고 저장 · 알림 · 발행하지 않는다
+- [x] #240 [서비스] 완료된 세션에 온 차량 이벤트 DOOR_CYCLE은 오류 없이 무시하고 eventId는 처리한 것으로 남긴다
+- [x] #241 SessionEventType은 SESSION_HELD · SESSION_RESUMED를 더한 21종이다
+- [x] #242 [web] POST /v1/pickup-sessions에 null이 든 scheduleIds([null] · [801, null])를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다
+- [x] #243 [web] POST /v1/pickup-sessions/{sessionId}/completion에 null이 든 notBoardedChildUserIds([null] · [131, null])를 보내면 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다
+- [x] #244 [web] POST /v1/pickup-sessions/{sessionId}/child-locations에 범위 밖 lat(-90~90 밖) · lng(-180~180 밖)를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다
+- [x] #245 [서비스] 차량 이벤트 DEPARTED를 받으면 철회되지 않은 호출을 철회(revokeReason VEHICLE_DEPARTED)하고 세션 자녀를 WAITING으로 돌리고 위치를 비우고 CALL_REVOKED를 저장 · 발행한다
+- [x] #246 [서비스] 차량 이벤트 STOP_FAILED를 받으면 철회되지 않은 호출을 철회(revokeReason STOP_FAILED)하고 CALL_REVOKED를 저장 · 발행하며, 호출이 없으면 아무것도 바꾸지 않는다
+- [x] #247 [서비스] 차량 이벤트 STOPPED를 받으면 저장된 최신 ETA로 합류 호출 판정을 다시 돌려 조건이 맞으면 호출을 만든다
+- [x] #248 [기반] Guard는 vehiclePhase가 STOPPED가 아니면 G6을 unmet에 넣는다
+- [x] #249 [서비스] 정차 전(vehiclePhase STOPPED 아님)에는 트리거와 G1~G5를 만족해도 자동 호출을 만들지 않고, 합류 안내 보내기(CALL-02)는 422 CALL_GUARD_UNMET(unmet에 G6)로 거절한다
+- [x] #250 [기반] PickupSession.applyTelemetry는 vehiclePhase가 ROUTING일 때 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 60이면 APPROACHING으로 바꾸고, 그 밖의 단계에서는 바꾸지 않는다
+- [x] #251 [서비스] 차량 ETA 수신으로 APPROACHING이 되면 VEHICLE_APPROACHING을 세션당 한 번 저장하고 차량 · 보호자 · 자녀에게 발행한다
+- [x] #252 SessionEventType은 VEHICLE_APPROACHING · PREPARE_NOTICE_SENT · CHILD_READY를 더한 24종이다
+- [x] #253 [서비스] 신호 끊김 철회는 철회되지 않은 호출이 있는 ACTIVE 세션 중 etaUpdatedAt이 1분 넘게 지난 세션의 호출을 철회(revokeReason SIGNAL_LOST)하고 세션 자녀를 WAITING으로 돌리고 CALL_REVOKED를 저장 · 발행한다
+- [x] #254 [서비스] 신호 끊김 철회 스케줄러는 pickup.call.signal-lost-check-interval(기본 PT15S)마다 신호 끊김 철회를 부른다(실제 DB 통합 테스트)
+- [x] #255 [서비스] 자녀 위치는 가족의 자녀 위치 사용(childLocationEnabled)이 꺼져 있으면 403 LOCATION_CONSENT_REQUIRED로 거절한다(LoadChildReadinessPort.hasLocationConsent가 user의 가족 설정을 읽음)
+- [x] #256 [서비스] 차량 ETA 수신에서 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 180이 처음 되면 세션 자녀에게 실내 준비 알림(Notification type PREPARE) 기록을 요청하고 PREPARE_NOTICE_SENT를 세션당 한 번 저장해 차량 · 보호자에게 발행한다
+- [x] #257 [기반] SessionChild.markReady는 readyAt을 기록하고 여러 번 불러도 첫 시각을 유지한다
+- [x] #258 [서비스] 준비 완료(SIG-06)는 세션 자녀의 readyAt을 기록하고 CHILD_READY(payload childUserId)를 저장해 차량 · 보호자에게 발행하며, 끝난 세션이면 SESSION_ALREADY_FINISHED, 세션 자녀가 아니면 NOT_FOUND로 거절한다
+- [x] #259 [web] POST /v1/pickup-sessions/{sessionId}/ready는 자녀 토큰으로 200과 childUserId · readyAt을 돌려주고, 차량 · 보호자 토큰이면 403 FORBIDDEN을 돌려준다
+- [x] #260 [서비스] 세션 조회의 children[]는 readyAt을 담는다
+- [x] #261 [서비스] 차량 ETA 수신은 SIG-01 location을 세션의 마지막 차량 위치(vehicleLat · vehicleLng · vehicleLocatedAt)로 저장하고 observedAt이 오래되면 무시한다
+- [x] #262 [persistence] pickup_session의 vehicle_lat · vehicle_lng · vehicle_located_at을 저장하고 읽는다
+- [x] #263 [서비스] 세션 조회는 vehicleLocation을 차량 · 보호자에게는 늘, 자녀에게는 remainingMeters ≤ 700 또는 남은 시간 ≤ 180초일 때만 주고, 끝난 세션이면 null로 준다
+- [x] #264 [서비스] 끝난 세션(COMPLETED · CANCELLED)이거나 탑승을 인식한(boardingDetectedAt 있음) 세션에는 차량 이벤트 DEPARTED · STOP_FAILED와 신호 끊김 철회가 호출을 철회하지 않고 자녀 상태 · acknowledgedAt을 바꾸지 않는다(DEPARTED는 vehiclePhase · VEHICLE_DEPARTED만 남김)
+- [x] #265 [서비스] ON_HOLD 세션에서는 준비 알림 기준을 넘어도 실내 준비 알림을 보내지 않고, 보류가 풀린 뒤 첫 차량 ETA 수신에서 기준 안이면 보낸다
+- [x] #266 [서비스] 탑승 인식 없이 MANUAL로 완료된 세션과 CANCELLED 세션에 DEPARTED · STOP_FAILED가 와도 살아 있는 호출을 철회하지 않는다(boardingDetectedAt이 비어 있어도 끝난 세션이면 철회 안 함)
 
 ## 미완료 항목
-- 없음
+- [ ] #267 [서비스] 픽업 완료(SES-11)는 notBoardedChildUserIds에 세션에 없는 childUserId가 있으면 404 NOT_FOUND로 거절하고 세션 상태 · 자녀 탑승 상태를 바꾸지 않는다(사람 결정 2026-11-13)
+- [ ] #268 [web] POST 픽업 완료(SES-11)에 세션에 없는 childUserId를 notBoardedChildUserIds로 보내면 404 NOT_FOUND를 돌려준다
+- [ ] #269 [web] PUT /v1/pickup-sessions/{sessionId}/route는 spotId 대신 candidate {name, location}을 받으면 임시 장소를 만들어 그 spotId로 경로를 확정한다. spotId와 candidate를 둘 다 보내거나 둘 다 빼면 422 VALIDATION_FAILED(최종디자인 11/13 V02 추천 장소, 팀장 결정 2026-11-13)
+- [ ] #270 [web] POST /v1/pickup-sessions/{sessionId}/spot-changes도 spotId 대신 candidate {name, location}을 받아 임시 장소로 세션 장소를 바꾼다(V03 「다른장소로 가기」)
+- [ ] #271 [서비스] 장소 변경에 here=true를 보내면 마지막으로 받은 차량 위치로 이름 「차량 정차 위치」, stopPoint · meetingPoint가 같은 임시 장소를 만들어 세션 장소를 바꾸고 바로 합류 안내(CALL)를 보낸다(V03 「여기로 부르기」, 서버가 한 번에 처리)
+- [ ] #272 [서비스] here=true인데 받은 차량 위치가 없으면 422 VALIDATION_FAILED, 정차 중이 아니라 호출 가드를 못 넘으면 장소를 바꾸지 않고 409 CALL_GUARD_UNMET로 거절한다
+- [ ] #273 [web] 세션 뷰 children[]에 profileImageUrl을, 세션 뷰에 운전 중인 보호자 driver {name, profileImageUrl}을 담는다(V03 · C03 아바타, C02 「엄마가 출발했어요」)
+- [ ] #274 [web] 세션 뷰 route에 경로 확정 때 전체 거리 totalMeters를 담는다(부모 메인 출발→도착 진행 막대)
+- [ ] #275 [서비스] 보호자에게 보내는 알림(출발 알림 · 준비 시간 추가 · 도움 요청 · 탑승 · 완료 등)의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE 모두다(GUARDIAN만이 아님, 사람 결정 2026-11-13)
+- [ ] #276 user의 LoadMemberService가 pickup에 주는 MemberInfo.profileImageUrl을 가족 조회(GetMyFamilyService · MemberResults)와 같은 방식의 URL로 채워, 세션 뷰 children[].profileImageUrl · driver.profileImageUrl에 실제 값이 나간다(#273 후속, 팀장 결정 2026-11-14)
 
 ## 완료 기준 (공통 규칙 문서)
-- [x] C1 설계서의 테스트 케이스가 모두 GREEN
-- [x] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [x] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
+- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-13 16:14 KST · 도메인 리뷰어 · 결론 통과 · 상 0 · 중 2 · 하 4 · 리뷰 시점 체크 266/266
-- 리뷰 시점 테스트: ● GREEN · 2588 passed · 전체 · 275s · .\gradlew.bat test --console=plain
-  - 결론: 통과
-  - 직전 리뷰의 [중] 2건은 모두 해소됐다. 동작을 바꿔야 하는 [상] · [중]은 없다. 직전 리뷰 뒤 바뀐 파일은 ReceiveVehicleEventServiceTest.java, docs/08, docs/followup/pickup.md, TODO.md뿐이고 main 코드는 바뀌지 않았다.
-  - 이전 지적 처리
-  - [중] MANUAL · 즉시 완료 · CANCELLED 뒤 출발 테스트 없음 → 해소. ReceiveVehicleEventServiceTest.java:594-657의 #266 8건이 boardingDetectedAt null을 먼저 단언해 keepsCalls의 isFinished() 조건을 고정한다.
-  - [중] 08 핵심 로직 본문에 #264 규칙 없음 → 해소. 08 L290 · L291 · L294가 코드(ReceiveVehicleEventService.java:88 · 102, RevokeSignalLostCallsService.java:89-92)와 맞다.
-  - [하] 5건 → FOLLOWUP 「1차 개발 뒤 정리」에 기록.
-  - 발견 사항
-  - [하] 08 「확인 필요」 표 L739(SES-06 · 07 행 「이벤트 21종」)도 옛 값(지금 24종). FOLLOWUP 메모 (3)에 L739를 함께 적기 → note
-  - [하] ba90e2f 뒤 작업이 모두 미커밋(수정 66개, user 도메인 변경 섞임), 관계없는 contest-application-consent.docx · iLink_Project_Package/ 있음 → note(커밋 때 도메인별로 나누고 두 항목 제외)
-  - [하] #266은 MANUAL 완료만 다루고 IMMEDIATE는 없음. 경로가 isFinished() 하나라 지금은 문제없음 → note
-  - 완료 기준: C1 충족(266/266, GREEN 2588) / C2 충족 / C3 충족 / C4 충족
-  - 테스트: scope all GREEN 2588 passed · 275s
-- 이전 리뷰: 2026-11-13 16:06 KST (조건부 통과), 2026-11-13 15:51 KST (수정 필요), 2026-11-13 10:38 KST (조건부 통과), 2026-11-13 10:19 KST (조건부 통과)
+- 아직 없음. 모든 항목이 체크되면 도메인 리뷰(tdd-guard:domain-reviewer · /tdd review)를 받아 checklist review로 기록해야 도메인이 완료된다.
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -305,8 +300,8 @@
 | 「같은 시간대」 묶기 기준(SES-02) | 소스에 없음. 일정의 classEndTime + targetPickup(목표 픽업 시각)이 같으면 같은 시간대로 가정 |
 | 「진행 중인 같은 세션」(SES-02 200) | 같은 차량 · 같은 date · 같은 scheduleIds 묶음으로 가정. 다르면 409 ANOTHER_SESSION_ACTIVE |
 | DRAFT 일정으로 시작할 때 오류 코드 | 소스는 「픽업 시작 불가」만 있음. 422 SETUP_INCOMPLETE로 가정 |
-| 일정 값 스냅샷 컬럼 | 소스는 schedule 값도 스냅샷한다고 했지만 SessionChild에는 scheduleId만 있음. 지연 판정(목표 시각 + 10분)에 쓸 목표 시각을 어디서 읽을지 정해야 함 |
-| 합류 안내 방식 스냅샷 | SET-06은 「다음 세션부터 적용」인데 PickupSession에 mode 컬럼이 없음. 지금은 판정 때 Family.joinCallMode를 읽는다고 가정(진행 중에 바뀌면 바로 반영됨) |
+| 일정 값 스냅샷 컬럼 | 결정됨: 일정 값은 스냅샷하지 않는다. SessionChild에는 scheduleId만 두고 판정 때마다 schedule에서 최신 값을 읽어, SET-03 수정은 진행 중인 세션에도 바로 적용된다(06 SET-03과 같음)(사람 결정 2026-11-13) |
+| 합류 안내 방식 스냅샷 | 결정됨: 스냅샷하지 않는다. 판정 때마다 Family.joinCallMode를 읽어 SET-06 변경은 진행 중인 세션에도 바로 적용된다(04 SET-06과 같음)(사람 결정 2026-11-13) |
 | G3 「경로 일치」의 판정 | 소스에 정의 없음. SES-04로 확정한 장소 버전과 지금 spotVersion이 같으면 통과로 가정 |
 | G5와 형제 | Call은 세션에 하나라 모든 세션 자녀의 callNotBefore가 지나야 통과로 가정. callNotBefore가 지금과 같은 시각이면 지난 것으로 본다(「이 시각 전에는 호출 안 함」) |
 | ETA_3MIN · DIST_700M이 동시에 맞을 때 triggerType | 소스에 없음. ETA_3MIN으로 가정 |
@@ -345,13 +340,18 @@
 | 예외 해소 | [사람 결정 2026-11-09] 보류 해제(SES-06 DELETE) 때 열린 예외의 incidentResolvedAt을 채움 |
 | 세션에 없는 childUserId | [팀장 결정 2026-11-09] 404 NOT_FOUND |
 | SessionEvent.type | [팀장 결정 2026-11-09] 도메인에서는 enum(SessionEventType), 저장은 문자열. [사람 결정 2026-11-09] SESSION_HELD · SESSION_RESUMED가 더해져 19종 → 21종(DB 저장 안 하는 ETA_UPDATED · VEHICLE_LOCATION 포함) |
-| 받는 사람 「보호자」 | [사람 결정 2026-11-09] 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE. TEACHER는 뺀다(알림 기록 · 실시간 이벤트 모두) |
+| 받는 사람 「보호자」 | [사람 결정 2026-11-09] 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE. TEACHER는 뺀다(알림 기록 · 실시간 이벤트 모두). 보호자에게 가는 FCM 알림도 GUARDIAN만이 아니라 세 role 모두에게 보낸다(사람 결정 2026-11-13) |
+| SES-11 notBoardedChildUserIds에 세션 밖 childUserId | 결정됨: 404 NOT_FOUND로 거절하고 세션 · 자녀 상태를 바꾸지 않는다(사람 결정 2026-11-13) |
+| 여기로 부르기(장소 변경 here=true) | 결정됨: 서버가 한 번에 처리한다. 마지막 차량 위치로 임시 장소를 만들어 세션 장소를 바꾸고 바로 합류 안내(CALL)를 보낸다(사람 결정 2026-11-13) |
+| 추천 장소 · 여기로 부르기의 임시 장소 저장 순서 | 결정됨: place #264(임시 장소 저장 in 포트) · #265(목록 · 기본 장소에서 제외)를 픽업 진행 중 메인 폴더에서 먼저 처리한 뒤 #269~#272를 진행한다(사람 결정 2026-11-14) |
+| 세션 뷰 driver(#273) | 결정됨: 세션 familyId의 role GUARDIAN 멤버 1명의 name · profileImageUrl. 없으면 null(사람 결정 2026-11-14) |
+| 세션 뷰 route.totalMeters(#274) | 결정됨: SES-04 요청에 totalMeters(0 이상 정수, 선택)를 더하고 pickup_session.route_total_meters에 저장한다. 확정 전이나 값이 없으면 null(사람 결정 2026-11-14) |
 | 이벤트 payload의 시각 값 | [사람 결정 2026-11-09] etaAt · predictedStopAt · callNotBefore · nextAllowedAt 등은 +09:00 문자열 |
 | 끝난 세션의 SES-04 · SES-05 · SIG-03 · SIG-05 | [사람 결정 2026-11-09] 409 SESSION_ALREADY_FINISHED로 거절하고 저장 · 알림 · 발행하지 않음 |
 | 완료 뒤 SIG-02 DOOR_CYCLE | [사람 결정 2026-11-09] 202로 받고 무시한다. markProcessed로 eventId는 남김 |
 | 자동 완료 스케줄러 | [사람 결정 2026-11-09] adapter/in/scheduler, 주기 pickup.session.auto-complete-interval(기본 PT10S), 세션마다 트랜잭션 |
 | 세션 뷰 조립 위치 | [팀장 결정 2026-11-09] SessionView는 port.in record라 application/service에서 조립(「구조」 절의 domain 조립 규칙 대신) |
-| 위치 동의 저장 위치 | 동의 테이블이 없음(05_인증-auth.md에도 기록) |
+| 위치 동의 저장 위치 | 결정됨: 지금은 저장하지 않는다. FAM-06에서 LOCATION 동의가 필수라 자녀 동의 때문에 나는 SIG-04 403 LOCATION_CONSENT_REQUIRED는 위치 동의 철회 기능이 생기기 전까지 실제로 나지 않는다. 철회 기능을 만들 때 저장 위치를 정한다(05_인증-auth.md와 같음)(사람 결정 2026-11-13) |
 | SIG-01이 끝난 세션에 올 때 | 소스에 없음. 202로 받고 무시한다고 가정 |
 | 세션 행 잠금 범위 | 소스는 SIG-05만 명시. 세션을 바꾸는 모든 요청을 loadForUpdate로 처리한다고 가정. [사람 결정 2026-11-09] 잠금 뒤 Call을 DB에서 다시 읽는다(영속성 컨텍스트 refresh). CallEntity에 @Version이 없어 잠금 없이 saveCall을 부르는 경로가 생기면 낙관적 잠금 추가 검토 |
 | call.scheduledAt 계산 | 예시는 ETA − 3분(18:12 → 18:09). 자녀 callNotBefore 중 가장 늦은 값보다 앞서지 않게 한다고 가정 |
@@ -370,10 +370,11 @@
 | SES-08 SSE 요청 로그 · 비동기 실행기 | 03 요청 로깅은 SSE를 연결(stream=open) · 종료(stream=closed) 두 줄로 남김. 타임아웃 · 연결 끊김 · completeWithError 때 종료 줄의 status · errorCode와 MVC 비동기 실행기 설정 필요 여부를 SES-08 때 정해야 함 |
 
 ## 다음 단계
-- 커밋 · 푸시: /tdd commit (기능별 분할 커밋) · /tdd push (커밋 후 기능 브랜치 푸시)
+- 남은 항목 10건부터 계속: /tdd domain pickup → /tdd go
 - 다음 도메인: 알림 (09_알림-notification.md). 시작: /tdd domain notification
 
 ## 후속 과제
+- place #264 · #265는 픽업 진행 중 메인 폴더에서 구현됨(증거: SaveTemporarySpotServiceTest 2건, PlacePersistenceAdapterTest · PlacePersistenceEntitiesMappingTest 27 passed). 장소 도메인을 활성화하면 이 증거로 체크한다. 운영 DB는 배포 전에 ALTER TABLE pickup_spot ADD COLUMN temporary boolean DEFAULT false NOT NULL; 을 사람이 실행해야 한다(prod ddl-auto validate). UpdatePickupSpotService가 9인자 restore를 써서 임시 장소를 PATCH하면 temporary가 false로 바뀜: 임시 장소 PATCH 허용 여부를 장소 설계서에서 정해야 함
 - [팀장 결정 · 설정 키] 픽업 기준값은 application.yml `pickup.session.*` 하위 키로 둠(`pickup:` 아래는 이미 async · idempotency · jwt 등 앱 전체 설정). 롤백되면 저장하지 않는 이벤트(ETA_UPDATED)도 커밋 뒤 발행하지 않음
 - [service lane #94] AutoCompleteBoardingService에 테스트 전용 package-private 4인자 생성자가 남음(구현자는 테스트 생성 코드를 못 고침) — AutoCompleteBoardingServiceTest 생성 코드를 5인자(TransactionOperations)로 바꾸고 생성자를 하나로 정리할 것. 자동 완료 한 세션 실패 시 건너뛰기 테스트 없음, PickupProperties yml 바인딩 확인 테스트 없음
 - [리뷰 거리] (1) #137 테스트 보조 SseEmitterProbe를 src/test의 org.springframework.web.servlet.mvc.method.annotation 패키지에 둠(패키지 전용 API 접근용) — 스프링 버전이 바뀌면 깨질 수 있음 (2) #207로 auth · place · user 테스트 이름이 바뀌어 auth #98 · place #44 · user #64의 체크 증거 이름과 어긋남 — 해당 도메인 문서 증거 갱신 필요 (3) 04 · 05 · 07 설계서의 「임시 어댑터」 설명(user L8 · L202, auth L19 · L266, place L8 · L19 · L153)을 실제 위임으로 고칠 것 (4) seq 없는 이벤트(ETA_UPDATED 등)는 SSE에서 id 줄 없이 보냄 — 팀장 결정
