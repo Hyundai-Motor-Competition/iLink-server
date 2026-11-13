@@ -34,6 +34,27 @@ class ScheduleModuleImportTest {
 		assertThat(violations).isEmpty();
 	}
 
+	@Test
+	@DisplayName("schedule main 소스에서 pickup 모듈 참조는 adapter/out/pickup 아래의 pickup.application.port.in뿐이다")
+	void scheduleMainSourcesReferPickupOnlyThroughInPortFromOutPickupAdapter() throws IOException {
+		Path pickupAdapter = SCHEDULE_MAIN.resolve("adapter/out/pickup");
+		List<Path> sources;
+		try (Stream<Path> files = Files.walk(SCHEDULE_MAIN)) {
+			sources = files.filter(file -> file.toString().endsWith(".java")).toList();
+		}
+
+		List<String> violations = sources.stream()
+				.filter(file -> read(file).lines()
+						.filter(line -> line.contains("com.example.pickupservice.pickup."))
+						.anyMatch(line -> !file.startsWith(pickupAdapter)
+								|| !line.contains("com.example.pickupservice.pickup.application.port.in.")))
+				.map(file -> SCHEDULE_MAIN.relativize(file).toString())
+				.toList();
+
+		assertThat(sources).isNotEmpty();
+		assertThat(violations).isEmpty();
+	}
+
 	private static String read(Path file) {
 		try {
 			return Files.readString(file, StandardCharsets.UTF_8);
