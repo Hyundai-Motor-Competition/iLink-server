@@ -17,6 +17,7 @@ class PlaceAcademyAdapter implements LoadAcademyPort {
 	@Override
 	public Optional<AcademyInfo> loadAcademy(long academyId) {
 		return loadAcademyUseCase.findAcademy(academyId)
-				.map(academy -> new AcademyInfo(academy.academyId(), academy.name(), academy.location()));
+				.map(academy -> new AcademyInfo(academy.academyId(), academy.name(), academy.location(),
+						academy.entrance()));
 	}
 }

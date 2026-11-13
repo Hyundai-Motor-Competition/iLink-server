@@ -77,6 +77,36 @@ class PlaceModuleLinkAdaptersTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	@DisplayName("LoadAcademyPort 어댑터는 schedule 학원의 출입구 좌표를 AcademyInfo.entrance로 넘긴다")
+	void academyAdapterPassesScheduleAcademyEntranceAsAcademyInfoEntrance() {
+		LoadAcademyPort academyPort = onlyBeanOf(LoadAcademyPort.class);
+		ScheduleSeed.Result seeded = scheduleSeed.seed();
+		try {
+			AcademyInfo academy = academyPort.loadAcademy(seeded.academyId()).orElseThrow();
+
+			assertThat(academy.entrance()).isNotNull();
+			assertThat(academy.entrance().lat()).isCloseTo(ScheduleSeed.ENTRANCE_LAT, within(SIX_DECIMALS));
+			assertThat(academy.entrance().lng()).isCloseTo(ScheduleSeed.ENTRANCE_LNG, within(SIX_DECIMALS));
+		} finally {
+			scheduleSeed.clear(seeded);
+		}
+	}
+
+	@Test
+	@DisplayName("LoadAcademyPort 어댑터는 schedule 학원에 출입구가 없으면 AcademyInfo.entrance를 null로 넘긴다")
+	void academyAdapterPassesNullEntranceWhenScheduleAcademyHasNoEntrance() {
+		LoadAcademyPort academyPort = onlyBeanOf(LoadAcademyPort.class);
+		ScheduleSeed.Result seeded = scheduleSeed.seedWithoutEntrance();
+		try {
+			AcademyInfo academy = academyPort.loadAcademy(seeded.academyId()).orElseThrow();
+
+			assertThat(academy.entrance()).isNull();
+		} finally {
+			scheduleSeed.clear(seeded);
+		}
+	}
+
+	@Test
 	@DisplayName("LoadAcademyPort 어댑터는 schedule에 없는 학원이면 빈 값을 돌려준다")
 	void academyAdapterReturnsEmptyForMissingAcademy() {
 		LoadAcademyPort academyPort = onlyBeanOf(LoadAcademyPort.class);

@@ -1,5 +1,6 @@
 package com.example.pickupservice.place.application.service;
 
+import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.place.application.port.in.AcademySpots;
 import com.example.pickupservice.place.application.port.in.ListPickupSpotsUseCase;
 import com.example.pickupservice.place.application.port.in.ListSpotsQuery;
@@ -9,6 +10,7 @@ import com.example.pickupservice.place.application.port.out.AcademyInfo;
 import com.example.pickupservice.place.application.port.out.CheckActivePickupPort;
 import com.example.pickupservice.place.application.port.out.LoadAcademyPort;
 import com.example.pickupservice.place.application.port.out.LoadSpotPort;
+import com.example.pickupservice.place.domain.BlockDetourDistance;
 import com.example.pickupservice.place.domain.PickupSpot;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,8 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class ListPickupSpotsService implements ListPickupSpotsUseCase {
 
+	private static final double WALK_METERS_PER_SECOND = 1.1;
+
 	private final LoadSpotPort loadSpotPort;
 	private final LoadAcademyPort loadAcademyPort;
 	private final CheckActivePickupPort checkActivePickupPort;
@@ -35,26 +39,36 @@ public class ListPickupSpotsService implements ListPickupSpotsUseCase {
 				? loadSpotPort.loadSpotsWithin(query.familyId(), query.academyId(), query.near(), query.radiusM())
 				: loadSpotPort.loadSpots(query.familyId(), query.academyId());
 
-		checkActivePickupPort.loadActiveChildLocation(query.familyId());
-
 		Map<Long, List<PickupSpot>> byAcademy = spots.stream()
 				.collect(Collectors.groupingBy(PickupSpot::getAcademyId, TreeMap::new, Collectors.toList()));
 
 		List<AcademySpots> academies = byAcademy.entrySet().stream()
-				.map(entry -> new AcademySpots(entry.getKey(), academyName(entry.getKey()), toItems(entry.getValue())))
+				.map(entry -> toAcademySpots(entry.getKey(), entry.getValue()))
 				.toList();
 		return new SpotGroups(academies);
 	}
 
-	private String academyName(long academyId) {
-		return loadAcademyPort.loadAcademy(academyId).map(AcademyInfo::name).orElse(null);
+	private AcademySpots toAcademySpots(long academyId, List<PickupSpot> spots) {
+		AcademyInfo academy = loadAcademyPort.loadAcademy(academyId).orElse(null);
+		String name = academy == null ? null : academy.name();
+		LatLng origin = academy == null ? null : (academy.entrance() != null ? academy.entrance() : academy.location());
+		return new AcademySpots(academyId, name, toItems(spots, origin));
 	}
 
-	private static List<SpotItem> toItems(List<PickupSpot> spots) {
+	private static List<SpotItem> toItems(List<PickupSpot> spots, LatLng origin) {
 		return spots.stream()
 				.sorted(Comparator.comparing(PickupSpot::getSpotId))
 				.map(spot -> new SpotItem(spot.getSpotId(), spot.getName(), spot.getStopPoint(),
-						spot.getMeetingPoint(), spot.getMemo(), spot.isDefault(), null))
+						spot.getMeetingPoint(), spot.getMemo(), spot.isDefault(),
+						walkMinutes(origin, spot.getMeetingPoint())))
 				.toList();
+	}
+
+	private static Integer walkMinutes(LatLng origin, LatLng meetingPoint) {
+		if (origin == null || meetingPoint == null) {
+			return null;
+		}
+		double meters = BlockDetourDistance.meters(origin, meetingPoint);
+		return (int) Math.ceil(meters / WALK_METERS_PER_SECOND / 60);
 	}
 }
