@@ -7,11 +7,8 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
 
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.List;
 
-/**
- * 테스트 DB pickup_test(PostgreSQL 17 + PostGIS 3) 연결과 테스트 공통 설정.
- * 서버는 TestPostgis가 고른다: Windows는 내장 서버, 그 밖의 OS는 Testcontainers(pickup.test.db로 강제).
- */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestPostgisConfiguration {
 
@@ -22,8 +19,13 @@ public class TestPostgisConfiguration {
 	private static final int JWT_SECRET_BYTES = 32;
 	private static final String PHONE_KEY_PROPERTY = "pickup.crypto.phone-key";
 	private static final int PHONE_KEY_BYTES = 32;
-	private static final String IDEMPOTENCY_CLEANUP_INTERVAL_PROPERTY = "pickup.idempotency.cleanup-interval";
-	private static final String SCHEDULER_IDLE_INTERVAL = "P1D";
+	static final List<String> SCHEDULER_INTERVAL_PROPERTIES = List.of(
+			"pickup.idempotency.cleanup-interval",
+			"pickup.session.auto-complete-interval",
+			"pickup.call.signal-lost-check-interval",
+			"pickup.sse.ping-interval",
+			"pickup.notification.resend-interval");
+	static final String SCHEDULER_IDLE_INTERVAL = "P1D";
 
 	@Bean
 	JdbcConnectionDetails testPostgisConnectionDetails() {
@@ -70,7 +72,8 @@ public class TestPostgisConfiguration {
 
 	@Bean
 	DynamicPropertyRegistrar idleSchedulerRegistrar() {
-		return registry -> registry.add(IDEMPOTENCY_CLEANUP_INTERVAL_PROPERTY, () -> SCHEDULER_IDLE_INTERVAL);
+		return registry -> SCHEDULER_INTERVAL_PROPERTIES
+				.forEach(property -> registry.add(property, () -> SCHEDULER_IDLE_INTERVAL));
 	}
 
 	private static String randomBase64(int bytes) {

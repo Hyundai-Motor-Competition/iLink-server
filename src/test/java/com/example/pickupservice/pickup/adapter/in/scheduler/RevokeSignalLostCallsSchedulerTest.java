@@ -1,6 +1,7 @@
 package com.example.pickupservice.pickup.adapter.in.scheduler;
 
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
+import com.example.pickupservice.common.fixture.MainApplicationYaml;
 import com.example.pickupservice.pickup.application.port.out.SaveCallPort;
 import com.example.pickupservice.pickup.domain.Call;
 import com.example.pickupservice.pickup.domain.CallStatus;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.util.ClassUtils;
@@ -42,7 +42,6 @@ class RevokeSignalLostCallsSchedulerTest extends IntegrationTestSupport {
 	private final PickupSeed pickupSeed;
 	private final JdbcTemplate jdbcTemplate;
 	private final Clock clock;
-	private final Environment environment;
 
 	private PickupSeed.Result seeded;
 
@@ -135,7 +134,7 @@ class RevokeSignalLostCallsSchedulerTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("revokeSignalLostCalls에는 @Scheduled(fixedDelayString = ${pickup.call.signal-lost-check-interval})가 붙어 있고 그 설정값은 15초이다")
+	@DisplayName("revokeSignalLostCalls에는 @Scheduled(fixedDelayString = ${pickup.call.signal-lost-check-interval})가 붙어 있고 그 운영 기본값(application.yml)은 15초이다")
 	void revokeSignalLostCallsIsScheduledEveryFifteenSecondsFromConfiguration() throws NoSuchMethodException {
 		Method method = ClassUtils.getUserClass(scheduler).getDeclaredMethod("revokeSignalLostCalls");
 
@@ -143,7 +142,7 @@ class RevokeSignalLostCallsSchedulerTest extends IntegrationTestSupport {
 
 		assertThat(scheduled).isNotNull();
 		assertThat(scheduled.fixedDelayString()).isEqualTo("${" + INTERVAL_PROPERTY + "}");
-		assertThat(environment.getProperty(INTERVAL_PROPERTY, Duration.class)).isEqualTo(Duration.ofSeconds(15));
+		assertThat(MainApplicationYaml.baseDuration(INTERVAL_PROPERTY)).isEqualTo(Duration.ofSeconds(15));
 	}
 
 	private void markEtaUpdatedAt(Instant etaUpdatedAt) {

@@ -12,6 +12,10 @@ spring:
   sql:
     init:
       mode: always
+  task:
+    scheduling:
+      pool:
+        size: 4
   servlet:
     multipart:
       max-file-size: 5MB
@@ -34,6 +38,8 @@ pickup:
       queue-capacity: 100
   idempotency:
     cleanup-interval: PT1H
+  notification:
+    resend-interval: PT60S
   sse:
     ping-interval: PT30S
   jwt:

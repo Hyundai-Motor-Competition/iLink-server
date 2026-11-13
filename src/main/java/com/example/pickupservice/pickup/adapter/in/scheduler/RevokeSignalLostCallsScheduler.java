@@ -14,7 +14,8 @@ public class RevokeSignalLostCallsScheduler {
 	private final RevokeSignalLostCallsUseCase revokeSignalLostCallsUseCase;
 	private final Clock clock;
 
-	@Scheduled(fixedDelayString = "${pickup.call.signal-lost-check-interval}")
+	@Scheduled(fixedDelayString = "${pickup.call.signal-lost-check-interval}",
+			initialDelayString = "${pickup.call.signal-lost-check-interval}")
 	void revokeSignalLostCalls() {
 		revokeSignalLostCallsUseCase.revokeSignalLostCalls(clock.instant());
 	}

@@ -83,7 +83,8 @@ public class SessionStreamRegistry {
 		emitters.forEach(SseEmitter::complete);
 	}
 
-	@Scheduled(fixedDelayString = "${pickup.sse.ping-interval}")
+	@Scheduled(fixedDelayString = "${pickup.sse.ping-interval}",
+			initialDelayString = "${pickup.sse.ping-interval}")
 	void ping() {
 		emittersBySession.forEach((sessionId, emitters) -> {
 			for (SseEmitter emitter : emitters) {
