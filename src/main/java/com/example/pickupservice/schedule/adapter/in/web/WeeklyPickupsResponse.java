@@ -37,6 +37,7 @@ public record WeeklyPickupsResponse(
 	public record PickupResponse(
 			long scheduleId,
 			String childName,
+			String profileImageUrl,
 			String academyName,
 			String classEndTime,
 			String targetPickupTime
@@ -46,6 +47,7 @@ public record WeeklyPickupsResponse(
 			return new PickupResponse(
 					pickup.scheduleId(),
 					pickup.childName(),
+					pickup.profileImageUrl(),
 					pickup.academyName(),
 					pickup.classEndTime().format(HH_MM),
 					pickup.targetPickupTime().format(HH_MM));

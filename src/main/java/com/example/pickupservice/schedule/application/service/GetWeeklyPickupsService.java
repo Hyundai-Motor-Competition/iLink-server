@@ -51,10 +51,12 @@ public class GetWeeklyPickupsService implements GetWeeklyPickupsUseCase {
 				? weekStart
 				: today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
 		Map<Long, String> childNames = childNamesOf(familyId);
-		List<PickupSchedule> schedules = loadSchedulePort.loadSchedulesOfChildren(List.copyOf(childNames.keySet()));
+		List<Long> childIds = List.copyOf(childNames.keySet());
+		List<PickupSchedule> schedules = loadSchedulePort.loadSchedulesOfChildren(childIds);
+		Map<Long, String> profileImageUrls = loadMemberUseCase.findProfileImageUrls(childIds);
 
 		List<DailyPickups> days = IntStream.range(0, DAYS_OF_WEEK)
-				.mapToObj(offset -> dailyPickups(start.plusDays(offset), schedules, childNames))
+				.mapToObj(offset -> dailyPickups(start.plusDays(offset), schedules, childNames, profileImageUrls))
 				.toList();
 		return new WeeklyPickups(start, days, readiness(familyId, schedulesOn(schedules, today.getDayOfWeek())));
 	}
@@ -66,10 +68,11 @@ public class GetWeeklyPickupsService implements GetWeeklyPickupsUseCase {
 	}
 
 	private static DailyPickups dailyPickups(LocalDate date, List<PickupSchedule> schedules,
-			Map<Long, String> childNames) {
+			Map<Long, String> childNames, Map<Long, String> profileImageUrls) {
 		List<WeeklyPickup> pickups = schedulesOn(schedules, date.getDayOfWeek()).stream()
 				.map(schedule -> new WeeklyPickup(schedule.getScheduleId(),
-						childNames.get(schedule.getChildUserId()), schedule.getAcademy().getName(),
+						childNames.get(schedule.getChildUserId()), profileImageUrls.get(schedule.getChildUserId()),
+						schedule.getAcademy().getName(),
 						schedule.getClassEndTime(), schedule.targetPickupTime()))
 				.toList();
 		return new DailyPickups(date, pickups);
@@ -90,15 +93,18 @@ public class GetWeeklyPickupsService implements GetWeeklyPickupsUseCase {
 		if (!allDevicesConnected(todaySchedules)) {
 			missing.add(MissingSetupItem.CHILD_DEVICE);
 		}
+		if (hasDraft(todaySchedules)) {
+			missing.add(MissingSetupItem.SCHEDULE);
+		}
 		List<Long> academyIds = SetupChecks.academyIdsOf(todaySchedules);
 		if (SetupChecks.lacksDefaultSpot(loadPickupSpotPort.loadSpots(familyId, academyIds), academyIds)) {
 			missing.add(MissingSetupItem.PICKUP_SPOT);
 		}
-		return new PickupReadiness(missing.isEmpty() && allReady(todaySchedules), List.copyOf(missing));
+		return new PickupReadiness(missing.isEmpty(), List.copyOf(missing));
 	}
 
-	private static boolean allReady(List<PickupSchedule> todaySchedules) {
-		return todaySchedules.stream().noneMatch(schedule -> schedule.getStatus() == ScheduleStatus.DRAFT);
+	private static boolean hasDraft(List<PickupSchedule> todaySchedules) {
+		return todaySchedules.stream().anyMatch(schedule -> schedule.getStatus() == ScheduleStatus.DRAFT);
 	}
 
 	private boolean allDevicesConnected(List<PickupSchedule> todaySchedules) {
