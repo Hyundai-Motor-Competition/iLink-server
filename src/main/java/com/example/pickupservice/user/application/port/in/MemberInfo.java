@@ -7,6 +7,11 @@ public record MemberInfo(
 		long familyId,
 		Role role,
 		String name,
-		String phone
+		String phone,
+		String profileImageUrl
 ) {
+
+	public MemberInfo(long userId, long familyId, Role role, String name, String phone) {
+		this(userId, familyId, role, name, phone, null);
+	}
 }

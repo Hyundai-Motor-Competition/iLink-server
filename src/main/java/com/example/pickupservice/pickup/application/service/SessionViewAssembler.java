@@ -9,6 +9,7 @@ import com.example.pickupservice.pickup.application.port.in.ChildLocationView;
 import com.example.pickupservice.pickup.application.port.in.SessionBoardingView;
 import com.example.pickupservice.pickup.application.port.in.SessionCallView;
 import com.example.pickupservice.pickup.application.port.in.SessionChildView;
+import com.example.pickupservice.pickup.application.port.in.SessionDriverView;
 import com.example.pickupservice.pickup.application.port.in.SessionEtaView;
 import com.example.pickupservice.pickup.application.port.in.SessionIncidentView;
 import com.example.pickupservice.pickup.application.port.in.SessionRouteView;
@@ -29,10 +30,12 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Component
@@ -63,9 +66,19 @@ public class SessionViewAssembler {
 				call(session, family, latestCall, now),
 				childViewer ? childrenForChild(session, members, viewer.id()) : children(session, members),
 				vehicleLocation(session, eta, childViewer),
-				new SessionRouteView(session.getRouteVersion(), session.getRemainingMeters()),
+				new SessionRouteView(session.getRouteVersion(), session.getRemainingMeters(),
+						session.getRouteTotalMeters()),
 				boarding(session),
-				incident(session));
+				incident(session),
+				driver(members));
+	}
+
+	private static SessionDriverView driver(List<MemberInfo> members) {
+		return members.stream()
+				.filter(member -> member.role() == Role.GUARDIAN)
+				.min(Comparator.comparingLong(MemberInfo::userId))
+				.map(member -> new SessionDriverView(member.name(), member.profileImageUrl()))
+				.orElse(null);
 	}
 
 	private static VehicleLocationView vehicleLocation(PickupSession session, SessionEtaView eta,
@@ -149,31 +162,33 @@ public class SessionViewAssembler {
 	}
 
 	private static List<SessionChildView> children(PickupSession session, List<MemberInfo> members) {
-		Map<Long, String> names = namesOf(members);
+		Map<Long, MemberInfo> byUserId = byUserId(members);
 		return session.getChildren().stream()
-				.map(child -> childView(child, names, location(child)))
+				.map(child -> childView(child, byUserId, location(child)))
 				.toList();
 	}
 
 	private static List<SessionChildView> childrenForChild(PickupSession session, List<MemberInfo> members,
 			long childUserId) {
-		Map<Long, String> names = namesOf(members);
+		Map<Long, MemberInfo> byUserId = byUserId(members);
 		return session.getChildren().stream()
 				.filter(child -> child.getChildUserId() == childUserId)
-				.map(child -> childView(child, names, null))
+				.map(child -> childView(child, byUserId, null))
 				.toList();
 	}
 
-	private static Map<Long, String> namesOf(List<MemberInfo> members) {
+	private static Map<Long, MemberInfo> byUserId(List<MemberInfo> members) {
 		return members.stream()
-				.collect(Collectors.toMap(MemberInfo::userId, MemberInfo::name, (first, second) -> first));
+				.collect(Collectors.toMap(MemberInfo::userId, Function.identity(), (first, second) -> first));
 	}
 
-	private static SessionChildView childView(SessionChild child, Map<Long, String> names,
+	private static SessionChildView childView(SessionChild child, Map<Long, MemberInfo> byUserId,
 			ChildLocationView location) {
-		return new SessionChildView(child.getChildUserId(), names.get(child.getChildUserId()), child.getChildPhase(),
-				child.getExtraPrepMinutes(), child.getCallNotBefore(), child.getAcknowledgedAt(), child.getBoardedAt(),
-				location, child.getReadyAt());
+		Optional<MemberInfo> member = Optional.ofNullable(byUserId.get(child.getChildUserId()));
+		return new SessionChildView(child.getChildUserId(), member.map(MemberInfo::name).orElse(null),
+				child.getChildPhase(), child.getExtraPrepMinutes(), child.getCallNotBefore(), child.getAcknowledgedAt(),
+				child.getBoardedAt(), location, child.getReadyAt(),
+				member.map(MemberInfo::profileImageUrl).orElse(null));
 	}
 
 	private static ChildLocationView location(SessionChild child) {

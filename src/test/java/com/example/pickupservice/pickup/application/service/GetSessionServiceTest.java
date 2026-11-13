@@ -8,6 +8,7 @@ import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.pickup.application.port.in.CallGuardView;
 import com.example.pickupservice.pickup.application.port.in.ChildLocationView;
 import com.example.pickupservice.pickup.application.port.in.SessionChildView;
+import com.example.pickupservice.pickup.application.port.in.SessionDriverView;
 import com.example.pickupservice.pickup.application.port.in.SessionIncidentView;
 import com.example.pickupservice.pickup.application.port.in.SessionQuery;
 import com.example.pickupservice.pickup.application.port.in.SessionSpotView;
@@ -94,6 +95,11 @@ class GetSessionServiceTest {
 	private static final Instant VEHICLE_LOCATED_AT = NOW.minusSeconds(3);
 	private static final VehicleLocationView VEHICLE_LOCATION_VIEW = new VehicleLocationView(
 			VEHICLE_LOCATION.lat(), VEHICLE_LOCATION.lng(), VEHICLE_LOCATED_AT);
+
+	// 멤버 프로필 사진 서명 URL(V03 · C03 아바타, C02 driver)
+	private static final String GUARDIAN_PROFILE_IMAGE_URL = "https://storage.example.com/profiles/31.jpg?sig=a";
+	private static final String CO_GUARDIAN_PROFILE_IMAGE_URL = "https://storage.example.com/profiles/32.jpg?sig=b";
+	private static final String MINJUN_PROFILE_IMAGE_URL = "https://storage.example.com/profiles/33.jpg?sig=c";
 
 	// 이 세션을 볼 수 없는 주체용
 	private static final long OTHER_FAMILY_ID = 13L;
@@ -303,6 +309,72 @@ class GetSessionServiceTest {
 		assertThat(view.spot()).isEqualTo(new SessionSpotView(SPOT_ID, SPOT_NAME, SPOT_VERSION, true));
 	}
 
+	@Test
+	@DisplayName("세션 조회는 children[].profileImageUrl에 가족 멤버 정보의 profileImageUrl을 담고 없으면 null로 돌려준다")
+	void getSessionGivesMemberProfileImageUrlInChildren() {
+		givenMembers(membersWithProfileImages());
+		givenSession(afterRouteConfirmedWithCalledChildren());
+
+		SessionView view = getSessionService.getSession(new SessionQuery(vehicle(), SESSION_ID));
+
+		assertThat(view.children())
+				.extracting(SessionChildView::childUserId, SessionChildView::profileImageUrl)
+				.containsExactlyInAnyOrder(
+						tuple(MINJUN_ID, MINJUN_PROFILE_IMAGE_URL),
+						tuple(SEOYUN_ID, null));
+	}
+
+	@Test
+	@DisplayName("세션 조회는 자녀 주체에게도 자기 children[].profileImageUrl을 준다")
+	void getSessionGivesOwnProfileImageUrlToChildPrincipal() {
+		givenMembers(membersWithProfileImages());
+		givenSession(afterRouteConfirmedWithCalledChildren());
+
+		SessionView view = getSessionService.getSession(new SessionQuery(child(MINJUN_ID), SESSION_ID));
+
+		assertThat(view.children())
+				.extracting(SessionChildView::childUserId, SessionChildView::profileImageUrl)
+				.containsExactly(tuple(MINJUN_ID, MINJUN_PROFILE_IMAGE_URL));
+	}
+
+	@Test
+	@DisplayName("세션 조회는 driver에 세션 가족의 GUARDIAN 멤버 name · profileImageUrl을 담는다")
+	void getSessionGivesGuardianAsDriverToVehicle() {
+		givenMembers(membersWithProfileImages());
+		givenSession(afterRouteConfirmedWithCalledChildren());
+
+		SessionView view = getSessionService.getSession(new SessionQuery(vehicle(), SESSION_ID));
+
+		assertThat(view.driver()).isEqualTo(new SessionDriverView("김보호", GUARDIAN_PROFILE_IMAGE_URL));
+	}
+
+	@Test
+	@DisplayName("세션 조회는 자녀 주체에게도 GUARDIAN 멤버를 driver로 준다")
+	void getSessionGivesGuardianAsDriverToChildPrincipal() {
+		givenMembers(membersWithProfileImages());
+		givenSession(afterRouteConfirmedWithCalledChildren());
+
+		SessionView view = getSessionService.getSession(new SessionQuery(child(MINJUN_ID), SESSION_ID));
+
+		assertThat(view.driver()).isEqualTo(new SessionDriverView("김보호", GUARDIAN_PROFILE_IMAGE_URL));
+	}
+
+	@Test
+	@DisplayName("세션 조회는 가족에 GUARDIAN 멤버가 없으면 driver를 null로 돌려준다")
+	void getSessionGivesNullDriverWithoutGuardian() {
+		givenMembers(List.of(
+				new MemberInfo(CO_GUARDIAN_ID, FAMILY_ID, Role.CO_GUARDIAN, "이공동", "010-3333-4444",
+						CO_GUARDIAN_PROFILE_IMAGE_URL),
+				new MemberInfo(DELEGATE_ID, FAMILY_ID, Role.DELEGATE, "박대리", "010-5555-6666", null),
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", "010-7777-8888", MINJUN_PROFILE_IMAGE_URL),
+				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", "010-9999-0000", null)));
+		givenSession(afterRouteConfirmedWithCalledChildren());
+
+		SessionView view = getSessionService.getSession(new SessionQuery(vehicle(), SESSION_ID));
+
+		assertThat(view.driver()).isNull();
+	}
+
 	@ParameterizedTest(name = "{0}")
 	@MethodSource("vehicleAndGuardians")
 	@DisplayName("세션 조회는 열린 예외가 있으면 incident에 type · childUserId · openedAt을 채워 돌려준다")
@@ -407,6 +479,22 @@ class GetSessionServiceTest {
 	// 세션은 sessionId로 읽기 전용 조회(load)한다. loadForUpdate · loadActiveBy*를 쓰면 빈 값이 나와 실패한다
 	private void givenSession(PickupSession session) {
 		when(loadSessionPort.load(SESSION_ID)).thenReturn(Optional.of(session));
+	}
+
+	private void givenMembers(List<MemberInfo> members) {
+		when(loadFamilyPort.loadMembers(FAMILY_ID)).thenReturn(members);
+	}
+
+	// 사진이 있는 멤버는 서명 URL, 서윤 · 박대리는 사진 URL이 없다(null)
+	private static List<MemberInfo> membersWithProfileImages() {
+		return List.of(
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1111-2222",
+						GUARDIAN_PROFILE_IMAGE_URL),
+				new MemberInfo(CO_GUARDIAN_ID, FAMILY_ID, Role.CO_GUARDIAN, "이공동", "010-3333-4444",
+						CO_GUARDIAN_PROFILE_IMAGE_URL),
+				new MemberInfo(DELEGATE_ID, FAMILY_ID, Role.DELEGATE, "박대리", "010-5555-6666", null),
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", "010-7777-8888", MINJUN_PROFILE_IMAGE_URL),
+				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", "010-9999-0000", null));
 	}
 
 	private static AuthPrincipal vehicle() {

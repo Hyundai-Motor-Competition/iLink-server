@@ -236,6 +236,41 @@ class PickupSessionTest {
 	}
 
 	@Test
+	@DisplayName("시작한 세션은 경로를 확정하기 전이라 routeTotalMeters가 null이다")
+	void startedSessionHasNullRouteTotalMeters() {
+		PickupSession session = PickupSession.start(VEHICLE_ID, FAMILY_ID, TODAY, SPOT, TWO_CHILDREN);
+
+		assertThat(session.getRouteTotalMeters()).isNull();
+	}
+
+	@Test
+	@DisplayName("confirmRoute(totalMeters)는 전체 거리를 routeTotalMeters에 담고 spotStatus CONFIRMED · routeVersion · stateVersion 1 증가는 confirmRoute()와 같다")
+	void confirmRouteWithTotalMetersStoresRouteTotalMeters() {
+		PickupSession session = PickupSession.start(VEHICLE_ID, FAMILY_ID, TODAY, SPOT, TWO_CHILDREN);
+		int routeBefore = session.getRouteVersion();
+		int stateBefore = session.getStateVersion();
+
+		session.confirmRoute(4_200);
+
+		assertThat(session.getRouteTotalMeters()).isEqualTo(4_200);
+		assertThat(session.getSpotStatus()).isEqualTo(SpotStatus.CONFIRMED);
+		assertThat(session.getRouteVersion()).isEqualTo(routeBefore + 1);
+		assertThat(session.getStateVersion()).isEqualTo(stateBefore + 1);
+	}
+
+	@Test
+	@DisplayName("confirmRoute(totalMeters)를 다시 부르면 routeTotalMeters를 새 값으로 덮어쓴다")
+	void confirmRouteAgainOverwritesRouteTotalMeters() {
+		PickupSession session = PickupSession.start(VEHICLE_ID, FAMILY_ID, TODAY, SPOT, TWO_CHILDREN);
+		session.confirmRoute(4_200);
+
+		session.confirmRoute(3_100);
+
+		assertThat(session.getRouteTotalMeters()).isEqualTo(3_100);
+		assertThat(session.getRouteVersion()).isEqualTo(2);
+	}
+
+	@Test
 	@DisplayName("changeSpot은 spotStatus를 SELECTED로 되돌리고 spotVersion과 stateVersion을 1씩 올린다")
 	void changeSpotReturnsSpotStatusToSelectedAndRaisesSpotVersionByOne() {
 		PickupSession session = PickupSession.start(VEHICLE_ID, FAMILY_ID, TODAY, SPOT, TWO_CHILDREN);

@@ -13,8 +13,16 @@ public record SessionChildView(
 		Instant acknowledgedAt,
 		Instant boardedAt,
 		ChildLocationView location,
-		Instant readyAt
+		Instant readyAt,
+		String profileImageUrl
 ) {
+
+	public SessionChildView(long childUserId, String name, ChildPhase phase, int extraPrepMinutes,
+			Instant callNotBefore, Instant acknowledgedAt, Instant boardedAt, ChildLocationView location,
+			Instant readyAt) {
+		this(childUserId, name, phase, extraPrepMinutes, callNotBefore, acknowledgedAt, boardedAt, location, readyAt,
+				null);
+	}
 
 	public SessionChildView(long childUserId, String name, ChildPhase phase, int extraPrepMinutes,
 			Instant callNotBefore, Instant acknowledgedAt, Instant boardedAt, ChildLocationView location) {

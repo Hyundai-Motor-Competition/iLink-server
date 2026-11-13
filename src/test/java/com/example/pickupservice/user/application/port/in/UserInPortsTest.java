@@ -167,7 +167,8 @@ class UserInPortsTest {
 				"familyId", "long",
 				"role", Role.class.getName(),
 				"name", String.class.getName(),
-				"phone", String.class.getName()));
+				"phone", String.class.getName(),
+				"profileImageUrl", String.class.getName()));
 		assertRecord(FamilyInfo.class, components(
 				"familyId", "long",
 				"joinCallMode", JoinCallMode.class.getName(),

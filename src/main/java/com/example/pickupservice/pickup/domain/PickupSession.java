@@ -46,6 +46,7 @@ public class PickupSession {
 	private Instant incidentResolvedAt;
 	private LatLng vehicleLocation;
 	private Instant vehicleLocatedAt;
+	private Integer routeTotalMeters;
 	private List<SessionChild> children;
 
 	public static PickupSession start(long vehicleId, long familyId, LocalDate date, SpotSnapshot spot,
@@ -55,7 +56,8 @@ public class PickupSession {
 				.toList();
 		return new PickupSession(null, vehicleId, familyId, spot.spotId(), spot.name(), spot.stopPoint(),
 				spot.meetingPoint(), date, SessionStatus.ACTIVE, VehiclePhase.ROUTING, SpotStatus.SELECTED, 0, 0, 0,
-				null, false, null, null, null, null, null, null, null, null, null, null, null, null, null, children);
+				null, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+				children);
 	}
 
 	public static PickupSession restore(Long sessionId, long vehicleId, long familyId, long spotId, String spotName,
@@ -80,11 +82,26 @@ public class PickupSession {
 			IncidentType incidentType, String incidentCause, Long incidentChildUserId, Instant incidentOpenedAt,
 			Instant incidentResolvedAt, LatLng vehicleLocation, Instant vehicleLocatedAt,
 			List<SessionChild> children) {
+		return restore(sessionId, vehicleId, familyId, spotId, spotName, stopPoint, meetingPoint, date,
+				sessionStatus, vehiclePhase, spotStatus, stateVersion, spotVersion, routeVersion, routeSpotVersion,
+				callHeld, etaAt, remainingMeters, etaUpdatedAt, boardingDetectedAt, boardingCancelableUntil,
+				boardingDoor, incidentType, incidentCause, incidentChildUserId, incidentOpenedAt, incidentResolvedAt,
+				vehicleLocation, vehicleLocatedAt, null, children);
+	}
+
+	public static PickupSession restore(Long sessionId, long vehicleId, long familyId, long spotId, String spotName,
+			LatLng stopPoint, LatLng meetingPoint, LocalDate date, SessionStatus sessionStatus,
+			VehiclePhase vehiclePhase, SpotStatus spotStatus, int stateVersion, int spotVersion, int routeVersion,
+			Integer routeSpotVersion, boolean callHeld, Instant etaAt, Integer remainingMeters, Instant etaUpdatedAt,
+			Instant boardingDetectedAt, Instant boardingCancelableUntil, BoardingDoor boardingDoor,
+			IncidentType incidentType, String incidentCause, Long incidentChildUserId, Instant incidentOpenedAt,
+			Instant incidentResolvedAt, LatLng vehicleLocation, Instant vehicleLocatedAt, Integer routeTotalMeters,
+			List<SessionChild> children) {
 		return new PickupSession(sessionId, vehicleId, familyId, spotId, spotName, stopPoint, meetingPoint, date,
 				sessionStatus, vehiclePhase, spotStatus, stateVersion, spotVersion, routeVersion, routeSpotVersion,
 				callHeld, etaAt, remainingMeters, etaUpdatedAt, boardingDetectedAt, boardingCancelableUntil,
 				boardingDoor, incidentType, incidentCause, incidentChildUserId, incidentOpenedAt, incidentResolvedAt,
-				vehicleLocation, vehicleLocatedAt, children);
+				vehicleLocation, vehicleLocatedAt, routeTotalMeters, children);
 	}
 
 	public void applyTelemetry(Instant observedAt, int navEtaSeconds, int remainingMeters, LatLng location) {
@@ -229,6 +246,11 @@ public class PickupSession {
 		routeVersion++;
 		routeSpotVersion = spotVersion;
 		raiseStateVersion();
+	}
+
+	public void confirmRoute(Integer totalMeters) {
+		confirmRoute();
+		routeTotalMeters = totalMeters;
 	}
 
 	public void changeSpot(SpotSnapshot spot) {

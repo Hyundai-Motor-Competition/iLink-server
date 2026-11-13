@@ -6,6 +6,7 @@ import com.example.pickupservice.pickup.application.port.in.ChildLocationView;
 import com.example.pickupservice.pickup.application.port.in.SessionBoardingView;
 import com.example.pickupservice.pickup.application.port.in.SessionCallView;
 import com.example.pickupservice.pickup.application.port.in.SessionChildView;
+import com.example.pickupservice.pickup.application.port.in.SessionDriverView;
 import com.example.pickupservice.pickup.application.port.in.SessionEtaView;
 import com.example.pickupservice.pickup.application.port.in.SessionIncidentView;
 import com.example.pickupservice.pickup.application.port.in.SessionRouteView;
@@ -35,7 +36,8 @@ public record SessionViewResponse(
 		VehicleLocationResponse vehicleLocation,
 		SessionRouteResponse route,
 		SessionBoardingResponse boarding,
-		SessionIncidentResponse incident
+		SessionIncidentResponse incident,
+		SessionDriverResponse driver
 ) {
 
 	public static SessionViewResponse from(SessionView view) {
@@ -50,7 +52,8 @@ public record SessionViewResponse(
 				mapOrNull(view.vehicleLocation(), VehicleLocationResponse::from),
 				mapOrNull(view.route(), SessionRouteResponse::from),
 				mapOrNull(view.boarding(), SessionBoardingResponse::from),
-				mapOrNull(view.incident(), SessionIncidentResponse::from));
+				mapOrNull(view.incident(), SessionIncidentResponse::from),
+				mapOrNull(view.driver(), SessionDriverResponse::from));
 	}
 
 	public record SessionStatusResponse(SessionStatus session, VehiclePhase vehicle, String call, SpotStatus spot) {
@@ -115,14 +118,15 @@ public record SessionViewResponse(
 			String acknowledgedAt,
 			String boardedAt,
 			ChildLocationResponse location,
-			String readyAt
+			String readyAt,
+			String profileImageUrl
 	) {
 
 		static SessionChildResponse from(SessionChildView child) {
 			return new SessionChildResponse(child.childUserId(), child.name(), child.phase(),
 					child.extraPrepMinutes(), kst(child.callNotBefore()), kst(child.acknowledgedAt()),
 					kst(child.boardedAt()), mapOrNull(child.location(), ChildLocationResponse::from),
-					kst(child.readyAt()));
+					kst(child.readyAt()), child.profileImageUrl());
 		}
 	}
 
@@ -140,10 +144,10 @@ public record SessionViewResponse(
 		}
 	}
 
-	public record SessionRouteResponse(int routeVersion, Integer remainingMeters) {
+	public record SessionRouteResponse(int routeVersion, Integer remainingMeters, Integer totalMeters) {
 
 		static SessionRouteResponse from(SessionRouteView route) {
-			return new SessionRouteResponse(route.routeVersion(), route.remainingMeters());
+			return new SessionRouteResponse(route.routeVersion(), route.remainingMeters(), route.totalMeters());
 		}
 	}
 
@@ -159,6 +163,13 @@ public record SessionViewResponse(
 
 		static SessionIncidentResponse from(SessionIncidentView incident) {
 			return new SessionIncidentResponse(incident.type(), incident.childUserId(), kst(incident.openedAt()));
+		}
+	}
+
+	public record SessionDriverResponse(String name, String profileImageUrl) {
+
+		static SessionDriverResponse from(SessionDriverView driver) {
+			return new SessionDriverResponse(driver.name(), driver.profileImageUrl());
 		}
 	}
 

@@ -162,7 +162,8 @@ class PickupInPortsTest {
 				"sessionId", "long",
 				"spotId", "long",
 				"navRouteId", STRING,
-				"stateVersion", "int"));
+				"stateVersion", "int",
+				"totalMeters", INTEGER_OR_NULL));
 		assertRecord(ChangeSpotCommand.class, components(
 				"principal", PRINCIPAL,
 				"sessionId", "long",
@@ -321,7 +322,11 @@ class PickupInPortsTest {
 				"vehicleLocation", VehicleLocationView.class.getName(),
 				"route", SessionRouteView.class.getName(),
 				"boarding", SessionBoardingView.class.getName(),
-				"incident", SessionIncidentView.class.getName()));
+				"incident", SessionIncidentView.class.getName(),
+				"driver", SessionDriverView.class.getName()));
+		assertRecord(SessionDriverView.class, components(
+				"name", STRING,
+				"profileImageUrl", STRING));
 		assertRecord(SessionStatusView.class, components(
 				"session", SessionStatus.class.getName(),
 				"vehicle", VehiclePhase.class.getName(),
@@ -361,7 +366,8 @@ class PickupInPortsTest {
 				"acknowledgedAt", INSTANT,
 				"boardedAt", INSTANT,
 				"location", ChildLocationView.class.getName(),
-				"readyAt", INSTANT));
+				"readyAt", INSTANT,
+				"profileImageUrl", STRING));
 		assertRecord(ChildLocationView.class, components(
 				"lat", "double",
 				"lng", "double",
@@ -372,7 +378,8 @@ class PickupInPortsTest {
 				"at", INSTANT));
 		assertRecord(SessionRouteView.class, components(
 				"routeVersion", "int",
-				"remainingMeters", INTEGER_OR_NULL));
+				"remainingMeters", INTEGER_OR_NULL,
+				"totalMeters", INTEGER_OR_NULL));
 		assertRecord(SessionBoardingView.class, components(
 				"detectedAt", INSTANT,
 				"cancelableUntil", INSTANT,

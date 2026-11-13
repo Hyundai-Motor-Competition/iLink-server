@@ -314,6 +314,50 @@ class PickupSessionPersistenceAdapterTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	@DisplayName("경로를 totalMeters 4200으로 확정한 세션을 저장하면 route_total_meters 컬럼에 4200이 담기고 load로 읽으면 routeTotalMeters가 4200이다")
+	void routeTotalMetersIsStoredInRouteTotalMetersColumnAndLoaded() {
+		PickupSession session = seededSession(SessionStatus.ACTIVE);
+		session.confirmRoute(4_200);
+
+		saveSessionPort.save(session);
+
+		assertThat(jdbcTemplate.queryForObject(
+				"select route_total_meters from pickup_session where session_id = ?", Integer.class,
+				seeded.sessionId())).as("DB route_total_meters").isEqualTo(4_200);
+		PickupSession loaded = loadSessionPort.load(seeded.sessionId()).orElseThrow();
+		assertThat(loaded.getRouteTotalMeters()).isEqualTo(4_200);
+	}
+
+	@Test
+	@DisplayName("경로를 확정하지 않은 세션을 저장하면 route_total_meters가 NULL이고 load로 읽으면 routeTotalMeters가 null이다")
+	void sessionWithoutRouteTotalMetersStoresNullColumnAndLoadsNull() {
+		saveSessionPort.save(seededSession(SessionStatus.ACTIVE));
+
+		Map<String, Object> row = jdbcTemplate.queryForMap(
+				"select route_total_meters from pickup_session where session_id = ?", seeded.sessionId());
+		assertThat(row.get("route_total_meters")).as("DB route_total_meters").isNull();
+		PickupSession loaded = loadSessionPort.load(seeded.sessionId()).orElseThrow();
+		assertThat(loaded.getRouteTotalMeters()).isNull();
+	}
+
+	@Test
+	@DisplayName("totalMeters 4200으로 확정해 저장한 세션을 다시 읽어 3100으로 다시 확정해 저장하면 route_total_meters가 3100으로 바뀐다")
+	void resavingSessionOverwritesRouteTotalMetersColumn() {
+		PickupSession session = seededSession(SessionStatus.ACTIVE);
+		session.confirmRoute(4_200);
+		saveSessionPort.save(session);
+		PickupSession reloaded = loadSessionPort.load(seeded.sessionId()).orElseThrow();
+
+		reloaded.confirmRoute(3_100);
+		saveSessionPort.save(reloaded);
+
+		assertThat(jdbcTemplate.queryForObject(
+				"select route_total_meters from pickup_session where session_id = ?", Integer.class,
+				seeded.sessionId())).as("DB route_total_meters").isEqualTo(3_100);
+		assertThat(loadSessionPort.load(seeded.sessionId()).orElseThrow().getRouteTotalMeters()).isEqualTo(3_100);
+	}
+
+	@Test
 	@DisplayName("같은 세션에 같은 childUserId의 SessionChild를 두 번 저장하면 (sessionId, childUserId) 유니크 위반 DataIntegrityViolationException이 나고 그 자녀 행은 1건만 남는다")
 	void savingSameChildUserIdTwiceInOneSessionViolatesUniqueConstraint() {
 		PickupSession seededWithDuplicate = PickupSession.restore(seeded.sessionId(), seeded.vehicleId(),
