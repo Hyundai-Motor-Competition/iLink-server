@@ -59,6 +59,7 @@ auth
 | pushToken | VARCHAR(255) | NULL | FCM 토큰 |
 | pushUpdatedAt | TIMESTAMPTZ | NULL | |
 | refreshTokenHash | CHAR(64) | | refresh 토큰의 SHA-256 해시 |
+| refreshTokenExpiresAt | TIMESTAMPTZ | NULL | refresh 토큰 만료 시각(발급 시각 + P14D, 갱신 때마다 새 값). 값이 없는 옛 행은 만료로 본다(사람 결정 2026-11-14) |
 | revokedAt | TIMESTAMPTZ | NULL | 폐기 시각 |
 
 ## API 명세
@@ -72,10 +73,10 @@ auth
 | LINK-01 | POST /v1/vehicle-link-codes | 차량 앱(연결 전 토큰 가능) | 불필요 | — → 201 codeId, code(8자), qrPayload, expiresAt(5분), reissuesLeft | 409 VEHICLE_ALREADY_LINKED(연결 전 토큰인데 차량이 이미 가족에 연결됨), 409 VEHICLE_UNLINKED(연결이 해제된 차량 행의 기기), 429 LINK_CODE_REISSUE_LIMIT |
 | LINK-02 | GET /v1/vehicle-link-codes/{codeId}/status | 차량 앱(코드를 발급한 기기) | 불필요 | — → 200 status(WAITING · LINKED · RELINKED · EXPIRED), vehicleId, familyId, accessToken, refreshToken(LINKED · RELINKED일 때 한 번만), pollAfterSeconds(WAITING일 때, 기본 2) | 403 NOT_CODE_OWNER, 404 LINK_CODE_INVALID, 429 TOO_MANY_REQUESTS(1초보다 자주) |
 | LINK-03 | GET /v1/vehicle-link-codes/by-code/{code} | 보호자 앱(인증 없음) | 불필요 | — → 200 status(NEW · RELINK), vehicleModel, plateNumberMasked, expiresAt | 404 LINK_CODE_INVALID, 410 LINK_CODE_EXPIRED, 429 LINK_CODE_ATTEMPT_LIMIT |
-| LINK-04 | POST /v1/vehicle-links | 보호자 앱(인증 없음) | 필요 | code, mode(NEW · RELINK), name(mode NEW일 때 필수, 1~20자, 이모지 불가, RELINK면 무시), consents[](type TERMS · PRIVACY · MARKETING, agreed), platform(ANDROID · IOS), pushToken(선택) → 201 vehicleId, familyId, userId, accessToken, refreshToken | 404 LINK_CODE_INVALID, 410 LINK_CODE_EXPIRED, 409 LINK_MODE_MISMATCH, 409 VEHICLE_ALREADY_LINKED(같은 대기 차량에 NEW 승인이 동시에 옴), 422 CONSENT_REQUIRED, 422 VEHICLE_MOVING(미구현, 확인 필요 사항 참조) |
+| LINK-04 | POST /v1/vehicle-links | 보호자 앱(인증 없음) | 필요 | code, mode(NEW · RELINK), name(mode NEW일 때 필수, 1~20자, 이모지 불가, RELINK면 무시), consents[](type TERMS · PRIVACY · MARKETING · SERVICE_IMPROVEMENT, agreed; MARKETING · SERVICE_IMPROVEMENT는 선택), platform(ANDROID · IOS), pushToken(선택, 보내면 1~255자) → 201 vehicleId, familyId, userId, accessToken, refreshToken | 404 LINK_CODE_INVALID, 410 LINK_CODE_EXPIRED, 409 LINK_MODE_MISMATCH, 409 VEHICLE_ALREADY_LINKED(같은 대기 차량에 NEW 승인이 동시에 옴), 422 CONSENT_REQUIRED, 422 VEHICLE_MOVING(미구현, 확인 필요 사항 참조) |
 | FAM-04 | POST /v1/families/me/members/{userId}/invites | GUARDIAN · CO_GUARDIAN | 필요 | replaceDevice(기본 false) → 201 inviteUrl, expiresAt(24시간) | 403 FORBIDDEN(대상 멤버 role이 GUARDIAN), 409 DEVICE_ALREADY_CONNECTED |
 | FAM-05 | GET /v1/invites/{token} | 자녀 · 선생님 · 대리보호자 앱(인증 없음) | 불필요 | — → 200 inviterName, memberName, role, requiredConsents[], expiresAt | 409 INVITE_ALREADY_USED, 410 INVITE_EXPIRED |
-| FAM-06 | POST /v1/invites/{token}/acceptance | 자녀 · 선생님 · 대리보호자 앱(인증 없음) | 필요 | consents[](type, agreed), platform(ANDROID · IOS), pushToken(선택) → 201 userId, familyId, role, accessToken, refreshToken | 409 INVITE_ALREADY_USED, 410 INVITE_EXPIRED, 422 CONSENT_REQUIRED |
+| FAM-06 | POST /v1/invites/{token}/acceptance | 자녀 · 선생님 · 대리보호자 앱(인증 없음) | 필요 | consents[](type, agreed; SERVICE_IMPROVEMENT는 선택), platform(ANDROID · IOS), pushToken(선택, 보내면 1~255자) → 201 userId, familyId, role, accessToken, refreshToken | 409 INVITE_ALREADY_USED, 410 INVITE_EXPIRED, 422 CONSENT_REQUIRED |
 
 응답 예시
 - LINK-01: `{"codeId":5012,"code":"K7P2QX9M","qrPayload":"pickup://link?code=K7P2QX9M","expiresAt":"2026-11-05T21:10:00+09:00","reissuesLeft":4}`
@@ -88,7 +89,7 @@ auth
 ### 토큰
 - access 토큰(JWT): 주체(VEHICLE · USER), familyId, role을 담는다. 만료 시각은 응답 accessTokenExpiresAt으로 알린다.
 - refresh 토큰: 기기(Device)마다 하나. 원문은 내려주기만 하고 DB에는 SHA-256 해시(refreshTokenHash)만 저장한다.
-- AUTH-01은 회전 방식이다. 새 access · refresh를 주고 이전 refresh는 폐기한다. 만료 · 폐기 · 모르는 토큰이면 401 REFRESH_TOKEN_INVALID. 보호자는 QR 재연결, 자녀는 재초대로 복구한다.
+- AUTH-01은 회전 방식이다. 새 access · refresh를 주고 이전 refresh는 폐기한다. 새 refresh 만료 시각은 갱신할 때마다 지금 + P14D로 다시 잡는다(14일 동안 쓰지 않으면 만료, 사람 결정 2026-11-14). 만료 · 폐기 · 모르는 토큰이면 401 REFRESH_TOKEN_INVALID. 보호자는 QR 재연결, 자녀는 재초대로 복구한다.
 - 연결 전 기기 토큰(AUTH-02 deviceToken)은 LINK-01 · LINK-02만 부를 수 있다.
 
 ### 차량 기기 등록 (AUTH-02)
@@ -153,6 +154,8 @@ Map<Long, MemberDeviceStatus> getDeviceStatuses(List<Long> userIds);        // G
 void revokeDevicesOf(long userId);                                          // RevokeMemberDevicesUseCase (user FAM-07)
 void revokeDevicesOfVehicle(long vehicleId);                                // RevokeVehicleDevicesUseCase (user LINK-05: 그 차량(ownerType VEHICLE)의 살아 있는 기기를 모두 폐기)
 List<PushTarget> findPushTargets(List<Long> userIds);                       // LoadPushTargetUseCase (notification: 살아 있고 pushToken이 있는 기기)
+Optional<PushTarget> findPushTargetByDeviceId(long deviceId);               // LoadPushTargetByDeviceUseCase (notification: USER 기기이고 pushToken이 있으면, 폐기 여부는 보지 않음)
+Optional<PushTarget> findLivePushTargetByDeviceId(long deviceId);           // LoadPushTargetByDeviceUseCase (notification: 위와 같고 살아 있는 기기만)
 
 // out 포트
 Optional<Device> loadDevice(long deviceId); List<Device> loadLiveDevices(OwnerType type, long ownerId); Optional<Device> loadByRefreshTokenHash(String hash); Device saveDevice(Device d);   // LoadDevicePort · SaveDevicePort
@@ -160,7 +163,7 @@ Optional<LinkCode> loadLinkCode(long codeId); Optional<LinkCode> loadLinkCodeByC
 Optional<MemberInvite> loadInviteByToken(String token); Optional<MemberInvite> loadLatestInvite(long userId); MemberInvite saveInvite(MemberInvite i);                                        // LoadInvitePort · SaveInvitePort
 IssuedTokens issueTokens(TokenSubject subject);                             // IssueTokenPort (JWT + refresh 원문 · 해시)
 String hashRefreshToken(String refreshToken);                               // IssueTokenPort (refresh 원문 → SHA-256 해시, AUTH-01에서 loadByRefreshTokenHash 전에 씀)
-// TokenSubject(type, id, familyId, role, deviceId) · IssuedTokens(accessToken, accessTokenExpiresAt, refreshToken, refreshTokenHash)
+// TokenSubject(type, id, familyId, role, deviceId) · IssuedTokens(accessToken, accessTokenExpiresAt, refreshToken, refreshTokenHash, refreshTokenExpiresAt)  // refreshTokenExpiresAt = 발급 시각 + pickup.jwt.refresh-ttl(P14D), 사람 결정 2026-11-14
 boolean hasActivePickup(long vehicleId);                                    // CheckActivePickupPort → pickup
 void publishDeviceReplaced(List<Long> previousDeviceIds);                   // PublishAuthEventPort (RELINK 이전 기기 알림)
 ```
@@ -286,10 +289,14 @@ void publishDeviceReplaced(List<Long> previousDeviceIds);                   // P
 - [x] [persistence] vehicle.version 컬럼은 NOT NULL에 기본값 0을 가진다(행이 있는 DB에도 컬럼을 추가할 수 있음)
 - [x] [web] POST /v1/vehicle-link-codes를 연결 전 토큰(familyId 없음)으로 부르는데 차량이 이미 가족에 연결돼 있으면 409 VEHICLE_ALREADY_LINKED를 돌려준다
 - [x] [web] POST /v1/families/me/members/{userId}/invites의 대상 멤버가 GUARDIAN이면 403 FORBIDDEN을 돌려준다
-- [ ] [web] 초대 수락(FAM-06)과 연결 승인(LINK-04)의 consents에 SERVICE_IMPROVEMENT(선택 동의)를 보낼 수 있고, 빠져도 수락 · 승인은 성공한다(C00 · 가족 프로필 등록4 「(선택) 서비스 개선」)
-- [ ] [서비스] refresh 토큰은 발급 14일(P14D) 뒤 만료되고, 만료된 refresh 토큰으로 POST /v1/auth/refresh를 부르면 유효하지 않은 refresh 토큰과 같은 401로 거절한다(사람 결정 2026-11-13)
-- [ ] [통합] access 토큰 유효 기간 PT30M · refresh 토큰 유효 기간 P14D는 application.yml 설정값으로 두고, 발급한 access 토큰의 exp가 발급 시각 + 30분이다
-- [ ] [web] GET /v1/vehicle-link-codes/by-code/{code}(LINK-03)가 같은 기기 5번 실패 뒤면 429 LINK_CODE_ATTEMPT_LIMIT과 error.retryAfterSeconds(차단이 풀릴 때까지 남은 초)를 돌려준다(D3)
+- [x] [web] 초대 수락(FAM-06)과 연결 승인(LINK-04)의 consents에 SERVICE_IMPROVEMENT(선택 동의)를 보낼 수 있고, 빠져도 수락 · 승인은 성공한다(C00 · 가족 프로필 등록4 「(선택) 서비스 개선」)
+- [x] [서비스] refresh 토큰은 발급 14일(P14D) 뒤 만료되고, 만료된 refresh 토큰으로 POST /v1/auth/refresh를 부르면 유효하지 않은 refresh 토큰과 같은 401로 거절한다(사람 결정 2026-11-13)
+- [x] [통합] access 토큰 유효 기간 PT30M · refresh 토큰 유효 기간 P14D는 application.yml 설정값으로 두고, 발급한 access 토큰의 exp가 발급 시각 + 30분이다
+- [x] [web] GET /v1/vehicle-link-codes/by-code/{code}(LINK-03)가 같은 기기 5번 실패 뒤면 429 LINK_CODE_ATTEMPT_LIMIT과 error.retryAfterSeconds(차단이 풀릴 때까지 남은 초)를 돌려준다(D3)
+- [x] [기반] Device는 refreshTokenExpiresAt을 갖고(DeviceEntity refresh_token_expires_at TIMESTAMPTZ, 값이 없는 옛 행을 위해 NULL 허용), restore · register가 그 값을 받으며, rotateRefreshToken(hash, expiresAt)은 해시와 만료 시각을 함께 바꾸고, isRefreshTokenExpired(now)는 now가 만료 시각 이상이거나 값이 없으면 true다(#122의 기반)
+- [x] [기반] ConsentType에 SERVICE_IMPROVEMENT가 있고, CHILD 필수 동의와 보호자 연결 필수 동의 어디에도 들어가지 않는다(선택 동의, #121의 기반)
+- [x] [persistence] Device를 refreshTokenExpiresAt과 함께 저장했다 다시 읽으면 refreshTokenExpiresAt이 같고, rotateRefreshToken(hash, expiresAt) 뒤 저장하면 새 만료 시각이 읽힌다(도메인 리뷰 11-14)
+- [x] [web] POST /v1/vehicle-links(LINK-04)와 POST /v1/invites/{token}/acceptance(FAM-06)에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려주고, pushToken을 빼면 201이다(AUTH-03과 같은 1~255자, 사람 결정 2026-11-14)
 - [ ] [서비스] 초대 발급 · 초대 조회 · 초대 수락은 대상 멤버가 해제된 멤버(user MemberInfo.removed true)면 404 NOT_FOUND로 거절하고 기기 · 토큰을 만들지 않는다(user D7 삭제 표시 뒤 후속, 사람 결정 2026-11-14)
 - [ ] [서비스] RevokeMemberDevicesUseCase(멤버 해제 때 호출)는 그 멤버의 기기 · 토큰과 함께 아직 쓰지 않은 초대도 폐기한다(사람 결정 2026-11-14)
 
@@ -297,7 +304,7 @@ void publishDeviceReplaced(List<Long> previousDeviceIds);                   // P
 
 | 항목 | 현재 가정 |
 |---|---|
-| access · refresh 토큰 유효 기간 | 소스에 없음. 설정값으로 두고 값은 정해야 함 |
+| access · refresh 토큰 유효 기간 | 결정됨: application.yml 설정값 pickup.jwt.access-ttl PT30M · pickup.jwt.refresh-ttl P14D. refresh 만료 시각은 Device.refreshTokenExpiresAt에 두고 AUTH-01 갱신 때마다 새로 잡는다(사람 결정 2026-11-13 · 11-14) |
 | JWT 서명 방식 | 소스에는 「JWT 키는 환경 변수」만 있음. 대칭키(HS256)로 가정 |
 | refresh 토큰 형식 | 예시가 「eyJ…」와 「rt_…」로 섞임. 불투명한 임의 문자열로 가정 |
 | access 토큰에 deviceId를 넣는지 | AUTH-03(devices/me) · AUTH-04(vehicle-devices/me)는 「지금 기기」를 알아야 하는데 4.1의 토큰 내용에는 deviceId가 없음. deviceId 클레임 추가로 가정 |

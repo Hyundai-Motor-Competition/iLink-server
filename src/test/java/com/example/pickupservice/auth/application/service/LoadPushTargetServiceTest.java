@@ -12,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -96,7 +97,7 @@ class LoadPushTargetServiceTest {
 	void findPushTargetByDeviceIdReturnsEmptyForVehicleDevice() {
 		when(loadDevicePort.loadDevice(901L)).thenReturn(Optional.of(
 				Device.restore(901L, OwnerType.VEHICLE, 55L, Platform.ANDROID, "fcm-vehicle", EARLIER, "d".repeat(64),
-						null)));
+						null, EARLIER.plus(Duration.ofDays(14)))));
 
 		assertThat(loadPushTargetService.findPushTargetByDeviceId(901L)).isNotNull().isEmpty();
 	}
@@ -145,7 +146,7 @@ class LoadPushTargetServiceTest {
 	void findLivePushTargetByDeviceIdReturnsEmptyForVehicleDevice() {
 		when(loadDevicePort.loadDevice(901L)).thenReturn(Optional.of(
 				Device.restore(901L, OwnerType.VEHICLE, 55L, Platform.ANDROID, "fcm-vehicle", EARLIER, "d".repeat(64),
-						null)));
+						null, EARLIER.plus(Duration.ofDays(14)))));
 
 		assertThat(loadPushTargetService.findLivePushTargetByDeviceId(901L)).isNotNull().isEmpty();
 	}
@@ -162,7 +163,7 @@ class LoadPushTargetServiceTest {
 			Instant revokedAt) {
 		Instant pushUpdatedAt = pushToken == null ? null : EARLIER;
 		return Device.restore(deviceId, OwnerType.USER, userId, platform, pushToken, pushUpdatedAt, "d".repeat(64),
-				revokedAt);
+				revokedAt, EARLIER.plus(Duration.ofDays(14)));
 	}
 
 }

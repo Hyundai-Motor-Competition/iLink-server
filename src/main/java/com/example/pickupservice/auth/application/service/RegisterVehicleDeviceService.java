@@ -37,7 +37,7 @@ public class RegisterVehicleDeviceService implements RegisterVehicleDeviceUseCas
 	public VehicleDeviceResult registerVehicleDevice(RegisterVehicleDeviceCommand command) {
 		long vehicleId = resolveVehicleId(command);
 		Device device = saveDevicePort.saveDevice(Device.register(OwnerType.VEHICLE, vehicleId, Platform.VEHICLE,
-				null, clock.instant(), PlaceholderRefreshHash.next()));
+				null, clock.instant(), PlaceholderRefreshHash.next(), null));
 		IssuedTokens tokens = new DeviceTokenRotator(issueTokenPort, saveDevicePort).issueTo(device,
 				new TokenSubject(PrincipalType.VEHICLE, vehicleId, null, null, device.getDeviceId()));
 		return new VehicleDeviceResult(device.getDeviceId(), vehicleId, tokens.accessToken());

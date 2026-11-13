@@ -1,9 +1,9 @@
 # FOLLOWUP · 인증 (auth)
 
-- 생성: 2026-11-11 11:47 KST · tdd-guard
-- 상태: 진행 중 (체크 120/120 · 완료 기준 0/4)
-- 테스트: ● GREEN · 275 passed · *, RealServerStartupTest · 165s · .\gradlew.bat test --tests com.example.pickupservice.common.* --tests com.example.pickupservice.RealServerStartupTest --console=plain
-- 설계서: C:/ilink/docs/05_인증-auth.md
+- 생성: 2026-11-14 01:13 KST · tdd-guard
+- 상태: 진행 중 (체크 128/128 · 완료 기준 3/4)
+- 테스트: ● GREEN · 2772 passed · 전체 · 238s · .\gradlew.bat test --console=plain
+- 설계서: C:/pw/auth/docs/05_인증-auth.md
 
 ## 완료 항목
 - [x] #1 [기반] LinkCode는 발급 시각 + 5분을 expiresAt으로 갖고 status ISSUED로 시작한다
@@ -103,7 +103,7 @@
 - [x] #95 [기반] LinkCode · MemberInvite · Device는 restore로 저장된 값을 그대로 가진 객체를 만든다
 - [x] #96 [기반] LinkCode.expire는 status를 EXPIRED로, MemberInvite.markUsed는 usedAt을, MemberInvite.revoke는 expiresAt을 지금으로 바꾼다
 - [x] #97 [기반] Device.revoke는 revokedAt을, Device.updatePushToken은 pushToken · pushUpdatedAt을, Device.rotateRefreshToken은 refreshTokenHash를 바꾼다
-- [x] #98 [기반] pickup 구현 전 임시 CheckActivePickupPort는 false를 돌려주고, PublishAuthEventPort는 이전 기기 id를 담은 스프링 이벤트를 발행한다
+- [x] #98 [기반] CheckActivePickupPort 어댑터는 pickup ActivePickupQueryUseCase.hasActivePickup 결과를 그대로 돌려주고, PublishAuthEventPort는 이전 기기 id를 담은 스프링 이벤트를 발행한다(사람 결정 2026-11-13)
 - [x] #99 [통합] user의 AuthMemberDeviceAdapter는 auth GetMemberDeviceStatusUseCase 결과를 user DeviceStatus로 바꿔 돌려준다
 - [x] #100 [통합] user의 RevokeMemberDevicesPort 구현은 auth RevokeMemberDevicesUseCase를 부른다
 - [x] #101 [서비스] user의 LoadVehicleUseCase는 findVehicle · findLinkedVehicleByVin으로 VehicleInfo를 돌려준다
@@ -126,97 +126,48 @@
 - [x] #118 [persistence] vehicle.version 컬럼은 NOT NULL에 기본값 0을 가진다(행이 있는 DB에도 컬럼을 추가할 수 있음)
 - [x] #119 [web] POST /v1/vehicle-link-codes를 연결 전 토큰(familyId 없음)으로 부르는데 차량이 이미 가족에 연결돼 있으면 409 VEHICLE_ALREADY_LINKED를 돌려준다
 - [x] #120 [web] POST /v1/families/me/members/{userId}/invites의 대상 멤버가 GUARDIAN이면 403 FORBIDDEN을 돌려준다
+- [x] #121 [web] 초대 수락(FAM-06)과 연결 승인(LINK-04)의 consents에 SERVICE_IMPROVEMENT(선택 동의)를 보낼 수 있고, 빠져도 수락 · 승인은 성공한다(C00 · 가족 프로필 등록4 「(선택) 서비스 개선」) ← InviteControllerTest.POST /v1/invites/{token}/acceptance의 consents에 SERVICE_IMPROVEMENT를 담아도 201을 돌려주고 그대로 넘긴다, InviteControllerTest.POST /v1/invites/{token}/acceptance의 consents에서 SERVICE_IMPROVEMENT가 빠져도 201을 돌려준다, VehicleLinkCodeControllerTest.POST /v1/vehicle-links의 consents에 SERVICE_IMPROVEMENT를 담아도 201을 돌려주고 그대로 넘긴다, VehicleLinkCodeControllerTest.POST /v1/vehicle-links의 consents에서 SERVICE_IMPROVEMENT가 빠져도 201을 돌려준다
+- [x] #122 [서비스] refresh 토큰은 발급 14일(P14D) 뒤 만료되고, 만료된 refresh 토큰으로 POST /v1/auth/refresh를 부르면 유효하지 않은 refresh 토큰과 같은 401로 거절한다(사람 결정 2026-11-13) ← RefreshTokenServiceTest.refresh 토큰 만료 시각이 지난 기기의 토큰으로 갱신하면 REFRESH_TOKEN_INVALID로 거절하고 아무것도 저장하지 않는다, RefreshTokenServiceTest.refresh 토큰 만료 시각과 같은 순간에 갱신하면 만료로 보고 REFRESH_TOKEN_INVALID로 거절한다, RefreshTokenServiceTest.refresh 토큰 만료 1초 전에 갱신하면 성공하고 기기의 refresh 만료 시각은 발급자가 준 발급 시각 + 14일로 바뀐다, RefreshTokenServiceTest.refresh 토큰 만료 시각이 없는 옛 기기의 토큰으로 갱신하면 REFRESH_TOKEN_INVALID로 거절한다
+- [x] #123 [통합] access 토큰 유효 기간 PT30M · refresh 토큰 유효 기간 P14D는 application.yml 설정값으로 두고, 발급한 access 토큰의 exp가 발급 시각 + 30분이다 ← JwtTokenIssuerTest.고정 시각에 발급하면 access 토큰 만료는 발급 시각 + 30분(exp claim · accessTokenExpiresAt)이고 refresh 토큰 만료는 발급 시각 + 14일이다, JwtTokenIssuerTest.application.yml의 pickup.jwt.access-ttl은 PT30M, pickup.jwt.refresh-ttl은 P14D이고 dev · prod 프로필도 그대로다, JwtTokenIssuerTest.JwtTokenIssuer의 생성자는 하나이고 access · refresh 유효 기간을 @Value로 pickup.jwt.access-ttl · pickup.jwt.refresh-ttl 설정에서 받는다
+- [x] #124 [web] GET /v1/vehicle-link-codes/by-code/{code}(LINK-03)가 같은 기기 5번 실패 뒤면 429 LINK_CODE_ATTEMPT_LIMIT과 error.retryAfterSeconds(차단이 풀릴 때까지 남은 초)를 돌려준다(D3) ← VehicleLinkCodeControllerTest.GET /v1/vehicle-link-codes/by-code/{code}가 같은 기기 5번 실패 뒤면 429 LINK_CODE_ATTEMPT_LIMIT과 retryAfterSeconds 42를 돌려준다
+- [x] #125 [기반] Device는 refreshTokenExpiresAt을 갖고(DeviceEntity refresh_token_expires_at TIMESTAMPTZ, 값이 없는 옛 행을 위해 NULL 허용), restore · register가 그 값을 받으며, rotateRefreshToken(hash, expiresAt)은 해시와 만료 시각을 함께 바꾸고, isRefreshTokenExpired(now)는 now가 만료 시각 이상이거나 값이 없으면 true다(#122의 기반) ← DeviceTest.Device.restore는 저장된 refreshTokenExpiresAt을 그대로 가진 객체를 만들고, 값이 없던 옛 행은 비운 채로 만든다, DeviceTest.Device.rotateRefreshToken(hash, expiresAt)은 refreshTokenHash와 refreshTokenExpiresAt을 함께 바꾸고 다른 값은 그대로 둔다, DeviceTest.Device.register는 받은 refreshTokenExpiresAt을 그대로 가진 객체를 만든다, DeviceTest.Device.isRefreshTokenExpired는 만료 시각 1초 전이면 false, 만료 시각과 같거나 지나면 true다, DeviceTest.Device.isRefreshTokenExpired는 refreshTokenExpiresAt이 없으면 true다, AuthPersistenceEntitiesMappingTest.device 테이블은 값이 없는 옛 행을 위해 NULL을 허용하는 refresh_token_expires_at TIMESTAMPTZ 컬럼을 갖는다, AuthPersistenceEntitiesTest.DeviceEntity는 NULL을 허용하는 Instant 필드 refreshTokenExpiresAt을 갖는다
+- [x] #126 [기반] ConsentType에 SERVICE_IMPROVEMENT가 있고, CHILD 필수 동의와 보호자 연결 필수 동의 어디에도 들어가지 않는다(선택 동의, #121의 기반) ← ConsentsTest.동의 종류는 TERMS · PRIVACY · MARKETING · LOCATION · PUSH · SERVICE_IMPROVEMENT 여섯 가지다, ConsentsTest.SERVICE_IMPROVEMENT는 보호자 연결 필수 동의에 들어가지 않는다
+- [x] #127 [persistence] Device를 refreshTokenExpiresAt과 함께 저장했다 다시 읽으면 refreshTokenExpiresAt이 같고, rotateRefreshToken(hash, expiresAt) 뒤 저장하면 새 만료 시각이 읽힌다(도메인 리뷰 11-14) ← AuthPersistenceAdapterTest.Device를 refreshTokenExpiresAt과 함께 저장했다 다시 읽으면 값이 같고, rotateRefreshToken(hash, expiresAt) 뒤 저장하면 새 만료 시각이 읽힌다
+- [x] #128 [web] POST /v1/vehicle-links(LINK-04)와 POST /v1/invites/{token}/acceptance(FAM-06)에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려주고, pushToken을 빼면 201이다(AUTH-03과 같은 1~255자, 사람 결정 2026-11-14) ← VehicleLinkCodeControllerTest.POST /v1/vehicle-links에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려준다, VehicleLinkCodeControllerTest.POST /v1/vehicle-links의 multipart request 파트에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려준다, VehicleLinkCodeControllerTest.POST /v1/vehicle-links에 pushToken을 빼면 201을 돌려주고 pushToken null을 넘긴다, InviteControllerTest.POST /v1/invites/{token}/acceptance에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려준다, InviteControllerTest.POST /v1/invites/{token}/acceptance는 pushToken 없이도 201을 돌려주고 pushToken null을 넘긴다
 
 ## 미완료 항목
 - 없음
 
 ## 완료 기준 (공통 규칙 문서)
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
-- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+- [x] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [x] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-11 11:47 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 2 · 하 12 · 리뷰 시점 체크 120/120
-- 리뷰 시점 테스트: ● GREEN · 275 passed · *, RealServerStartupTest · 165s · .\gradlew.bat test --tests com.example.pickupservice.common.* --tests com.example.pickupservice.RealServerStartupTest --console=plain
+- 2026-11-14 01:12 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 2 · 하 8 · 리뷰 시점 체크 128/128
+- 리뷰 시점 테스트: ● GREEN · 2772 passed · 전체 · 238s · .\gradlew.bat test --console=plain
   - 결론: 조건부 통과
-  - 동작을 바꿔야 하는 [상]은 0건입니다. 지난 리뷰(11-07 23:03) 뒤 auth 코드를 바꾼 것은 다른 도메인 커밋 4개뿐입니다(72f5aad user, c08c65a pickup, 8d833fa · 0472d8a notification). 그 영향으로 기록과 문서가 어긋난 [중] 2건이 새로 생겼습니다.
-  - [중] 체크된 항목 3건의 증거 테스트 이름이 다른 도메인 커밋에서 바뀌어 연결이 끊겼고, #98은 문장 자체가 지금 동작과 반대임 — auth.md:34(#26) · 113(#105)의 DisplayName은 RegisterVehicleDeviceServiceTest:93 · IssueLinkCodeServiceTest:277에서 「409 … 「이미 보호자가 연결된 차량입니다」」로 바뀌었음(72f5aad, 단언은 더 강해짐). auth.md:106(#98)과 05:266은 「임시 CheckActivePickupPort는 false」라고 적혀 있지만, AuthPickupActivityAdapter:18은 이제 pickup ActivePickupQueryUseCase에 위임하고 증거가 AuthModuleLi…
-  - [중] 05 설계서가 병합 뒤 구현과 다름 — (1) 시그니처 05:151-155와 범위 05:7에 notification용 in 포트 LoadPushTargetByDeviceUseCase가 없음. 이 포트는 findPushTargetByDeviceId(폐기 기기 포함)와 findLivePushTargetByDeviceId(살아 있는 기기만) 두 메서드를 갖고, 둘 다 USER 기기이면서 pushToken이 있을 때만 돌려줌(LoadPushTargetByDeviceUseCase.java:5-10, LoadPushTargetService:22-50, 소비 측 NotificationPushTargetAdapter:27 · 32). (2) 구조 05:19 「임시 구현(pickup 구현 전까지 false)」과 의…
-  - [하] AuthInPortsTest:90-101은 다른 모듈용 유스케이스를 3개만 검사함. LoadPushTargetByDeviceUseCase와 RevokeVehicleDevicesUseCase의 시그니처는 보지 않음 → 항목 추가(선택)
-  - [하] ACTIVE_PICKUP_EXISTS 409를 AuthErrors:21-24와 UserErrors:25-28 두 곳에서 따로 정의함(문구만 「로그아웃」 · 「차량 연결 해제」로 다름). 03:100은 「여러 모듈이 같은 뜻으로 쓰는 도메인 오류는 ErrorCode에 한 번」이라고 정했는데, 72f5aad는 VEHICLE_ALREADY_LINKED만 합침 → 사람 결정
-  - [하] AuthPickupActivityAdapter:8에 주석 1줄이 있음(02:78 위반, auth main의 유일한 주석). pickup.md:356(2)에 기록됨 → 리팩터링
-  - [하] AUTH-04가 실제 pickup까지 이어지는지 확인하는 통합 테스트가 없음. VehicleDeviceControllerTest(#70)는 유스케이스 대역을 쓰고, AuthModuleLinkAdaptersTest:59는 @MockitoBean ActivePickupQueryUseCase를 씀. 「진행 중 세션이 있는 DB → DELETE /v1/vehicle-devices/me/session → 409」 테스트가 없음 → 항목 추가(선택)
-  - [하] LoadPushTargetService에서 같은 필터와 PushTarget 변환이 두 번 나옴: findPushTargets 33-36과 toPushTarget 45-50. 지난 「isLive 중복」 메모와 같은 결 → 리팩터링
-  - [하] API 문서가 다른 곳과 어긋남. Idempotency-Key 헤더 @Parameter가 AUTH-02(VehicleDeviceApiDoc:17)에만 있고 LINK-04(VehicleLinkCodeApiDoc:43-50) · FAM-04 · FAM-06(InviteApiDoc:18-41)에는 설명 글로만 있음. 이 셋은 409 IDEMPOTENCY_KEY_REUSED 응답도 문서에 없음(user · pickup doc은 @Parameter로 둠). 태그 설명(VehicleLinkCodeApiDoc:16)에 LINK-04 「승인」이 빠짐 → note
-  - [하] 429 retryAfterSeconds가 도메인마다 다름. LINK_CODE_REISSUE_LIMIT · LINK_CODE_ATTEMPT_LIMIT(AuthErrors:26-29 · 41-44)은 null인데, notification RESEND_TOO_SOON은 새 BusinessException.tooManyRequests(ErrorCode, int)로 채움. 기존 메모 「429 retryAfterSeconds 없음」을 넓힌 것 → note
-  - [하] auth in 포트의 계약 타입이 auth.domain에 있어(MemberDeviceStatus, PushTarget 안의 Platform) 소비 방식이 셋으로 갈림. user · schedule은 자기 DeviceStatus로 바꾸는데, ScheduleMemberDeviceAdapter:24는 name()으로 바꿔서 auth에 값이 늘면 실행 중 IllegalArgumentException이 남. pickup은 LoadChildReadinessPort:3 · StartPickupService:3에서 그대로 씀. notification은 DispatchSessionEventService:14에서 auth.domain.Platform을 import함 → 사람 결정(계약 타입을 port.in으로 옮길지)
-  - [하] 위치 동의를 auth가 저장하지 않아 pickup PickupChildReadinessAdapter:27-29가 늘 true를 돌려줌. 그래서 SIG-04 403 LOCATION_CONSENT_REQUIRED는 실제로 나지 않음. 지금은 FAM-06 CHILD 수락에 LOCATION 동의가 필수라 가정이 맞지만, 동의 철회 경로가 생기면 깨짐(05 확인 필요 사항 「동의 저장 위치」, pickup.md:361) → 설계 결정 필요
-  - [하] 진행 기록이 서로 다름. auth.md:4 · 133-137은 완료 기준 4/4 · 리뷰 5회이고 경로가 C:/pickup(auth.md:5-6)인데, TODO.md:28은 0/4, REVIEW.md:11은 「리뷰 없음」. auth.md:140 「상 1」도 본문(:143 [상] 0건)과 다름. pickup.md:367에 원인이 적혀 있음 → note
-  - [하] 02:19 의존 방향에 user → auth, auth → pickup(AUTH-04), pickup → auth, schedule → auth가 없음. 03:100의 VEHICLE_ALREADY_LINKED 사용처에 AUTH-02(RegisterVehicleDeviceService:52)가 빠짐 → note
-  - [하] (다른 도메인) place #44도 같은 문제임. place.md:52의 증거 「pickup 구현 전 임시 CheckActivePickupPort…」가 PlaceModuleLinkAdaptersTest에 없음 → note(place 리뷰 때)
-  - 완료 기준:
-  - C1 사람 확인 필요 — 체크 120/120이고 GREEN 2261 passed. 119건은 증거가 있음(이름만 바뀐 2건 포함). #98의 앞 절반(임시 false)은 pickup 병합으로 일부러 바꾼 동작이라, 문장을 고쳐야 충족
-  - C2 미충족 — API 명세 · 핵심 로직 · in/out 포트 26개는 05:139-165와 같음. 다만 실제 in 포트 LoadPushTargetByDeviceUseCase가 05에 없고, 05:8 · 19의 「임시 어댑터」 설명이 실제와 다름. 문서 3곳만 고치면 충족
-  - C3 미충족(경미) — auth 코드에서 공통 규칙 위반은 [하] 2건(주석 1줄 02:78, ACTIVE_PICKUP_EXISTS 중복 03:100). domain에는 Spring · JPA · common.text import가 없음. 엔드포인트는 모두 /v1 아래라 PreLinkTokenInterceptor(/v1/**)가 새 pickup · notification API도 막음
-  - C4 충족 — 05 확인 필요 사항 29행과 FOLLOWUP 표(auth.md:174-204)를 diff로 비교했더니 같음(「SAME」). 「RELINK 푸시는 행 없이 FCM만」은 NotifyDeviceReplacedService가 그 가정대로 구현함
-  - 후속 과제:
-  - [사람 결정 11-07] mode · tokenDeliveredAt · name · 시드 · familyId 구분 — 해소됨
-  - [설계 확인] 사용된 초대만 있음 → NONE — 해소됨(05:133)
-  - [문서] 05 시그니처 hashRefreshToken · TokenSubject · MemberDeviceStatus — 해소됨(05:152 · 162-163). 새 포트 누락은 위 [중]
-  - [설계 확인] code UNIQUE 아님 — 설계 결정 필요
-  - [설계 확인] LINK-05 뒤 refresh familyId — 해소됨(#117). access PT30M · refresh 만료 미구현 — 설계 결정 필요
-  - [persistence 중간 리뷰] 발급 카운터 — 해소됨. N+1 · 인덱스 · FK · token 로그 — 남음(이제 pickup StartPickup · notification도 getDeviceStatuses · loadDevice를 반복 호출)
-  - [설계 확인] AUTH-02 refresh 없음 · 연결 전 토큰 만료 — 설계 결정 필요
-  - [설계 확인 web] deviceId 없는 토큰 · 연결 전 토큰 AUTH-04 · AUTH-03 platform 검사 — 설계 결정 필요
-  - [설계 확인] 폐기된 기기의 AUTH-04 응답 · AUTH-03 platform 무시 — 설계 결정 필요
-  - [설계 확인 승인] VEHICLE_MOVING · 보호자 phone — 설계 결정 필요
-  - [service 리뷰] 동시 NEW 승인(#115) · FAM-06 이전 기기 폐기(#108) — 해소됨. 연결 전 토큰 복구 · 카운터 초기화 — 설계 결정 필요. (하) 묶음 — 남음
-  - [web 리뷰] familyId 빈 USER 토큰 NPE · pushToken 빈 문자열 허용(ApproveLinkRequest:19, AcceptInviteRequest:14) · AUTH-03 주체 검사 — 남음
-  - [문서] common.text를 02 예외 목록 · 04 구조에 반영 — 남음(02:70, 04:21)
-  - [사람 결정 auth 리뷰] (1)~(4) — 해소됨. DeviceReplacedEvent 위치 — 해소됨(notification이 port.out에서 읽음, pickup SessionEventMessage와 같은 방식). 나머지 미결 — 설계 결정 필요
-  - [auth 리뷰 · 문서 · 하] 05 갱신 · VEHICLE_MOVING 표시 — 해소됨. CheckActivePickupPort 임시 어댑터 — 해소됨(c08c65a). 429 retryAfterSeconds · remoteAddr · consents LOCATION · PUSH 허용 · 02 user → auth — 남음
-  - [#105 후속] — 해소됨(issuedBeforeLink 기준)
-  - [사람 결정 재리뷰] issuedBeforeLink · 기기 단위 — 해소됨
-  - [auth 재리뷰 · 문서 · 중] 05 본문 — 해소됨
-  - [auth 재리뷰 · user · 중] user #64 증거 — 남음(user 도메인, user.md:105에 [중]으로 기록)
-  - [auth 재리뷰 · 문서 · 하] API 문서 갱신 — 해소됨(VehicleLinkCodeApiDoc:19 · 23 · 30 · 35 · 47, InviteApiDoc:21)
-  - [auth 재리뷰 · 하] 연결 전 코드 NEW 승인 중 연결되면 409 — 남음(부분). auth 단위 테스트는 없고, #115 동시성 통합 테스트가 같은 409 경로를 덮음
-  - [auth 재리뷰 · 하] 다른 기기의 ISSUED 코드가 쌓임 · (vehicle_id, status) 인덱스 없음 — 남음(VehicleLinkCodeEntity:23)
-  - [auth 재리뷰 · 하] LinkCodeIssueCounter 정리 · AUTH-02로 한도 우회 — 남음
-  - [auth 재리뷰 · 문서 · 하] Idempotency 키 공간 줄 — 해소됨(05:321). 02:19 · 04:21 — 남음
-  - [사람 결정 11-07 · 후속] VIN NEW 선점 — 설계 결정 필요(05:322)
-  - [#115 후속 · 하] version null Vehicle — 설계 결정 필요(사람 결정으로 미룸)
-  - [auth 재리뷰 · 문서] #33 문장 — 해소됨
-  - [중간 리뷰 · #115 후속] versionToSave 분기 — 설계 결정 필요(미룸)
-  - [중간 리뷰 · 문서] VEHICLE_MOVING — 설계 결정 필요(미구현 표시는 해소)
-  - [auth 재리뷰2 · 하] 동시 요청 500(AUTH-02 VIN, LINK-05) — 남음
-  - [auth 재리뷰2 · 하] RELINK · FAM-06 동시 처리 — 남음
-  - [auth 재리뷰2 · 하] 해제 직전 ISSUED 코드 · lane 태그(05:281-284) — 남음. version 설명 — 해소됨(#118)
-  - [auth 재리뷰2 · 문서 · 중] 05 본문 남은 곳 — 해소됨. 다만 05:19가 pickup 병합으로 다시 어긋남(위 [중])
-  - [사람 결정 11-07] versionToSave는 후속 과제로 — 남음
-  - [문서 · 하] 04 name · 의존 칸 — 04:8 의존 칸은 해소됨. 04:222 name은 user 도메인이라 남음
-  - [#118 후속 · 운영] prod용 vehicle.version SQL — 남음(ops 아래에 SQL 스크립트 없음)
-  - [중간 리뷰 #117~#120 · 중] 폐기 반복 4곳 · 메서드 이름 — 설계 결정 필요
-  - [중간 리뷰 #117~#120 · 하] AuthInPortsTest:95 · unlinkedVehicleToken 이름(VehicleLinkCodeControllerTest:130 · 169) · InviteControllerTest:175-177 중복 단언 — 남음
-  - [auth 재리뷰3 · 하] VehicleLinkApiDoc:13 기기 폐기 문구 — 해소됨(「AUTH-02로 다시 등록」은 빠짐). #117 끝까지 잇는 통합 테스트 — 남음
-  - [auth 재리뷰3 · 하] 05:315 「LINK-05 포함」 · UserModuleLinkAdaptersTest:53 — 남음. 「상 1」 기록 — REVIEW.md는 다시 만들어지며 사라졌고 auth.md:140에는 남음
-  - 테스트: mcp__tdd-guard__tests scope "all" → 마지막 전체 실행(10분 전) 뒤 소스 변경이 없어 결과를 재사용. GREEN 2261 passed(`.\gradlew.bat test --console=plain`, 90s). 그 밖에 git diff 5d5bd09..HEAD(auth · common)로 바뀐 곳을 봤고, 증거 DisplayName 120건을 grep으로 대조해 3건이 없음(#26 · #98 · #105)을 확인함.
-  - 주요 파일
-  - C:/ilink/docs/05_인증-auth.md
-  - C:/ilink/docs/followup/auth.md
-  - C:/ilink/src/main/java/com/example/pickupservice/auth/application/port/in/LoadPushTargetByDeviceUseCase.java
-  - C:/ilink/src/main/java/com/example/pickupservice/auth/application/service/LoadPushTargetService.java
-  - C:/ilink/src/main/java/com/example/pickupservice/auth/adapter/out/pickup/AuthPickupActivityAdapter.java
-  - C:/ilink/src/main/java/com/example/pickupservice/auth/application/service/AuthErrors.java
-  - C:/ilink/src/test/java/com/example/pickupservice/auth/adapter/out/AuthModuleLinkAdaptersTest.java
-  - C:/ilink/src/test/java/com/example/pickupservice/auth/application/port/in/AuthInPortsTest.java
-  - C:/ilink/src/main/java/com/example/pickupservice/pickup/adapter/out/auth/PickupChildReadinessAdapter.java
+  - 이전 리뷰(11-14 00:52) 지적: [중] 6건 중 5건 해소(RevokeVehicleDevicesServiceTest 고정 Clock · 만료 NOW+3일, #127 저장 · 읽기 테스트, 옛 오버로드 5개 삭제, 05 본문 반영, LoadPushTargetByDeviceUseCase 시그니처). [하] sliding 만료(사람 결정) · AuthSeed · 주석 · LoadPushTargetService 중복 · Idempotency-Key @Parameter · 빈 pushToken(#128) 해소. TODO · REVIEW 기록, AuthInPortsTest 시그니처, 운영 DDL · FK 표기 · profile.md:104는 남음.
+  - [중] 진행 기록이 아직 되돌아가 있음. TODO.md:12는 shared를 「대기 · 완료 기준 0/4」로, REVIEW.md:8은 「리뷰 없음」으로 적음. HEAD에는 「완료 · 4/4 · 리뷰 11-14 00:02 조건부 통과」 → note(커밋 전에 HEAD의 shared 줄을 되살릴 것)
+  - [중] #1~#120 증거 기록이 그대로 없음. auth.md 증거 8/128건. 108/120건은 항목 문장과 같은 DisplayName이 있음. 12건(#26 #31 #70 #72 #98 #103 #104 #105 #115 #116 #117 #118)은 이름이 다른 테스트로 이어짐 → 사람 결정(7b20627 기록을 되살리거나 12건 증거를 다시 연결)
+  - [하] LINK-04 · FAM-06은 공백만 있는 pushToken("   ")을 받음. ApproveLinkRequest:19 · AcceptInviteRequest:14는 @Size(min = 1), AUTH-03은 UpdatePushTokenRequest:11 @NotBlank. LoadPushTargetService:47은 isEmpty만 걸러 공백 토큰도 푸시 대상 → 사람 결정
+  - [하] 05 API 표 LINK-04(05:76) · FAM-06(05:79) pushToken에 1~255자 제한 표기가 없음 → note(문서)
+  - [하] #127 테스트 마지막 단언(AuthPersistenceAdapterTest:105-106)은 DB를 거치지 않는 도메인 확인이라 항목과 관계없음 → 리팩터링(단언 삭제)
+  - [하] FOLLOWUP 낡은 문장: auth.md:219 「access PT30M 임시값, refresh 만료 미구현」, profile.md:104 → note
+  - [하] 운영 DDL SQL 파일 없음(device.refresh_token_expires_at, vehicle.version). 05:31 · 46 「FK」와 02:145 「DB FK 제약 없음」 불일치 → note
+  - [하] (지난 리뷰부터) RevokeVehicleDevicesUseCase · LoadPushTargetByDeviceUseCase 시그니처 테스트가 auth port 테스트에 없음 → 항목 추가(선택)
+  - [하] LoadPushTargetService:33 filter(Device::isLive) 중복 → 리팩터링
+  - [하] #121~#128 작업 49개 파일이 커밋 전 → note
+  - 확인한 것: 토큰을 내는 경로 5곳이 모두 DeviceTokenRotator:17-18을 거쳐 refreshTokenExpiresAt을 채움. RefreshTokenService:39 경계값을 RefreshTokenServiceTest:192-252가 검증. JwtTokenIssuer:39-56 refresh-ttl @Value, application.yml:47 P14D.
+  - 완료 기준: C1 사람 확인 필요(128/128 체크, GREEN 2772 passed, 증거 기록 8/128) / C2 충족 / C3 충족 / C4 충족
+  - 테스트: GREEN 2772 passed · 238s
+- 이전 리뷰: 2026-11-14 00:52 KST (조건부 통과)
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
 |---|---|
-| access · refresh 토큰 유효 기간 | 소스에 없음. 설정값으로 두고 값은 정해야 함 |
+| access · refresh 토큰 유효 기간 | 결정됨: application.yml 설정값 pickup.jwt.access-ttl PT30M · pickup.jwt.refresh-ttl P14D. refresh 만료 시각은 Device.refreshTokenExpiresAt에 두고 AUTH-01 갱신 때마다 새로 잡는다(사람 결정 2026-11-13 · 11-14) |
 | JWT 서명 방식 | 소스에는 「JWT 키는 환경 변수」만 있음. 대칭키(HS256)로 가정 |
 | refresh 토큰 형식 | 예시가 「eyJ…」와 「rt_…」로 섞임. 불투명한 임의 문자열로 가정 |
 | access 토큰에 deviceId를 넣는지 | AUTH-03(devices/me) · AUTH-04(vehicle-devices/me)는 「지금 기기」를 알아야 하는데 4.1의 토큰 내용에는 deviceId가 없음. deviceId 클레임 추가로 가정 |
@@ -228,9 +179,9 @@
 | LINK-03 「기기당 5회 실패」의 기기 식별 · 저장 위치 | 인증 없는 호출이라 기기를 알 수 없고 저장 테이블도 없음. 요청 IP 기준 메모리 카운터로 가정 |
 | LINK-02 「1초보다 자주」 판단 저장 위치 | 소스에 없음. 메모리로 가정(서버 1대 전제) |
 | LINK-04 VEHICLE_MOVING 판단 근거 | 세션 밖에서는 차량 주행 상태를 받는 API가 없음. 판단 근거가 없어 미구현(API 문서에서도 뺌). 판단 방법을 정하면 설계서 · 구현 · API 문서를 함께 맞춤 |
-| 동의(consents) 저장 위치 | 저장 테이블이 없음. SIG-04의 LOCATION_CONSENT_REQUIRED가 위치 동의를 읽어야 함. 저장 위치를 정해야 함 |
-| LINK-04 NEW로 만드는 GUARDIAN의 name · phone | name은 결정됨(사람 결정 2026-11-07). LINK-04 요청 name(1~20자, 이모지 불가), mode NEW일 때 필수 · RELINK면 무시. phone은 미정. 요청에 없어 null로 만들고 있어 user의 「자녀 외 phone 필수」 규칙과 어긋남. 보호자 전화번호를 받을 곳을 정해야 함 |
-| 차량 번호판(plateNumber) 입력 경로 | AUTH-02는 vin · model만 받음. LINK-03이 번호판을 보여 주려면 입력 경로가 필요함 |
+| 동의(consents) 저장 위치 | 결정됨: 지금은 저장하지 않는다. FAM-06 CHILD 수락에서 LOCATION 동의가 필수라 연결된 자녀는 동의한 상태로 본다. 그래서 SIG-04의 403 LOCATION_CONSENT_REQUIRED는 위치 동의 철회 기능이 생기기 전까지 실제로 나지 않는다. 철회 기능을 만들 때 저장 위치를 정한다(사람 결정 2026-11-13) |
+| LINK-04 NEW로 만드는 GUARDIAN의 name · phone | name은 결정됨(사람 결정 2026-11-07). LINK-04 요청 name(1~20자, 이모지 불가), mode NEW일 때 필수 · RELINK면 무시. phone은 결정됨: 받지 않는다. GUARDIAN phone은 null을 허용하고 user의 「자녀 외 phone 필수」 규칙의 예외로 둔다(사람 결정 2026-11-13) |
+| 차량 번호판(plateNumber) 입력 경로 | 결정됨: 서버가 번호판을 받지 않는다. 차대번호(VIN) 조회로 나중에 불러올 수 있어 입력 경로를 두지 않는다(사람 결정 2026-11-13) |
 | FAM-05 inviterName | MemberInvite에 초대한 사람 컬럼이 없음. 가족의 GUARDIAN 이름으로 가정 |
 | 자녀 외 role의 필수 동의 | 소스는 CHILD만 정함. TERMS · PRIVACY로 가정 |
 | 재발급 때 이전 초대 「폐기」 방법 | MemberInvite에 상태 컬럼이 없음. 이전 초대의 expiresAt을 지금으로 당긴다고 가정 |
@@ -251,6 +202,13 @@
 - 다음 도메인: 일정 (06_일정-schedule.md). 시작: /tdd domain schedule
 
 ## 후속 과제
+- auth lane worktree(lane/auth/service · lane/auth/web)는 옛 커밋(202커밋 뒤, 고유 커밋 없음)에서 다시 쓰여 남은 항목 #121~#126은 메인 폴더(feature/auth)에서 순차 진행. lane worktree · 브랜치 정리는 사람이 판단.
+- 운영 배포 전 device.refresh_token_expires_at(TIMESTAMPTZ, NULL 허용) 컬럼을 운영 DB에 직접 추가해야 한다(prod ddl-auto validate). 값이 없는 옛 기기는 refresh 만료로 보아 다시 로그인해야 한다.
+- [auth 리뷰 11-14 · 중] 커밋 전 확인: 작업 트리의 docs/followup/TODO.md가 shared를 「완료 · 4/4 · 리뷰 11-14 조건부 통과」에서 「대기 · 0/4」로 되돌림. REVIEW.md:10도 auth 120/124 · 리뷰 없음. 커밋 때 shared 기록을 되살릴 것. #1~#120 증거 기록은 d7ff790이 다른 폴더 상태로 auth.md를 다시 만들며 사라짐(7b20627에 120/120, 112건은 지금 이름 그대로)
+- [auth 리뷰 11-14 · 하] 운영 DDL을 SQL 파일로 남길 것(device.refresh_token_expires_at TIMESTAMPTZ NULL, vehicle.version). 05 테이블 「FK → Vehicle · User」와 02:145 「DB FK 제약 없음」 표기를 맞출 것. profile.md:104 「refresh 만료 미구현」은 #122로 구현됨
+- [auth 재리뷰 11-14 · 사람 결정] LINK-04 · FAM-06 pushToken이 공백만 있는 값("   ")이면 지금은 받는다(@Size(min=1)). AUTH-03은 @NotBlank. 공백만 있는 값도 422로 할지 결정 필요. LoadPushTargetService는 isEmpty만 걸러 공백 토큰도 푸시 대상이 됨
+- [auth 재리뷰 11-14 · 하] 리팩터링 남음: AuthPersistenceAdapterTest:105-106 DB를 거치지 않는 단언 삭제, LoadPushTargetService:33 filter(Device::isLive) 중복 삭제. 문서: auth.md:219 「access PT30M 임시값, refresh 만료 미구현」 문장은 #122 · #123으로 해소됨. 선택 항목: AuthInPortsTest에 RevokeVehicleDevicesUseCase · LoadPushTargetByDeviceUseCase 시그니처 검사
+- [auth 재리뷰 11-14 · 사람 결정 · 중] #1~#120 증거 기록: 커밋 7b20627의 docs/followup/auth.md 기록을 되살릴지, 이름이 바뀐 12건(#26 #31 #70 #72 #98 #103 #104 #105 #115 #116 #117 #118)의 증거를 다시 연결할지 결정 필요. 결정 뒤 C1 체크. #121~#128 작업(49개 파일)은 커밋 전이며, 커밋 전에 TODO.md · REVIEW.md의 shared 줄을 HEAD 값으로 되살릴 것
 - [사람 결정 2026-11-07] (1) VehicleLinkCode에 mode(NEW · RELINK, LINK-04 승인 때 채움) · tokenDeliveredAt(LINK-02가 토큰을 내려준 시각) 컬럼 추가 — 승인 시 USED, 토큰 내려준 뒤 다시 조회하면 404 LINK_CODE_INVALID. (2) LINK-04 요청에 name(1~20자, 이모지 불가) 추가, mode NEW일 때 필수 · RELINK면 무시. (3) 도메인 시드는 공통 IntegrationTestSupport에서 빼고 필요한 테스트가 직접 @Import(user C3 해소용). (4) 「연결 중」 차이: user loadLinkedVehicleByVin 결과의 familyId로 auth가 구분(familyId 있음 → 409 VEHICLE_ALREADY_LINKED, 없음 → 대기 행 재사용). 설계서 테이블 · API 명세 갱신은 도메인 끝날 때 반영.
 - [설계 확인 · auth] 멤버 기기 상태: 사용된 초대만 있고 살아 있는 기기가 없을 때(수락 뒤 기기 폐기)는 설계서 표에 없음 → NONE으로 가정(DeviceStatusJudgeTest). 설계서 표에 행 추가 필요. 판정은 USER 기기만 넘긴다는 전제.
 - [문서] 05 설계서 「시그니처」 갱신 필요: IssueTokenPort.hashRefreshToken(String) 추가, TokenSubject(type, id, familyId, role, deviceId) · IssuedTokens(accessToken, accessTokenExpiresAt, refreshToken, refreshTokenHash) 컴포넌트, 기기 상태 반환 타입 MemberDeviceStatus(auth.domain). [주의] out 포트 11개는 Bash로 만들어 tdd-guard 기반 파일로 등록되지 않았을 수 있음 — lane에서 포트를 고치지 않도록 프롬프트로 막을 것.

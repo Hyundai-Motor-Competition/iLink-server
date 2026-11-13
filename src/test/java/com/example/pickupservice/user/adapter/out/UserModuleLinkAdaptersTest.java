@@ -20,6 +20,7 @@ import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
@@ -122,7 +123,7 @@ class UserModuleLinkAdaptersTest extends IntegrationTestSupport {
 
 	private static Device liveUserDevice(long userId, Instant at) {
 		return Device.register(OwnerType.USER, userId, Platform.ANDROID, "push-" + UUID.randomUUID(), at,
-				randomSha256Hex());
+				randomSha256Hex(), at.plus(Duration.ofDays(14)));
 	}
 
 	private static String uniqueInviteToken() {

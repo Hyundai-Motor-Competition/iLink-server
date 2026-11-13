@@ -4,10 +4,12 @@ import com.example.pickupservice.auth.adapter.out.token.JwtTokenIssuer;
 import com.example.pickupservice.auth.application.port.in.ApproveLinkCommand;
 import com.example.pickupservice.auth.application.port.in.ConsentAgreement;
 import com.example.pickupservice.auth.application.port.in.VehicleLinkResult;
+import com.example.pickupservice.auth.application.port.out.IssuedTokens;
 import com.example.pickupservice.auth.application.port.out.LoadDevicePort;
 import com.example.pickupservice.auth.application.port.out.LoadLinkCodePort;
 import com.example.pickupservice.auth.application.port.out.PublishAuthEventPort;
 import com.example.pickupservice.auth.application.port.out.SaveDevicePort;
+import com.example.pickupservice.auth.application.port.out.TokenSubject;
 import com.example.pickupservice.auth.application.port.out.SaveLinkCodePort;
 import com.example.pickupservice.auth.domain.ConsentType;
 import com.example.pickupservice.auth.domain.Device;
@@ -50,6 +52,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
@@ -61,6 +64,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -72,6 +76,7 @@ class ApproveLinkServiceTest {
 	private static final byte[] SECRET_BYTES = "pickup-test-jwt-secret-0123456789abcdef".getBytes(StandardCharsets.UTF_8);
 	private static final String SECRET = Base64.getEncoder().encodeToString(SECRET_BYTES);
 	private static final Duration ACCESS_TTL = Duration.ofMinutes(30);
+	private static final Duration REFRESH_TTL = Duration.ofDays(14);
 	private static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 	private static final long CODE_ID = 5012L;
 	private static final String CODE = "K7P2QX9M";
@@ -114,7 +119,8 @@ class ApproveLinkServiceTest {
 	private SaveDevicePort saveDevicePort;
 
 	@Spy
-	private JwtTokenIssuer issueTokenPort = new JwtTokenIssuer(SECRET, ACCESS_TTL, Clock.fixed(NOW, ZoneOffset.UTC));
+	private JwtTokenIssuer issueTokenPort = new JwtTokenIssuer(SECRET, ACCESS_TTL, REFRESH_TTL,
+			Clock.fixed(NOW, ZoneOffset.UTC));
 
 	@Mock
 	private PublishAuthEventPort publishAuthEventPort;
@@ -141,7 +147,7 @@ class ApproveLinkServiceTest {
 			}
 			return Device.restore(NEW_DEVICE_ID, device.getOwnerType(), device.getOwnerId(), device.getPlatform(),
 					device.getPushToken(), device.getPushUpdatedAt(), device.getRefreshTokenHash(),
-					device.getRevokedAt());
+					device.getRevokedAt(), device.getRefreshTokenExpiresAt());
 		});
 		lenient().when(createGuardianUseCase.createGuardian(any(CreateGuardianCommand.class)))
 				.thenReturn(new GuardianAccount(FAMILY_ID, NEW_GUARDIAN_ID));
@@ -359,6 +365,28 @@ class ApproveLinkServiceTest {
 		assertThat(device.getPushToken()).isNull();
 		assertThat(device.getPushUpdatedAt()).isNull();
 		assertThat(device.getRefreshTokenHash()).isEqualTo(issueTokenPort.hashRefreshToken(result.refreshToken()));
+	}
+
+	@Test
+	@DisplayName("연결 승인이 만든 Device의 refresh 토큰 만료 시각은 발급자가 준 refreshTokenExpiresAt(발급 시각 + 14일)이다")
+	void approveLinkStoresRefreshTokenExpiryFromIssuedTokens() {
+		givenCode(issuedCode());
+		givenVehicle(pendingVehicle());
+		List<IssuedTokens> issued = new ArrayList<>();
+		doAnswer(invocation -> {
+			IssuedTokens tokens = (IssuedTokens) invocation.callRealMethod();
+			issued.add(tokens);
+			return tokens;
+		}).when(issueTokenPort).issueTokens(any(TokenSubject.class));
+
+		VehicleLinkResult result = approveLinkService.approveLink(command(LinkMode.NEW, requiredConsents(), null));
+
+		assertThat(issued).hasSize(1);
+		Device device = lastSavedDeviceOf(NEW_GUARDIAN_ID);
+		assertThat(device.getRefreshTokenHash()).isEqualTo(issueTokenPort.hashRefreshToken(result.refreshToken()));
+		assertThat(device.getRefreshTokenExpiresAt())
+				.isEqualTo(issued.getFirst().refreshTokenExpiresAt())
+				.isEqualTo(NOW.plus(REFRESH_TTL));
 	}
 
 	@Test
@@ -660,7 +688,7 @@ class ApproveLinkServiceTest {
 
 	private static Device liveUserDevice(long deviceId, long userId) {
 		return Device.restore(deviceId, OwnerType.USER, userId, Platform.ANDROID, "old-fcm-" + deviceId,
-				NOW.minusSeconds(3600), OLD_REFRESH_HASH, null);
+				NOW.minusSeconds(3600), OLD_REFRESH_HASH, null, NOW.plus(Duration.ofDays(14)));
 	}
 
 	private static void assertError(ThrowingCallable call, HttpStatus status, String code) {

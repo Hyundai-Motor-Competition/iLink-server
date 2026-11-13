@@ -257,7 +257,7 @@ class PickupModuleLinkAdaptersTest extends IntegrationTestSupport {
 
 	private static Device liveUserDevice(long userId, Instant at) {
 		return Device.register(OwnerType.USER, userId, Platform.ANDROID, "push-" + UUID.randomUUID(), at,
-				randomSha256Hex());
+				randomSha256Hex(), at.plus(Duration.ofDays(14)));
 	}
 
 	private static String uniqueInviteToken() {

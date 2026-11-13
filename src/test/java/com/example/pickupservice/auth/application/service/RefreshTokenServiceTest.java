@@ -2,8 +2,10 @@ package com.example.pickupservice.auth.application.service;
 
 import com.example.pickupservice.auth.adapter.out.token.JwtTokenIssuer;
 import com.example.pickupservice.auth.application.port.in.TokenResult;
+import com.example.pickupservice.auth.application.port.out.IssuedTokens;
 import com.example.pickupservice.auth.application.port.out.LoadDevicePort;
 import com.example.pickupservice.auth.application.port.out.SaveDevicePort;
+import com.example.pickupservice.auth.application.port.out.TokenSubject;
 import com.example.pickupservice.auth.domain.Device;
 import com.example.pickupservice.auth.domain.OwnerType;
 import com.example.pickupservice.auth.domain.Platform;
@@ -13,6 +15,7 @@ import com.example.pickupservice.user.application.port.in.LoadMemberUseCase;
 import com.example.pickupservice.user.application.port.in.LoadVehicleUseCase;
 import com.example.pickupservice.user.application.port.in.MemberInfo;
 import com.example.pickupservice.user.application.port.in.VehicleInfo;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,13 +39,17 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,6 +60,7 @@ class RefreshTokenServiceTest {
 	private static final byte[] SECRET_BYTES = "pickup-test-jwt-secret-0123456789abcdef".getBytes(StandardCharsets.UTF_8);
 	private static final String SECRET = Base64.getEncoder().encodeToString(SECRET_BYTES);
 	private static final Duration ACCESS_TTL = Duration.ofMinutes(30);
+	private static final Duration REFRESH_TTL = Duration.ofDays(14);
 	private static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 	private static final String OLD_REFRESH_TOKEN = "rt_old-refresh-token-of-device-501";
 	private static final long GUARDIAN_ID = 31L;
@@ -66,7 +74,8 @@ class RefreshTokenServiceTest {
 	private SaveDevicePort saveDevicePort;
 
 	@Spy
-	private JwtTokenIssuer issueTokenPort = new JwtTokenIssuer(SECRET, ACCESS_TTL, Clock.fixed(NOW, ZoneOffset.UTC));
+	private JwtTokenIssuer issueTokenPort = new JwtTokenIssuer(SECRET, ACCESS_TTL, REFRESH_TTL,
+			Clock.fixed(NOW, ZoneOffset.UTC));
 
 	@Mock
 	private LoadMemberUseCase loadMemberUseCase;
@@ -74,8 +83,17 @@ class RefreshTokenServiceTest {
 	@Mock
 	private LoadVehicleUseCase loadVehicleUseCase;
 
+	@Mock
+	private Clock clock;
+
 	@InjectMocks
 	private RefreshTokenService refreshTokenService;
+
+	@BeforeEach
+	void setUpClock() {
+		lenient().when(clock.instant()).thenReturn(NOW);
+		lenient().when(clock.getZone()).thenReturn(ZoneOffset.UTC);
+	}
 
 	@Test
 	@DisplayName("토큰 발급은 refresh 원문을 돌려주고 Device에는 그 SHA-256 해시만 저장한다")
@@ -116,7 +134,7 @@ class RefreshTokenServiceTest {
 	@DisplayName("토큰 갱신이 발급한 access 토큰에는 VEHICLE 기기 차량의 familyId가 들어 있고 role은 비어 있다")
 	void refreshOfVehicleDeviceIssuesAccessTokenWithVehicleFamilyIdAndNoRole() {
 		Device device = Device.restore(601L, OwnerType.VEHICLE, VEHICLE_ID, Platform.VEHICLE, null, null,
-				issueTokenPort.hashRefreshToken(OLD_REFRESH_TOKEN), null);
+				issueTokenPort.hashRefreshToken(OLD_REFRESH_TOKEN), null, NOW.plus(Duration.ofDays(3)));
 		givenStoredDevices(device);
 		when(loadVehicleUseCase.findVehicle(VEHICLE_ID)).thenReturn(Optional.of(
 				new VehicleInfo(VEHICLE_ID, FAMILY_ID, "KMHJ381ABNU123456", "아이오닉 5", "12가3456", true)));
@@ -151,7 +169,8 @@ class RefreshTokenServiceTest {
 	@DisplayName("폐기된 기기의 refresh 토큰으로 갱신하면 REFRESH_TOKEN_INVALID로 거절한다")
 	void refreshWithRevokedDeviceTokenIsRejected() {
 		Device revoked = Device.restore(501L, OwnerType.USER, GUARDIAN_ID, Platform.ANDROID, "fcm-token-1",
-				NOW.minusSeconds(3600), issueTokenPort.hashRefreshToken(OLD_REFRESH_TOKEN), NOW.minusSeconds(60));
+				NOW.minusSeconds(3600), issueTokenPort.hashRefreshToken(OLD_REFRESH_TOKEN), NOW.minusSeconds(60),
+				NOW.plus(Duration.ofDays(3)));
 		givenStoredDevices(revoked);
 
 		assertRefreshTokenInvalid(OLD_REFRESH_TOKEN);
@@ -170,9 +189,76 @@ class RefreshTokenServiceTest {
 		verify(saveDevicePort, never()).saveDevice(any());
 	}
 
+	@Test
+	@DisplayName("refresh 토큰 만료 시각이 지난 기기의 토큰으로 갱신하면 REFRESH_TOKEN_INVALID로 거절하고 아무것도 저장하지 않는다")
+	void refreshWithExpiredRefreshTokenIsRejected() {
+		Device expired = liveGuardianDeviceExpiringAt(NOW.minusSeconds(1));
+		givenStoredDevices(expired);
+		givenGuardianMember();
+
+		assertRefreshTokenInvalid(OLD_REFRESH_TOKEN);
+
+		verify(issueTokenPort, never()).issueTokens(any());
+		verify(saveDevicePort, never()).saveDevice(any());
+		assertThat(expired.getRefreshTokenHash()).isEqualTo(issueTokenPort.hashRefreshToken(OLD_REFRESH_TOKEN));
+		assertThat(expired.getRefreshTokenExpiresAt()).isEqualTo(NOW.minusSeconds(1));
+	}
+
+	@Test
+	@DisplayName("refresh 토큰 만료 시각과 같은 순간에 갱신하면 만료로 보고 REFRESH_TOKEN_INVALID로 거절한다")
+	void refreshAtExactRefreshTokenExpiryIsRejected() {
+		givenStoredDevices(liveGuardianDeviceExpiringAt(NOW));
+		givenGuardianMember();
+
+		assertRefreshTokenInvalid(OLD_REFRESH_TOKEN);
+
+		verify(issueTokenPort, never()).issueTokens(any());
+		verify(saveDevicePort, never()).saveDevice(any());
+	}
+
+	@Test
+	@DisplayName("refresh 토큰 만료 시각이 없는 옛 기기의 토큰으로 갱신하면 REFRESH_TOKEN_INVALID로 거절한다")
+	void refreshWithLegacyDeviceWithoutRefreshExpiryIsRejected() {
+		givenStoredDevices(liveGuardianDeviceExpiringAt(null));
+		givenGuardianMember();
+
+		assertRefreshTokenInvalid(OLD_REFRESH_TOKEN);
+
+		verify(issueTokenPort, never()).issueTokens(any());
+		verify(saveDevicePort, never()).saveDevice(any());
+	}
+
+	@Test
+	@DisplayName("refresh 토큰 만료 1초 전에 갱신하면 성공하고 기기의 refresh 만료 시각은 발급자가 준 발급 시각 + 14일로 바뀐다")
+	void refreshOneSecondBeforeExpirySucceedsAndMovesExpiryToNewlyIssuedValue() {
+		givenStoredDevices(liveGuardianDeviceExpiringAt(NOW.plusSeconds(1)));
+		givenGuardianMember();
+		List<IssuedTokens> issued = new ArrayList<>();
+		doAnswer(invocation -> {
+			IssuedTokens tokens = (IssuedTokens) invocation.callRealMethod();
+			issued.add(tokens);
+			return tokens;
+		}).when(issueTokenPort).issueTokens(any(TokenSubject.class));
+
+		TokenResult result = refreshTokenService.refresh(OLD_REFRESH_TOKEN);
+
+		assertThat(issued).hasSize(1);
+		ArgumentCaptor<Device> saved = ArgumentCaptor.forClass(Device.class);
+		verify(saveDevicePort).saveDevice(saved.capture());
+		assertThat(saved.getValue().getRefreshTokenHash()).isEqualTo(sha256Hex(result.refreshToken()));
+		assertThat(saved.getValue().getRefreshTokenExpiresAt())
+				.isEqualTo(issued.getFirst().refreshTokenExpiresAt())
+				.isEqualTo(NOW.plus(REFRESH_TTL));
+	}
+
 	private Device liveGuardianDevice() {
+		return liveGuardianDeviceExpiringAt(NOW.plus(Duration.ofDays(3)));
+	}
+
+	private Device liveGuardianDeviceExpiringAt(Instant refreshTokenExpiresAt) {
 		return Device.restore(501L, OwnerType.USER, GUARDIAN_ID, Platform.ANDROID, "fcm-token-1",
-				NOW.minusSeconds(3600), issueTokenPort.hashRefreshToken(OLD_REFRESH_TOKEN), null);
+				NOW.minusSeconds(3600), issueTokenPort.hashRefreshToken(OLD_REFRESH_TOKEN), null,
+				refreshTokenExpiresAt);
 	}
 
 	private void givenStoredDevices(Device... devices) {
@@ -186,12 +272,13 @@ class RefreshTokenServiceTest {
 			return Optional.empty();
 		});
 		if (devices.length > 0 && devices[0].isLive()) {
-			when(saveDevicePort.saveDevice(any(Device.class))).thenAnswer(invocation -> invocation.getArgument(0));
+			lenient().when(saveDevicePort.saveDevice(any(Device.class)))
+					.thenAnswer(invocation -> invocation.getArgument(0));
 		}
 	}
 
 	private void givenGuardianMember() {
-		when(loadMemberUseCase.findMember(GUARDIAN_ID)).thenReturn(Optional.of(
+		lenient().when(loadMemberUseCase.findMember(GUARDIAN_ID)).thenReturn(Optional.of(
 				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "01012345678")));
 	}
 

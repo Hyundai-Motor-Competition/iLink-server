@@ -248,7 +248,7 @@ class IssueInviteServiceTest {
 
 	private static Device liveDevice(long userId) {
 		return Device.restore(401L, OwnerType.USER, userId, Platform.ANDROID, "fcm-old", NOW.minusSeconds(3600),
-				"0".repeat(64), null);
+				"0".repeat(64), null, NOW.plus(Duration.ofDays(14)));
 	}
 
 	private static void assertError(ThrowingCallable call, HttpStatus status, String code) {

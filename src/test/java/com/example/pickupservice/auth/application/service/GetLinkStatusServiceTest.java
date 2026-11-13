@@ -55,6 +55,7 @@ class GetLinkStatusServiceTest {
 	private static final byte[] SECRET_BYTES = "pickup-test-jwt-secret-0123456789abcdef".getBytes(StandardCharsets.UTF_8);
 	private static final String SECRET = Base64.getEncoder().encodeToString(SECRET_BYTES);
 	private static final Duration ACCESS_TTL = Duration.ofMinutes(30);
+	private static final Duration REFRESH_TTL = Duration.ofDays(14);
 	private static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 	private static final long CODE_ID = 5012L;
 	private static final long VEHICLE_ID = 77L;
@@ -78,7 +79,8 @@ class GetLinkStatusServiceTest {
 	private SaveDevicePort saveDevicePort;
 
 	@Spy
-	private JwtTokenIssuer issueTokenPort = new JwtTokenIssuer(SECRET, ACCESS_TTL, Clock.fixed(NOW, ZoneOffset.UTC));
+	private JwtTokenIssuer issueTokenPort = new JwtTokenIssuer(SECRET, ACCESS_TTL, REFRESH_TTL,
+			Clock.fixed(NOW, ZoneOffset.UTC));
 
 	@Mock
 	private LoadVehicleUseCase loadVehicleUseCase;
@@ -177,6 +179,7 @@ class GetLinkStatusServiceTest {
 		assertThat(savedDevice.getValue().getDeviceId()).isEqualTo(VEHICLE_DEVICE_ID);
 		assertThat(savedDevice.getValue().getRefreshTokenHash())
 				.isEqualTo(issueTokenPort.hashRefreshToken(result.refreshToken()));
+		assertThat(savedDevice.getValue().getRefreshTokenExpiresAt()).isEqualTo(NOW.plus(REFRESH_TTL));
 
 		ArgumentCaptor<LinkCode> savedCode = ArgumentCaptor.forClass(LinkCode.class);
 		verify(saveLinkCodePort).saveLinkCode(savedCode.capture());
@@ -308,7 +311,7 @@ class GetLinkStatusServiceTest {
 		lenient().when(loadVehicleUseCase.findVehicle(VEHICLE_ID)).thenReturn(Optional.of(linkedVehicle()));
 		lenient().when(loadDevicePort.loadDevice(VEHICLE_DEVICE_ID)).thenReturn(Optional.of(
 				Device.restore(VEHICLE_DEVICE_ID, OwnerType.VEHICLE, VEHICLE_ID, Platform.VEHICLE, null, null,
-						OLD_VEHICLE_REFRESH_HASH, NOW.minusSeconds(1))));
+						OLD_VEHICLE_REFRESH_HASH, NOW.minusSeconds(1), NOW.plus(Duration.ofDays(14)))));
 		lenient().when(loadDevicePort.loadLiveDevices(OwnerType.VEHICLE, VEHICLE_ID))
 				.thenReturn(List.of(liveVehicleDevice(OTHER_VEHICLE_DEVICE_ID)));
 
@@ -342,7 +345,7 @@ class GetLinkStatusServiceTest {
 
 	private static Device liveVehicleDevice(long deviceId) {
 		return Device.restore(deviceId, OwnerType.VEHICLE, VEHICLE_ID, Platform.VEHICLE, null, null,
-				OLD_VEHICLE_REFRESH_HASH, null);
+				OLD_VEHICLE_REFRESH_HASH, null, NOW.plus(Duration.ofDays(14)));
 	}
 
 	private static void assertNotCodeOwner(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
