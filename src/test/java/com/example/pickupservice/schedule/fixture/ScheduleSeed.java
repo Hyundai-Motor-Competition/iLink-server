@@ -7,6 +7,7 @@ import com.example.pickupservice.schedule.domain.ScheduleStatus;
 import com.example.pickupservice.user.fixture.UserSeed;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import org.locationtech.jts.geom.Point;
 import org.springframework.boot.test.context.TestComponent;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -33,10 +34,18 @@ public class ScheduleSeed {
 	private final TransactionTemplate transactionTemplate;
 
 	public Result seed() {
+		return seedAcademy(GeoPoints.toPoint(ENTRANCE_LAT, ENTRANCE_LNG));
+	}
+
+	public Result seedWithoutEntrance() {
+		return seedAcademy(null);
+	}
+
+	private Result seedAcademy(Point entrance) {
 		UserSeed.Result user = userSeed.seed();
 		return transactionTemplate.execute(status -> {
 			AcademyEntity academy = persist(new AcademyEntity(null, ACADEMY_EXTERNAL_PLACE_ID, ACADEMY_NAME, ACADEMY_ADDRESS,
-					GeoPoints.toPoint(ACADEMY_LAT, ACADEMY_LNG), GeoPoints.toPoint(ENTRANCE_LAT, ENTRANCE_LNG),
+					GeoPoints.toPoint(ACADEMY_LAT, ACADEMY_LNG), entrance,
 					ACADEMY_PHONE));
 			PickupScheduleEntity schedule = persist(new PickupScheduleEntity(null, user.minjunId(),
 					academy.getAcademyId(), WEEKDAYS, CLASS_END_TIME, TARGET_PICKUP, ScheduleStatus.READY));

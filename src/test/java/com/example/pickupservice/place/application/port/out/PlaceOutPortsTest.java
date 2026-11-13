@@ -40,7 +40,7 @@ class PlaceOutPortsTest {
 	}
 
 	@Test
-	@DisplayName("place 쪽 AcademyInfo는 academyId · name · location record다")
+	@DisplayName("place 쪽 AcademyInfo는 academyId · name · location · entrance record다")
 	void academyInfoHasComponents() {
 		verifyAcademyInfoRecord();
 	}
@@ -71,9 +71,9 @@ class PlaceOutPortsTest {
 		assertThat(AcademyInfo.class.isRecord()).as("AcademyInfo는 record여야 한다").isTrue();
 		RecordComponent[] components = AcademyInfo.class.getRecordComponents();
 		assertThat(Arrays.stream(components).map(RecordComponent::getName).toList())
-				.containsExactly("academyId", "name", "location");
+				.containsExactly("academyId", "name", "location", "entrance");
 		assertThat(Arrays.stream(components).map(c -> c.getGenericType().getTypeName()).toList())
-				.containsExactly("long", String.class.getName(), LatLng.class.getName());
+				.containsExactly("long", String.class.getName(), LatLng.class.getName(), LatLng.class.getName());
 	}
 
 	private record ExpectedMethod(String name, String genericReturnType, Class<?>[] parameterTypes,

@@ -1,8 +1,8 @@
 # FOLLOWUP · 장소 (place)
 
-- 생성: 2026-11-12 23:42 KST · tdd-guard
-- 상태: 진행 중 (체크 96/96 · 완료 기준 2/4)
-- 테스트: ● GREEN · 2415 passed · 전체 · 279s · .\gradlew.bat test --console=plain
+- 생성: 2026-11-13 17:03 KST · tdd-guard
+- 상태: 진행 중 (체크 99/99 · 완료 기준 2/4)
+- 테스트: ● GREEN · 2599 passed · 전체 · 271s · .\gradlew.bat test --console=plain
 - 설계서: C:/ilink/docs/07_장소-place.md
 
 ## 완료 항목
@@ -103,6 +103,9 @@ PlaceDomainImportTest.place domain 소스 어디에도 JTS를 쓰는 common.geo.
 - [x] #94 GET /v1/pickup-spot-recommendations에 ISO 형식이 아닌 arriveAt을 보내면 422 VALIDATION_FAILED와 fields의 arriveAt을 돌려준다 ← PickupSpotRecommendationControllerTest.[1] arriveAt = "내일"
 - [x] #95 차량 시간 어댑터는 미래 운행 정보 길찾기에 summary 파라미터를 붙이지 않는다 ← KakaoMobilityDriveTimeAdapterTest.미래 운행 정보 길찾기는 summary 파라미터를 붙이지 않는다 (departAt 있음)
 - [x] #96 참조 데이터 로더는 테이블별 적재를 한 트랜잭션으로 해서 중간에 실패하면 그 테이블에 일부 행을 남기지 않는다 ← GangnamReferenceDataLoaderRollbackTest.curb_stop_candidate 적재가 뒤쪽 묶음에서 실패하면
+- [x] #97 [기반] 블록 우회 도보 거리 규칙은 두 좌표 사이 남북 거리와 동서 거리를 더한 값을 m로 돌려준다(북쪽 300m · 동쪽 400m면 직선 500m가 아니라 700m) ← BlockDetourDistanceTest.블록 우회 거리 규칙은 북쪽 300m · 동쪽 400m 떨어진 두 점 사이를 직선 500m가 아니라
+- [x] #98 [서비스] 장소 조회는 walkMinutes를 학원 출입구(없으면 학원 위치)에서 만남 지점까지 블록 우회 도보 거리를 초속 1.1m로 나눈 시간을 분으로 올림해 돌려준다 ← ListPickupSpotsServiceTest.장소 조회는 출입구가 있으면 출입구에서 만남 지점까지 블록 우회 거리(700m)를
+- [x] #99 [persistence] LoadAcademyPort 어댑터는 schedule 학원의 출입구 좌표(entrance)를 place AcademyInfo.entrance로 넘기고, 출입구가 없으면 null로 넘긴다 ← PlaceModuleLinkAdaptersTest.LoadAcademyPort 어댑터는 schedule 학원의 출입구 좌표를 AcademyInfo.entrance로 넘긴다
 
 ## 미완료 항목
 - 없음
@@ -114,29 +117,23 @@ PlaceDomainImportTest.place domain 소스 어디에도 JTS를 쓰는 common.geo.
 - [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-12 23:36 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 3 · 하 9 · 리뷰 시점 체크 96/96
-- 리뷰 시점 테스트: ● GREEN · 2415 passed · 전체 · 287s · .\gradlew.bat test --console=plain
+- 2026-11-13 17:03 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 2 · 하 7 · 리뷰 시점 체크 99/99
+- 리뷰 시점 테스트: ● GREEN · 2599 passed · 전체 · 271s · .\gradlew.bat test --console=plain
   - 결론: 조건부 통과
-  - (상 0 · 중 3 · 하 9. 이전 [중] 4건 중 1건 해소, 남은 3건은 모두 사람 결정 대기. 새로 생긴 [상] · [중] 없음. 전체를 다시 볼 근거 없음)
-  - [중] (이전 리뷰, 남음) 길가 후보 3,147행 중 812행의 road_name이 비어 있어 응답 name이 null이 되고, 이름 없는 도로가 한 묶음으로 1곳만 남음. 후속 과제에는 기록됨. name null 응답 테스트도 아직 없음 — curb_stop_candidates.csv(빈 행 812 재확인), SpotCandidateMerger.java:40, docs/followup/place.md 후속 과제 2번째 줄 → 사람 결정 뒤 항목 추가
-  - [중] (이전 리뷰, 남음) 결과를 버리는 loadActiveChildLocation 호출이 그대로이고 strict stub이 호출을 강제함 — ListPickupSpotsService.java:38, ListPickupSpotsServiceTest.java:139 → 리팩터링(호출과 stub 제거)
-  - [중] (이전 리뷰, 남음) #44 문장이 지금 동작과 반대이고 그 이름의 증거 테스트가 없음. 07의 「임시 어댑터」 설명도 옛 내용 — 07 L8 · L24 · L208, PlaceModuleLinkAdaptersTest.java:44 → 사람 결정(문장 · 증거 · 07 문구를 「pickup에 위임」으로 고침)
-  - [하] main 코드에 Javadoc 1줄이 새로 생김(02 L78 위반). PlacePickupActivityAdapter 주석은 지웠으나 로더에 새로 달았고, 같은 내용이 이미 07 L129에 있음. place main의 주석은 이 1줄뿐 — GangnamReferenceDataLoader.java:50 → 리팩터링(삭제)
-  - [하] #93 증거가 맞지 않는 테스트로 기록됨. 기록된 「강남구 밖(서울시청) 학원으로 추천하면」은 supported false만 보고 「대치동 주변 후보를 돌려준다」를 검증하지 않음. 맞는 테스트는 「대치동 학원으로 추천하면 supported true이고…」(통과). #91 증거도 「0m」 테스트라 문장의 111m · GeoPoints 없음을 보지 않음(맞는 것: 「위도 0.001도 차이를 약 111m」, PlaceDomainImportTest) — docs/followup/place.md:99 · :101, RecommendPickupSpotsServiceIntegrationTest.java:86-111 · :132-141, StraightDistanceTest.java:23-30 → note(증거 …
-  - [하] 새 테스트 파일 2개에 Javadoc · 설명 주석 8곳이 늘어남. 지난번에 지적한 4곳은 지워졌고 그 전 6곳은 그대로 — GangnamReferenceDataLoaderRollbackTest.java:14 · :35, RecommendPickupSpotsServiceIntegrationTest.java:41 · :45 · :47 · :58 · :177 · :183 / 남은 6곳: PlaceModuleLinkAdaptersTest.java:33, AddPickupSpotServiceTest.java:238, PlacePersistenceAdapterTest.java:40 · :45, UpdatePickupSpotServiceTest.java:378 · :384 → 리팩터링
-  - [하] PlaceDomainImportTest는 소스 글자를 훑어 의존 규칙을 검사하는 테스트인데, 02 L80 · L214는 「아키텍처 규칙은 테스트가 아니라 코드 리뷰로 확인」이라고 정함. 같은 방식의 선례는 있음(ScheduleModuleImportTest.java:16-30). import common.geo.* 꼴은 못 잡음 — PlaceDomainImportTest.java:26 · :40 → 사람 결정(그대로 두고 02 L80에 예외를 적을지, 지울지)
-  - [하] iLink_Project_Package/ 폴더가 여전히 추적 안 됨이고 .gitignore에도 없음. 07 문구는 고쳐졌으나(L70) 폴더 처리 결정이 후속 과제에 없음 — git status ?? iLink_Project_Package/ → 사람 결정(/tdd commit 전에 무시 · 삭제 · 커밋 중 하나)
-  - [하] 07 API 표 SPOT-04 오류 칸에 「arriveAt 형식 오류」가 없음. 코드 · API 문서 · #94 테스트에는 있음 — 07 L80, PickupSpotRecommendationController.java:57-61, PickupSpotRecommendationApiDoc.java:20-21 → note(문서 갱신)
-  - [하] 모양 2건. responseCode = "422",description에 빈칸 빠짐. StraightDistance는 생성자가 상수보다 위(다른 domain 클래스는 상수가 먼저: SpotCandidateMerger.java:14-16) — PickupSpotRecommendationApiDoc.java:20, StraightDistance.java:7-10 → 리팩터링
-  - [하] (이전 리뷰, 남음 · 모두 후속 과제에 기록됨) 「서버가 뜬 뒤 60행 · 3,147행」 테스트가 @AfterEach의 load()로도 통과 가능, 공영주차장 좌표 소수점 7~8자리, 02 문서 갱신, GangnamServiceAreaAdapter 위치, 카카오 어댑터 2개 중복, prod DDL 스크립트 없음, API 문서 예시 +09:00 → note
-  - [하] (그 이전 리뷰, 남음) 08 L39 FK 표기, web 테스트 없음(SPOT-02 404 · DELETE 404 · 409 DEFAULT_SPOT_CONFLICT), 세션 있을 때 walkMinutes 테스트, 동시 요청 시나리오, PATCH memo "", lat · lng 범위, toPoint(LatLng) 반복 3곳, pickup이 place SpotInfo를 바로 씀, 02 L19 → note
-  - 이전 지적 처리 (22건): 해소됨 9건(트랜잭션 안 외부 호출, API 문서 404, 로더 트랜잭션 #96, BOM 표기, domain → GeoPoints 의존 #91, distanceMeters 직접 테스트 없음, #79 증거, 07 구조 블록 · 출처 문구, 지적한 테스트 Javadoc 4곳 · PlacePickupActivityAdapter 주석). 일부 해소 1건(테스트 없음 4건 중 3건: #93 · #94 · #95. name null 응답 1건 남음). 남음 12건.
-  - 새 항목 #91~#96 대조: 6개 모두 설계 문장(07 L127-129 · L122 · L80)과 코드가 맞고, 테스트가 그 문장을 직접 단언함. GeoPoints.distanceMeters 제거로 다른 도메인이 깨지는 곳 없음(사용처 0건). TransactionTemplate을 main에서 쓰는 곳은 로더 하나뿐이고 07 L129에 근거 있음.
-  - 미확인: 실제 카카오모빌리티 호출(키 · 응답 모양 · 한도). #96 테스트가 트랜잭션을 빼면 실제로 RED가 되는지. 서버 2대가 빈 테이블로 동시에 뜰 때 로더 동작(빈 테이블 확인이 트랜잭션 밖이고 잠금이 없음). RollbackTest가 만드는 트리거 · 함수가 실행이 중간에 죽었을 때 남는지. dev 배포 DB에 참조 데이터가 들어갔는지.
-  - 완료 기준: C1 미충족 — 전체 GREEN 2415, place 297건 실패 0, #91~#96 모두 테스트 있음. 단 #44 문장(07 L208)이 지금 동작과 반대이고 그 이름의 증거 테스트가 없음(이전과 같음, 사람 결정 대기) / C2 충족 — 바뀐 3곳(트랜잭션 경계 · 직선거리 위치 · 적재 트랜잭션)이 07 L127-129와 일치. 이름 없는 길의 name null만 설계에 없음(사람 결정 대기) / C3 미충족 — 02 L78 주석 1건이 새로 생김(GangnamReferenceDataLoader.java:50, 지우면 해소). 02 L70 의존은 해소됨. 02 L173과 다른 422, 02 L80과 ImportTest는 사람 결정 대기 / C4 충족 — 07 확인 필요 24행이 FOLL…
-  - 후속 과제(새로 적을 것): iLink_Project_Package 폴더 처리, 로더 Javadoc 삭제, #91 · #93 증거 다시 기록, 02 L80 · L214와 ImportTest 2개, 07 L80 오류 칸
-  - 테스트: mcp__tdd-guard__tests scope "all" → GREEN 2415 passed · 287s. place 39개 클래스 297건 실패 0
-- 이전 리뷰: 2026-11-12 23:06 KST (조건부 통과), 2026-11-11 11:57 KST (조건부 통과)
+  - 상 0 · 중 2 · 하 7. 이전 지적 10건 중 해소 3건(어댑터 entrance 테스트, 테스트 주석 6줄, 07 L83 예시). 남은 [중] 2건 · [하] 6건은 사람이 1차 개발 뒤 정리하기로 FOLLOWUP에 적어 둠. 새 [상] · [중] 없음. 바뀐 main 코드 없음.
+  - [중] (이전, 미룸) 체크된 #27 · #44 문장이 지금 동작과 반대 — 07:191 · :208 → 사람 결정
+  - [중] (이전, 미룸) road_name 빈 길가 후보 812행 → name null — SpotCandidateMerger.java:40 → 사람 결정
+  - [하] 쓰지 않는 필드 checkActivePickupPort · lenient stub → 리팩터링(메모 (3))
+  - [하] 아무도 안 쓰는 loadActiveChildLocation 경로 → 사람 결정(메모 (2))
+  - [하] 07 옛 문구 L8 · L155, PickupSpotControllerTest.java:73 DisplayName → note(메모 (4))
+  - [하] FOLLOWUP 옛 메모(walkMinutes 늘 null, loadActiveChildLocation 매번 부름) → note
+  - [하] AcademyInfo 3인자 보조 생성자 main 사용 0건 → note(메모 (5))
+  - [하] (새) 07 L83 예시 walkMinutes 2는 시드 좌표로 검산하면 1분(26.6m) → note
+  - [하] SPOT-01 출입구 우선 · SPOT-04 location만 — 위반 아님 → note(메모 (6))
+  - #99 대조: PlaceModuleLinkAdaptersTest.java:79-107 2건이 entrance 있음 · 없음을 직접 단언, 우연 통과 아님, ScheduleSeed 변경 영향 없음, 테스트 주석 제거 확인.
+  - 완료 기준: C1 미충족(#27 · #44 문장, 사람 결정 대기) / C2 충족 / C3 미충족(422/400, PlaceDomainImportTest 사람 결정 대기) / C4 충족
+  - 테스트: scope all GREEN 2599 passed · 271s
+- 이전 리뷰: 2026-11-13 16:54 KST (조건부 통과), 2026-11-12 23:36 KST (조건부 통과), 2026-11-12 23:06 KST (조건부 통과), 2026-11-11 11:57 KST (조건부 통과)
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -145,7 +142,7 @@ PlaceDomainImportTest.place domain 소스 어디에도 JTS를 쓰는 common.geo.
 | 반경 조회 기준 좌표 | near · radiusM이 정차 지점 기준인지 만남 지점 기준인지 소스에 없음. GIST가 걸린 정차 지점 기준으로 가정 |
 | ST_MakeEnvelope(지도 범위) 조회 | 소스 2.2는 지도 범위 조회를 말하지만 API에는 near · radiusM만 있음. 범위(사각형) 파라미터는 두지 않음 |
 | near · radiusM 중 하나만 온 경우 | 결정됨: 422 VALIDATION_FAILED(빠진 쪽을 fields에) |
-| walkMinutes 계산 방법 | 걷는 속도 · 경로 계산 방법이 소스에 없음. 정해야 함. 지금은 늘 null |
+| walkMinutes 계산 방법 | [사람 결정 2026-11-13] 학원 출입구 → 만남 지점 블록 우회 거리(남북 + 동서) ÷ 초속 1.1m, 분 올림 |
 | 유일한 기본 장소를 PATCH로 isDefault false로 바꾸는 경우 | 결정됨: 남은 장소 수와 상관없이 422 DEFAULT_SPOT_REQUIRED(다른 장소를 기본으로 지정해야 바뀜) |
 | PATCH로 memo 지우기 | null은 「안 보냄」이라 지금은 못 지움. 빈 문자열을 「지움」으로 볼지 정해야 함 |
 | 기본 장소 유일성을 DB로도 막을지 | 결정됨(사람): DB 부분 유니크 인덱스 uk_pickup_spot_default + 동시 요청으로 부딪히면 409 DEFAULT_SPOT_CONFLICT |
@@ -177,6 +174,8 @@ PlaceDomainImportTest.place domain 소스 어디에도 JTS를 쓰는 common.geo.
 - SPOT-04 후속: (1) 실제 카카오모빌리티 호출은 테스트가 없다(MockRestServiceServer만). 키 · 한도 · 응답 모양은 2026-11-12 수동 호출로만 확인 (2) 공영주차장 좌표가 소수점 7~8자리라 응답 location이 6자리를 넘음. 공통 좌표 반올림 결정과 함께 정리 (3) API 문서 예시 arriveAt의 +09:00은 URL에서 %2B로 바꿔야 함. 실제 HTTP로는 미확인 (4) GangnamServiceAreaAdapter는 classpath 파일을 읽는데 adapter/out/persistence에 있음 (5) 카카오 어댑터 2개(KakaoMapSearchAdapter · KakaoMobilityDriveTimeAdapter)의 RestClient 설정 · 헤더 · 실패 처리가 겹침. common으로 묶을 후보 (6) 「서버가 뜬 뒤 60행 · 3,147행」 테스트는 @AfterEach의 load()로도 통과할 수 있어 ApplicationRunner 연결을 직접 보지 않음 (7) 02_공통-규칙-global에 추천 책임 · 네이티브 쿼리 예외(반경 조회 2개 · 로더 INSERT) · 참조 테이블 PK 예외를 반영해야 함 (8) 참조 데이터(parking_public.csv · curb_stop_candidates.csv)는 손으로 다시 만들어 넣어야 하고, 길가 선 데이터는 2021-08 파일 기준
 - [설계 결정 필요] (1) iLink_Project_Package/ 폴더(기획 문서 + 강남구 원본 데이터 약 15MB)가 git에 없고 .gitignore에도 없다. 커밋 · 무시 · 삭제 중 사람이 정해야 함. 2026-11-12 커밋에서는 제외함 (2) PlaceDomainImportTest는 소스 글자를 훑어 의존 규칙을 보는 테스트인데 02_공통-규칙-global L80 · L214는 아키텍처 규칙을 코드 리뷰로 확인한다고 정한다(선례 ScheduleModuleImportTest). 그대로 두고 02에 예외를 적을지, 지울지 사람이 정해야 함 (3) 참조 데이터 로더는 빈 테이블 확인이 트랜잭션 밖이고 잠금이 없어, 서버 2대가 빈 테이블로 동시에 뜨면 한쪽이 기본 키 충돌로 실패할 수 있음. 배포 대수 확인 필요
 - [완료 기준 미충족 · 사람 결정 필요] C1: #44 문장(임시 CheckActivePickupPort는 false · 빈 값)이 지금 동작(pickup 연동 어댑터)과 반대라 문장을 고치거나 항목을 정리해야 함. 전체 테스트는 GREEN 2415 passed. C3: 필수 쿼리 누락을 422로 돌려주는 것과 공통 규칙의 400 중 어느 쪽인지, PlaceDomainImportTest를 02 문서 L80 · L214의 예외로 둘지 정해지지 않음. GangnamReferenceDataLoader의 Javadoc 위반은 2026-11-12 정리 리뷰에서 지움
+- [2026-11-13] 체크된 #191(「진행 중 세션이 없으면 walkMinutes null」)의 증거 테스트는 사람 결정(블록 우회 도보 시간)으로 동작이 바뀌어 #98 테스트 4건으로 대체됨. #191 문장은 옛 동작. ListPickupSpotsService의 쓰지 않던 loadActiveChildLocation 호출 제거(포트는 PlaceOutPortsTest가 확인하므로 유지)
+- [1차 개발 뒤 정리 · 2026-11-13] (1) 체크된 #27(07 L191 「세션 없으면 walkMinutes null」)과 #44 문장이 지금 동작과 반대 — 문장 고칠지 항목 정리할지 결정(C1) (2) 아무도 안 쓰는 경로 place CheckActivePickupPort.loadActiveChildLocation → PlacePickupActivityAdapter → pickup activeChildLocation 정리 여부 (3) ListPickupSpotsService의 쓰지 않는 checkActivePickupPort 필드 · 테스트 lenient stub 제거 (4) 07 L155 시그니처 주석 「(walkMinutes)」, L8 의존 줄 「자녀 현재 위치」, PickupSpotControllerTest DisplayName 「null walkMinutes」 갱신 (5) AcademyInfo 3인자 보조 생성자 제거 후보 (6) SPOT-04도 출입구를 기준점으로 쓸지 (7) FOLLOWUP의 #191 표기는 place #27. 응답 예시(07 L83) walkMinutes는 2로 갱신함
 - place: SPOT-03 PATCH에서 null이 「안 보냄」이라 memo를 지울 방법이 없음 — 빈 문자열("")을 「지움」으로 볼지 결정 필요. 설계서에 없던 record 이름(AcademySpots · SpotItem), SpotInfo 필드(spotId · familyId · academyId · name · stopPoint · meetingPoint)는 test-writer가 정함
 - place 결정(팀장): #48 기본 장소를 PATCH로 isDefault false로 바꾸면 남은 장소 수와 상관없이 422 DEFAULT_SPOT_REQUIRED(장소가 있는 학원엔 기본 장소가 늘 하나). 학원 정보가 없을 때 수정 · 추가는 404(테스트는 추가 쪽만)
 - place 결정(팀장): SPOT-01 학원 정보가 없으면 academyName null로 묶음 유지, walkMinutes는 계산 방법이 정해질 때까지 늘 null, 학원 이름은 학원마다 loadAcademy 1회(가족 학원 수가 적다고 가정), 묶음 academyId · 장소 spotId 오름차순

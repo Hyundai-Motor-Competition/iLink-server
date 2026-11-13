@@ -5,6 +5,11 @@ import com.example.pickupservice.common.geo.LatLng;
 public record AcademyInfo(
 		long academyId,
 		String name,
-		LatLng location
+		LatLng location,
+		LatLng entrance
 ) {
+
+	public AcademyInfo(long academyId, String name, LatLng location) {
+		this(academyId, name, location, null);
+	}
 }

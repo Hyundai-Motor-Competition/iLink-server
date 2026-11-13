@@ -80,7 +80,7 @@ uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스�
 | SPOT-04 | GET /v1/pickup-spot-recommendations | GUARDIAN · CO_GUARDIAN · DELEGATE, 차량 앱 | 불필요 | query academyId(저장된 학원, 필수), origin(차량 현재 좌표 "lat,lng", 필수), arriveAt(선택, ISO 시각) → 200 supported, items[](rank · kind(PUBLIC_PARKING · CURB_STOP) · name · location{lat, lng} · walkMeters · walkSeconds · driveSeconds · totalSeconds · cautions[]) 최대 3개 | 404 NOT_FOUND(학원 없음), 422 VALIDATION_FAILED(academyId · origin이 없거나 형식 오류, arriveAt이 ISO 형식이 아니거나 과거) |
 
 응답 예시
-- SPOT-01: `{"academies":[{"academyId":55,"academyName":"해솔영어학원","spots":[{"spotId":21,"name":"정문 앞","stopPoint":{"lat":37.501234,"lng":127.039876},"meetingPoint":{"lat":37.501301,"lng":127.039901},"memo":"편의점 앞","isDefault":true,"walkMinutes":null}]}]}`
+- SPOT-01: `{"academies":[{"academyId":55,"academyName":"해솔영어학원","spots":[{"spotId":21,"name":"정문 앞","stopPoint":{"lat":37.501234,"lng":127.039876},"meetingPoint":{"lat":37.501301,"lng":127.039901},"memo":"편의점 앞","isDefault":true,"walkMinutes":1}]}]}`
 - SPOT-02: `{"spotId":21,"isDefault":true}`
 
 ## 핵심 로직
@@ -258,8 +258,9 @@ List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<In
 - [x] GET /v1/pickup-spot-recommendations에 ISO 형식이 아닌 arriveAt을 보내면 422 VALIDATION_FAILED와 fields의 arriveAt을 돌려준다
 - [x] 차량 시간 어댑터는 미래 운행 정보 길찾기에 summary 파라미터를 붙이지 않는다
 - [x] 참조 데이터 로더는 테이블별 적재를 한 트랜잭션으로 해서 중간에 실패하면 그 테이블에 일부 행을 남기지 않는다
-- [ ] [기반] 블록 우회 도보 거리 규칙은 두 좌표 사이 남북 거리와 동서 거리를 더한 값을 m로 돌려준다(북쪽 300m · 동쪽 400m면 직선 500m가 아니라 700m)
-- [ ] [서비스] 장소 조회는 walkMinutes를 학원 출입구(없으면 학원 위치)에서 만남 지점까지 블록 우회 도보 거리를 초속 1.1m로 나눈 시간을 분으로 올림해 돌려준다
+- [x] [기반] 블록 우회 도보 거리 규칙은 두 좌표 사이 남북 거리와 동서 거리를 더한 값을 m로 돌려준다(북쪽 300m · 동쪽 400m면 직선 500m가 아니라 700m)
+- [x] [서비스] 장소 조회는 walkMinutes를 학원 출입구(없으면 학원 위치)에서 만남 지점까지 블록 우회 도보 거리를 초속 1.1m로 나눈 시간을 분으로 올림해 돌려준다
+- [x] [persistence] LoadAcademyPort 어댑터는 schedule 학원의 출입구 좌표(entrance)를 place AcademyInfo.entrance로 넘기고, 출입구가 없으면 null로 넘긴다
 
 ## 확인 필요 사항
 

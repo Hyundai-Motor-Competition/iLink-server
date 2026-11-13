@@ -45,6 +45,10 @@ class ListPickupSpotsServiceTest {
 	private static final LatLng MEETING = new LatLng(37.501301, 127.039901);
 	private static final LatLng NEAR = new LatLng(37.501200, 127.039800);
 
+	private static final double NORTH_10M_LAT_DELTA = 0.00009;
+	private static final double NORTH_300M_LAT_DELTA = 0.0026980;
+	private static final double EAST_400M_LNG_DELTA = 0.0045343;
+
 	@Mock
 	private LoadSpotPort loadSpotPort;
 
@@ -81,9 +85,10 @@ class ListPickupSpotsServiceTest {
 						tuple(ACADEMY_ID, "해솔영어학원"),
 						tuple(OTHER_ACADEMY_ID, "바른수학학원"));
 		AcademySpots haesol = result.academies().get(0);
-		assertThat(haesol.spots()).containsExactly(
-				new SpotItem(21L, "정문 앞", STOP, MEETING, "편의점 앞", true, null),
-				new SpotItem(22L, "후문", STOP, MEETING, null, false, null));
+		assertThat(haesol.spots()).usingRecursiveFieldByFieldElementComparatorIgnoringFields("walkMinutes")
+				.containsExactly(
+						new SpotItem(21L, "정문 앞", STOP, MEETING, "편의점 앞", true, null),
+						new SpotItem(22L, "후문", STOP, MEETING, null, false, null));
 		assertThat(result.academies().get(1).spots()).extracting(SpotItem::spotId).containsExactly(31L);
 		verify(loadAcademyPort, times(1)).loadAcademy(ACADEMY_ID);
 		verify(loadAcademyPort, times(1)).loadAcademy(OTHER_ACADEMY_ID);
@@ -130,19 +135,75 @@ class ListPickupSpotsServiceTest {
 	}
 
 	@Test
-	@DisplayName("장소 조회는 진행 중 세션이 없으면 모든 장소의 walkMinutes를 null로 돌려준다")
-	void listSpotsReturnsNullWalkMinutesWithoutActiveSession() {
-		PickupSpot frontGate = spot(21L, ACADEMY_ID, "정문 앞", "편의점 앞", true);
-		PickupSpot backGate = spot(22L, ACADEMY_ID, "후문", null, false);
-		PickupSpot otherAcademySpot = spot(31L, OTHER_ACADEMY_ID, "학원 건물 앞", null, true);
-		given(loadSpotPort.loadSpots(FAMILY_ID, null)).willReturn(List.of(frontGate, backGate, otherAcademySpot));
-		given(checkActivePickupPort.loadActiveChildLocation(FAMILY_ID)).willReturn(Optional.empty());
+	@DisplayName("장소 조회는 출입구가 있으면 출입구에서 만남 지점까지 블록 우회 거리(700m)를 초속 1.1m로 나눠 분으로 올림한 11분을 walkMinutes로 돌려준다")
+	void listSpotsComputesWalkMinutesFromEntranceWhenAcademyHasEntrance() {
+		LatLng entrance = new LatLng(37.502000, 127.040000);
+		LatLng farLocation = new LatLng(37.511000, 127.040000);
+		given(loadAcademyPort.loadAcademy(ACADEMY_ID))
+				.willReturn(Optional.of(new AcademyInfo(ACADEMY_ID, "해솔영어학원", farLocation, entrance)));
+		PickupSpot frontGate = spotMeeting(21L, ACADEMY_ID, northEast300x400From(entrance));
+		given(loadSpotPort.loadSpots(FAMILY_ID, null)).willReturn(List.of(frontGate));
+
+		SpotGroups result = listPickupSpotsService.listSpots(new ListSpotsQuery(FAMILY_ID, null, null, null));
+
+		assertThat(result.academies().get(0).spots()).extracting(SpotItem::walkMinutes).containsExactly(11);
+	}
+
+	@Test
+	@DisplayName("장소 조회는 출입구가 없으면 학원 위치에서 만남 지점까지 블록 우회 거리(700m)를 초속 1.1m로 나눠 분으로 올림한 11분을 walkMinutes로 돌려준다")
+	void listSpotsComputesWalkMinutesFromAcademyLocationWhenNoEntrance() {
+		given(loadAcademyPort.loadAcademy(ACADEMY_ID))
+				.willReturn(Optional.of(new AcademyInfo(ACADEMY_ID, "해솔영어학원", ACADEMY_LOCATION, null)));
+		PickupSpot frontGate = spotMeeting(21L, ACADEMY_ID, northEast300x400From(ACADEMY_LOCATION));
+		given(loadSpotPort.loadSpots(FAMILY_ID, null)).willReturn(List.of(frontGate));
+
+		SpotGroups result = listPickupSpotsService.listSpots(new ListSpotsQuery(FAMILY_ID, null, null, null));
+
+		assertThat(result.academies().get(0).spots()).extracting(SpotItem::walkMinutes).containsExactly(11);
+	}
+
+	@Test
+	@DisplayName("장소 조회는 진행 중 세션이 없어도 walkMinutes를 계산하고, 만남 지점이 가까우면 1분 미만도 1분으로 올림한다")
+	void listSpotsRoundsUpWalkMinutesAndComputesWithoutActiveSession() {
+		LatLng nearMeeting = new LatLng(ACADEMY_LOCATION.lat() + NORTH_10M_LAT_DELTA, ACADEMY_LOCATION.lng());
+		LatLng northOnlyMeeting = new LatLng(ACADEMY_LOCATION.lat() + NORTH_300M_LAT_DELTA, ACADEMY_LOCATION.lng());
+		PickupSpot near = spotMeeting(21L, ACADEMY_ID, nearMeeting);
+		PickupSpot northOnly = spotMeeting(22L, ACADEMY_ID, northOnlyMeeting);
+		given(loadSpotPort.loadSpots(FAMILY_ID, null)).willReturn(List.of(near, northOnly));
+
+		SpotGroups result = listPickupSpotsService.listSpots(new ListSpotsQuery(FAMILY_ID, null, null, null));
+
+		assertThat(result.academies().get(0).spots())
+				.extracting(SpotItem::spotId, SpotItem::walkMinutes)
+				.containsExactly(tuple(21L, 1), tuple(22L, 5));
+	}
+
+	@Test
+	@DisplayName("장소 조회는 학원마다 그 학원의 출입구 또는 위치를 기준으로 walkMinutes를 따로 계산하고, 학원 정보가 없으면 walkMinutes를 null로 돌려준다")
+	void listSpotsComputesWalkMinutesPerAcademyAndNullForMissingAcademy() {
+		long missingAcademyId = 99L;
+		LatLng entrance = new LatLng(37.502000, 127.040000);
+		given(loadAcademyPort.loadAcademy(ACADEMY_ID))
+				.willReturn(Optional.of(new AcademyInfo(ACADEMY_ID, "해솔영어학원", ACADEMY_LOCATION, entrance)));
+		given(loadAcademyPort.loadAcademy(missingAcademyId)).willReturn(Optional.empty());
+		PickupSpot withEntrance = spotMeeting(21L, ACADEMY_ID, northEast300x400From(entrance));
+		PickupSpot withLocation = spotMeeting(31L, OTHER_ACADEMY_ID, northEast300x400From(OTHER_ACADEMY_LOCATION));
+		PickupSpot orphan = spotMeeting(41L, missingAcademyId, northEast300x400From(ACADEMY_LOCATION));
+		given(loadSpotPort.loadSpots(FAMILY_ID, null)).willReturn(List.of(withEntrance, withLocation, orphan));
 
 		SpotGroups result = listPickupSpotsService.listSpots(new ListSpotsQuery(FAMILY_ID, null, null, null));
 
 		List<SpotItem> allSpots = result.academies().stream().flatMap(group -> group.spots().stream()).toList();
-		assertThat(allSpots).hasSize(3);
-		assertThat(allSpots).extracting(SpotItem::walkMinutes).containsOnlyNulls();
+		assertThat(allSpots).extracting(SpotItem::spotId, SpotItem::walkMinutes)
+				.containsExactly(tuple(21L, 11), tuple(31L, 11), tuple(41L, null));
+	}
+
+	private static LatLng northEast300x400From(LatLng origin) {
+		return new LatLng(origin.lat() + NORTH_300M_LAT_DELTA, origin.lng() + EAST_400M_LNG_DELTA);
+	}
+
+	private static PickupSpot spotMeeting(long spotId, long academyId, LatLng meetingPoint) {
+		return PickupSpot.restore(spotId, FAMILY_ID, academyId, "정문 앞", null, STOP, meetingPoint, false, GUARDIAN_ID);
 	}
 
 	@Test
