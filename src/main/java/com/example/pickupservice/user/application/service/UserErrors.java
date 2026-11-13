@@ -1,6 +1,7 @@
 package com.example.pickupservice.user.application.service;
 
 import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.error.ErrorCode;
 import org.springframework.http.HttpStatus;
 
 final class UserErrors {
@@ -24,7 +25,6 @@ final class UserErrors {
 	}
 
 	static BusinessException activePickupExists() {
-		return BusinessException.of(HttpStatus.CONFLICT, "ACTIVE_PICKUP_EXISTS",
-				"진행 중인 픽업이 있어 차량 연결을 해제할 수 없습니다");
+		return BusinessException.of(ErrorCode.ACTIVE_PICKUP_EXISTS);
 	}
 }

@@ -25,7 +25,7 @@ public class CompleteSetupService implements CompleteSetupUseCase {
 			throw ScheduleErrors.settingsVersionConflict();
 		}
 		if (!summary.missing().isEmpty()) {
-			throw ScheduleErrors.setupIncomplete();
+			throw ScheduleErrors.setupIncomplete(summary.missing());
 		}
 		return new SetupCompletionResult(true);
 	}

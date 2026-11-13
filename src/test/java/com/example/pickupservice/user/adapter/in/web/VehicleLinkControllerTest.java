@@ -1,6 +1,7 @@
 package com.example.pickupservice.user.adapter.in.web;
 
 import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.user.application.port.in.UnlinkVehicleCommand;
@@ -21,6 +22,7 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @RequiredArgsConstructor
@@ -64,14 +66,14 @@ class VehicleLinkControllerTest extends FamilyWebTestSupport {
 	}
 
 	@Test
-	@DisplayName("DELETE /v1/vehicle-links/{vehicleId}가 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS를 돌려준다")
+	@DisplayName("DELETE /v1/vehicle-links/{vehicleId}가 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS와 common ErrorCode 문구(차량 로그아웃과 같은 문구)를 돌려준다")
 	void unlinkVehicleWithActivePickupReturns409ActivePickupExists() throws Exception {
-		willThrow(BusinessException.of(
-				HttpStatus.CONFLICT, "ACTIVE_PICKUP_EXISTS", "진행 중인 픽업이 있어 차량 연결을 해제할 수 없습니다"))
+		willThrow(BusinessException.of(ErrorCode.ACTIVE_PICKUP_EXISTS))
 				.given(unlinkVehicleUseCase).unlinkVehicle(any());
 
 		mockMvc.perform(unlinkVehicleRequest(VEHICLE_ID, guardianBearer()))
-				.andExpect(commonError(HttpStatus.CONFLICT, "ACTIVE_PICKUP_EXISTS"));
+				.andExpect(commonError(HttpStatus.CONFLICT, "ACTIVE_PICKUP_EXISTS"))
+				.andExpect(jsonPath("$.error.message").value("진행 중인 픽업이 있어 처리할 수 없습니다"));
 	}
 
 	private MockHttpServletRequestBuilder unlinkVehicleRequest(long vehicleId, String bearer) {

@@ -1,6 +1,7 @@
 package com.example.pickupservice.schedule.adapter.in.web;
 
 import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.schedule.application.port.in.ChildQuery;
@@ -211,13 +212,15 @@ class SetupControllerTest extends ScheduleWebTestSupport {
 	}
 
 	@Test
-	@DisplayName("POST /v1/children/{childId}/setup-completion이 누락이 있으면 422 SETUP_INCOMPLETE를 돌려준다")
+	@DisplayName("POST /v1/children/{childId}/setup-completion이 누락이 있으면 422 SETUP_INCOMPLETE와 common ErrorCode 문구(픽업 시작과 같은 문구)를 돌려주고 missing은 error.missing 추가 키로 나간다")
 	void completeSetupWithMissingItemsReturns422SetupIncomplete() throws Exception {
-		given(completeSetupUseCase.completeSetup(any())).willThrow(BusinessException.of(
-				HttpStatus.UNPROCESSABLE_CONTENT, "SETUP_INCOMPLETE", "설정이 끝나지 않았습니다"));
+		given(completeSetupUseCase.completeSetup(any())).willThrow(BusinessException.of(ErrorCode.SETUP_INCOMPLETE)
+				.withDetail("missing", List.of(MissingSetupItem.CHILD_DEVICE, MissingSetupItem.PICKUP_SPOT)));
 
 		mockMvc.perform(setupCompletionRequest(guardianBearer(), COMPLETION_BODY))
-				.andExpect(commonError(HttpStatus.UNPROCESSABLE_CONTENT, "SETUP_INCOMPLETE"));
+				.andExpect(commonError(HttpStatus.UNPROCESSABLE_CONTENT, "SETUP_INCOMPLETE"))
+				.andExpect(jsonPath("$.error.message").value("픽업 준비가 끝나지 않았습니다"))
+				.andExpect(jsonPath("$.error.missing", contains("CHILD_DEVICE", "PICKUP_SPOT")));
 	}
 
 	@Test

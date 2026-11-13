@@ -71,6 +71,26 @@ class CompleteSetupServiceTest {
 	}
 
 	@Test
+	@DisplayName("설정 완료가 missing 때문에 거절되면 common ErrorCode.SETUP_INCOMPLETE 문구를 쓰고 남은 missing 목록을 추가 키 missing으로 담는다(D2)")
+	void completeSetupRejectionUsesCommonSetupIncompleteMessageAndCarriesMissing() {
+		given(getSetupSummaryUseCase.getSetupSummary(QUERY)).willReturn(summary(
+				List.of(MissingSetupItem.CHILD_DEVICE, MissingSetupItem.PICKUP_SPOT), SETTINGS_VERSION));
+
+		BusinessException thrown = catchThrowableOfType(BusinessException.class,
+				() -> completeSetupService.completeSetup(
+						new CompleteSetupCommand(FAMILY_ID, CHILD_ID, SETTINGS_VERSION)));
+
+		assertError(thrown, HttpStatus.UNPROCESSABLE_CONTENT, "SETUP_INCOMPLETE");
+		assertThat(thrown.getMessage()).isEqualTo(ErrorCode.SETUP_INCOMPLETE.getMessage());
+		assertThat(thrown.details()).containsOnlyKeys("missing");
+		assertThat(thrown.details().get("missing")).isInstanceOf(List.class);
+		List<String> missingNames = ((List<?>) thrown.details().get("missing")).stream()
+				.map(String::valueOf)
+				.toList();
+		assertThat(missingNames).containsExactly("CHILD_DEVICE", "PICKUP_SPOT");
+	}
+
+	@Test
 	@DisplayName("설정 완료는 버전도 다르고 missing도 남아 있으면 버전 충돌 409를 먼저 돌려준다")
 	void completeSetupChecksVersionBeforeMissing() {
 		given(getSetupSummaryUseCase.getSetupSummary(QUERY)).willReturn(summary(
