@@ -290,6 +290,8 @@ void publishDeviceReplaced(List<Long> previousDeviceIds);                   // P
 - [ ] [서비스] refresh 토큰은 발급 14일(P14D) 뒤 만료되고, 만료된 refresh 토큰으로 POST /v1/auth/refresh를 부르면 유효하지 않은 refresh 토큰과 같은 401로 거절한다(사람 결정 2026-11-13)
 - [ ] [통합] access 토큰 유효 기간 PT30M · refresh 토큰 유효 기간 P14D는 application.yml 설정값으로 두고, 발급한 access 토큰의 exp가 발급 시각 + 30분이다
 - [ ] [web] GET /v1/vehicle-link-codes/by-code/{code}(LINK-03)가 같은 기기 5번 실패 뒤면 429 LINK_CODE_ATTEMPT_LIMIT과 error.retryAfterSeconds(차단이 풀릴 때까지 남은 초)를 돌려준다(D3)
+- [ ] [서비스] 초대 발급 · 초대 조회 · 초대 수락은 대상 멤버가 해제된 멤버(user MemberInfo.removed true)면 404 NOT_FOUND로 거절하고 기기 · 토큰을 만들지 않는다(user D7 삭제 표시 뒤 후속, 사람 결정 2026-11-14)
+- [ ] [서비스] RevokeMemberDevicesUseCase(멤버 해제 때 호출)는 그 멤버의 기기 · 토큰과 함께 아직 쓰지 않은 초대도 폐기한다(사람 결정 2026-11-14)
 
 ## 확인 필요 사항
 

@@ -254,6 +254,7 @@ InvalidScheduleException(String field, String reason)                   // 도�
 - [ ] [web] GET /v1/families/me/today-pickups(GUARDIAN · CO_GUARDIAN)는 오늘 가족 자녀들의 픽업을 시각 순으로 childName · academyName · targetAt · status(SCHEDULED · IN_PROGRESS · COMPLETED)로 돌려준다(부모 메인 오늘의 픽업 타임라인)
 - [ ] [persistence] Academy는 familyId를 갖고 (familyId, externalPlaceId)가 유니크다. 두 가족이 같은 externalPlaceId로 일정을 등록하면 학원 행이 가족마다 따로 생긴다(사람 결정 2026-11-13: 학원은 가족마다 따로 둠)
 - [ ] [서비스] 일정 등록 · 수정의 학원 다시 쓰기는 같은 가족의 학원만 갱신하고, 다른 가족 학원의 이름 · 주소 · 위치 · 출입구 · 대표번호를 바꾸지 않는다
+- [ ] [서비스] 해제된 자녀(user MemberInfo.removed true)에게는 일정 생성 · 수정을 404 NOT_FOUND로 거절한다. 해제된 자녀의 기존 일정 행은 지우지 않는다(사람 결정 2026-11-14)
 
 ## 확인 필요 사항
 
