@@ -48,6 +48,7 @@ pickup
 | spotVersion | INT | 기본 0 | |
 | routeVersion | INT | 기본 0 | |
 | routeSpotVersion | INT | NULL | SES-04 경로 확정 때의 spotVersion. G3 「경로 일치」 판정용 [팀장 결정 2026-11-09] |
+| routeTotalMeters | INT | NULL | DB 칸 이름 route_total_meters. SES-04 totalMeters(경로 전체 거리). 다시 확정하면 덮어씀 [사람 결정 2026-11-14] |
 | callHeld | BOOLEAN | 기본 false | CALL-01 발송 전 보류. DB에 두어 재시작해도 유지 |
 | etaAt | TIMESTAMPTZ | NULL | 내비 ETA, 최신값만 |
 | remainingMeters | INT | NULL | |
@@ -214,8 +215,10 @@ SES-02~07, SES-11~13, CALL-01 · 03이 성공하면 돌려주고 SES-03이 조�
 | children[].childUserId · name · phase · extraPrepMinutes · callNotBefore · acknowledgedAt · boardedAt | | 자녀별 상태 |
 | children[].location.lat · lng · at | number · number · datetime | 호출 전 · 탑승 후 · 동의 없음이면 null. 차량 · 보호자에게만 |
 | children[].readyAt | datetime | SIG-06 준비 완료 시각. 없으면 null |
+| children[].profileImageUrl | string | 자녀 프로필 사진 URL. 없으면 null |
+| driver.name · profileImageUrl | string · string | 운전 중인 보호자. 세션 가족의 GUARDIAN 중 userId가 가장 작은 1명. 없으면 driver = null [사람 결정 2026-11-14] |
 | vehicleLocation.lat · lng · at | number · number · datetime | 마지막 차량 위치. 차량 · 보호자에게 늘, 자녀에게는 700m · 180초 안일 때만. 없거나 세션이 끝났으면 null |
-| route.routeVersion · remainingMeters | integer | |
+| route.routeVersion · remainingMeters · totalMeters | integer | totalMeters는 SES-04로 받은 전체 거리. 없으면 null |
 | boarding.detectedAt · cancelableUntil · door | | 없으면 boarding = null |
 | incident.type · childUserId · openedAt | | 없으면 incident = null |
 
@@ -718,15 +721,15 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 - [x] [서비스] 끝난 세션(COMPLETED · CANCELLED)이거나 탑승을 인식한(boardingDetectedAt 있음) 세션에는 차량 이벤트 DEPARTED · STOP_FAILED와 신호 끊김 철회가 호출을 철회하지 않고 자녀 상태 · acknowledgedAt을 바꾸지 않는다(DEPARTED는 vehiclePhase · VEHICLE_DEPARTED만 남김)
 - [x] [서비스] ON_HOLD 세션에서는 준비 알림 기준을 넘어도 실내 준비 알림을 보내지 않고, 보류가 풀린 뒤 첫 차량 ETA 수신에서 기준 안이면 보낸다
 - [x] [서비스] 탑승 인식 없이 MANUAL로 완료된 세션과 CANCELLED 세션에 DEPARTED · STOP_FAILED가 와도 살아 있는 호출을 철회하지 않는다(boardingDetectedAt이 비어 있어도 끝난 세션이면 철회 안 함)
-- [ ] [서비스] 픽업 완료(SES-11)는 notBoardedChildUserIds에 세션에 없는 childUserId가 있으면 404 NOT_FOUND로 거절하고 세션 상태 · 자녀 탑승 상태를 바꾸지 않는다(사람 결정 2026-11-13)
-- [ ] [web] POST 픽업 완료(SES-11)에 세션에 없는 childUserId를 notBoardedChildUserIds로 보내면 404 NOT_FOUND를 돌려준다
+- [x] [서비스] 픽업 완료(SES-11)는 notBoardedChildUserIds에 세션에 없는 childUserId가 있으면 404 NOT_FOUND로 거절하고 세션 상태 · 자녀 탑승 상태를 바꾸지 않는다(사람 결정 2026-11-13)
+- [x] [web] POST 픽업 완료(SES-11)에 세션에 없는 childUserId를 notBoardedChildUserIds로 보내면 404 NOT_FOUND를 돌려준다
 - [ ] [web] PUT /v1/pickup-sessions/{sessionId}/route는 spotId 대신 candidate {name, location}을 받으면 임시 장소를 만들어 그 spotId로 경로를 확정한다. spotId와 candidate를 둘 다 보내거나 둘 다 빼면 422 VALIDATION_FAILED(최종디자인 11/13 V02 추천 장소, 팀장 결정 2026-11-13)
 - [ ] [web] POST /v1/pickup-sessions/{sessionId}/spot-changes도 spotId 대신 candidate {name, location}을 받아 임시 장소로 세션 장소를 바꾼다(V03 「다른장소로 가기」)
 - [ ] [서비스] 장소 변경에 here=true를 보내면 마지막으로 받은 차량 위치로 이름 「차량 정차 위치」, stopPoint · meetingPoint가 같은 임시 장소를 만들어 세션 장소를 바꾸고 바로 합류 안내(CALL)를 보낸다(V03 「여기로 부르기」, 서버가 한 번에 처리)
 - [ ] [서비스] here=true인데 받은 차량 위치가 없으면 422 VALIDATION_FAILED, 정차 중이 아니라 호출 가드를 못 넘으면 장소를 바꾸지 않고 409 CALL_GUARD_UNMET로 거절한다
-- [ ] [web] 세션 뷰 children[]에 profileImageUrl을, 세션 뷰에 운전 중인 보호자 driver {name, profileImageUrl}을 담는다(V03 · C03 아바타, C02 「엄마가 출발했어요」)
-- [ ] [web] 세션 뷰 route에 경로 확정 때 전체 거리 totalMeters를 담는다(부모 메인 출발→도착 진행 막대)
-- [ ] [서비스] 보호자에게 보내는 알림(출발 알림 · 준비 시간 추가 · 도움 요청 · 탑승 · 완료 등)의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE 모두다(GUARDIAN만이 아님, 사람 결정 2026-11-13)
+- [x] [web] 세션 뷰 children[]에 profileImageUrl을, 세션 뷰에 운전 중인 보호자 driver {name, profileImageUrl}을 담는다(V03 · C03 아바타, C02 「엄마가 출발했어요」)
+- [x] [web] 세션 뷰 route에 경로 확정 때 전체 거리 totalMeters를 담는다(부모 메인 출발→도착 진행 막대)
+- [x] [서비스] 보호자에게 보내는 알림(출발 알림 · 준비 시간 추가 · 도움 요청 · 탑승 · 완료 등)의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE 모두다(GUARDIAN만이 아님, 사람 결정 2026-11-13)
 - [ ] user의 LoadMemberService가 pickup에 주는 MemberInfo.profileImageUrl을 가족 조회(GetMyFamilyService · MemberResults)와 같은 방식의 URL로 채워, 세션 뷰 children[].profileImageUrl · driver.profileImageUrl에 실제 값이 나간다(#273 후속, 팀장 결정 2026-11-14)
 
 ## 확인 필요 사항
@@ -780,7 +783,8 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 | SES-11 notBoardedChildUserIds에 세션 밖 childUserId | 결정됨: 404 NOT_FOUND로 거절하고 세션 · 자녀 상태를 바꾸지 않는다(사람 결정 2026-11-13) |
 | 여기로 부르기(장소 변경 here=true) | 결정됨: 서버가 한 번에 처리한다. 마지막 차량 위치로 임시 장소를 만들어 세션 장소를 바꾸고 바로 합류 안내(CALL)를 보낸다(사람 결정 2026-11-13) |
 | 추천 장소 · 여기로 부르기의 임시 장소 저장 순서 | 결정됨: place #264(임시 장소 저장 in 포트) · #265(목록 · 기본 장소에서 제외)를 픽업 진행 중 메인 폴더에서 먼저 처리한 뒤 #269~#272를 진행한다(사람 결정 2026-11-14) |
-| 세션 뷰 driver(#273) | 결정됨: 세션 familyId의 role GUARDIAN 멤버 1명의 name · profileImageUrl. 없으면 null(사람 결정 2026-11-14) |
+| 세션 뷰 driver(#273) | 결정됨: 세션 familyId의 role GUARDIAN 멤버 1명의 name · profileImageUrl. 없으면 null(사람 결정 2026-11-14). GUARDIAN이 여럿이면 userId가 가장 작은 사람. 임시 장소의 createdBy도 같은 사람(팀장 결정 2026-11-14) |
+| 추천 장소 candidate로 경로 확정 · 장소 변경(#269 · #270) | [팀장 결정 2026-11-14] candidate {name, location}을 받으면 place SaveTemporarySpotUseCase로 임시 장소를 만든다: familyId는 세션 가족, academyId는 세션 지금 장소의 academyId, createdBy는 driver와 같은 GUARDIAN, stopPoint · meetingPoint는 둘 다 location. SES-04(route)는 세션 장소를 그 임시 장소로 바꾼 뒤(changeSpot과 같은 전제: CHILD_ALREADY_MOVING · CALL_ALREADY_SENT 거절) 바로 경로를 확정하고 SPOT_CHANGED · SPOT_CONFIRMED를 저장한다. 이때 spotId 불일치 409 검사는 하지 않는다. SES-05(spot-changes)는 spotId 대신 그 임시 spotId로 장소를 바꾼다. 거절이면 임시 장소를 만들지 않는다(같은 트랜잭션) |
 | 세션 뷰 route.totalMeters(#274) | 결정됨: SES-04 요청에 totalMeters(0 이상 정수, 선택)를 더하고 pickup_session.route_total_meters에 저장한다. 확정 전이나 값이 없으면 null(사람 결정 2026-11-14). 다시 확정하면 요청 값으로 덮어쓰고 값이 없으면 null(팀장 결정 2026-11-14) |
 | 이벤트 payload의 시각 값 | [사람 결정 2026-11-09] etaAt · predictedStopAt · callNotBefore · nextAllowedAt 등은 +09:00 문자열 |
 | 끝난 세션의 SES-04 · SES-05 · SIG-03 · SIG-05 | [사람 결정 2026-11-09] 409 SESSION_ALREADY_FINISHED로 거절하고 저장 · 알림 · 발행하지 않음 |
