@@ -372,6 +372,34 @@ class DispatchSessionEventServiceTest {
 		verify(loadPushTargetPort, never()).loadPushTargets(any());
 	}
 
+	@Test
+	@DisplayName("발송 리스너는 PREPARE_NOTICE_SENT의 notificationIds 행을 세션 자녀 기기로 보내며 제목은 「준비 알림」, 본문은 「곧 도착해요. 실내에서 준비해 주세요」이고 sentAt을 채운다")
+	void sendsPrepareNoticeToChildDeviceWithPrepareTitleAndBody() {
+		long childId = 41L;
+		long childDeviceId = 911L;
+		Notification prepareRow = Notification.restore(7301L, SESSION_ID, null, "PREPARE", childDeviceId, null, null,
+				null);
+		when(loadNotificationPort.load(7301L)).thenReturn(Optional.of(prepareRow));
+		when(loadPushTargetPort.loadPushTarget(childDeviceId))
+				.thenReturn(Optional.of(new PushTarget(childId, childDeviceId, Platform.ANDROID, "token-child")));
+		when(sendPushPort.send(any(PushMessage.class))).thenReturn(true);
+		when(saveNotificationPort.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		service.dispatch(new SessionEventMessage(SESSION_ID, EVENT_ID, SEQ, "PREPARE_NOTICE_SENT", STATE_VERSION,
+				OCCURRED_AT, Map.of("notificationIds", List.of(7301L)), List.of(childId)));
+
+		ArgumentCaptor<PushMessage> captor = ArgumentCaptor.forClass(PushMessage.class);
+		verify(sendPushPort, times(1)).send(captor.capture());
+		PushMessage pushed = captor.getValue();
+		assertThat(pushed.target().userId()).isEqualTo(childId);
+		assertThat(pushed.target().deviceId()).isEqualTo(childDeviceId);
+		assertThat(pushed.title()).isEqualTo("준비 알림");
+		assertThat(pushed.body()).isEqualTo("곧 도착해요. 실내에서 준비해 주세요");
+		assertThat(pushed.data()).containsEntry("notificationId", "7301");
+		assertThat(prepareRow.getSentAt()).isEqualTo(NOW);
+		verify(saveNotificationPort).save(prepareRow);
+	}
+
 	private static SessionEventMessage callEvent(long callId, long... notificationIds) {
 		return new SessionEventMessage(SESSION_ID, EVENT_ID, SEQ, "CALL_TRIGGERED", STATE_VERSION, OCCURRED_AT,
 				Map.of("callId", callId, "notificationIds", idList(notificationIds)), List.of(GUARDIAN_ID));

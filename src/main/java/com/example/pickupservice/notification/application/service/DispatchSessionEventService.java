@@ -32,6 +32,7 @@ public class DispatchSessionEventService implements DispatchSessionEventUseCase 
 	private static final Map<String, String> EVENT_TO_NOTIFICATION_TYPE = Map.of(
 			"SESSION_STARTED", "SESSION_STARTED",
 			"DEPARTURE_NOTICE_SENT", "DEPARTURE",
+			"PREPARE_NOTICE_SENT", "PREPARE",
 			"CALL_TRIGGERED", "CALL",
 			"PREP_TIME_EXTENDED", "PREP_EXTENDED",
 			"HELP_REQUESTED", "HELP");
