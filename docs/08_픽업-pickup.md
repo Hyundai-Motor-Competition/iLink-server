@@ -161,7 +161,7 @@ pickup
 | ID | Method · 경로 | 호출 | Idempotency-Key | 요청 → 응답 | 오류 |
 |---|---|---|---|---|---|
 | SES-01 | GET /v1/pickup-sessions/active | 모든 앱 | 불필요 | — → 200 sessionId · status(ACTIVE · ON_HOLD) · stateVersion, 없으면 204 | 공통 |
-| SES-02 | POST /v1/pickup-sessions | 차량 앱 | 필요 | scheduleIds[](1개 이상), date(한국 날짜) → 201 새 세션 · 200 진행 중인 같은 세션, SessionView | 422 NOT_TODAY, 422 SCHEDULES_NOT_GROUPABLE, 422 SETUP_INCOMPLETE(missing 함께), 409 ANOTHER_SESSION_ACTIVE |
+| SES-02 | POST /v1/pickup-sessions | 차량 앱 | 필요 | scheduleIds[](1개 이상, null 원소가 있으면 422 VALIDATION_FAILED), date(한국 날짜) → 201 새 세션 · 200 진행 중인 같은 세션, SessionView | 422 NOT_TODAY, 422 SCHEDULES_NOT_GROUPABLE, 422 SETUP_INCOMPLETE(missing 함께), 409 ANOTHER_SESSION_ACTIVE |
 | SES-03 | GET /v1/pickup-sessions/{sessionId} | 그 세션의 차량, 가족 사용자 | 불필요 | — → 200 SessionView(주체별 필드) | 공통 |
 | SES-04 | PUT /v1/pickup-sessions/{sessionId}/route | 차량 앱 | 필요 | spotId, navRouteId, stateVersion → 200 SessionView | 422 SPOT_NOT_SAVED, 409 STATE_VERSION_CONFLICT(stateVersion 다름 · spotId가 세션 장소와 다름, 순서는 SPOT_NOT_SAVED 먼저), 409 SESSION_ALREADY_FINISHED(끝난 세션) |
 | SES-05 | POST /v1/pickup-sessions/{sessionId}/spot-changes | 차량 앱, GUARDIAN · CO_GUARDIAN | 필요 | spotId, stateVersion, spotVersion → 200 SessionView | 409 CALL_ALREADY_SENT, 409 CHILD_ALREADY_MOVING, 409 SESSION_ALREADY_FINISHED(끝난 세션) |
@@ -669,6 +669,7 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 - [x] [서비스] 끝난(COMPLETED · CANCELLED) 세션에 경로 확정 · 장소 변경 · 준비 시간 추가 · 도움 요청이 오면 SESSION_ALREADY_FINISHED로 거절하고 저장 · 알림 · 발행하지 않는다
 - [x] [서비스] 완료된 세션에 온 차량 이벤트 DOOR_CYCLE은 오류 없이 무시하고 eventId는 처리한 것으로 남긴다
 - [x] SessionEventType은 SESSION_HELD · SESSION_RESUMED를 더한 21종이다
+- [ ] [web] POST /v1/pickup-sessions에 null이 든 scheduleIds([null] · [801, null])를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다
 
 ## 확인 필요 사항
 

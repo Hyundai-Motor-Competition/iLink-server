@@ -82,6 +82,7 @@ common에는 엔드포인트가 없다. 아래 부품이 모든 도메인의 API
 | BusinessException | 예외의 status · code · message · retryAfterSeconds | 도메인 오류는 모두 이 길 |
 | 그 밖의 Spring MVC 4xx 예외(ResponseStatusException 포함) | 그 예외의 4xx 상태 | code는 HttpStatus 이름(예: CONFLICT), message는 reason, reason이 없으면 기본 문구 |
 | 처리하지 않은 예외, Idempotency 조회 · 예약 단계의 DB 오류(유니크 위반 제외, DataAccessException · TransactionException) | 500 INTERNAL_SERVER_ERROR | 고정 문구. 본문에 예외 내용 · 예외 클래스 이름 · 테이블 · 컬럼 이름 없음 |
+| 클라이언트가 연결을 끊어 난 예외(SSE 스트림 끊김의 AsyncRequestNotUsableException, Broken pipe 등) | 응답 본문 없음 | 정상 상황이라 ERROR가 아닌 DEBUG로만 기록. 판정은 Spring의 DisconnectedClientHelper.isClientDisconnectedException(2026-11-13 dev 로그 분석으로 추가) |
 
 ## 핵심 로직
 
@@ -300,6 +301,8 @@ class BusinessException extends RuntimeException {   // 공개 생성자 없음
 - [x] [web] 각 도메인이 PublicEndpoints 빈으로 등록한 메서드 · 경로는 토큰 없이 부를 수 있고 만료된 Bearer 토큰을 붙여도 401이 아니라 그대로 처리된다
 - [x] [web] dev API 문서(/v3/api-docs)는 Bearer JWT 보안 스키마를 담는다
 - [x] [web] 공통 오류 코드(ErrorCode)로 BusinessException을 만들어 던지면 그 코드의 HTTP 상태 · code · 문구로 응답한다(429는 retryAfterSeconds 포함)
+- [ ] [web] GlobalExceptionHandler는 클라이언트가 연결을 끊어 난 예외(AsyncRequestNotUsableException · Broken pipe IOException 등 DisconnectedClientHelper.isClientDisconnectedException이 true인 것)를 ERROR로 기록하지 않고 DEBUG로만 남기며 응답 본문을 쓰지 않는다
+- [ ] [web] GlobalExceptionHandler는 클라이언트 끊김이 아닌 처리하지 않은 예외는 지금처럼 ERROR로 기록하고 500 INTERNAL_SERVER_ERROR 본문을 돌려준다
 
 ## 확인 필요 사항
 
