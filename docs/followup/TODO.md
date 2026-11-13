@@ -1,26 +1,16 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-13 22:01 KST · tdd-guard
+- 생성: 2026-11-14 00:02 KST · tdd-guard
 - 설계서: C:/pickup/docs
 - 프로젝트: gradle · C:/pickup
-- 테스트: ● GREEN · 2687 passed · 전체 · 135s
-- 진행: 공유모듈 59/64 · 사용자 79/85 · 인증 120/123 · 일정 77/83 · 장소 99/104 · 픽업 266/275 · 알림 65/65 · 프로필사진 39/39 · 남은 항목 34/838
-- 현재 도메인: 프로필사진 (10_프로필사진-profile.md) · 진행 시작: /tdd go
+- 테스트: ● GREEN · 2738 passed · 전체 · 161s
+- 진행: 공유모듈 72/72 · 사용자 79/85 · 인증 120/124 · 일정 77/83 · 장소 99/104 · 픽업 266/275 · 알림 65/65 · 프로필사진 39/39 · 남은 항목 30/847
+- 현재 도메인: 공유모듈 (03_공유모듈-shared.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
 
-## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 대기 · 항목 59/64 · 완료 기준 0/4
-### 테스트 케이스
-- [ ] #60 [web] ACTIVE_PICKUP_EXISTS는 common ErrorCode에 한 번만 정의하고, 로그아웃(auth)과 차량 연결 해제(user)가 같은 409 · 같은 code · 같은 문구로 응답한다(D2, 사람 결정 2026-11-13)
-- [ ] #61 [web] SETUP_INCOMPLETE는 common ErrorCode에 한 번만 정의하고, schedule과 pickup이 같은 422 · 같은 code · 같은 문구로 응답하며 missing 목록은 추가 키로 담는다(D2)
-- [ ] #62 [web] 도메인 code용 429 팩토리 하나가 code · 문구와 retryAfterSeconds(다시 시도할 초)를 함께 담아 응답한다(D3)
-- [ ] #63 [web] 429인 LINK_CODE_REISSUE_LIMIT · LINK_CODE_ATTEMPT_LIMIT · HELP_REQUEST_TOO_SOON · RESEND_TOO_SOON · TOO_MANY_REQUESTS 응답은 모두 retryAfterSeconds를 담는다(HELP_REQUEST_TOO_SOON의 nextAllowedAt은 추가 키로 유지, D3)
-- [ ] #64 [통합] spring.task.scheduling.pool.size가 4라 @Scheduled 작업이 스레드 1개를 나눠 쓰지 않는다(한 작업이 오래 걸려도 다른 작업이 제때 돈다, D6)
-### 완료 기준
-- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
-- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+## 1. 공유모듈 (shared) · 03_공유모듈-shared.md · 완료 · 항목 72/72 · 완료 기준 4/4 · 리뷰 11-14 00:02 조건부 통과 (상 0 · 중 3 · 하 7)
+- 남은 할 일 없음
 
 ## 2. 사용자 (user) · 04_사용자-user.md · 대기 · 항목 79/85 · 완료 기준 0/4
 ### 테스트 케이스
@@ -36,11 +26,12 @@
 - [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
 - [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
-## 3. 인증 (auth) · 05_인증-auth.md · 대기 · 항목 120/123 · 완료 기준 0/4
+## 3. 인증 (auth) · 05_인증-auth.md · 대기 · 항목 120/124 · 완료 기준 0/4
 ### 테스트 케이스
 - [ ] #121 [web] 초대 수락(FAM-06)과 연결 승인(LINK-04)의 consents에 SERVICE_IMPROVEMENT(선택 동의)를 보낼 수 있고, 빠져도 수락 · 승인은 성공한다(C00 · 가족 프로필 등록4 「(선택) 서비스 개선」)
 - [ ] #122 [서비스] refresh 토큰은 발급 14일(P14D) 뒤 만료되고, 만료된 refresh 토큰으로 POST /v1/auth/refresh를 부르면 유효하지 않은 refresh 토큰과 같은 401로 거절한다(사람 결정 2026-11-13)
 - [ ] #123 [통합] access 토큰 유효 기간 PT30M · refresh 토큰 유효 기간 P14D는 application.yml 설정값으로 두고, 발급한 access 토큰의 exp가 발급 시각 + 30분이다
+- [ ] #124 [web] GET /v1/vehicle-link-codes/by-code/{code}(LINK-03)가 같은 기기 5번 실패 뒤면 429 LINK_CODE_ATTEMPT_LIMIT과 error.retryAfterSeconds(차단이 풀릴 때까지 남은 초)를 돌려준다(D3)
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치

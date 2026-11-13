@@ -15,12 +15,14 @@
 ```text
 common
 ├─ security        SecurityConfig(SecurityFilterChain · @EnableMethodSecurity · PublicEndpoints 빈을 모아 permitAll), PublicEndpoints · PublicEndpoint(인증 없는 API 등록), JwtDecoderConfig(HS256 검증 · exp 필수), AuthPrincipalJwtConverter(클레임 → AuthPrincipal), AuthPrincipal · PrincipalType · Role, 401 · 403 처리
-├─ error           ErrorResponse, ErrorCode(02 공통 코드와 여러 모듈이 같이 쓰는 도메인 코드, TOO_MANY_REQUESTS 포함), BusinessException(정적 팩토리만), GlobalExceptionHandler(@RestControllerAdvice), ValidationFieldErrors, ErrorResponseWriter(필터 단계 오류 본문)
+├─ error           ErrorResponse, ErrorCode(02 공통 코드와 여러 모듈이 같이 쓰는 도메인 코드, TOO_MANY_REQUESTS 포함), BusinessException(정적 팩토리만), GlobalExceptionHandler(@RestControllerAdvice), ValidationFieldErrors, ErrorResponseWriter(필터 단계 오류 본문), ErrorCodeAttribute · FilterStageEnd(필터 단계에서 끝남 표시와 그때의 Authentication을 요청 속성에 남김, logging은 읽기만)
 ├─ idempotency     IdempotencyKeyFilter, @IdempotencyKeyRequired, IdempotencyKeyEntity · IdempotencyKeyRepository, IdempotencyKeyCleaner(@Scheduled 만료 삭제), CachedBodyRequest(본문 다시 읽기)
-├─ logging         RequestIdFilter(MDC requestId), RequestLoggingInterceptor(HandlerInterceptor, AOP 아님), @PollingLog
-├─ web             Spring MVC 공통 설정: JsonOnlyWebMvcConfig(응답은 JSON만), 검증 재정의 허용(ValidationConfigurationCustomizer)
+├─ logging         RequestIdFilter(MDC requestId), RequestLoggingInterceptor(HandlerInterceptor, AOP 아님), FilterStageRequestLoggingFilter(필터 단계에서 끝난 요청 한 줄), RequestLogLine(로그 형식 · path · principal 공통), RequestLogAttributes · PollStateStore(@PollingLog 직전 상태), RequestLoggingConfig, @PollingLog
+├─ web             Spring MVC 공통 설정: JsonOnlyWebMvcConfig(응답은 JSON만), 검증 재정의 허용(ValidationConfig), ProfileImageParts(multipart 사진 부분)
 ├─ async           AsyncConfig(@EnableAsync, eventTaskExecutor), SchedulingConfig(@Scheduled 작업 실행)
 ├─ time            TimeUtils, TimeZoneConfig(JVM 기본 시간대 UTC), ClockConfig(Clock.systemUTC() 빈)
+├─ text            문자열 규칙 도우미(이름 · 차량 번호 마스킹 등)
+├─ image           프로필 사진 형식 · 크기 검사 공통
 ├─ geo             GeoPoints, LatLng: 좌표 { lat, lng } ↔ JTS Point 변환
 ├─ swagger         SwaggerConfig(OpenAPI 빈: bearerAuth 보안 스키마 HTTP bearer JWT · 전역 보안 요구). 문서는 dev만
 └─ persistence     BaseTimeEntity
@@ -87,20 +89,26 @@ common에는 엔드포인트가 없다. 아래 부품이 모든 도메인의 API
 ## 핵심 로직
 
 ### 오류 형식
-- 모든 오류 응답 본문은 `{"error":{"code","message","retryAfterSeconds","fields","overlapScheduleIds"}}`. code · message · retryAfterSeconds 키는 늘 있고(값이 없으면 retryAfterSeconds는 null), fields는 VALIDATION_FAILED일 때만, overlapScheduleIds는 값이 있을 때만(NON_NULL) 나온다.
+- 모든 오류 응답 본문은 `{"error":{"code","message","retryAfterSeconds","fields","overlapScheduleIds"}}`. code · message · retryAfterSeconds 키는 늘 있고(값이 없으면 retryAfterSeconds는 null), fields는 VALIDATION_FAILED일 때만, overlapScheduleIds는 값이 있을 때만(NON_NULL) 나온다. withDetail로 넣은 추가 키(예: missing · nextAllowedAt · unmet)는 error 안에 함께 나온다(공통 키 code · message · retryAfterSeconds · fields는 추가 키로 쓸 수 없음). 409 STATE_VERSION_CONFLICT만 본문 최상위에 error와 함께 session 키가 붙는다.
 - 컨트롤러까지 간 요청의 예외는 GlobalExceptionHandler(@RestControllerAdvice)가, 필터 단계 오류(Security 401 · 403, IdempotencyKeyFilter 409 · 422 · 500)는 ErrorResponseWriter가 같은 본문으로 쓴다.
 - BusinessException은 공개 생성자가 없고 정적 팩토리로만 만든다(팀장 결정, 파라미터 3개 규칙).
 
 | 팩토리 | 쓰는 때 | 응답 |
 |---|---|---|
-| of(ErrorCode) | 02의 공통 코드(NOT_FOUND · FORBIDDEN 등), 여러 모듈이 같이 쓰는 도메인 코드(VEHICLE_ALREADY_LINKED) | 그 코드의 HTTP 상태 · code · 문구 |
-| of(HttpStatus, String code, String message) | 한 모듈만 쓰는 도메인 오류 코드(문자열) | 넣은 상태 · code · message |
+| of(ErrorCode) | 02의 공통 코드(NOT_FOUND · FORBIDDEN 등), 여러 모듈이 같이 쓰는 도메인 코드(VEHICLE_ALREADY_LINKED · ACTIVE_PICKUP_EXISTS · SETUP_INCOMPLETE) | 그 코드의 HTTP 상태 · code · 문구 |
+| of(HttpStatus, String code, String message) | 한 모듈만 쓰는 도메인 오류 코드(문자열, 429 제외) | 넣은 상태 · code · message |
 | tooManyRequests(int retryAfterSeconds) | 429 횟수 제한 | 429 TOO_MANY_REQUESTS, retryAfterSeconds 채움 |
+| tooManyRequests(ErrorCode errorCode, int retryAfterSeconds) | ErrorCode에 있는 429 코드(RESEND_TOO_SOON) | 그 코드의 429 · code · 문구, retryAfterSeconds 채움 |
+| tooManyRequests(String code, String message, int retryAfterSeconds) | 한 모듈만 쓰는 도메인 429 코드(LINK_CODE_REISSUE_LIMIT · LINK_CODE_ATTEMPT_LIMIT · HELP_REQUEST_TOO_SOON, D3) | 429 · 넣은 code · message, retryAfterSeconds 채움 |
 | conflictWithOverlap(HttpStatus status, String code, String message, List\<Long\> overlapScheduleIds) | 겹치는 일정 id를 함께 보내는 도메인 오류(schedule SCHEDULE_OVERLAP) | 넣은 상태 · code · message, error.overlapScheduleIds 채움 |
+| invalidField(String field, String reason) | 서비스가 필드를 지정해 내는 입력 오류 | 422 VALIDATION_FAILED, error.fields 한 건 |
+| stateVersionConflict(Object session) | 픽업 상태 버전 충돌 | 409 STATE_VERSION_CONFLICT, 본문 최상위 session |
+| (인스턴스) withDetail(String key, Object value) | 위 팩토리로 만든 예외에 추가 키를 붙일 때 | error 안에 그 키 추가 |
 
-- ErrorCode enum에는 02의 공통 코드만 둔다(TOO_MANY_REQUESTS 포함). 도메인 코드는 enum에 넣지 않는다. 단, 여러 모듈이 같은 뜻으로 쓰는 도메인 오류는 한 번만 ErrorCode에 둔다(예: VEHICLE_ALREADY_LINKED 409 「이미 보호자가 연결된 차량입니다」 — user createGuardian · auth LINK-01 · LINK-04, 사람 결정 user #73).
-- 429는 retryAfterSeconds를 채운다. 도메인 코드로 429를 낼 때 retryAfterSeconds를 채우는 방법은 확인 필요.
-- 500은 고정 문구를 보내고 예외 내용은 서버 로그에만 남긴다(MDC requestId가 함께 찍힘).
+- ErrorCode enum에는 02의 공통 코드를 둔다(TOO_MANY_REQUESTS 포함). 한 모듈만 쓰는 도메인 코드는 원칙적으로 enum에 넣지 않고 of(HttpStatus, …)로 만든다. 이미 enum에 들어간 도메인 코드: SESSION_ALREADY_FINISHED · CALL_ALREADY_REVOKED(pickup), PROFILE_IMAGE_INVALID · PROFILE_IMAGE_TOO_LARGE · STORAGE_UNAVAILABLE(프로필 사진, 필터 · multipart 단계에서도 쓰임), RESEND_TOO_SOON(notification, tooManyRequests(ErrorCode, int)용). 또, 여러 모듈이 같은 뜻으로 쓰는 도메인 오류는 한 번만 ErrorCode에 둔다(예: VEHICLE_ALREADY_LINKED 409 「이미 보호자가 연결된 차량입니다」 — user createGuardian · auth LINK-01 · LINK-04, 사람 결정 user #73). 같은 방식으로 ACTIVE_PICKUP_EXISTS 409 「진행 중인 픽업이 있어 처리할 수 없습니다」(auth 로그아웃 · user 차량 연결 해제), SETUP_INCOMPLETE 422 「픽업 준비가 끝나지 않았습니다」(schedule SET-08 · pickup SES-02, missing은 추가 키)를 둔다(D2, 사람 결정 2026-11-13).
+- 모든 429는 retryAfterSeconds를 채운다(D3). 도메인 코드 429는 tooManyRequests(String, String, int)로 만든다. 값: LINK_CODE_REISSUE_LIMIT 300 고정(사람 결정 2026-11-13), LINK_CODE_ATTEMPT_LIMIT 차단이 풀릴 때까지 남은 초, HELP_REQUEST_TOO_SOON nextAllowedAt까지 남은 초(nextAllowedAt 추가 키 유지), RESEND_TOO_SOON 다시 보낼 수 있을 때까지 남은 초, 상태 폴링 TOO_MANY_REQUESTS 1. 남은 초는 올림하고 최소 1이다.
+- 500은 고정 문구를 보내고 예외 내용은 서버 로그에만 남긴다(MDC requestId가 함께 찍힘). 5xx로 끝나는 BusinessException(예: 502)도 원인 예외 스택과 함께 ERROR 로그를 남긴다. 4xx는 로그를 남기지 않는다.
+- of(HttpStatus, code, message) · of(ErrorCode)에 429를 넣거나 tooManyRequests(ErrorCode, int)에 429가 아닌 코드를 넣으면 IllegalArgumentException(#67 · #72). 429는 tooManyRequests로만 만든다. 남은 초는 TimeUtils.secondsUntil로 구한다(domain 패키지는 쓰지 않고 서비스에서 계산).
 - 409 STATE_VERSION_CONFLICT 응답에는 error와 함께 최신 세션 뷰가 실린다(pickup이 채움). 실리는 필드 이름은 확인 필요.
 
 422 fields[].field 이름
@@ -127,6 +135,7 @@ common에는 엔드포인트가 없다. 아래 부품이 모든 도메인의 API
 | familyId | 숫자 | 없으면 401이 아니라 AuthPrincipal.familyId = null(연결 전 차량 등). 숫자가 아니면 401 |
 | role | GUARDIAN · CO_GUARDIAN · DELEGATE · TEACHER · CHILD(USER 토큰만) | 없는 값이면 401. 없으면 role = null |
 | iat · exp | 발급 · 만료 시각 | exp는 필수라 없으면 401(사람 결정). 만료면 401. 만료 검사는 Nimbus 기본 여유 60초 |
+| deviceId | 기기 id 숫자(auth JwtTokenIssuer가 넣음) | common은 읽지 않음. auth의 CurrentDevice가 기기 단위 API(로그아웃 · 푸시 토큰 · 연결 코드)에서 읽는다 |
 
 - 권한: authorities에 ROLE_{role}과 PRINCIPAL_{type}을 넣는다. @EnableMethodSecurity를 켜고 컨트롤러에 @PreAuthorize("hasRole('GUARDIAN')")처럼 단다(Spring 표준, 팀장 결정). VEHICLE 토큰에 role 클레임이 있으면 AuthPrincipal.role은 채워지지만 ROLE_ 권한은 주지 않는다.
 - 401: 토큰이 없거나 만료 · 서명 틀림 · exp 없음 · 주체 클레임 틀림이면 Security 인증 실패 처리가 ErrorResponseWriter로 401 UNAUTHORIZED 공통 오류 본문을 쓴다.
@@ -177,6 +186,7 @@ common에는 엔드포인트가 없다. 아래 부품이 모든 도메인의 API
 - RequestIdFilter: X-Request-Id 헤더가 영숫자 · - · _ 64자 이하면 그대로 쓰고, 없거나 그 밖의 값이면 새 UUID를 만든다. MDC "requestId"에 넣는다.
 - 로그 형식: application.yml의 logging.pattern.correlation을 "[%X{requestId:-}] "로 둔다. 같은 요청 동안 남는 모든 로그 줄(500 처리기 error 로그, Idempotency 저장 실패 로그 포함)에 [requestId]가 찍힌다.
 - RequestLoggingInterceptor: @RestController 메서드 요청마다 INFO 한 줄을 key=value로 남긴다. 키는 requestId · principal · method · path · status · durationMs이고 예외로 끝나면 errorCode를 더한다.
+- FilterStageRequestLoggingFilter(RequestIdFilter 바로 안쪽): 필터 단계에서 끝난 요청(Idempotency 422 · 409 · 500 · 같은 키 재응답, Security 401 · 403)도 같은 형식으로 한 줄 남긴다(#69, 사람 결정 2026-11-13). ErrorResponseWriter와 Idempotency 재응답이 common.error.FilterStageEnd로 요청 속성에 「필터 단계에서 끝남」 표시 · 그때의 Authentication · errorCode를 남기고, 필터는 체인이 끝난 뒤 그 표시가 있을 때만 쓴다. 컨트롤러까지 간 요청은 인터셉터만 남겨 한 요청에 한 줄이다. 단, 컨트롤러 단계의 AccessDeniedException · AuthenticationException이 GlobalExceptionHandler에서 다시 던져져 Security 처리기가 응답을 쓰면 인터셉터는 줄을 남기지 않고 필터가 실제 401 · 403 줄을 남긴다(#71).
 - path는 실제 요청 경로가 아니라 매핑 패턴(예: /v1/invites/{token})이다. 매핑 패턴이 없으면 "unknown"을 남긴다. 그래서 경로 변수의 토큰 · 연결 코드 값이 로그에 남지 않는다(사람 결정).
 - principal은 USER:{userId} · VEHICLE:{vehicleId}, 인증 없는 요청은 ANONYMOUS.
 - status는 실제 응답 상태다. @ResponseStatus(CREATED)면 201, @PreAuthorize 거절이면 403(errorCode=FORBIDDEN).
@@ -199,11 +209,12 @@ common에는 엔드포인트가 없다. 아래 부품이 모든 도메인의 API
 
 ### 비동기 · 스케줄링
 - AsyncConfig: @EnableAsync와 이벤트 리스너용 ThreadPoolTaskExecutor 빈 eventTaskExecutor(스레드 이름 접두사 event-)를 등록한다. @Async 메서드는 이 풀에서 돈다. 크기는 설정 pickup.async.event.*(임시값 core 2 · max 4 · queue 100, 확인 필요).
-- SchedulingConfig: @Scheduled 작업을 켠다. 서버 1대 전제.
+- SchedulingConfig: @Scheduled 작업을 켠다. 서버 1대 전제. 실행 스레드는 spring.task.scheduling.pool.size 4개(D6, application.yml). 모든 @Scheduled 작업은 주기를 설정 키로 받고(fixedDelayString) 첫 실행도 그 주기만큼 늦춘다(initialDelayString). 키: pickup.idempotency.cleanup-interval PT1H · pickup.session.auto-complete-interval PT10S · pickup.call.signal-lost-check-interval PT15S · pickup.sse.ping-interval PT30S · pickup.notification.resend-interval PT60S. 공통 테스트 설정은 다섯 키를 모두 P1D로 둔다.
 
 ### 테스트 픽스처
 - 공통 테스트 기반 클래스는 PostgreSQL 17 + PostGIS 3 서버 하나(JVM당 1개, DB pickup_test)를 모든 테스트가 같이 쓴다. Windows는 내장 서버(EmbeddedPostgis, Docker 없음), 그 밖의 OS는 Testcontainers postgis/postgis:17-3.7 컨테이너(PostgisContainer)다. TestPostgis가 OS로 고르고 pickup.test.db로 강제한다.
 - AccessTokenFixture는 서버와 같은 키 · 클레임 이름으로 VEHICLE · USER access 토큰(exp 30분)을 만든다. 만료 토큰 테스트는 만료 시각을 Nimbus 여유 60초보다 더 과거로 둔다.
+- GeoOffsets(테스트 좌표 픽스처)는 WGS84 타원체 자오선 곡률 반지름으로 북쪽 오프셋 좌표를 만든다(구 기준과 거리 차이 약 0.19%). 경계 500m는 499m · 501m로 시험한다.
 - 스케줄러 테스트 격리: 공통 테스트 설정에서 pickup.idempotency.cleanup-interval을 아주 길게(예: P1D) 둔다. 04~09의 자동 완료 · 재발송 스케줄러도 같은 방식으로 둔다(팀장 결정).
 - prod 프로필 테스트는 ddl-auto를 update로 덮어쓴다(테스트 전용 엔티티 때문에 validate를 쓸 수 없음).
 - 증거 메모: FOLLOWUP의 #6 · #9 · #20 · #39 증거 인용은 문장 일부만 보여 준다(#6 JVM 시간대만, #9 VEHICLE 토큰만, #20 204 · 본문 null만, #39 reason 없는 경우만). 문장 전체를 덮는 테스트는 따로 있다.
@@ -215,6 +226,7 @@ common에는 엔드포인트가 없다. 아래 부품이 모든 도메인의 API
 String TimeUtils.toKst(Instant utc);                 // "2026-11-03T18:12:00+09:00"
 Instant TimeUtils.toUtc(OffsetDateTime requested);
 LocalDate TimeUtils.todayKst(Clock clock);           // Clock 빈: ClockConfig(Clock.systemUTC())
+int TimeUtils.secondsUntil(Instant now, Instant until); // 429 retryAfterSeconds용, 올림 · 최소 1
 
 // common.geo
 Point GeoPoints.toPoint(double lat, double lng);     // SRID 4326
@@ -229,13 +241,19 @@ record PublicEndpoint(HttpMethod method, String pattern) {}
 // PublicEndpoints: 인증 없는 API를 가진 도메인이 내는 빈. PublicEndpoint 목록을 담고 SecurityConfig가 모두 모아 permitAll
 
 // common.error
-// ErrorCode: 02의 공통 코드(TOO_MANY_REQUESTS 포함)와 여러 모듈이 같이 쓰는 도메인 코드(VEHICLE_ALREADY_LINKED). 코드마다 HTTP 상태 · 기본 문구
+// ErrorCode: 02의 공통 코드(TOO_MANY_REQUESTS 포함)와 여러 모듈이 같이 쓰는 도메인 코드(VEHICLE_ALREADY_LINKED · ACTIVE_PICKUP_EXISTS · SETUP_INCOMPLETE). 코드마다 HTTP 상태 · 기본 문구
 class BusinessException extends RuntimeException {   // 공개 생성자 없음
     static BusinessException of(ErrorCode errorCode);
     static BusinessException of(HttpStatus status, String code, String message);
     static BusinessException tooManyRequests(int retryAfterSeconds);
+    static BusinessException tooManyRequests(ErrorCode errorCode, int retryAfterSeconds);
+    static BusinessException tooManyRequests(String code, String message, int retryAfterSeconds);   // 도메인 code 429(D3)
     static BusinessException conflictWithOverlap(HttpStatus status, String code, String message, List<Long> overlapScheduleIds);
+    static BusinessException invalidField(String field, String reason);
+    static BusinessException stateVersionConflict(Object session);
+    BusinessException withDetail(String key, Object value);   // 공통 키 code · message · retryAfterSeconds · fields는 막음
     HttpStatus status(); String code(); Integer retryAfterSeconds(); List<Long> overlapScheduleIds();
+    List<FieldError> fields(); Map<String, Object> details(); Object session();
 }
 
 // 컨트롤러 메서드에 다는 애너테이션
@@ -304,11 +322,19 @@ class BusinessException extends RuntimeException {   // 공개 생성자 없음
 - [x] [web] 공통 오류 코드(ErrorCode)로 BusinessException을 만들어 던지면 그 코드의 HTTP 상태 · code · 문구로 응답한다(429는 retryAfterSeconds 포함)
 - [x] [web] GlobalExceptionHandler는 클라이언트가 연결을 끊어 난 예외(AsyncRequestNotUsableException · Broken pipe IOException 등 DisconnectedClientHelper.isClientDisconnectedException이 true인 것)를 ERROR로 기록하지 않고 DEBUG로만 남기며 응답 본문을 쓰지 않는다
 - [x] [web] GlobalExceptionHandler는 클라이언트 끊김이 아닌 처리하지 않은 예외는 지금처럼 ERROR로 기록하고 500 INTERNAL_SERVER_ERROR 본문을 돌려준다
-- [ ] [web] ACTIVE_PICKUP_EXISTS는 common ErrorCode에 한 번만 정의하고, 로그아웃(auth)과 차량 연결 해제(user)가 같은 409 · 같은 code · 같은 문구로 응답한다(D2, 사람 결정 2026-11-13)
-- [ ] [web] SETUP_INCOMPLETE는 common ErrorCode에 한 번만 정의하고, schedule과 pickup이 같은 422 · 같은 code · 같은 문구로 응답하며 missing 목록은 추가 키로 담는다(D2)
-- [ ] [web] 도메인 code용 429 팩토리 하나가 code · 문구와 retryAfterSeconds(다시 시도할 초)를 함께 담아 응답한다(D3)
-- [ ] [web] 429인 LINK_CODE_REISSUE_LIMIT · LINK_CODE_ATTEMPT_LIMIT · HELP_REQUEST_TOO_SOON · RESEND_TOO_SOON · TOO_MANY_REQUESTS 응답은 모두 retryAfterSeconds를 담는다(HELP_REQUEST_TOO_SOON의 nextAllowedAt은 추가 키로 유지, D3)
-- [ ] [통합] spring.task.scheduling.pool.size가 4라 @Scheduled 작업이 스레드 1개를 나눠 쓰지 않는다(한 작업이 오래 걸려도 다른 작업이 제때 돈다, D6)
+- [x] [web] ACTIVE_PICKUP_EXISTS는 common ErrorCode에 한 번만 정의하고, 로그아웃(auth)과 차량 연결 해제(user)가 같은 409 · 같은 code · 같은 문구로 응답한다(D2, 사람 결정 2026-11-13)
+- [x] [web] SETUP_INCOMPLETE는 common ErrorCode에 한 번만 정의하고, schedule과 pickup이 같은 422 · 같은 code · 같은 문구로 응답하며 missing 목록은 추가 키로 담는다(D2)
+- [x] [web] 도메인 code용 429 팩토리 하나가 code · 문구와 retryAfterSeconds(다시 시도할 초)를 함께 담아 응답한다(D3)
+- [x] [web] 429인 LINK_CODE_REISSUE_LIMIT · LINK_CODE_ATTEMPT_LIMIT · HELP_REQUEST_TOO_SOON · RESEND_TOO_SOON · TOO_MANY_REQUESTS 응답은 모두 retryAfterSeconds를 담는다(HELP_REQUEST_TOO_SOON의 nextAllowedAt은 추가 키로 유지, D3)
+- [x] [통합] spring.task.scheduling.pool.size가 4라 @Scheduled 작업이 스레드 1개를 나눠 쓰지 않는다(한 작업이 오래 걸려도 다른 작업이 제때 돈다, D6)
+- [x] [기반] 공통 테스트 설정은 자동 완료 · 신호 끊김 철회 · SSE ping · 미전달 알림 재발송 스케줄러 주기를 아주 길게(P1D) 두어 테스트 중에 돌지 않게 하고, 재발송 스케줄러 주기도 설정 값으로 바꿀 수 있다(스케줄러 테스트 격리, 팀장 결정)
+- [x] [web] 5xx로 끝나는 BusinessException(예: 502)은 GlobalExceptionHandler가 원인 예외 스택과 함께 ERROR 로그를 남기고 공통 오류 본문을 돌려준다
+- [x] [web] BusinessException.of(HttpStatus, code, message)에 429를 넣으면 IllegalArgumentException으로 막아 retryAfterSeconds 없는 429를 만들 수 없다(429는 tooManyRequests로만, D3)
+- [x] [기반] common의 남은 초 계산 하나(지금 시각과 허용 시각의 차이를 초로 올림, 최소 1)를 LINK_CODE_ATTEMPT_LIMIT · HELP_REQUEST_TOO_SOON · RESEND_TOO_SOON이 같이 쓰고, RESEND_TOO_SOON도 다시 보낼 수 있는 시각까지 0.5초 남았으면 retryAfterSeconds 1을 담는다(사람 결정 2026-11-13)
+- [x] [web] 필터 단계에서 끝난 요청(Idempotency 422 · 409 · 같은 키 재응답, Security 401 · 403)도 요청 로그 한 줄(requestId · 주체 · 메서드 · 경로 · status · errorCode · 걸린 시간)을 남기고, 경로에 토큰 · 연결 코드 값이 그대로 남지 않는다(사람 결정 2026-11-13)
+- [x] [web] Idempotency-Key 조회 · 예약 단계 DB 오류로 필터가 500 INTERNAL_SERVER_ERROR로 끝낸 요청도 요청 로그 한 줄(status=500 · errorCode=INTERNAL_SERVER_ERROR)을 남긴다
+- [x] [web] 컨트롤러까지 간 요청이 인증 · 권한 예외로 끝나 Security 처리기가 응답을 쓰더라도 요청 로그는 정확히 한 줄이고 status는 실제 응답 상태(401 · 403)다
+- [x] [web] of(ErrorCode)에 429 코드(TOO_MANY_REQUESTS · RESEND_TOO_SOON)를 넣거나 tooManyRequests(ErrorCode, int)에 429가 아닌 코드를 넣으면 IllegalArgumentException으로 막는다(D3)
 
 ## 확인 필요 사항
 
@@ -322,7 +348,7 @@ class BusinessException extends RuntimeException {   // 공개 생성자 없음
 | 같은 키 요청이 동시에 두 개 들어올 때 | 해소: 실행 전에 행을 예약(response_status null)하고 유니크 인덱스로 두 번째 예약을 막음. 처리 중인 키로 온 요청은 409 IDEMPOTENCY_KEY_REUSED(팀장 결정) |
 | 409 STATE_VERSION_CONFLICT 본문에 세션 뷰를 싣는 필드 이름 | 소스에 없음. error와 나란히 session 필드로 가정 |
 | 좌표 변환을 common에 둠 | 소스의 common 목록에는 없으나 schedule · place · pickup이 같이 써서 재사용 규칙(2.2)을 적용 |
-| 좌표 소수점 6자리 초과 입력 | 반올림할지 422로 거절할지 소스에 없음. 반올림으로 가정. 반올림 위치(GeoPoints 또는 요청 DTO)도 정하지 않음 |
+| 좌표 소수점 6자리 초과 입력 | 결정됨: 반올림 · 거절 없이 받은 값을 그대로 저장한다(geography double 정밀도, 사람 결정 2026-11-13) |
 | JWT 서명 방식 · 키 형식 | 해소: HS256, 설정 pickup.jwt.secret(Base64, 32바이트 이상), 환경 변수 JWT_SECRET. 클레임은 sub · principalType · familyId · role · iat · exp이고 exp는 필수(없으면 401, 사람 결정). 핵심 로직 「인증」 |
 | SSE · LINK-02 로그 예외를 AOP가 아는 방법 | 해소: 경로 기준이 아님. SSE는 비동기 처리 시작(afterConcurrentHandlingStarted), 폴링은 @PollingLog(stateField)로 구분. 로깅도 AOP가 아니라 RequestLoggingInterceptor(팀장 결정) |
 | 요청 로그 path에 경로 변수 값 | 해소: path는 매핑 패턴, 패턴이 없으면 "unknown". 폴링 직전 값 키만 메모리에서 실제 URI(사람 결정 2026-11-07 리뷰 후) |
@@ -334,7 +360,7 @@ class BusinessException extends RuntimeException {   // 공개 생성자 없음
 | access 토큰 「폐기」 기준 | 02는 「만료 · 폐기면 401」인데 common은 서명 · exp만 검사하고 05의 폐기는 Device.revokedAt(refresh)뿐. 폐기한 기기의 access 토큰이 만료까지 통과함. 「폐기는 refresh 기준」으로 문서를 고칠지, 요청마다 기기 폐기를 확인할지 auth 전에 정함(05 「AUTH-04 뒤 이미 발급된 access 토큰」과 같이) |
 | Role enum 중복 | 해소: 02에 「common 순수 타입(Role · PrincipalType · LatLng)은 domain에서 써도 된다」 예외를 둠. Role은 common.security.Role 하나만 두고 user/domain에 따로 만들지 않음(사람 결정 2026-11-07 리뷰 후) |
 | 주체 종류별 필수 클레임 | 지금 role 없는 USER 토큰은 role null로 통과하고, 소수 familyId(12.5)는 잘려 12가 됨. 05 토큰 형식과 함께 정함 |
-| JWT 키 검사 · 키와 클레임 이름의 위치 | 키가 32바이트보다 짧아도 기동되고 모든 인증이 401. 기동 때 막을지 정함. 키 만드는 코드가 JwtDecoderConfig · AccessTokenFixture 두 곳이고 클레임 이름 상수는 AuthPrincipalJwtConverter 안에만 있음. auth 발급기가 생길 때 SecretKey 빈 · 상수 위치를 하나로 모을지 정함 |
+| JWT 키 검사 · 키와 클레임 이름의 위치 | 키가 32바이트보다 짧아도 기동되고 모든 인증이 401. 기동 때 막을지 정함. 키 만드는 코드가 JwtDecoderConfig · JwtTokenIssuer · AccessTokenFixture 세 곳이고 클레임 이름 상수는 AuthPrincipalJwtConverter 안에만 있음. auth 발급기가 생길 때 SecretKey 빈 · 상수 위치를 하나로 모을지 정함 |
 | 인증 없는 Idempotency-Key 공용 공간의 보안 | 다른 기기가 같은 키 · 같은 본문을 보내면 첫 기기의 응답(토큰 포함 가능, AUTH-02 · LINK-04 · FAM-06)이 그대로 감. 키가 무작위 UUID이고 본문에 1회용 코드가 있어 위험은 낮다고 봄. 토큰을 돌려주는 인증 없는 API는 재응답 대신 409로 할지 05에서 정함 |
 | 응답 저장(완료) 실패 때 처리 | 컨트롤러가 2xx로 끝났는데 응답 저장이 실패하면 지금은 행을 지우고 2xx를 보냄. 같은 키로 다시 보내면 유스케이스가 다시 실행될 수 있음. 대안: 행을 남겨 24시간 409 / 처리 중 행에 짧은 만료 |
 | 남은 처리 중 행 | 처리 도중 서버가 꺼지거나 Error로 끝나 남은 처리 중 행은 만료 삭제 전까지 같은 키를 409로 막음. 행 삭제가 실패하면 원래 예외가 덮임. 그대로 둘지 처리 중 행만 짧게 지울지 정함 |
@@ -345,7 +371,7 @@ class BusinessException extends RuntimeException {   // 공개 생성자 없음
 | 본문 형식 오류의 코드 | JSON 값 타입 · enum · 시각 형식 오류와 빠진 본문이 모두 400 INVALID_REQUEST(fields 없음). 유지할지 422로 바꿀지 정함. INVALID_REQUEST 문구 「요청 형식을 확인해 주세요」는 구현자가 정함 |
 | 도메인 코드의 ResponseStatusException | Spring 4xx 예외의 code는 HttpStatus 이름(CONFLICT 등)으로 나감. 도메인 코드에서 금지하고 BusinessException만 쓸지 정함. reason 없는 404 예외와 매핑 없는 경로의 문구가 다름 |
 | 422 fields 표기 범위 | 클래스 단위 제약 오류는 fields에 안 담김. 중첩 · 배열 필드 이름 형식(a.b, a[].b 또는 children[0].name), 한 필드 여러 위반, List 본문 인덱스, 이름이 다른 @PathVariable은 정하지 않음 |
-| BusinessException 생성자 | 해소: 공개 생성자 없음. 정적 팩토리 of(ErrorCode) · of(HttpStatus, String code, String message) · tooManyRequests(int retryAfterSeconds), ErrorCode에 TOO_MANY_REQUESTS 추가(팀장 결정). conflictWithOverlap(HttpStatus, String code, String message, List<Long> overlapScheduleIds) 추가(일정 SET-02 · 03의 overlapScheduleIds용, 06 결정). IdempotencyKeyEntity 6인자 생성자, status · code null 방어, 5xx BusinessException 로그는 다음 리뷰 때 다시 봄 |
+| BusinessException 생성자 | 해소: 공개 생성자 없음. 정적 팩토리 of(ErrorCode) · of(HttpStatus, String code, String message) · tooManyRequests(int retryAfterSeconds), ErrorCode에 TOO_MANY_REQUESTS 추가(팀장 결정). conflictWithOverlap(HttpStatus, String code, String message, List<Long> overlapScheduleIds) 추가(일정 SET-02 · 03의 overlapScheduleIds용, 06 결정). IdempotencyKeyEntity 6인자 생성자는 삭제됨(11-13). status · code null 방어는 다음 리뷰 때 다시 봄. 5xx BusinessException 로그는 해소(#66). tooManyRequests(ErrorCode, int) · tooManyRequests(String, String, int) 추가(D3) |
 | 도메인 코드 429의 retryAfterSeconds | 결정됨: 모든 429에 retryAfterSeconds를 채운다. 도메인 code용 429 팩토리 하나를 두고, HELP_REQUEST_TOO_SOON의 nextAllowedAt은 추가 키로 남긴다. 테스트 케이스 끝의 D3 항목으로 구현(사람 결정 2026-11-13) |
 | 여러 모듈이 따로 정의한 같은 code 오류 | 결정됨: ACTIVE_PICKUP_EXISTS · SETUP_INCOMPLETE는 common ErrorCode에 한 번만 두고 같은 상태 · 문구로 응답한다(SETUP_INCOMPLETE의 missing은 추가 키). 테스트 케이스 끝의 D2 항목으로 구현(사람 결정 2026-11-13) |
 | 이벤트 스레드 풀 크기 · 포화 정책 | 소스에 없음. 임시값 core 2 · max 4 · queue 100(pickup.async.event.*). 큐가 찬 뒤에야 core를 넘어 늘어 실제 동시 실행은 2개(제안: core = max 4). 포화 때 기본 AbortPolicy라 AFTER_COMMIT 이벤트가 버려짐(재발송 스케줄러가 보완) → 유지 또는 CallerRunsPolicy. 직접 만든 Executor 빈 때문에 Boot의 applicationTaskExecutor가 빠져 MVC 비동기가 SimpleAsyncTaskExecutor를 쓸 수 있음(SES-08 때 확인). @Scheduled 실행 스레드 수는 결정됨: spring.task.scheduling.pool.size 4개, 테스트 케이스 끝의 D6 항목으로 구현(사람 결정 2026-11-13) |

@@ -202,7 +202,7 @@ code 이름은 기획안 「4. 이벤트 · 상태」 탭의 ERR 이름을 그�
 - 예외 메시지에 개인정보(전화번호 · 위치 · 토큰 · 연결 코드)를 넣지 않는다. 500 처리와 Idempotency 저장 실패 로그는 예외 내용을 서버 로그에 그대로 남기고 따로 가리지 않으므로, 예외를 만드는 쪽이 지킨다.
 
 요청 로그 (구현: 03_공유모듈-shared.md 「요청 로깅」)
-- 대상은 adapter/in/web의 모든 컨트롤러 메서드(@RestController). AOP가 아니라 HandlerInterceptor가 요청이 끝난 뒤 남긴다.
+- 대상은 adapter/in/web의 모든 컨트롤러 메서드(@RestController)와 필터 단계에서 끝난 요청(Idempotency · Security). AOP가 아니라 HandlerInterceptor가 요청이 끝난 뒤 남기고, 필터에서 끝난 요청은 FilterStageRequestLoggingFilter가 남긴다(사람 결정 2026-11-13).
 - 형식: 요청 하나에 INFO 한 줄, key=value. 키는 requestId · principal · method · path · status · durationMs이고, 예외로 끝나면 errorCode를 더한다.
 - principal은 USER:{userId} · VEHICLE:{vehicleId}, 인증 없는 요청은 ANONYMOUS. status는 실제 응답 상태다.
 - requestId: X-Request-Id 헤더가 영숫자 · - · _ 64자 이하면 그대로 쓰고, 없거나 그 밖의 값이면 새 UUID를 만든다. MDC "requestId"에 넣어 같은 요청의 다른 로그(500 로그 등)에도 찍는다.
