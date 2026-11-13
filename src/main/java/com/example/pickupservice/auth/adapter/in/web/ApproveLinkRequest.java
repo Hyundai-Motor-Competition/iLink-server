@@ -16,7 +16,7 @@ public record ApproveLinkRequest(
 		@NotNull LinkMode mode,
 		@NotNull List<@Valid @NotNull ConsentRequest> consents,
 		@GuardianPlatform Platform platform,
-		@Size(max = 255) String pushToken,
+		@Size(min = 1, max = 255) String pushToken,
 		String name
 ) {
 

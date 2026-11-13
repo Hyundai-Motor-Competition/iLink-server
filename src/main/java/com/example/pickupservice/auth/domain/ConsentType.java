@@ -5,5 +5,6 @@ public enum ConsentType {
 	PRIVACY,
 	MARKETING,
 	LOCATION,
-	PUSH
+	PUSH,
+	SERVICE_IMPROVEMENT
 }
