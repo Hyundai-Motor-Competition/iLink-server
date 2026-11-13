@@ -47,7 +47,9 @@ public interface PickupSessionApiDoc {
 			StartPickupRequest request);
 
 	@Operation(summary = "세션 조회 (SES-03)",
-			description = "그 세션의 차량, 가족 사용자. 주체마다 보이는 필드가 다르다")
+			description = "그 세션의 차량, 가족 사용자. 주체마다 보이는 필드가 다르다. "
+					+ "vehicleLocation(마지막 차량 위치)은 차량 · 보호자에게 늘, 자녀에게는 남은 거리 700m 이하 또는 "
+					+ "남은 시간 180초 이하일 때만 주고, 끝난 세션이면 null이다. 앱은 화면이 켜진 동안 15초마다 조회한다")
 	@ApiResponse(responseCode = "200", description = "SessionView(주체별 필드)")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (세션이 없거나 다른 가족의 것)")

@@ -1,5 +1,6 @@
 package com.example.pickupservice.pickup.adapter.out.persistence;
 
+import com.example.pickupservice.pickup.domain.CallStatus;
 import com.example.pickupservice.pickup.domain.SessionStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +22,17 @@ interface PickupSessionJpaRepository extends JpaRepository<PickupSessionEntity, 
 
 	List<PickupSessionEntity> findBySessionStatusAndBoardingCancelableUntilBeforeOrderBySessionId(
 			SessionStatus sessionStatus, Instant now);
+
+	@Query("""
+			select s from PickupSessionEntity s
+			where s.sessionStatus = :status
+			  and s.etaUpdatedAt < :staleBefore
+			  and exists (select 1 from CallEntity c
+			              where c.sessionId = s.sessionId and c.status <> :revoked)
+			order by s.sessionId
+			""")
+	List<PickupSessionEntity> findSignalLost(@Param("status") SessionStatus status,
+			@Param("staleBefore") Instant staleBefore, @Param("revoked") CallStatus revoked);
 
 	Optional<PickupSessionEntity> findFirstByVehicleIdAndSessionStatusInOrderBySessionIdDesc(Long vehicleId,
 			Collection<SessionStatus> statuses);

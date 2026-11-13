@@ -61,9 +61,18 @@ public class SessionChildEntity extends BaseTimeEntity {
 
 	private Instant boardedAt;
 
+	private Instant readyAt;
+
 	public SessionChildEntity(Long sessionChildId, Long sessionId, Long childUserId, Long scheduleId,
 			ChildPhase childPhase, Short extraPrepMinutes, Instant callNotBefore, BigDecimal lastLat,
 			BigDecimal lastLng, Instant lastLocatedAt, Instant acknowledgedAt, Instant boardedAt) {
+		this(sessionChildId, sessionId, childUserId, scheduleId, childPhase, extraPrepMinutes, callNotBefore, lastLat,
+				lastLng, lastLocatedAt, acknowledgedAt, boardedAt, null);
+	}
+
+	public SessionChildEntity(Long sessionChildId, Long sessionId, Long childUserId, Long scheduleId,
+			ChildPhase childPhase, Short extraPrepMinutes, Instant callNotBefore, BigDecimal lastLat,
+			BigDecimal lastLng, Instant lastLocatedAt, Instant acknowledgedAt, Instant boardedAt, Instant readyAt) {
 		this.sessionChildId = sessionChildId;
 		this.sessionId = sessionId;
 		this.childUserId = childUserId;
@@ -76,6 +85,7 @@ public class SessionChildEntity extends BaseTimeEntity {
 		this.lastLocatedAt = lastLocatedAt;
 		this.acknowledgedAt = acknowledgedAt;
 		this.boardedAt = boardedAt;
+		this.readyAt = readyAt;
 	}
 
 }

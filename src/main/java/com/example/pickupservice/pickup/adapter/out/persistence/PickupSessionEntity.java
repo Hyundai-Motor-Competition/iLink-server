@@ -21,6 +21,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.ColumnDefault;
 import org.locationtech.jts.geom.Point;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 
@@ -113,12 +114,33 @@ public class PickupSessionEntity extends BaseTimeEntity {
 
 	private Instant incidentResolvedAt;
 
+	@Column(precision = 9, scale = 6)
+	private BigDecimal vehicleLat;
+
+	@Column(precision = 9, scale = 6)
+	private BigDecimal vehicleLng;
+
+	private Instant vehicleLocatedAt;
+
 	public PickupSessionEntity(Long sessionId, Long vehicleId, Long familyId, Long spotId, String spotName,
 			Point stopPoint, Point meetingPoint, LocalDate date, SessionStatus sessionStatus, VehiclePhase vehiclePhase,
 			SpotStatus spotStatus, int stateVersion, int spotVersion, int routeVersion, Integer routeSpotVersion,
 			boolean callHeld, Instant etaAt, Integer remainingMeters, Instant etaUpdatedAt, Instant boardingDetectedAt,
 			Instant boardingCancelableUntil, BoardingDoor boardingDoor, IncidentType incidentType,
 			String incidentCause, Long incidentChildUserId, Instant incidentOpenedAt, Instant incidentResolvedAt) {
+		this(sessionId, vehicleId, familyId, spotId, spotName, stopPoint, meetingPoint, date, sessionStatus,
+				vehiclePhase, spotStatus, stateVersion, spotVersion, routeVersion, routeSpotVersion, callHeld, etaAt,
+				remainingMeters, etaUpdatedAt, boardingDetectedAt, boardingCancelableUntil, boardingDoor, incidentType,
+				incidentCause, incidentChildUserId, incidentOpenedAt, incidentResolvedAt, null, null, null);
+	}
+
+	public PickupSessionEntity(Long sessionId, Long vehicleId, Long familyId, Long spotId, String spotName,
+			Point stopPoint, Point meetingPoint, LocalDate date, SessionStatus sessionStatus, VehiclePhase vehiclePhase,
+			SpotStatus spotStatus, int stateVersion, int spotVersion, int routeVersion, Integer routeSpotVersion,
+			boolean callHeld, Instant etaAt, Integer remainingMeters, Instant etaUpdatedAt, Instant boardingDetectedAt,
+			Instant boardingCancelableUntil, BoardingDoor boardingDoor, IncidentType incidentType,
+			String incidentCause, Long incidentChildUserId, Instant incidentOpenedAt, Instant incidentResolvedAt,
+			BigDecimal vehicleLat, BigDecimal vehicleLng, Instant vehicleLocatedAt) {
 		this.sessionId = sessionId;
 		this.vehicleId = vehicleId;
 		this.familyId = familyId;
@@ -146,6 +168,9 @@ public class PickupSessionEntity extends BaseTimeEntity {
 		this.incidentChildUserId = incidentChildUserId;
 		this.incidentOpenedAt = incidentOpenedAt;
 		this.incidentResolvedAt = incidentResolvedAt;
+		this.vehicleLat = vehicleLat;
+		this.vehicleLng = vehicleLng;
+		this.vehicleLocatedAt = vehicleLocatedAt;
 	}
 
 }

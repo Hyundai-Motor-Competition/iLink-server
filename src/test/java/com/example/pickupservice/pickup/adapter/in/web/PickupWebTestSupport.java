@@ -16,6 +16,7 @@ import com.example.pickupservice.pickup.application.port.in.GetSessionUseCase;
 import com.example.pickupservice.pickup.application.port.in.HoldCallUseCase;
 import com.example.pickupservice.pickup.application.port.in.HoldSessionUseCase;
 import com.example.pickupservice.pickup.application.port.in.ListSessionEventsUseCase;
+import com.example.pickupservice.pickup.application.port.in.MarkChildReadyUseCase;
 import com.example.pickupservice.pickup.application.port.in.OpenIncidentUseCase;
 import com.example.pickupservice.pickup.application.port.in.ReceiveTelemetryUseCase;
 import com.example.pickupservice.pickup.application.port.in.ReceiveVehicleEventUseCase;
@@ -80,6 +81,9 @@ public abstract class PickupWebTestSupport extends IntegrationTestSupport {
 
 	@MockitoBean
 	protected RequestHelpUseCase requestHelpUseCase;
+
+	@MockitoBean
+	protected MarkChildReadyUseCase markChildReadyUseCase;
 
 	@MockitoBean
 	protected HoldCallUseCase holdCallUseCase;

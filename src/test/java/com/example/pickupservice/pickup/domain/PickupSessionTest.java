@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -318,6 +319,106 @@ class PickupSessionTest {
 		assertThat(session.getRemainingMeters()).isEqualTo(LAST_REMAINING_METERS);
 		assertThat(session.getEtaUpdatedAt()).isEqualTo(LAST_OBSERVED_AT);
 		assertThat(session.getStateVersion()).isEqualTo(RESTORED_STATE_VERSION);
+	}
+
+	@Test
+	@DisplayName("applyTelemetry에 location을 주면 vehicleLocation을 그 위치로, vehicleLocatedAt을 observedAt으로 덮어쓰고 stateVersion은 올리지 않는다")
+	void applyTelemetryWithLocationOverwritesVehicleLocationAndLocatedAt() {
+		PickupSession session = restoreWithLastEta();
+		Instant observedAt = LAST_OBSERVED_AT.plusSeconds(15);
+		LatLng first = new LatLng(37.498100, 127.027600);
+		LatLng second = new LatLng(37.499200, 127.028700);
+
+		session.applyTelemetry(observedAt, 600, 4_200, first);
+		session.applyTelemetry(observedAt.plusSeconds(15), 500, 3_900, second);
+
+		assertThat(session.getVehicleLocation()).isEqualTo(second);
+		assertThat(session.getVehicleLocatedAt()).isEqualTo(observedAt.plusSeconds(15));
+		assertThat(session.getEtaUpdatedAt()).isEqualTo(observedAt.plusSeconds(15));
+		assertThat(session.getStateVersion()).isEqualTo(RESTORED_STATE_VERSION);
+	}
+
+	@Test
+	@DisplayName("applyTelemetry는 observedAt이 마지막 값보다 오래되면 location을 줘도 vehicleLocation · vehicleLocatedAt을 바꾸지 않는다")
+	void applyTelemetryWithOlderObservedAtKeepsVehicleLocation() {
+		PickupSession session = restoreWithLastEta();
+		LatLng stored = new LatLng(37.498100, 127.027600);
+		session.applyTelemetry(LAST_OBSERVED_AT.plusSeconds(15), 600, 4_200, stored);
+
+		session.applyTelemetry(LAST_OBSERVED_AT, 100, 300, new LatLng(37.499200, 127.028700));
+
+		assertThat(session.getVehicleLocation()).isEqualTo(stored);
+		assertThat(session.getVehicleLocatedAt()).isEqualTo(LAST_OBSERVED_AT.plusSeconds(15));
+	}
+
+	@Test
+	@DisplayName("applyTelemetry의 location이 null이면 ETA는 덮어쓰고 저장된 vehicleLocation · vehicleLocatedAt은 그대로 둔다")
+	void applyTelemetryWithNullLocationKeepsVehicleLocation() {
+		PickupSession session = restoreWithLastEta();
+		LatLng stored = new LatLng(37.498100, 127.027600);
+		Instant storedAt = LAST_OBSERVED_AT.plusSeconds(15);
+		session.applyTelemetry(storedAt, 600, 4_200, stored);
+
+		session.applyTelemetry(storedAt.plusSeconds(15), 500, 3_900, null);
+
+		assertThat(session.getEtaUpdatedAt()).isEqualTo(storedAt.plusSeconds(15));
+		assertThat(session.getRemainingMeters()).isEqualTo(3_900);
+		assertThat(session.getVehicleLocation()).isEqualTo(stored);
+		assertThat(session.getVehicleLocatedAt()).isEqualTo(storedAt);
+	}
+
+	@ParameterizedTest(name = "navEtaSeconds {0} · remainingMeters {1}")
+	@CsvSource({"600, 700", "60, 701"})
+	@DisplayName("applyTelemetry는 vehiclePhase가 ROUTING일 때 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 60이면 APPROACHING으로 바꾸고 stateVersion을 1 올리며 ETA도 덮어쓴다")
+	void applyTelemetryChangesRoutingToApproachingWithin700MetersOr60Seconds(int navEtaSeconds,
+			int remainingMeters) {
+		PickupSession session = restoreWithLastEta(VehiclePhase.ROUTING);
+		Instant observedAt = LAST_OBSERVED_AT.plusSeconds(15);
+
+		session.applyTelemetry(observedAt, navEtaSeconds, remainingMeters);
+
+		assertThat(session.getVehiclePhase()).isEqualTo(VehiclePhase.APPROACHING);
+		assertThat(session.getStateVersion()).isEqualTo(RESTORED_STATE_VERSION + 1);
+		assertThat(session.getEtaAt()).isEqualTo(observedAt.plusSeconds(navEtaSeconds));
+		assertThat(session.getRemainingMeters()).isEqualTo(remainingMeters);
+		assertThat(session.getEtaUpdatedAt()).isEqualTo(observedAt);
+	}
+
+	@Test
+	@DisplayName("applyTelemetry는 vehiclePhase가 ROUTING이어도 remainingMeters 701 · navEtaSeconds 61이면 ROUTING 그대로 두고 stateVersion을 올리지 않는다")
+	void applyTelemetryKeepsRoutingWhenOutside700MetersAnd60Seconds() {
+		PickupSession session = restoreWithLastEta(VehiclePhase.ROUTING);
+
+		session.applyTelemetry(LAST_OBSERVED_AT.plusSeconds(15), 61, 701);
+
+		assertThat(session.getVehiclePhase()).isEqualTo(VehiclePhase.ROUTING);
+		assertThat(session.getStateVersion()).isEqualTo(RESTORED_STATE_VERSION);
+	}
+
+	@ParameterizedTest(name = "vehiclePhase {0}")
+	@EnumSource(value = VehiclePhase.class, names = {"APPROACHING", "STOPPED", "DEPARTED"})
+	@DisplayName("applyTelemetry는 vehiclePhase가 ROUTING이 아니면(APPROACHING · STOPPED · DEPARTED) 접근 중 기준 안이어도 vehiclePhase와 stateVersion을 바꾸지 않는다")
+	void applyTelemetryDoesNotChangeVehiclePhaseOtherThanRouting(VehiclePhase phase) {
+		PickupSession session = restoreWithLastEta(phase);
+
+		session.applyTelemetry(LAST_OBSERVED_AT.plusSeconds(15), 30, 300);
+
+		assertThat(session.getVehiclePhase()).isEqualTo(phase);
+		assertThat(session.getStateVersion()).isEqualTo(RESTORED_STATE_VERSION);
+	}
+
+	@Test
+	@DisplayName("applyTelemetry는 observedAt이 마지막 값보다 오래되면 접근 중 기준 안이어도 ROUTING을 APPROACHING으로 바꾸지 않고 ETA · stateVersion도 그대로 둔다")
+	void applyTelemetryWithOlderObservedAtKeepsRouting() {
+		PickupSession session = restoreWithLastEta(VehiclePhase.ROUTING);
+
+		session.applyTelemetry(LAST_OBSERVED_AT.minusSeconds(1), 30, 300);
+
+		assertThat(session.getVehiclePhase()).isEqualTo(VehiclePhase.ROUTING);
+		assertThat(session.getStateVersion()).isEqualTo(RESTORED_STATE_VERSION);
+		assertThat(session.getEtaAt()).isEqualTo(LAST_ETA_AT);
+		assertThat(session.getRemainingMeters()).isEqualTo(LAST_REMAINING_METERS);
+		assertThat(session.getEtaUpdatedAt()).isEqualTo(LAST_OBSERVED_AT);
 	}
 
 	@Test
@@ -830,6 +931,32 @@ class PickupSessionTest {
 	}
 
 	@Test
+	@DisplayName("markChildReady는 그 자녀만 readyAt을 채우고 childPhase는 CALLED 그대로 두며 다른 자녀는 그대로다")
+	void markChildReadyRecordsReadyAtOnlyForThatChildAndKeepsPhase() {
+		PickupSession session = restoreSession(VehiclePhase.APPROACHING, ChildPhase.CALLED);
+
+		session.markChildReady(FIRST_CHILD_ID, ACKNOWLEDGED_AT);
+
+		assertThat(session.getChildren())
+				.extracting(SessionChild::getChildUserId, SessionChild::getChildPhase, SessionChild::getReadyAt)
+				.containsExactlyInAnyOrder(
+						tuple(FIRST_CHILD_ID, ChildPhase.CALLED, ACKNOWLEDGED_AT),
+						tuple(SECOND_CHILD_ID, ChildPhase.CALLED, null));
+	}
+
+	@Test
+	@DisplayName("markChildReady는 세션에 없는 childUserId면 CHILD_NOT_IN_SESSION으로 거절되고 자녀 childPhase · stateVersion은 그대로다")
+	void markChildReadyWithUnknownChildIsRejectedWithChildNotInSession() {
+		PickupSession session = restoreSession(VehiclePhase.APPROACHING, ChildPhase.CALLED);
+
+		assertThatThrownBy(() -> session.markChildReady(UNKNOWN_CHILD_ID, ACKNOWLEDGED_AT))
+				.isInstanceOfSatisfying(PickupRuleException.class,
+						e -> assertThat(e.violation()).isEqualTo(PickupViolation.CHILD_NOT_IN_SESSION));
+		assertChildPhases(session, ChildPhase.CALLED, ChildPhase.CALLED);
+		assertThat(session.getStateVersion()).isEqualTo(RESTORED_STATE_VERSION);
+	}
+
+	@Test
 	@DisplayName("extendChildPrep은 09:09에 5분을 더하면 그 자녀만 extraPrepMinutes 5 · callNotBefore 09:14로 바꾸고 childPhase는 WAITING 그대로이며 stateVersion을 1 올린다")
 	void extendChildPrepChangesOnlyThatChildPrepAndRaisesStateVersionByOne() {
 		PickupSession session = restoreSession(VehiclePhase.APPROACHING, ChildPhase.WAITING);
@@ -1159,8 +1286,13 @@ class PickupSessionTest {
 	}
 
 	private static PickupSession restoreWithLastEta() {
+		return restoreWithLastEta(VehiclePhase.APPROACHING);
+	}
+
+	// 마지막 SIG-01: ETA 900초 · 남은 거리 5000m(접근 중 기준 밖)
+	private static PickupSession restoreWithLastEta(VehiclePhase vehiclePhase) {
 		return PickupSession.restore(1L, VEHICLE_ID, FAMILY_ID, SPOT_ID, SPOT_NAME, STOP_POINT, MEETING_POINT, TODAY,
-				SessionStatus.ACTIVE, VehiclePhase.APPROACHING, SpotStatus.CONFIRMED, RESTORED_STATE_VERSION, 1, 1,
+				SessionStatus.ACTIVE, vehiclePhase, SpotStatus.CONFIRMED, RESTORED_STATE_VERSION, 1, 1,
 				null, false, LAST_ETA_AT, LAST_REMAINING_METERS, LAST_OBSERVED_AT, null, null, null, null, null, null,
 				null, null, List.of());
 	}

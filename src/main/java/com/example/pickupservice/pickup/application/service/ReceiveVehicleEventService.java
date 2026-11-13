@@ -8,9 +8,11 @@ import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
 import com.example.pickupservice.pickup.application.port.out.LoadSessionPort;
 import com.example.pickupservice.pickup.application.port.out.ProcessedVehicleEventPort;
 import com.example.pickupservice.pickup.application.port.out.PublishSessionEventPort;
+import com.example.pickupservice.pickup.application.port.out.SaveCallPort;
 import com.example.pickupservice.pickup.application.port.out.SaveSessionPort;
 import com.example.pickupservice.pickup.application.port.out.SessionEventPort;
 import com.example.pickupservice.pickup.domain.BoardingDoor;
+import com.example.pickupservice.pickup.domain.Call;
 import com.example.pickupservice.pickup.domain.CallStatus;
 import com.example.pickupservice.pickup.domain.PickupRuleException;
 import com.example.pickupservice.pickup.domain.PickupSession;
@@ -20,10 +22,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @Transactional
@@ -32,6 +36,7 @@ public class ReceiveVehicleEventService implements ReceiveVehicleEventUseCase {
 
 	private static final String VEHICLE_STOPPED = SessionEventType.VEHICLE_STOPPED.name();
 	private static final String VEHICLE_DEPARTED = SessionEventType.VEHICLE_DEPARTED.name();
+	private static final String CALL_REVOKED = SessionEventType.CALL_REVOKED.name();
 	private static final String BOARDING_DETECTED = SessionEventType.BOARDING_DETECTED.name();
 
 	private final LoadSessionPort loadSessionPort;
@@ -42,6 +47,8 @@ public class ReceiveVehicleEventService implements ReceiveVehicleEventUseCase {
 	private final SessionEventPort sessionEventPort;
 	private final PublishSessionEventPort publishSessionEventPort;
 	private final PickupProperties pickupProperties;
+	private final SaveCallPort saveCallPort;
+	private final CallEngine callEngine;
 
 	@Override
 	public void receive(VehicleEventCommand command) {
@@ -54,6 +61,7 @@ public class ReceiveVehicleEventService implements ReceiveVehicleEventUseCase {
 		switch (command.type()) {
 			case "STOPPED" -> stopped(locked, command.occurredAt());
 			case "DEPARTED" -> departed(locked, command.occurredAt());
+			case "STOP_FAILED" -> stopFailed(locked, command.occurredAt());
 			case "DOOR_CYCLE" -> doorCycle(locked, command);
 			default -> {
 			}
@@ -69,14 +77,63 @@ public class ReceiveVehicleEventService implements ReceiveVehicleEventUseCase {
 		SessionEvent event = sessionEventPort.append(session.getSessionId(), VEHICLE_STOPPED,
 				session.getStateVersion(), occurredAt, payload);
 		publish(event, guardiansAndSessionChildren(session));
+		if (hasStoredEta(session)) {
+			int navEtaSeconds = (int) Duration.between(session.getEtaUpdatedAt(), session.getEtaAt()).toSeconds();
+			callEngine.triggerIfReady(session, navEtaSeconds, session.getRemainingMeters());
+		}
 	}
 
 	private void departed(PickupSession locked, Instant occurredAt) {
 		locked.markDeparted();
+		Optional<Call> liveCall = keepsCalls(locked) ? Optional.empty()
+				: loadCallPort.loadLiveCall(locked.getSessionId());
+		liveCall.ifPresent(call -> revokeCall(call, locked, "VEHICLE_DEPARTED", occurredAt));
 		PickupSession session = saveSessionPort.save(locked);
 		SessionEvent event = sessionEventPort.append(session.getSessionId(), VEHICLE_DEPARTED,
 				session.getStateVersion(), occurredAt, Map.of());
-		publish(event, guardiansAndSessionChildren(session));
+		List<Long> receivers = guardiansAndSessionChildren(session);
+		publish(event, receivers);
+		if (liveCall.isPresent()) {
+			appendAndPublishCallRevoked(session, occurredAt, receivers);
+		}
+	}
+
+	private void stopFailed(PickupSession locked, Instant occurredAt) {
+		if (keepsCalls(locked)) {
+			return;
+		}
+		Optional<Call> liveCall = loadCallPort.loadLiveCall(locked.getSessionId());
+		if (liveCall.isEmpty()) {
+			return;
+		}
+		revokeCall(liveCall.get(), locked, "STOP_FAILED", occurredAt);
+		PickupSession session = saveSessionPort.save(locked);
+		appendAndPublishCallRevoked(session, occurredAt, guardiansAndSessionChildren(session));
+	}
+
+	private void revokeCall(Call call, PickupSession session, String reason, Instant at) {
+		try {
+			call.revoke(reason, at);
+		} catch (PickupRuleException exception) {
+			throw PickupErrors.from(exception);
+		}
+		session.revertChildrenToWaiting();
+		saveCallPort.saveCall(call);
+	}
+
+	private void appendAndPublishCallRevoked(PickupSession session, Instant at, List<Long> receivers) {
+		SessionEvent event = sessionEventPort.append(session.getSessionId(), CALL_REVOKED,
+				session.getStateVersion(), at, Map.of());
+		publish(event, receivers);
+	}
+
+	private static boolean keepsCalls(PickupSession session) {
+		return session.isFinished() || session.getBoardingDetectedAt() != null;
+	}
+
+	private static boolean hasStoredEta(PickupSession session) {
+		return session.getEtaAt() != null && session.getRemainingMeters() != null
+				&& session.getEtaUpdatedAt() != null;
 	}
 
 	private void doorCycle(PickupSession locked, VehicleEventCommand command) {

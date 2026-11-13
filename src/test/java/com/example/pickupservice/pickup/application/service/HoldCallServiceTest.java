@@ -217,7 +217,7 @@ class HoldCallServiceTest {
 	@Test
 	@DisplayName("호출 보류 해제는 저장된 ETA가 180초 안이고 가드 G1~G5를 통과하면 Call을 ACCEPTED · ETA_3MIN · 지금 spotVersion · prevCallId 없음으로 한 번 저장한다")
 	void releaseCallHoldCreatesEtaTriggeredCallFromStoredEta() {
-		givenLockedSession(session(true, LAST_OBSERVED_AT.plusSeconds(150), 1500, LAST_OBSERVED_AT));
+		givenLockedSession(session(VehiclePhase.STOPPED, true,LAST_OBSERVED_AT.plusSeconds(150), 1500, LAST_OBSERVED_AT));
 
 		holdCallService.releaseCallHold(command());
 
@@ -233,7 +233,7 @@ class HoldCallServiceTest {
 	@Test
 	@DisplayName("호출 보류 해제는 저장된 남은 거리가 700m 안이면 ETA가 길어도 triggerType DIST_700M인 ACCEPTED Call을 저장한다")
 	void releaseCallHoldCreatesDistanceTriggeredCallFromStoredRemainingMeters() {
-		givenLockedSession(session(true, LAST_OBSERVED_AT.plusSeconds(600), 650, LAST_OBSERVED_AT));
+		givenLockedSession(session(VehiclePhase.STOPPED, true,LAST_OBSERVED_AT.plusSeconds(600), 650, LAST_OBSERVED_AT));
 
 		holdCallService.releaseCallHold(command());
 
@@ -245,7 +245,7 @@ class HoldCallServiceTest {
 	@Test
 	@DisplayName("호출 보류 해제로 호출을 만들면 세션 자녀에게 CALL 알림 기록을 요청하고 CALL_TRIGGERED를 올린 stateVersion · 지금 시각으로 저장해 append가 준 eventId · seq로 보호자에게 발행한다")
 	void releaseCallHoldRecordsNotificationAndAppendsCallTriggeredWithRaisedStateVersion() {
-		givenLockedSession(session(true, LAST_OBSERVED_AT.plusSeconds(150), 1500, LAST_OBSERVED_AT));
+		givenLockedSession(session(VehiclePhase.STOPPED, true,LAST_OBSERVED_AT.plusSeconds(150), 1500, LAST_OBSERVED_AT));
 
 		holdCallService.releaseCallHold(command());
 
@@ -293,7 +293,8 @@ class HoldCallServiceTest {
 	@DisplayName("호출 보류 해제는 저장된 ETA가 트리거를 만족해도 1분 넘게 지난 값이면(G4) callHeld만 풀고 호출을 만들지 않는다")
 	void releaseCallHoldDoesNotCreateCallWhenStoredEtaIsStale() {
 		Instant staleObservedAt = NOW.minus(Duration.ofMinutes(2));
-		givenLockedSession(session(true, staleObservedAt.plusSeconds(150), 600, staleObservedAt));
+		givenLockedSession(session(VehiclePhase.STOPPED, true, staleObservedAt.plusSeconds(150), 600,
+				staleObservedAt));
 
 		holdCallService.releaseCallHold(command());
 
@@ -345,13 +346,19 @@ class HoldCallServiceTest {
 	// ACTIVE · 경로 확정(CONFIRMED) · 두 자녀 실내 대기(준비 시간 추가 없음)인 세션. ETA 값만 바꿔 쓴다
 	private static PickupSession session(boolean callHeld, Instant etaAt, Integer remainingMeters,
 			Instant etaUpdatedAt) {
+		return session(VehiclePhase.APPROACHING, callHeld, etaAt, remainingMeters, etaUpdatedAt);
+	}
+
+	// 호출이 나가려면 G6(차량 정차)도 통과해야 해서 호출 생성을 보는 테스트는 STOPPED로 부른다
+	private static PickupSession session(VehiclePhase vehiclePhase, boolean callHeld, Instant etaAt,
+			Integer remainingMeters, Instant etaUpdatedAt) {
 		List<SessionChild> children = List.of(
 				SessionChild.restore(7001L, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.WAITING, 0, null, null, null,
 						null, null),
 				SessionChild.restore(7002L, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.WAITING, 0, null, null, null,
 						null, null));
 		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
-				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.APPROACHING,
+				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, vehiclePhase,
 				SpotStatus.CONFIRMED, STATE_VERSION, SPOT_VERSION, ROUTE_VERSION, SPOT_VERSION, callHeld, etaAt,
 				remainingMeters, etaUpdatedAt, null, null, null, null, null, null, null, null, children);
 	}

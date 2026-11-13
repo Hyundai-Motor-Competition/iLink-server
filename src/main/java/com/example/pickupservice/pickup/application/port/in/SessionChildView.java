@@ -12,6 +12,12 @@ public record SessionChildView(
 		Instant callNotBefore,
 		Instant acknowledgedAt,
 		Instant boardedAt,
-		ChildLocationView location
+		ChildLocationView location,
+		Instant readyAt
 ) {
+
+	public SessionChildView(long childUserId, String name, ChildPhase phase, int extraPrepMinutes,
+			Instant callNotBefore, Instant acknowledgedAt, Instant boardedAt, ChildLocationView location) {
+		this(childUserId, name, phase, extraPrepMinutes, callNotBefore, acknowledgedAt, boardedAt, location, null);
+	}
 }

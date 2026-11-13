@@ -52,6 +52,7 @@ class ReceiveTelemetryServiceIntegrationTest extends IntegrationTestSupport {
 	private static final int REMAINING_METERS = 650;
 	private static final String CALL_TRIGGERED = SessionEventType.CALL_TRIGGERED.name();
 	private static final String ETA_UPDATED = SessionEventType.ETA_UPDATED.name();
+	private static final String PREPARE_NOTICE_SENT = SessionEventType.PREPARE_NOTICE_SENT.name();
 
 	private final ReceiveTelemetryUseCase receiveTelemetryUseCase;
 	private final PickupSeed pickupSeed;
@@ -67,10 +68,11 @@ class ReceiveTelemetryServiceIntegrationTest extends IntegrationTestSupport {
 	@BeforeEach
 	void setUp() {
 		seeded = pickupSeed.seed();
-		// AUTO 가족(UserSeed) · 경로 확정(G2 · G3) 상태로 만든다. 준비 시간(G5)은 시드에서 비어 있다
+		// AUTO 가족(UserSeed) · 경로 확정(G2 · G3) · 차량 정차 중(G6) 상태로 만든다. 준비 시간(G5)은 시드에서 비어 있다
 		jdbcTemplate.update("""
 				update pickup_session
-				set spot_status = 'CONFIRMED', route_version = 1, route_spot_version = spot_version
+				set spot_status = 'CONFIRMED', route_version = 1, route_spot_version = spot_version,
+				    vehicle_phase = 'STOPPED'
 				where session_id = ?
 				""", seeded.sessionId());
 		capture.clear();
@@ -95,9 +97,11 @@ class ReceiveTelemetryServiceIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("호출 조건을 채운 SIG-01이 오면 한 트랜잭션으로 Call(ACCEPTED · ETA_3MIN · 지금 spotVersion)과 CALL_TRIGGERED(seq 1)가 저장되고, 커밋 뒤에 CALL_TRIGGERED가 저장된 eventId · seq로 1번 나간다")
+	@DisplayName("호출 조건을 채운 SIG-01이 오면 한 트랜잭션으로 Call(ACCEPTED · ETA_3MIN · 지금 spotVersion)과 CALL_TRIGGERED(seq 2)가 저장되고, 커밋 뒤에 CALL_TRIGGERED가 저장된 eventId · seq로 1번 나간다. 준비 알림은 이미 보낸 상태(PREPARE_NOTICE_SENT seq 1)로 둔다")
 	void telemetryMeetingTriggerSavesCallAndPublishesCallTriggeredOnceAfterCommit() {
 		Instant observedAt = clock.instant();
+		// 준비 알림을 이미 보낸 상태로 만든다. 그래서 이번 신호에서 PREPARE_NOTICE_SENT를 다시 쓰지 않는다
+		sessionEventPort.append(seeded.sessionId(), PREPARE_NOTICE_SENT, PickupSeed.STATE_VERSION, observedAt, Map.of());
 
 		receiveTelemetryUseCase.receive(telemetry(observedAt));
 
@@ -110,12 +114,12 @@ class ReceiveTelemetryServiceIntegrationTest extends IntegrationTestSupport {
 			assertThat(((Number) call.get("spot_version")).intValue()).isZero();
 		});
 		List<Map<String, Object>> events = jdbcTemplate.queryForList(
-				"select event_id, seq, type from session_event where session_id = ?", seeded.sessionId());
-		assertThat(events).singleElement().satisfies(event -> {
-			assertThat(event.get("type")).isEqualTo(CALL_TRIGGERED);
-			assertThat(((Number) event.get("seq")).longValue()).isEqualTo(1L);
-		});
-		long savedEventId = ((Number) events.getFirst().get("event_id")).longValue();
+				"select event_id, seq, type from session_event where session_id = ? order by seq", seeded.sessionId());
+		assertThat(events).extracting(event -> event.get("type"))
+				.containsExactly(PREPARE_NOTICE_SENT, CALL_TRIGGERED);
+		Map<String, Object> callTriggered = events.get(1);
+		assertThat(((Number) callTriggered.get("seq")).longValue()).isEqualTo(2L);
+		long savedEventId = ((Number) callTriggered.get("event_id")).longValue();
 
 		assertThat(capture.afterCommit())
 				.filteredOn(message -> CALL_TRIGGERED.equals(message.type()))
@@ -123,7 +127,7 @@ class ReceiveTelemetryServiceIntegrationTest extends IntegrationTestSupport {
 				.satisfies(message -> {
 					assertThat(message.sessionId()).isEqualTo(seeded.sessionId());
 					assertThat(message.eventId()).isEqualTo(savedEventId);
-					assertThat(message.seq()).isEqualTo(1L);
+					assertThat(message.seq()).isEqualTo(2L);
 				});
 	}
 

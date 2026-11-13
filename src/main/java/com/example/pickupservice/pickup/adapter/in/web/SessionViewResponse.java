@@ -12,6 +12,7 @@ import com.example.pickupservice.pickup.application.port.in.SessionRouteView;
 import com.example.pickupservice.pickup.application.port.in.SessionSpotView;
 import com.example.pickupservice.pickup.application.port.in.SessionStatusView;
 import com.example.pickupservice.pickup.application.port.in.SessionView;
+import com.example.pickupservice.pickup.application.port.in.VehicleLocationView;
 import com.example.pickupservice.pickup.domain.ChildPhase;
 import com.example.pickupservice.pickup.domain.SessionStatus;
 import com.example.pickupservice.pickup.domain.SpotStatus;
@@ -31,6 +32,7 @@ public record SessionViewResponse(
 		SessionEtaResponse eta,
 		SessionCallResponse call,
 		List<SessionChildResponse> children,
+		VehicleLocationResponse vehicleLocation,
 		SessionRouteResponse route,
 		SessionBoardingResponse boarding,
 		SessionIncidentResponse incident
@@ -45,6 +47,7 @@ public record SessionViewResponse(
 				mapOrNull(view.eta(), SessionEtaResponse::from),
 				mapOrNull(view.call(), SessionCallResponse::from),
 				mapOrNull(view.children(), children -> children.stream().map(SessionChildResponse::from).toList()),
+				mapOrNull(view.vehicleLocation(), VehicleLocationResponse::from),
 				mapOrNull(view.route(), SessionRouteResponse::from),
 				mapOrNull(view.boarding(), SessionBoardingResponse::from),
 				mapOrNull(view.incident(), SessionIncidentResponse::from));
@@ -111,13 +114,15 @@ public record SessionViewResponse(
 			String callNotBefore,
 			String acknowledgedAt,
 			String boardedAt,
-			ChildLocationResponse location
+			ChildLocationResponse location,
+			String readyAt
 	) {
 
 		static SessionChildResponse from(SessionChildView child) {
 			return new SessionChildResponse(child.childUserId(), child.name(), child.phase(),
 					child.extraPrepMinutes(), kst(child.callNotBefore()), kst(child.acknowledgedAt()),
-					kst(child.boardedAt()), mapOrNull(child.location(), ChildLocationResponse::from));
+					kst(child.boardedAt()), mapOrNull(child.location(), ChildLocationResponse::from),
+					kst(child.readyAt()));
 		}
 	}
 
@@ -125,6 +130,13 @@ public record SessionViewResponse(
 
 		static ChildLocationResponse from(ChildLocationView location) {
 			return new ChildLocationResponse(location.lat(), location.lng(), kst(location.at()));
+		}
+	}
+
+	public record VehicleLocationResponse(double lat, double lng, String at) {
+
+		static VehicleLocationResponse from(VehicleLocationView location) {
+			return new VehicleLocationResponse(location.lat(), location.lng(), kst(location.at()));
 		}
 	}
 

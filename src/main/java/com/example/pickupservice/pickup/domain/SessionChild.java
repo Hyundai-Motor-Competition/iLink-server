@@ -22,16 +22,25 @@ public class SessionChild {
 	private Instant lastLocatedAt;
 	private Instant acknowledgedAt;
 	private Instant boardedAt;
+	private Instant readyAt;
 
 	public static SessionChild waiting(long childUserId, long scheduleId) {
-		return new SessionChild(null, childUserId, scheduleId, ChildPhase.WAITING, 0, null, null, null, null, null);
+		return new SessionChild(null, childUserId, scheduleId, ChildPhase.WAITING, 0, null, null, null, null, null,
+				null);
 	}
 
 	public static SessionChild restore(Long sessionChildId, long childUserId, long scheduleId, ChildPhase childPhase,
 			int extraPrepMinutes, Instant callNotBefore, LatLng lastLocation, Instant lastLocatedAt,
 			Instant acknowledgedAt, Instant boardedAt) {
+		return restore(sessionChildId, childUserId, scheduleId, childPhase, extraPrepMinutes, callNotBefore,
+				lastLocation, lastLocatedAt, acknowledgedAt, boardedAt, null);
+	}
+
+	public static SessionChild restore(Long sessionChildId, long childUserId, long scheduleId, ChildPhase childPhase,
+			int extraPrepMinutes, Instant callNotBefore, LatLng lastLocation, Instant lastLocatedAt,
+			Instant acknowledgedAt, Instant boardedAt, Instant readyAt) {
 		return new SessionChild(sessionChildId, childUserId, scheduleId, childPhase, extraPrepMinutes, callNotBefore,
-				lastLocation, lastLocatedAt, acknowledgedAt, boardedAt);
+				lastLocation, lastLocatedAt, acknowledgedAt, boardedAt, readyAt);
 	}
 
 	public void board(Instant at) {
@@ -65,6 +74,13 @@ public class SessionChild {
 		}
 		acknowledgedAt = at;
 		childPhase = ChildPhase.MEETING;
+	}
+
+	public void markReady(Instant at) {
+		if (readyAt != null) {
+			return;
+		}
+		readyAt = at;
 	}
 
 	public void markCalled() {

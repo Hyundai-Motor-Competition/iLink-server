@@ -19,7 +19,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * 설계서 「세션 뷰 (SessionView)」 응답 예시와 같은 값. 예시에 없는 children[].callNotBefore · location은 필드 표대로 넣었다.
+ * 설계서 「세션 뷰 (SessionView)」 응답 예시와 같은 값. 예시에 없는 children[].callNotBefore · location · vehicleLocation은 필드 표대로 넣었다.
  */
 public final class SessionViewFixture {
 
@@ -38,10 +38,11 @@ public final class SessionViewFixture {
 			            "progress": { "acceptedAt": null, "sentAt": null, "deliveredAt": null, "acknowledgedAt": null } },
 			  "children": [
 			    { "childUserId": 31, "name": "민준", "phase": "WAITING", "extraPrepMinutes": 10,
-			      "callNotBefore": "2026-11-05T18:10:00+09:00", "acknowledgedAt": null, "boardedAt": null, "location": null },
+			      "callNotBefore": "2026-11-05T18:10:00+09:00", "acknowledgedAt": null, "boardedAt": null, "location": null, "readyAt": null },
 			    { "childUserId": 32, "name": "서윤", "phase": "WAITING", "extraPrepMinutes": 0,
-			      "callNotBefore": null, "acknowledgedAt": null, "boardedAt": null, "location": null }
+			      "callNotBefore": null, "acknowledgedAt": null, "boardedAt": null, "location": null, "readyAt": null }
 			  ],
+			  "vehicleLocation": null,
 			  "route": { "routeVersion": 2, "remainingMeters": 4200 }, "boarding": null, "incident": null
 			}
 			""";

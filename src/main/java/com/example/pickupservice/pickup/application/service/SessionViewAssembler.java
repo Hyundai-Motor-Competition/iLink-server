@@ -15,6 +15,7 @@ import com.example.pickupservice.pickup.application.port.in.SessionRouteView;
 import com.example.pickupservice.pickup.application.port.in.SessionSpotView;
 import com.example.pickupservice.pickup.application.port.in.SessionStatusView;
 import com.example.pickupservice.pickup.application.port.in.SessionView;
+import com.example.pickupservice.pickup.application.port.in.VehicleLocationView;
 import com.example.pickupservice.pickup.domain.Call;
 import com.example.pickupservice.pickup.domain.ChildPhase;
 import com.example.pickupservice.pickup.domain.Guard;
@@ -38,6 +39,8 @@ import java.util.stream.Collectors;
 public class SessionViewAssembler {
 
 	private static final String NO_CALL = "NONE";
+	private static final int CHILD_VEHICLE_LOCATION_METERS = 700;
+	private static final int CHILD_VEHICLE_LOCATION_SECONDS = 180;
 
 	private final Duration etaValidFor;
 	private final Duration callBeforeEta;
@@ -50,17 +53,36 @@ public class SessionViewAssembler {
 	public SessionView assemble(PickupSession session, AuthPrincipal viewer, FamilyInfo family,
 			List<MemberInfo> members, Optional<Call> latestCall, Instant now) {
 		boolean childViewer = isChild(viewer);
+		SessionEtaView eta = eta(session, now);
 		return new SessionView(
 				session.getSessionId(),
 				session.getStateVersion(),
 				status(session, latestCall),
 				childViewer && !isRouteConfirmed(session) ? null : spot(session),
-				eta(session, now),
+				eta,
 				call(session, family, latestCall, now),
 				childViewer ? childrenForChild(session, members, viewer.id()) : children(session, members),
+				vehicleLocation(session, eta, childViewer),
 				new SessionRouteView(session.getRouteVersion(), session.getRemainingMeters()),
 				boarding(session),
 				incident(session));
+	}
+
+	private static VehicleLocationView vehicleLocation(PickupSession session, SessionEtaView eta,
+			boolean childViewer) {
+		if (session.isFinished() || session.getVehicleLocation() == null) {
+			return null;
+		}
+		if (childViewer && !isVehicleNear(session.getRemainingMeters(), eta.remainingSeconds())) {
+			return null;
+		}
+		return new VehicleLocationView(session.getVehicleLocation().lat(), session.getVehicleLocation().lng(),
+				session.getVehicleLocatedAt());
+	}
+
+	private static boolean isVehicleNear(Integer remainingMeters, Integer remainingSeconds) {
+		return (remainingMeters != null && remainingMeters <= CHILD_VEHICLE_LOCATION_METERS)
+				|| (remainingSeconds != null && remainingSeconds <= CHILD_VEHICLE_LOCATION_SECONDS);
 	}
 
 	private static SessionIncidentView incident(PickupSession session) {
@@ -151,7 +173,7 @@ public class SessionViewAssembler {
 			ChildLocationView location) {
 		return new SessionChildView(child.getChildUserId(), names.get(child.getChildUserId()), child.getChildPhase(),
 				child.getExtraPrepMinutes(), child.getCallNotBefore(), child.getAcknowledgedAt(), child.getBoardedAt(),
-				location);
+				location, child.getReadyAt());
 	}
 
 	private static ChildLocationView location(SessionChild child) {

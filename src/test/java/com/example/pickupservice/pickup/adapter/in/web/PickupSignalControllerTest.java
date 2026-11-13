@@ -9,6 +9,8 @@ import com.example.pickupservice.pickup.application.port.in.ChildLocationCommand
 import com.example.pickupservice.pickup.application.port.in.ExtendPrepTimeCommand;
 import com.example.pickupservice.pickup.application.port.in.HelpRequestCommand;
 import com.example.pickupservice.pickup.application.port.in.HelpRequestResult;
+import com.example.pickupservice.pickup.application.port.in.MarkChildReadyCommand;
+import com.example.pickupservice.pickup.application.port.in.MarkChildReadyResult;
 import com.example.pickupservice.pickup.application.port.in.PrepExtensionResult;
 import com.example.pickupservice.pickup.application.port.in.TelemetryCommand;
 import com.example.pickupservice.pickup.application.port.in.VehicleEventCommand;
@@ -61,6 +63,7 @@ class PickupSignalControllerTest extends PickupWebTestSupport {
 	private static final String PREP_EXTENSIONS_PATH = "/v1/pickup-sessions/{sessionId}/prep-time-extensions";
 	private static final String CHILD_LOCATIONS_PATH = "/v1/pickup-sessions/{sessionId}/child-locations";
 	private static final String HELP_REQUESTS_PATH = "/v1/pickup-sessions/{sessionId}/help-requests";
+	private static final String READY_PATH = "/v1/pickup-sessions/{sessionId}/ready";
 	private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 	private static final long CHILD_USER_ID = 31L;
 	private static final long GUARDIAN_USER_ID = 101L;
@@ -354,6 +357,43 @@ class PickupSignalControllerTest extends PickupWebTestSupport {
 				.andExpect(jsonPath("$.error.nextAllowedAt").value("2026-11-09T18:21:30+09:00"));
 
 		then(requestHelpUseCase).should().request(new HelpRequestCommand(CHILD, SESSION_ID, "NEED_HELP"));
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/ready는 자녀 토큰으로 Idempotency-Key 없이 200과 childUserId · readyAt(+09:00)을 돌려준다")
+	void markReadyWithChildTokenReturns200WithChildUserIdAndReadyAt() throws Exception {
+		given(markChildReadyUseCase.markReady(any()))
+				.willReturn(new MarkChildReadyResult(CHILD_USER_ID, Instant.parse("2026-11-13T09:21:30Z")));
+
+		mockMvc.perform(readyRequest(childBearer()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.childUserId").value(CHILD_USER_ID))
+				.andExpect(jsonPath("$.readyAt").value("2026-11-13T18:21:30+09:00"));
+
+		then(markChildReadyUseCase).should().markReady(new MarkChildReadyCommand(CHILD, SESSION_ID));
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/ready를 차량 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다")
+	void markReadyWithVehicleTokenReturns403Forbidden() throws Exception {
+		mockMvc.perform(readyRequest(vehicleBearer()))
+				.andExpect(commonError(HttpStatus.FORBIDDEN, "FORBIDDEN"));
+
+		then(markChildReadyUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/ready를 GUARDIAN 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다")
+	void markReadyWithGuardianTokenReturns403Forbidden() throws Exception {
+		mockMvc.perform(readyRequest(guardianBearer()))
+				.andExpect(commonError(HttpStatus.FORBIDDEN, "FORBIDDEN"));
+
+		then(markChildReadyUseCase).shouldHaveNoInteractions();
+	}
+
+	private MockHttpServletRequestBuilder readyRequest(String bearer) {
+		return post(READY_PATH, SESSION_ID)
+				.header(HttpHeaders.AUTHORIZATION, bearer);
 	}
 
 	private MockHttpServletRequestBuilder prepExtensionRequest(String bearer, String body) {

@@ -64,6 +64,8 @@ class PickupSessionPersistenceAdapterTest extends IntegrationTestSupport {
 	private static final LatLng SNAPSHOT_STOP = new LatLng(37.501777, 127.039123);
 	private static final LatLng SNAPSHOT_MEETING = new LatLng(37.501888, 127.039456);
 	private static final LatLng CHILD_LOCATION = new LatLng(37.501555, 127.039222);
+	private static final LatLng VEHICLE_LOCATION = new LatLng(37.498123, 127.027678);
+	private static final LatLng NEWER_VEHICLE_LOCATION = new LatLng(37.499456, 127.028789);
 	private static final LatLng SEED_STOP = new LatLng(PickupSeed.STOP_LAT, PickupSeed.STOP_LNG);
 	private static final LatLng SEED_MEETING = new LatLng(PickupSeed.MEETING_LAT, PickupSeed.MEETING_LNG);
 	private static final Instant T0 = Instant.parse("2026-11-09T07:00:00Z");
@@ -243,6 +245,72 @@ class PickupSessionPersistenceAdapterTest extends IntegrationTestSupport {
 				.isEqualByComparingTo(new BigDecimal("37.501555"));
 		assertThat((BigDecimal) minjunRow.get("last_lng")).as("민준 last_lng")
 				.isEqualByComparingTo(new BigDecimal("127.039222"));
+	}
+
+	@Test
+	@DisplayName("마지막 차량 위치가 있는 세션을 저장하면 vehicle_lat · vehicle_lng(소수점 6자리) · vehicle_located_at 컬럼에 담기고 load로 읽으면 vehicleLocation · vehicleLocatedAt이 같다")
+	void vehicleLocationIsStoredInVehicleColumnsAndLoaded() {
+		PickupSession toSave = PickupSession.restore(seeded.sessionId(), seeded.vehicleId(), seeded.familyId(),
+				seeded.spotId(), PickupSeed.SPOT_NAME, SEED_STOP, SEED_MEETING, seeded.date(), SessionStatus.ACTIVE,
+				VehiclePhase.APPROACHING, SpotStatus.CONFIRMED, PickupSeed.STATE_VERSION, 0, 1, 0, false,
+				T0.plusSeconds(720), 650, T0.plusSeconds(600), null, null, null, null, null, null, null, null,
+				VEHICLE_LOCATION, T0.plusSeconds(600), List.of(
+						seededChild(seeded.minjunSessionChildId(), seeded.minjunId(), seeded.minjunScheduleId()),
+						seededChild(seeded.seoyunSessionChildId(), seeded.seoyunId(), seeded.seoyunScheduleId())));
+
+		saveSessionPort.save(toSave);
+
+		Map<String, Object> row = jdbcTemplate.queryForMap(
+				"select vehicle_lat, vehicle_lng, vehicle_located_at from pickup_session where session_id = ?",
+				seeded.sessionId());
+		assertThat((BigDecimal) row.get("vehicle_lat")).as("DB vehicle_lat")
+				.isEqualByComparingTo(new BigDecimal("37.498123"));
+		assertThat((BigDecimal) row.get("vehicle_lng")).as("DB vehicle_lng")
+				.isEqualByComparingTo(new BigDecimal("127.027678"));
+		assertThat(row.get("vehicle_located_at")).as("DB vehicle_located_at").isNotNull();
+		PickupSession loaded = loadSessionPort.load(seeded.sessionId()).orElseThrow();
+		assertLatLng(loaded.getVehicleLocation(), VEHICLE_LOCATION, "vehicleLocation");
+		assertThat(loaded.getVehicleLocatedAt()).isEqualTo(T0.plusSeconds(600));
+	}
+
+	@Test
+	@DisplayName("차량 위치가 없는 세션을 저장하면 vehicle_lat · vehicle_lng · vehicle_located_at이 NULL이고 load로 읽으면 vehicleLocation · vehicleLocatedAt이 null이다")
+	void sessionWithoutVehicleLocationStoresNullColumnsAndLoadsNull() {
+		saveSessionPort.save(seededSession(SessionStatus.ACTIVE));
+
+		Map<String, Object> row = jdbcTemplate.queryForMap(
+				"select vehicle_lat, vehicle_lng, vehicle_located_at from pickup_session where session_id = ?",
+				seeded.sessionId());
+		assertThat(row.get("vehicle_lat")).as("DB vehicle_lat").isNull();
+		assertThat(row.get("vehicle_lng")).as("DB vehicle_lng").isNull();
+		assertThat(row.get("vehicle_located_at")).as("DB vehicle_located_at").isNull();
+		PickupSession loaded = loadSessionPort.load(seeded.sessionId()).orElseThrow();
+		assertThat(loaded.getVehicleLocation()).isNull();
+		assertThat(loaded.getVehicleLocatedAt()).isNull();
+	}
+
+	@Test
+	@DisplayName("차량 위치가 저장된 세션에 더 새 위치를 applyTelemetry로 덮어 다시 저장하면 vehicle_lat · vehicle_lng · vehicle_located_at이 새 값으로 바뀐다")
+	void resavingSessionOverwritesVehicleLocationColumns() {
+		PickupSession session = seededSession(SessionStatus.ACTIVE);
+		session.applyTelemetry(T0, 600, 4_200, VEHICLE_LOCATION);
+		saveSessionPort.save(session);
+		PickupSession reloaded = loadSessionPort.load(seeded.sessionId()).orElseThrow();
+
+		reloaded.applyTelemetry(T0.plusSeconds(15), 500, 3_900, NEWER_VEHICLE_LOCATION);
+		saveSessionPort.save(reloaded);
+
+		Map<String, Object> row = jdbcTemplate.queryForMap(
+				"select vehicle_lat, vehicle_lng from pickup_session where session_id = ?", seeded.sessionId());
+		assertThat((BigDecimal) row.get("vehicle_lat")).as("DB vehicle_lat")
+				.isEqualByComparingTo(new BigDecimal("37.499456"));
+		assertThat((BigDecimal) row.get("vehicle_lng")).as("DB vehicle_lng")
+				.isEqualByComparingTo(new BigDecimal("127.028789"));
+		PickupSession loaded = loadSessionPort.load(seeded.sessionId()).orElseThrow();
+		assertLatLng(loaded.getVehicleLocation(), NEWER_VEHICLE_LOCATION, "vehicleLocation");
+		assertThat(loaded.getVehicleLocatedAt()).isEqualTo(T0.plusSeconds(15));
+		assertThat(jdbcTemplate.queryForObject("select count(*) from pickup_session where vehicle_id = ?",
+				Integer.class, seeded.vehicleId())).as("시드 차량 세션 행 수").isEqualTo(1);
 	}
 
 	@Test

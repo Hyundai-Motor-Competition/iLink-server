@@ -212,6 +212,7 @@ class SendCallServiceTest {
 	@DisplayName("합류 안내 보내기는 장소 미확정(G2)과 ETA 오래됨(G4)이 함께면 unmet에 [G2, G4]를 가드 순서대로 담아 CALL_GUARD_UNMET으로 거절한다")
 	void sendRejectsWithAllUnmetGuardsInOrder() {
 		givenLockedSession(readyForManualCall()
+				.vehiclePhase(VehiclePhase.STOPPED)
 				.spotStatus(SpotStatus.SELECTED)
 				.etaUpdatedAt(NOW.minusSeconds(61))
 				.build());
@@ -222,6 +223,22 @@ class SendCallServiceTest {
 		assertThat(exception).isNotNull();
 		assertThat(exception.code()).isEqualTo("CALL_GUARD_UNMET");
 		assertThat(exception.details().get("unmet")).isEqualTo(List.of("G2", "G4"));
+	}
+
+	@ParameterizedTest(name = "vehiclePhase {0}")
+	@EnumSource(value = VehiclePhase.class, names = {"ROUTING", "APPROACHING"})
+	@DisplayName("합류 안내 보내기는 정차 전(vehiclePhase STOPPED 아님)이면 가드 G1~G5를 통과해도 422 CALL_GUARD_UNMET과 unmet [G6]으로 거절하고 아무것도 저장 · 발행하지 않는다")
+	void sendRejectsBeforeVehicleStopsWithG6Unmet(VehiclePhase notStopped) {
+		givenLockedSession(readyForManualCall().vehiclePhase(notStopped).build());
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> sendCallService.send(command()));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		assertThat(exception.code()).isEqualTo("CALL_GUARD_UNMET");
+		assertThat(exception.details().get("unmet")).isEqualTo(List.of("G6"));
+		verifyNoInteractions(saveCallPort, recordNotificationPort, sessionEventPort, publishSessionEventPort);
 	}
 
 	@ParameterizedTest(name = "살아 있는 호출 status {0}")
@@ -257,7 +274,7 @@ class SendCallServiceTest {
 	@Test
 	@DisplayName("합류 안내 보내기는 GUARDIAN_CONFIRM 가족에서 가드 G1~G5를 통과하면 ETA · 거리 트리거(180초 · 700m) 밖이어도 Call을 ACCEPTED · MANUAL · 지금 spotVersion · prevCallId 없음으로 한 번 저장한다")
 	void sendSavesAcceptedManualCallWhenGuardsPass() {
-		givenLockedSession(readyForManualCall().build());
+		givenLockedSession(readyForManualCall().vehiclePhase(VehiclePhase.STOPPED).build());
 
 		sendCallService.send(command());
 
@@ -273,7 +290,7 @@ class SendCallServiceTest {
 	@Test
 	@DisplayName("합류 안내 보내기가 성공하면 저장한 Call의 callId와 status ACCEPTED를 돌려준다")
 	void sendReturnsSavedCallIdWithAcceptedStatus() {
-		givenLockedSession(readyForManualCall().build());
+		givenLockedSession(readyForManualCall().vehiclePhase(VehiclePhase.STOPPED).build());
 
 		CallResult result = sendCallService.send(command());
 
@@ -283,7 +300,7 @@ class SendCallServiceTest {
 	@Test
 	@DisplayName("합류 안내 보내기는 마지막 호출이 철회(REVOKED)됐으면 거절하지 않고 그 callId를 prevCallId로 단 MANUAL Call을 저장한다")
 	void sendLinksPrevCallIdWhenLatestCallIsRevoked() {
-		givenLockedSession(readyForManualCall().build());
+		givenLockedSession(readyForManualCall().vehiclePhase(VehiclePhase.STOPPED).build());
 		lenient().when(loadCallPort.loadLiveCall(SESSION_ID)).thenReturn(Optional.empty());
 		lenient().when(loadCallPort.loadLatestCall(SESSION_ID)).thenReturn(Optional.of(revokedCall()));
 
@@ -299,7 +316,7 @@ class SendCallServiceTest {
 	@Test
 	@DisplayName("합류 안내 보내기가 성공하면 Call을 저장한 뒤 그 callId로 세션 자녀 모두에게 CALL 알림 기록을 한 번 요청한다")
 	void sendRequestsCallNotificationForSessionChildrenAfterSavingCall() {
-		givenLockedSession(readyForManualCall().build());
+		givenLockedSession(readyForManualCall().vehiclePhase(VehiclePhase.STOPPED).build());
 
 		sendCallService.send(command());
 
@@ -318,7 +335,7 @@ class SendCallServiceTest {
 	@Test
 	@DisplayName("합류 안내 보내기가 성공하면 Call을 저장한 뒤 CALL_TRIGGERED를 지금 stateVersion · 서버 시각과 payload callId · trigger MANUAL로 한 번 저장한다")
 	void sendAppendsCallTriggeredWithManualTriggerAfterSavingCall() {
-		givenLockedSession(readyForManualCall().build());
+		givenLockedSession(readyForManualCall().vehiclePhase(VehiclePhase.STOPPED).build());
 
 		sendCallService.send(command());
 
@@ -338,7 +355,7 @@ class SendCallServiceTest {
 	@Test
 	@DisplayName("합류 안내 보내기가 성공하면 저장한 CALL_TRIGGERED를 append가 준 eventId · seq로 보호자에게 발행한다")
 	void sendPublishesCallTriggeredToGuardianAfterAppending() {
-		givenLockedSession(readyForManualCall().build());
+		givenLockedSession(readyForManualCall().vehiclePhase(VehiclePhase.STOPPED).build());
 
 		sendCallService.send(command());
 
@@ -361,7 +378,7 @@ class SendCallServiceTest {
 	@Test
 	@DisplayName("합류 안내 보내기는 알림 기록이 돌려준 notificationId 목록을 알림 기록 뒤에 발행하는 CALL_TRIGGERED payload의 notificationIds에 담고 저장하는 이벤트 payload에는 넣지 않는다")
 	void sendPublishesCallTriggeredWithRecordedNotificationIds() {
-		givenLockedSession(readyForManualCall().build());
+		givenLockedSession(readyForManualCall().vehiclePhase(VehiclePhase.STOPPED).build());
 		when(recordNotificationPort.recordNotifications(any(NotificationRequest.class)))
 				.thenReturn(List.of(7001L, 7002L));
 
@@ -415,15 +432,16 @@ class SendCallServiceTest {
 		return matched.get(0);
 	}
 
-	// 가드 하나만 통과하지 못하게 만든 세션
+	// 가드 하나만 통과하지 못하게 만든 세션. 나머지 가드가 섞이지 않도록 차량 정차 중(G6 통과)에서 시작한다
 	private static PickupSession breaking(GuardId guard) {
-		SessionBuilder builder = readyForManualCall();
+		SessionBuilder builder = readyForManualCall().vehiclePhase(VehiclePhase.STOPPED);
 		return switch (guard) {
 			case G1 -> builder.sessionStatus(SessionStatus.ON_HOLD).build();
 			case G2 -> builder.spotStatus(SpotStatus.SELECTED).build();
 			case G3 -> builder.routeSpotVersion(SPOT_VERSION - 1).build();
 			case G4 -> builder.etaUpdatedAt(NOW.minusSeconds(61)).build();
 			case G5 -> builder.seoyunCallNotBefore(NOW.plusSeconds(60)).build();
+			case G6 -> builder.vehiclePhase(VehiclePhase.ROUTING).build();
 		};
 	}
 
@@ -457,6 +475,7 @@ class SendCallServiceTest {
 	private static final class SessionBuilder {
 
 		private SessionStatus sessionStatus = SessionStatus.ACTIVE;
+		private VehiclePhase vehiclePhase = VehiclePhase.APPROACHING;
 		private SpotStatus spotStatus = SpotStatus.CONFIRMED;
 		private Integer routeSpotVersion = SPOT_VERSION;
 		private Instant etaUpdatedAt = NOW.minusSeconds(10);
@@ -464,6 +483,12 @@ class SendCallServiceTest {
 
 		SessionBuilder sessionStatus(SessionStatus value) {
 			this.sessionStatus = value;
+			return this;
+		}
+
+		// 가드를 통과하려면 G6(차량 정차)도 맞아야 해서 호출 생성 · 가드 목록을 보는 테스트는 STOPPED를 지정한다
+		SessionBuilder vehiclePhase(VehiclePhase value) {
+			this.vehiclePhase = value;
 			return this;
 		}
 
@@ -494,7 +519,7 @@ class SendCallServiceTest {
 					SessionChild.restore(7002L, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.WAITING,
 							seoyunCallNotBefore == null ? 0 : 5, seoyunCallNotBefore, null, null, null, null));
 			return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
-					FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, sessionStatus, VehiclePhase.APPROACHING,
+					FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, sessionStatus, vehiclePhase,
 					spotStatus, STATE_VERSION, SPOT_VERSION, ROUTE_VERSION, routeSpotVersion, false,
 					NOW.plus(Duration.ofMinutes(10)), 4200, etaUpdatedAt, null, null, null, null, null, null, null, null,
 					children);
