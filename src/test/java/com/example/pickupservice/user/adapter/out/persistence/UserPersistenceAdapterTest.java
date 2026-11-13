@@ -18,11 +18,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +44,7 @@ class UserPersistenceAdapterTest extends IntegrationTestSupport {
 	private final LoadVehiclePort loadVehiclePort;
 	private final EntityManager entityManager;
 	private final TransactionTemplate transactionTemplate;
+	private final JdbcTemplate jdbcTemplate;
 
 	private final List<Long> familyIds = new ArrayList<>();
 	private final List<Long> vehicleIds = new ArrayList<>();
@@ -123,6 +126,58 @@ class UserPersistenceAdapterTest extends IntegrationTestSupport {
 				.ignoringFields("version")
 				.isEqualTo(Vehicle.restore(savedUnowned.getVehicleId(), null, savedUnowned.getVin(), "EV9", null,
 						null));
+	}
+
+	@Test
+	@DisplayName("childLocationEnabled를 true로 저장하고 다시 읽으면 true이고 false로 바꿔 저장하면 false로 읽힌다")
+	void childLocationEnabledIsSavedAndLoaded() {
+		Family saved = saveFamilyPort.saveFamily(Family.restore(null, JoinCallMode.AUTO, 2, true));
+		long familyId = saved.getFamilyId();
+		familyIds.add(familyId);
+		assertThat(saved.isChildLocationEnabled()).as("저장 결과").isTrue();
+		clearPersistenceContext();
+
+		Family loaded = loadFamilyPort.loadFamily(familyId).orElseThrow();
+		assertThat(loaded.isChildLocationEnabled()).as("다시 읽은 값").isTrue();
+		assertThat(loaded.getSettingsVersion()).isEqualTo(2);
+
+		loaded.changeChildLocation(false);
+		saveFamilyPort.saveFamily(loaded);
+		clearPersistenceContext();
+
+		Family reloaded = loadFamilyPort.loadFamily(familyId).orElseThrow();
+		assertThat(reloaded.isChildLocationEnabled()).as("false로 바꿔 저장한 뒤 읽은 값").isFalse();
+		assertThat(reloaded.getSettingsVersion()).isEqualTo(3);
+	}
+
+	@Test
+	@DisplayName("child_location_enabled 컬럼은 boolean NOT NULL이고 기본값이 false여서 값 없이 넣은 행은 false로 읽힌다")
+	void childLocationEnabledColumnIsNotNullWithDefaultFalse() {
+		Map<String, Object> column = jdbcTemplate.queryForMap("""
+				select data_type, is_nullable, column_default
+				from information_schema.columns
+				where table_schema = current_schema()
+				  and table_name = 'family'
+				  and column_name = 'child_location_enabled'
+				""");
+		assertThat(column.get("data_type")).isEqualTo("boolean");
+		assertThat(column.get("is_nullable")).isEqualTo("NO");
+		assertThat(column.get("column_default")).as("child_location_enabled의 DB 기본값").isNotNull();
+		assertThat(String.valueOf(column.get("column_default"))).isEqualTo("false");
+
+		Long familyId = jdbcTemplate.queryForObject("""
+				insert into family (join_call_mode, settings_version, created_at, updated_at)
+				values ('AUTO', 0, now(), now())
+				returning family_id
+				""", Long.class);
+		familyIds.add(familyId);
+
+		assertThat(loadFamilyPort.loadFamily(familyId)).get()
+				.extracting(Family::isChildLocationEnabled)
+				.isEqualTo(false);
+		assertThat(jdbcTemplate.queryForObject(
+				"select child_location_enabled from family where family_id = ?", Boolean.class, familyId))
+				.isFalse();
 	}
 
 	@Test

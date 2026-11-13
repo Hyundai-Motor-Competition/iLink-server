@@ -36,7 +36,8 @@ public class GetMyFamilyService implements GetMyFamilyUseCase {
 		List<MemberResult> members = MemberResults.withDeviceStatus(
 				loadUserPort.loadUsers(query.familyId()), loadMemberDeviceStatusPort);
 		VehicleSummary vehicle = loadLinkedVehicleSummary(query.familyId());
-		return new FamilyResult(family.getFamilyId(), family.getJoinCallMode(), vehicle, members);
+		return new FamilyResult(family.getFamilyId(), family.getJoinCallMode(), vehicle, members,
+				family.isChildLocationEnabled());
 	}
 
 	private VehicleSummary loadLinkedVehicleSummary(long familyId) {

@@ -4,7 +4,9 @@ import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.user.application.port.in.CallModeResult;
+import com.example.pickupservice.user.application.port.in.ChildLocationResult;
 import com.example.pickupservice.user.application.port.in.ChangeCallModeCommand;
+import com.example.pickupservice.user.application.port.in.ChangeChildLocationCommand;
 import com.example.pickupservice.user.application.port.in.FamilyResult;
 import com.example.pickupservice.user.application.port.in.GetMyFamilyQuery;
 import com.example.pickupservice.user.application.port.in.MemberResult;
@@ -54,6 +56,7 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 	private static final String MY_FAMILY_PATH = "/v1/families/me";
 	private static final String MEMBERS_PATH = "/v1/families/me/members";
 	private static final String CALL_MODE_PATH = "/v1/families/me/call-mode";
+	private static final String CHILD_LOCATION_PATH = "/v1/families/me/child-location";
 	private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 	private static final long FAMILY_ID = 12L;
 	private static final long GUARDIAN_USER_ID = 101L;
@@ -78,6 +81,7 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 				.andExpect(status().isOk())
 				.andExpect(content().json("""
 						{"familyId":12,
+							 "childLocationEnabled":false,
 						 "joinCallMode":"AUTO",
 						 "vehicle":{"vehicleId":77,"model":"아이오닉 5","plateNumberMasked":"12가 ****"},
 						 "members":[
@@ -121,6 +125,28 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 				.andExpect(commonError(HttpStatus.FORBIDDEN, "FORBIDDEN"));
 
 		then(getMyFamilyUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("GET /v1/families/me는 유스케이스의 childLocationEnabled가 true이면 응답에 childLocationEnabled true를 담는다")
+	void getMyFamilyWritesChildLocationEnabledTrueWhenUseCaseReturnsTrue() throws Exception {
+		given(getMyFamilyUseCase.getMyFamily(any())).willReturn(familyResultWithChildLocation(true));
+
+		mockMvc.perform(get(MY_FAMILY_PATH).header(HttpHeaders.AUTHORIZATION, guardianBearer()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$", hasKey("childLocationEnabled")))
+				.andExpect(jsonPath("$.childLocationEnabled").value(true));
+	}
+
+	@Test
+	@DisplayName("GET /v1/families/me는 유스케이스의 childLocationEnabled가 false이면 응답에 childLocationEnabled false를 담는다")
+	void getMyFamilyWritesChildLocationEnabledFalseWhenUseCaseReturnsFalse() throws Exception {
+		given(getMyFamilyUseCase.getMyFamily(any())).willReturn(familyResultWithChildLocation(false));
+
+		mockMvc.perform(get(MY_FAMILY_PATH).header(HttpHeaders.AUTHORIZATION, guardianBearer()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$", hasKey("childLocationEnabled")))
+				.andExpect(jsonPath("$.childLocationEnabled").value(false));
 	}
 
 	@Test
@@ -389,6 +415,94 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 		then(changeCallModeUseCase).shouldHaveNoInteractions();
 	}
 
+	@Test
+	@DisplayName("PUT /v1/families/me/child-location는 200과 childLocationEnabled · settingsVersion을 돌려준다")
+	void changeChildLocationReturns200WithChildLocationEnabledAndSettingsVersion() throws Exception {
+		given(changeChildLocationUseCase.changeChildLocation(any())).willReturn(new ChildLocationResult(true, 8));
+
+		mockMvc.perform(changeChildLocationRequest(guardianBearer(), """
+						{"enabled":true}
+						"""))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"childLocationEnabled":true,"settingsVersion":8}
+						""", JsonCompareMode.STRICT));
+	}
+
+	@Test
+	@DisplayName("PUT /v1/families/me/child-location는 토큰의 familyId(12)와 본문의 enabled를 ChangeChildLocationCommand로 유스케이스에 넘긴다")
+	void changeChildLocationPassesTokenFamilyIdAndEnabledToUseCase() throws Exception {
+		given(changeChildLocationUseCase.changeChildLocation(any())).willReturn(new ChildLocationResult(true, 8));
+
+		mockMvc.perform(changeChildLocationRequest(guardianBearer(), """
+						{"enabled":true}
+						"""))
+				.andExpect(status().isOk());
+
+		then(changeChildLocationUseCase).should().changeChildLocation(new ChangeChildLocationCommand(FAMILY_ID, true));
+	}
+
+	@Test
+	@DisplayName("PUT /v1/families/me/child-location를 CO_GUARDIAN 토큰으로 부르면 200과 childLocationEnabled false를 돌려준다")
+	void changeChildLocationWithCoGuardianTokenReturns200() throws Exception {
+		given(changeChildLocationUseCase.changeChildLocation(any())).willReturn(new ChildLocationResult(false, 9));
+
+		mockMvc.perform(changeChildLocationRequest(userBearer(CO_GUARDIAN_USER_ID, Role.CO_GUARDIAN), """
+						{"enabled":false}
+						"""))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"childLocationEnabled":false,"settingsVersion":9}
+						""", JsonCompareMode.STRICT));
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = Role.class, names = {"CHILD", "DELEGATE", "TEACHER"})
+	@DisplayName("PUT /v1/families/me/child-location를 CHILD · DELEGATE · TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려준다")
+	void changeChildLocationWithNonGuardianTokenReturns403Forbidden(Role role) throws Exception {
+		mockMvc.perform(changeChildLocationRequest(userBearer(CHILD_USER_ID, role), """
+						{"enabled":true}
+						"""))
+				.andExpect(commonError(HttpStatus.FORBIDDEN, "FORBIDDEN"));
+
+		then(changeChildLocationUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("PUT /v1/families/me/child-location에 enabled를 빼고 보내면 422 VALIDATION_FAILED와 fields의 enabled를 돌려준다")
+	void changeChildLocationWithoutEnabledReturns422WithEnabledField() throws Exception {
+		mockMvc.perform(changeChildLocationRequest(guardianBearer(), """
+						{}
+						"""))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("enabled")));
+
+		then(changeChildLocationUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("PUT /v1/families/me/child-location에 enabled를 null로 보내면 422 VALIDATION_FAILED와 fields의 enabled를 돌려준다")
+	void changeChildLocationWithNullEnabledReturns422WithEnabledField() throws Exception {
+		mockMvc.perform(changeChildLocationRequest(guardianBearer(), """
+						{"enabled":null}
+						"""))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("enabled")));
+
+		then(changeChildLocationUseCase).shouldHaveNoInteractions();
+	}
+
+	private MockHttpServletRequestBuilder changeChildLocationRequest(String bearer, String body) {
+		return put(CHILD_LOCATION_PATH)
+				.header(HttpHeaders.AUTHORIZATION, bearer)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body);
+	}
+
 	private MockHttpServletRequestBuilder changeCallModeRequest(String bearer, String body) {
 		return put(CALL_MODE_PATH)
 				.header(HttpHeaders.AUTHORIZATION, bearer)
@@ -431,6 +545,13 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 
 	private static VehicleSummary linkedVehicle() {
 		return new VehicleSummary(VEHICLE_ID, "아이오닉 5", "12가 ****");
+	}
+
+	private static FamilyResult familyResultWithChildLocation(boolean childLocationEnabled) {
+		return new FamilyResult(FAMILY_ID, JoinCallMode.AUTO, linkedVehicle(), List.of(
+				new MemberResult(GUARDIAN_USER_ID, Role.GUARDIAN, "김보호", "+821012345678", DeviceStatus.CONNECTED),
+				new MemberResult(CHILD_USER_ID, Role.CHILD, "민준", null, DeviceStatus.INVITE_PENDING)),
+				childLocationEnabled);
 	}
 
 	private static FamilyResult familyResult(VehicleSummary vehicle) {

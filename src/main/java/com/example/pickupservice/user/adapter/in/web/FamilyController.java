@@ -4,6 +4,9 @@ import com.example.pickupservice.common.idempotency.IdempotencyKeyRequired;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.user.adapter.in.web.doc.FamilyApiDoc;
 import com.example.pickupservice.user.application.port.in.ChangeCallModeUseCase;
+import com.example.pickupservice.user.application.port.in.ChangeChildLocationCommand;
+import com.example.pickupservice.user.application.port.in.ChangeChildLocationUseCase;
+import com.example.pickupservice.user.application.port.in.ChildLocationResult;
 import com.example.pickupservice.user.application.port.in.GetMyFamilyQuery;
 import com.example.pickupservice.user.application.port.in.GetMyFamilyUseCase;
 import com.example.pickupservice.user.application.port.in.RegisterMemberUseCase;
@@ -34,6 +37,7 @@ public class FamilyController implements FamilyApiDoc {
 	private final UpdateMemberUseCase updateMemberUseCase;
 	private final RemoveMemberUseCase removeMemberUseCase;
 	private final ChangeCallModeUseCase changeCallModeUseCase;
+	private final ChangeChildLocationUseCase changeChildLocationUseCase;
 
 	@Override
 	@PreAuthorize("hasAnyRole('GUARDIAN', 'CO_GUARDIAN')")
@@ -80,6 +84,17 @@ public class FamilyController implements FamilyApiDoc {
 			@AuthenticationPrincipal AuthPrincipal principal,
 			@Valid @RequestBody ChangeCallModeRequest request) {
 		return CallModeResponse.from(changeCallModeUseCase.changeCallMode(request.toCommand(principal.familyId())));
+	}
+
+	@Override
+	@PreAuthorize("hasAnyRole('GUARDIAN', 'CO_GUARDIAN')")
+	@PutMapping("/v1/families/me/child-location")
+	public ChildLocationResponse changeChildLocation(
+			@AuthenticationPrincipal AuthPrincipal principal,
+			@Valid @RequestBody ChangeChildLocationRequest request) {
+		ChildLocationResult result = changeChildLocationUseCase.changeChildLocation(
+				new ChangeChildLocationCommand(principal.familyId(), request.enabled()));
+		return new ChildLocationResponse(result.childLocationEnabled(), result.settingsVersion());
 	}
 
 }

@@ -42,6 +42,17 @@ class LoadFamilyServiceTest {
 	}
 
 	@Test
+	@DisplayName("findFamily는 저장된 Family의 childLocationEnabled가 true이면 FamilyInfo의 childLocationEnabled도 true를 돌려준다")
+	void findFamilyReturnsChildLocationEnabledTrueWhenFamilyHasItOn() {
+		given(loadFamilyPort.loadFamily(FAMILY_ID))
+				.willReturn(Optional.of(Family.restore(FAMILY_ID, JoinCallMode.GUARDIAN_CONFIRM, 7, true)));
+
+		FamilyInfo result = loadFamilyService.findFamily(FAMILY_ID);
+
+		assertThat(result.childLocationEnabled()).isTrue();
+	}
+
+	@Test
 	@DisplayName("findFamily는 가족이 없으면 NOT_FOUND로 거절한다")
 	void findFamilyThrowsNotFoundWhenFamilyMissing() {
 		given(loadFamilyPort.loadFamily(FAMILY_ID)).willReturn(Optional.empty());

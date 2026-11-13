@@ -2,6 +2,7 @@ package com.example.pickupservice.user.adapter.in.web;
 
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
 import com.example.pickupservice.user.application.port.in.ChangeCallModeUseCase;
+import com.example.pickupservice.user.application.port.in.ChangeChildLocationUseCase;
 import com.example.pickupservice.user.application.port.in.GetMyFamilyUseCase;
 import com.example.pickupservice.user.application.port.in.RegisterMemberUseCase;
 import com.example.pickupservice.user.application.port.in.RemoveMemberUseCase;
@@ -28,5 +29,8 @@ public abstract class FamilyWebTestSupport extends IntegrationTestSupport {
 
 	@MockitoBean
 	protected ChangeCallModeUseCase changeCallModeUseCase;
+
+	@MockitoBean
+	protected ChangeChildLocationUseCase changeChildLocationUseCase;
 
 }
