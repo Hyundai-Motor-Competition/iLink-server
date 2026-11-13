@@ -5,7 +5,7 @@
 | 항목 | 내용 |
 |---|---|
 | 범위 | 엔티티 PickupSpot. API SPOT-01(조회) · SPOT-02(추가) · SPOT-03(수정 · 삭제) · SPOT-04(추천). 참조 데이터 PublicParking · CurbStopCandidate. 다른 모듈용 in 포트(기본 장소 · 장소 조회) |
-| 의존 | 03_공유모듈-shared, 04_사용자-user(가족 · 작성자), 06_일정-schedule(Academy 위치. out 포트 LoadAcademyPort → schedule in 포트 LoadAcademyUseCase.findAcademy). pickup의 in 포트(진행 중 세션이 쓰는 장소, 자녀 현재 위치)는 out 포트 CheckActivePickupPort + 임시 어댑터(pickup 구현 전). schedule의 LoadPickupSpotPort는 place LoadPickupSpotUseCase.findSpots에 위임 |
+| 의존 | 03_공유모듈-shared, 04_사용자-user(가족 · 작성자), 06_일정-schedule(Academy 위치. out 포트 LoadAcademyPort → schedule in 포트 LoadAcademyUseCase.findAcademy). pickup의 in 포트(진행 중 세션이 쓰는 장소, 자녀 현재 위치)는 out 포트 CheckActivePickupPort → pickup ActivePickupQueryUseCase로 연동됨(사람 결정 2026-11-13). schedule의 LoadPickupSpotPort는 place LoadPickupSpotUseCase.findSpots에 위임 |
 | 진행 | 계층 병렬 |
 
 ## 구조
@@ -21,7 +21,7 @@ place
 │                          GangnamReferenceDataLoader(서버가 뜰 때 CSV 적재, JdbcTemplate 묶음 INSERT)
 ├─ adapter/out/map         KakaoMobilityDriveTimeAdapter(DriveTimePort, 카카오모빌리티 길찾기)
 ├─ adapter/out/schedule    PlaceAcademyAdapter(LoadAcademyPort → schedule in 포트 LoadAcademyUseCase.findAcademy, academyId · name · location)
-├─ adapter/out/pickup      PlacePickupActivityAdapter(CheckActivePickupPort, pickup 구현 전 임시: isUsedByActiveSession false, loadActiveChildLocation 빈 값)
+├─ adapter/out/pickup      PlacePickupActivityAdapter(CheckActivePickupPort 구현 → pickup ActivePickupQueryUseCase.isSpotInUse · activeChildLocation)(사람 결정 2026-11-13)
 ├─ application/port/in · out · service
 └─ domain                  PickupSpot, 기본 장소 규칙,
                            추천 규칙(StraightDistance · WalkTimeRule · SpotCandidateMerger · SpotRankingRule · SpotCautionRule · ServiceArea)
@@ -205,7 +205,7 @@ List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<In
 - [x] [web] DELETE /v1/pickup-spots/{spotId}가 진행 중 세션의 장소면 409 SPOT_IN_USE를 돌려준다
 - [x] [web] DELETE /v1/pickup-spots/{spotId}가 다른 장소가 남은 기본 장소면 422 DEFAULT_SPOT_REQUIRED를 돌려준다
 - [x] [web] Idempotency-Key는 POST /v1/families/me/pickup-spots · DELETE /v1/pickup-spots/{spotId}에만 요구된다
-- [x] [persistence] pickup 구현 전 임시 CheckActivePickupPort는 isUsedByActiveSession false, loadActiveChildLocation 빈 값을 돌려준다
+- [x] [persistence] CheckActivePickupPort 어댑터는 isUsedByActiveSession · loadActiveChildLocation에 pickup ActivePickupQueryUseCase.isSpotInUse · activeChildLocation 결과를 그대로 돌려준다(사람 결정 2026-11-13)
 - [x] [persistence] LoadAcademyPort 어댑터는 schedule의 LoadAcademyUseCase.findAcademy 결과를 place가 쓰는 학원 정보(academyId · name · location)로 바꿔 돌려주고 없으면 빈 값을 돌려준다
 - [x] [서비스] findSpot은 spotId의 장소를 돌려주고 없으면 빈 값을, findSpots는 가족의 학원 목록에 속한 장소를 spotId · academyId · name · isDefault로 돌려준다
 - [x] schedule의 임시 LoadPickupSpotPort를 place findSpots 연동으로 바꿔 설정 요약 · 주간 일정의 PICKUP_SPOT 판정이 실제 장소를 본다
@@ -261,6 +261,11 @@ List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<In
 - [x] [기반] 블록 우회 도보 거리 규칙은 두 좌표 사이 남북 거리와 동서 거리를 더한 값을 m로 돌려준다(북쪽 300m · 동쪽 400m면 직선 500m가 아니라 700m)
 - [x] [서비스] 장소 조회는 walkMinutes를 학원 출입구(없으면 학원 위치)에서 만남 지점까지 블록 우회 도보 거리를 초속 1.1m로 나눈 시간을 분으로 올림해 돌려준다
 - [x] [persistence] LoadAcademyPort 어댑터는 schedule 학원의 출입구 좌표(entrance)를 place AcademyInfo.entrance로 넘기고, 출입구가 없으면 null로 넘긴다
+- [ ] [서비스] 차량 세션용 임시 장소 저장 in 포트는 familyId · academyId · name · stopPoint · meetingPoint로 temporary=true인 PickupSpot을 저장하고 spotId를 돌려준다(최종디자인 11/13 V02 · V03, 팀장 결정 2026-11-13)
+- [ ] [persistence] 가족 장소 목록(GET /v1/families/me/pickup-spots)과 기본 장소 판정은 temporary=true인 임시 장소를 빼고 돌려준다
+- [ ] [web] GET /v1/pickup-spot-recommendations/nearby?academyId=는 출발 위치 없이 학원 기준 근처 후보를 name · location · walkMeters · walkSeconds로 걷는 거리 짧은 순으로 돌려준다(일정 등록 픽업일정등록8 화면용)
+- [ ] [서비스] 학원 기준 근처 추천은 카카오 길찾기를 부르지 않고 driveSeconds · totalSeconds를 비운다. 지원 지역 밖 학원이면 supported false와 빈 목록을 준다
+- [ ] [서비스] 장소 추천(SPOT-04 · 학원 기준 근처 추천)은 도로 이름이 빈 길가 후보의 name을 「이름 없는 길」로 돌려준다(null을 주지 않음, 사람 결정 2026-11-13)
 
 ## 확인 필요 사항
 
@@ -287,6 +292,8 @@ List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<In
 | SPOT-04 후보가 3곳보다 적을 때 | 있는 만큼만 돌려줌. 0곳이면 supported true와 빈 items |
 | SPOT-04 카카오모빌리티 한도 | 무료 하루 자동차 길찾기 10,000건 · 미래 운행 5,000건. 요청 1건이 최대 8건을 씀. 한도를 넘을 때 대응은 미정. 다중 목적지 길찾기는 반경 10km 한도 때문에 쓰지 않음[팀장 결정 2026-11-12] |
 | SPOT-04 카카오 결과 저장 | 카카오 DevTalk 답변 기준 장소 ID · place_url만 저장 가능. 추천 결과는 저장하지 않음 |
+| 도로 이름이 빈 길가 후보의 name | 결정됨: null 대신 「이름 없는 길」로 준다(사람 결정 2026-11-13) |
+| 추천 장소 선택 · 여기로 부르기의 장소 저장 | 결정됨: 차량 앱이 추천 장소를 고르거나 「여기로 부르기」를 하면 서버가 임시 장소(temporary=true인 PickupSpot)를 만든다. 임시 장소는 가족 장소 목록 · 기본 장소 판정에서 빠진다(사람 결정 2026-11-13) |
 | SPOT-04 참조 데이터 갱신 | CSV를 손으로 다시 만들어 넣음. 자동 갱신 없음 |
 | SPOT-04 origin | 클라이언트가 차량 현재 좌표를 보냄. 서버가 가진 SIG-01 위치는 쓰지 않음 |
 | SPOT-04 학원 위치 | 결정됨(사람 2026-11-12): 저장된 Academy를 academyId로 조회해 location을 씀. 출입구 좌표(entrance)는 아직 쓰지 않음. 저장된 값이 카카오 검색에서 온 것이라 저장 방식은 06_일정-schedule에서 따로 정함(미정) |

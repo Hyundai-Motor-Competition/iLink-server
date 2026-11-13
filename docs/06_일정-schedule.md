@@ -28,7 +28,7 @@ schedule
 | 컬럼 | 타입 | 키 · 제약 | 설명 |
 |---|---|---|---|
 | academyId | BIGINT | PK | |
-| externalPlaceId | VARCHAR(100) | UNIQUE, NOT NULL | 외부 지도 장소 id(예: kakao:12345). 같은 학원을 가족 간 공유 |
+| externalPlaceId | VARCHAR(100) | UNIQUE, NOT NULL | 외부 지도 장소 id(예: kakao:12345). 지금은 전역 UNIQUE로 같은 학원을 가족 간 공유. 학원은 가족마다 따로 두기로 해 familyId를 더하고 (familyId, externalPlaceId) 유니크로 바꿀 예정, 테스트 케이스 참고(사람 결정 2026-11-13) |
 | name | VARCHAR(100) | | |
 | address | VARCHAR(255) | | |
 | location | geography(Point,4326) | GIST | 학원 위치 |
@@ -95,7 +95,7 @@ schedule
 - 하루 한도의 현재 가정: 자녀 1명의 같은 요일 기준. 새 일정의 요일마다 세고 한 요일이라도 이미 3개 이상이면 초과.
 - 수정 때 겹침 · 한도는 자기 자신을 뺀 목록으로 판정한다(서비스가 뺀다).
 - 도메인 검증 실패는 도메인 전용 예외 InvalidScheduleException(field, reason)으로 던지고 서비스가 422 VALIDATION_FAILED(fields)로 바꾼다. 도메인은 Spring · common.error를 쓰지 않는다.
-- SET-03은 진행 중 세션에 적용되지 않고 다음 세션부터 적용된다(pickup이 세션 시작 때 스냅샷).
+- SET-03은 진행 중인 세션에도 바로 적용된다. pickup은 세션 시작 때 일정 값을 스냅샷하지 않고(SessionChild에는 scheduleId만 둠) 판정 때마다 최신 값을 읽는다(사람 결정 2026-11-13).
 
 학원 다시 쓰기(externalPlaceId 기준)
 
@@ -228,7 +228,7 @@ InvalidScheduleException(String field, String reason)                   // 도�
 - [x] [web] Idempotency-Key는 POST /v1/children/{childId}/schedules · POST /v1/children/{childId}/setup-completion에만 요구된다
 - [x] [persistence] 지도 API 어댑터는 카카오 로컬 검색 응답을 externalPlaceId(kakao:{id}) · name · address · location의 AcademyCandidate로 바꾼다
 - [x] [persistence] 지도 API 어댑터는 외부 API 오류 · 시간 초과면 502 MAP_API_UNAVAILABLE로 거절한다
-- [x] [persistence] place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다
+- [x] [persistence] LoadPickupSpotPort 어댑터는 place LoadPickupSpotUseCase.findSpots로 읽은 가족의 실제 장소 목록을 돌려준다(사람 결정 2026-11-13)
 - [x] [persistence] LoadMemberDeviceStatusPort 어댑터는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다
 - [x] [기반] 공통 BusinessException에 overlapScheduleIds를 담아 던지면 오류 응답 error.overlapScheduleIds에 실리고, 담지 않으면 그 키가 응답에 없다
 - [x] [서비스] findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려주고 없으면 빈 값을 돌려준다
@@ -248,12 +248,19 @@ InvalidScheduleException(String field, String reason)                   // 도�
 - [x] joinCallMode는 schedule 자체 enum으로 설정 요약 · 차량용 설정 요약 in 포트와 응답에 담고 user.domain 타입을 import하지 않는다
 - [x] POST /v1/children/{childId}/schedules · PUT /v1/schedules/{scheduleId}에 101자 externalPlaceId를 보내면 422 VALIDATION_FAILED를 돌려준다
 - [x] 일정 수정은 등록과 같이 저장한 학원(기존 출입구 반영) 기준으로 status를 판정한다
+- [ ] [서비스] SET-09 readiness는 오늘 일정이 DRAFT면 startable false와 missing에 SCHEDULE을 넣어 SES-02 픽업 시작 판정과 같은 값을 준다(D10, 사람 결정 2026-11-13)
+- [ ] [web] GET /v1/children/me/next-pickup(CHILD 전용)은 지금 이후 가장 가까운 픽업의 academyName · spotName · targetAt(KST)을 돌려주고, 남은 일정이 없으면 200과 null 본문을 준다(최종디자인 11/13 C01 실내 대기)
+- [ ] [web] GET /v1/vehicles/me/weekly-pickups의 각 픽업에 자녀 profileImageUrl을 담는다(V01 자녀 카드)
+- [ ] [web] GET /v1/families/me/today-pickups(GUARDIAN · CO_GUARDIAN)는 오늘 가족 자녀들의 픽업을 시각 순으로 childName · academyName · targetAt · status(SCHEDULED · IN_PROGRESS · COMPLETED)로 돌려준다(부모 메인 오늘의 픽업 타임라인)
+- [ ] [persistence] Academy는 familyId를 갖고 (familyId, externalPlaceId)가 유니크다. 두 가족이 같은 externalPlaceId로 일정을 등록하면 학원 행이 가족마다 따로 생긴다(사람 결정 2026-11-13: 학원은 가족마다 따로 둠)
+- [ ] [서비스] 일정 등록 · 수정의 학원 다시 쓰기는 같은 가족의 학원만 갱신하고, 다른 가족 학원의 이름 · 주소 · 위치 · 출입구 · 대표번호를 바꾸지 않는다
 
 ## 확인 필요 사항
 
 | 항목 | 현재 가정 |
 |---|---|
 | Academy에 externalPlaceId 칸이 없음 | 해소: externalPlaceId 컬럼(UNIQUE)으로 같은 학원을 다시 씀(가족 간 공유). 핵심 로직 「학원 다시 쓰기」 |
+| 학원을 가족 간에 공유할지 | 결정됨: 학원은 가족마다 따로 둔다. Academy에 familyId를 더하고 (familyId, externalPlaceId)를 유니크로 한다. 테스트 케이스 끝의 두 항목으로 구현(사람 결정 2026-11-13) |
 | 이미 있는 학원 갱신의 동시 수정 | 후속 과제. 이미 있는 학원 갱신은 JPA merge라 동시 수정 때 다른 가족이 막 넣은 entrance를 지울 수 있음 |
 | 일정 수정 때 학원 정보가 바뀐 경우 | 해소: 같은 externalPlaceId면 그 행을 갱신, 다르면 그 학원을 찾거나 새로 만듦 |
 | 「겹침」의 정의 | 소스는 「같은 아이의 겹치는 일정」만 있음. 같은 자녀 · 같은 요일 · 같은 classEndTime으로 가정 |
