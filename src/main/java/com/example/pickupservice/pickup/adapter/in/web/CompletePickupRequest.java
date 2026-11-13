@@ -10,7 +10,7 @@ import java.util.List;
 public record CompletePickupRequest(
 		@NotNull @Pattern(regexp = "IMMEDIATE|MANUAL") String mode,
 		@NotNull Integer stateVersion,
-		List<Long> notBoardedChildUserIds
+		List<@NotNull Long> notBoardedChildUserIds
 ) {
 
 	public CompletePickupCommand toCommand(AuthPrincipal principal, long sessionId) {

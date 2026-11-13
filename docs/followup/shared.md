@@ -1,8 +1,8 @@
 # FOLLOWUP · 공유모듈 (shared)
 
-- 생성: 2026-11-11 11:48 KST · tdd-guard
-- 상태: 진행 중 (체크 57/57 · 완료 기준 0/4)
-- 테스트: ● GREEN · 275 passed · *, RealServerStartupTest · 165s · .\gradlew.bat test --tests com.example.pickupservice.common.* --tests com.example.pickupservice.RealServerStartupTest --console=plain
+- 생성: 2026-11-13 12:40 KST · tdd-guard
+- 상태: 진행 중 (체크 59/59 · 완료 기준 0/4)
+- 테스트: ● GREEN · 2429 passed · 전체 · 219s · .\gradlew.bat test --console=plain
 - 설계서: C:/ilink/docs/03_공유모듈-shared.md
 
 ## 완료 항목
@@ -63,6 +63,8 @@
 - [x] #55 [web] 각 도메인이 PublicEndpoints 빈으로 등록한 메서드 · 경로는 토큰 없이 부를 수 있고 만료된 Bearer 토큰을 붙여도 401이 아니라 그대로 처리된다
 - [x] #56 [web] dev API 문서(/v3/api-docs)는 Bearer JWT 보안 스키마를 담는다
 - [x] #57 [web] 공통 오류 코드(ErrorCode)로 BusinessException을 만들어 던지면 그 코드의 HTTP 상태 · code · 문구로 응답한다(429는 retryAfterSeconds 포함)
+- [x] #58 [web] GlobalExceptionHandler는 클라이언트가 연결을 끊어 난 예외(AsyncRequestNotUsableException · Broken pipe IOException 등 DisconnectedClientHelper.isClientDisconnectedException이 true인 것)를 ERROR로 기록하지 않고 DEBUG로만 남기며 응답 본문을 쓰지 않는다 ← GlobalExceptionHandlerClientDisconnectTest."/disconnect/async-request-not-usable"
+- [x] #59 [web] GlobalExceptionHandler는 클라이언트 끊김이 아닌 처리하지 않은 예외는 지금처럼 ERROR로 기록하고 500 INTERNAL_SERVER_ERROR 본문을 돌려준다 ← GlobalExceptionHandlerClientDisconnectTest.클라이언트 끊김이 아닌 처리하지 않은 예외(IllegalStateException)는 ERROR로 기록하고
 
 ## 미완료 항목
 - 없음
@@ -74,6 +76,7 @@
 - [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
+- 다시 리뷰 필요: 2026-11-11 11:48 KST 리뷰 뒤에 체크 · 추가된 항목 #58, #59
 - 2026-11-11 11:48 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 8 · 하 22 · 리뷰 시점 체크 57/57
 - 리뷰 시점 테스트: ● GREEN · 275 passed · *, RealServerStartupTest · 165s · .\gradlew.bat test --tests com.example.pickupservice.common.* --tests com.example.pickupservice.RealServerStartupTest --console=plain
   - 결론: 조건부 통과
@@ -200,6 +203,7 @@
 | BaseTimeEntity 보조 테스트 | TIMESTAMPTZ 컬럼 테스트가 체크리스트 밖 보조 테스트로 있음. 테스트 케이스로 올릴지 정함. createdAt이 updatable=false라 merge 저장 때 돌려받은 엔티티의 createdAt이 null일 수 있음(04~09 변환 때 주의) |
 
 ## 다음 단계
+- 도메인 리뷰: /tdd review shared (2026-11-11 11:48 KST 리뷰 뒤에 체크 · 추가된 항목 #58, #59)
 - 커밋 · 푸시: /tdd commit (기능별 분할 커밋) · /tdd push (커밋 후 기능 브랜치 푸시)
 - 다음 도메인: 사용자 (04_사용자-user.md). 시작: /tdd domain user
 
