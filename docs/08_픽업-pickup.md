@@ -433,6 +433,7 @@ int revokeSignalLostCalls(Instant now);                              // RevokeSi
 
 // in 포트 — 다른 모듈용
 boolean hasActivePickup(long vehicleId); boolean isInActivePickup(long userId); boolean isSpotInUse(long spotId); Optional<LatLng> activeChildLocation(long familyId);   // ActivePickupQueryUseCase (auth · user · place)
+Map<Long, PickupProgress> findProgressBySchedule(long familyId, LocalDate date);   // PickupProgressQueryUseCase (schedule SET-12). scheduleId별: ACTIVE · ON_HOLD → IN_PROGRESS, COMPLETED → COMPLETED, CANCELLED 제외, 여러 세션이면 COMPLETED 우선. PickupProgress는 in 포트 enum(사람 결정 2026-11-14)
 void markCallSent(long callId, Instant sentAt); void markCallDelivered(long callId, Instant deliveredAt); boolean isCallAcknowledged(long callId);   // CallProgressUseCase (notification)
 
 // out 포트

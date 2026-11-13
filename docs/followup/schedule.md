@@ -1,22 +1,22 @@
 # FOLLOWUP · 일정 (schedule)
 
-- 생성: 2026-11-11 12:02 KST · tdd-guard
-- 상태: 진행 중 (체크 77/77 · 완료 기준 0/4)
-- 테스트: ● GREEN · 2261 passed · 전체 · 206s · .\gradlew.bat test --console=plain
-- 설계서: C:/ilink/docs/06_일정-schedule.md
+- 생성: 2026-11-14 01:29 KST · tdd-guard
+- 상태: 진행 중 (체크 83/83 · 완료 기준 0/4)
+- 테스트: ● GREEN · 2802 passed · 전체 · 217s · .\gradlew.bat test --console=plain
+- 설계서: C:/pw/schedule/docs/06_일정-schedule.md
 
 ## 완료 항목
-- [x] #1 [기반] PickupSchedule은 학원 출입구가 없으면 DRAFT, 있으면 READY로 만들어진다 ← PickupScheduleTest.PickupSchedule은 학원 출입구가 없으면 DRAFT로 만들어진다
-- [x] #2 [기반] 일정 규칙은 targetPickup이 0~60을 벗어나면 거절한다 ← PickupScheduleTest.일정 규칙은 targetPickup이 0~60을 벗어나면 거절한다
-- [x] #3 [기반] 일정 규칙은 weekdays가 비어 있으면 거절한다 ← PickupScheduleTest.일정 규칙은 weekdays가 비어 있으면 거절한다
-- [x] #4 [기반] 겹침 규칙은 같은 자녀 · 같은 요일 · 같은 classEndTime 일정을 겹침으로 판정한다 ← ScheduleOverlapRuleTest.겹침 규칙은 같은 자녀 · 같은 요일 · 같은 classEndTime 일정을 겹침으로 판정한다
-- [x] #5 [기반] 하루 한도 규칙은 같은 자녀 같은 요일에 네 번째 일정이면 한도 초과로 판정한다 ← DailyScheduleLimitRuleTest.하루 한도 규칙은 같은 자녀 같은 요일에 네 번째 일정이면 한도 초과로 판정한다
-- [x] #6 [기반] targetPickupTime 계산은 classEndTime 18:00 · targetPickup 5에서 18:05를 돌려준다 ← PickupScheduleTest.targetPickupTime 계산은 classEndTime 18:00 · targetPickup 5에서 18:05를 돌려준다
-- [x] #7 [기반] 이름 마스킹은 김보호를 김*호로 바꾼다 ← NameMaskerTest.이름 마스킹은 김보호를 김*호로 바꾼다
-- [x] #8 [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다 ← ScheduleInPortsTest.핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
-- [x] #9 [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다 ← ScheduleOutPortsTest.핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
-- [x] #10 [기반] AcademyEntity · PickupScheduleEntity가 BaseTimeEntity를 상속하고 location · entrance는 geography(Point,4326)로 매핑된다 ← SchedulePersistenceEntitiesMappingTest.academy.location · academy.entrance는 타입 Point · SRID 4326인 geography 컬럼으로 만들어진다
-- [x] #11 [기반] 테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다 ← ScheduleSeedTest.테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다
+- [x] #1 [기반] PickupSchedule은 학원 출입구가 없으면 DRAFT, 있으면 READY로 만들어진다
+- [x] #2 [기반] 일정 규칙은 targetPickup이 0~60을 벗어나면 거절한다
+- [x] #3 [기반] 일정 규칙은 weekdays가 비어 있으면 거절한다
+- [x] #4 [기반] 겹침 규칙은 같은 자녀 · 같은 요일 · 같은 classEndTime 일정을 겹침으로 판정한다
+- [x] #5 [기반] 하루 한도 규칙은 같은 자녀 같은 요일에 네 번째 일정이면 한도 초과로 판정한다
+- [x] #6 [기반] targetPickupTime 계산은 classEndTime 18:00 · targetPickup 5에서 18:05를 돌려준다
+- [x] #7 [기반] 이름 마스킹은 김보호를 김*호로 바꾼다
+- [x] #8 [기반] 핵심 로직 「시그니처」의 in 포트 인터페이스와 Command · Result record가 있다
+- [x] #9 [기반] 핵심 로직 「시그니처」의 out 포트 인터페이스가 있다
+- [x] #10 [기반] AcademyEntity · PickupScheduleEntity가 BaseTimeEntity를 상속하고 location · entrance는 geography(Point,4326)로 매핑된다
+- [x] #11 [기반] 테스트 시드로 학원 1곳(해솔영어학원, 출입구 있음)과 자녀 민준의 월 · 수 18:00 일정 1개를 만든다
 - [x] #12 [persistence] Academy를 저장하고 읽으면 location · entrance 좌표가 같다
 - [x] #13 [persistence] weekdays [MON, WED, FRI]를 저장하면 컬럼에 MON,WED,FRI로 들어가고 같은 목록으로 읽힌다
 - [x] #14 [persistence] classEndTime 18:00을 저장하면 시간대 변환 없이 18:00으로 읽힌다
@@ -63,7 +63,7 @@
 - [x] #55 [web] Idempotency-Key는 POST /v1/children/{childId}/schedules · POST /v1/children/{childId}/setup-completion에만 요구된다
 - [x] #56 [persistence] 지도 API 어댑터는 카카오 로컬 검색 응답을 externalPlaceId(kakao:{id}) · name · address · location의 AcademyCandidate로 바꾼다
 - [x] #57 [persistence] 지도 API 어댑터는 외부 API 오류 · 시간 초과면 502 MAP_API_UNAVAILABLE로 거절한다
-- [x] #58 [persistence] place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다
+- [x] #58 [persistence] LoadPickupSpotPort 어댑터는 place LoadPickupSpotUseCase.findSpots로 읽은 가족의 실제 장소 목록을 돌려준다(사람 결정 2026-11-13)
 - [x] #59 [persistence] LoadMemberDeviceStatusPort 어댑터는 auth의 멤버 기기 상태를 schedule DeviceStatus로 바꿔 돌려준다
 - [x] #60 [기반] 공통 BusinessException에 overlapScheduleIds를 담아 던지면 오류 응답 error.overlapScheduleIds에 실리고, 담지 않으면 그 키가 응답에 없다
 - [x] #61 [서비스] findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려주고 없으면 빈 값을 돌려준다
@@ -83,6 +83,12 @@
 - [x] #75 joinCallMode는 schedule 자체 enum으로 설정 요약 · 차량용 설정 요약 in 포트와 응답에 담고 user.domain 타입을 import하지 않는다
 - [x] #76 POST /v1/children/{childId}/schedules · PUT /v1/schedules/{scheduleId}에 101자 externalPlaceId를 보내면 422 VALIDATION_FAILED를 돌려준다
 - [x] #77 일정 수정은 등록과 같이 저장한 학원(기존 출입구 반영) 기준으로 status를 판정한다
+- [x] #78 [서비스] SET-09 readiness는 오늘 일정이 DRAFT면 startable false와 missing에 SCHEDULE을 넣어 SES-02 픽업 시작 판정과 같은 값을 준다(D10, 사람 결정 2026-11-13) ← GetWeeklyPickupsServiceTest.주간 일정 readiness는 오늘 일정 중 DRAFT가 있으면 기기와 기본 장소가 다 있어도 startable false와 missing [SCHEDULE]을 돌려준다, GetWeeklyPickupsServiceTest.주간 일정 readiness는 오늘 일정이 DRAFT이고 기기도 기본 장소도 없으면 missing을 CHILD_DEVICE, SCHEDULE, PICKUP_SPOT 순서로 돌려준다
+- [x] #79 [web] GET /v1/children/me/next-pickup(CHILD 전용)은 지금 이후 가장 가까운 픽업의 academyName · spotName · targetAt(KST)을 돌려주고, 남은 일정이 없으면 200과 null 본문을 준다(최종디자인 11/13 C01 실내 대기) ← ChildScheduleControllerTest.GET /v1/children/me/next-pickup은 CHILD 토큰으로 200과 academyName · spotName · targetAt(KST +09:00)을 돌려준다, ChildScheduleControllerTest.GET /v1/children/me/next-pickup은 남은 일정이 없으면 200과 빈(null) 본문을 돌려준다, ChildScheduleControllerTest.GET /v1/children/me/next-pickup을 GUARDIAN 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다, GetNextPickupServiceTest.다음 픽업은 오늘 아직 지나지 않은 READY 일정의 학원 이름 · 기본 장소 이름 · targetAt(classEndTime + targetPickup분)을 돌려준다, GetNextPickupServiceTest.다음 픽업은 여러 일정 중 targetAt(classEndTime + targetPickup분)이 가장 이른 것을 돌려준다
+- [x] #80 [web] GET /v1/vehicles/me/weekly-pickups의 각 픽업에 자녀 profileImageUrl을 담는다(V01 자녀 카드) ← VehicleScheduleControllerTest.GET /v1/vehicles/me/weekly-pickups는 pickups[]마다 자녀 profileImageUrl을 담고 URL이 없으면 null로 돌려준다, GetWeeklyPickupsServiceTest.주간 일정은 각 픽업에 그 자녀의 profileImageUrl을 담고 URL이 없는 자녀는 null로 둔다, GetWeeklyPickupsServiceTest.주간 일정은 가족 CHILD들의 userId로 findProfileImageUrls를 한 번만 부른다, LoadMemberServiceTest.findProfileImageUrls는 profileImageKey가 있는 사용자에게 그 키의 서명 URL을, 없는 사용자에게 기본 아바타 서명 URL을 준다
+- [x] #81 [web] GET /v1/families/me/today-pickups(GUARDIAN · CO_GUARDIAN)는 오늘 가족 자녀들의 픽업을 시각 순으로 childName · academyName · targetAt · status(SCHEDULED · IN_PROGRESS · COMPLETED)로 돌려준다(부모 메인 오늘의 픽업 타임라인) ← FamilyScheduleControllerTest.GET /v1/families/me/today-pickups는 GUARDIAN 토큰으로 200과 items[](scheduleId · childName · academyName · targetAt(KST +09:00) · status)를 유스케이스 순서대로 돌려준다, FamilyScheduleControllerTest.GET /v1/families/me/today-pickups는 CO_GUARDIAN 토큰으로도 200과 items를 돌려준다, FamilyScheduleControllerTest.GET /v1/families/me/today-pickups를 CHILD 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다, GetTodayPickupsServiceTest.오늘의 픽업은 한국 날짜 오늘 요일이 들어 있는 가족 자녀들의 일정만 돌려주고 DRAFT 일정도 넣는다
+- [x] #82 [persistence] Academy는 familyId를 갖고 (familyId, externalPlaceId)가 유니크다. 두 가족이 같은 externalPlaceId로 일정을 등록하면 학원 행이 가족마다 따로 생긴다(사람 결정 2026-11-13: 학원은 가족마다 따로 둠) ← SchedulePersistenceAdapterTest.두 가족이 같은 externalPlaceId로 학원을 저장하면 academyId가 서로 다른 academy 행이 가족마다 따로 생긴다, SchedulePersistenceAdapterTest.loadAcademyByExternalPlaceId(familyId, externalPlaceId)는 그 가족의 학원만 돌려주고 그 externalPlaceId 학원이 없는 가족으로 찾으면 빈 값을 돌려준다, SchedulePersistenceAdapterTest.Academy를 저장하고 loadAcademy로 읽으면 familyId가 그대로이고 academy.family_id 컬럼에 그 값이 들어간다, SchedulePersistenceEntitiesMappingTest.academy에는 (family_id, external_place_id)를 묶은 유니크 인덱스가 1개 있고 external_place_id 하나만 묶은 유니크 인덱스는 없다
+- [x] #83 [서비스] 일정 등록 · 수정의 학원 다시 쓰기는 같은 가족의 학원만 갱신하고, 다른 가족 학원의 이름 · 주소 · 위치 · 출입구 · 대표번호를 바꾸지 않는다 ← AcademyReuseAcrossFamiliesIntegrationTest.가족 A의 학원이 있는 externalPlaceId로 가족 B가 다른 이름 · 주소 · 위치 · 출입구 · 대표번호를 담아 일정을 등록하면 B는 새 academyId(B 가족 소유)를 받고 A 학원 행의 값은 그대로다, AcademyReuseAcrossFamiliesIntegrationTest.가족 B가 일정 수정으로 같은 externalPlaceId 학원의 이름 · 주소 · 위치 · 출입구 · 대표번호를 바꾸면 B의 학원만 바뀌고 가족 A 학원 행의 값은 그대로다
 
 ## 미완료 항목
 - 없음
@@ -94,91 +100,32 @@
 - [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-11 12:02 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 5 · 하 15 · 리뷰 시점 체크 77/77
-- 리뷰 시점 테스트: ● GREEN · 2261 passed · 전체 · 206s · .\gradlew.bat test --console=plain
+- 2026-11-14 01:27 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 4 · 하 7 · 리뷰 시점 체크 83/83
+- 리뷰 시점 테스트: ● GREEN · 2802 passed · 전체 · 217s · .\gradlew.bat test --console=plain
   - 결론: 조건부 통과
-  - 동작을 꼭 바꿔야 하는 [상]은 없습니다. [중] 5건은 모두 사람 결정이 먼저 필요합니다.
-  - [중] 학원에 출입구가 새로 생겨도, 같은 학원을 쓰는 기존 DRAFT 일정은 계속 DRAFT로 남음 — status를 바꾸는 곳은 저장하는 그 일정 하나뿐임(PickupSchedule.java:45, CreateScheduleService.java:36-37, UpdateScheduleService.java:44-45). 같은 가족 안에서도 생김: 월요일 일정을 출입구 없이 등록(DRAFT) → 같은 학원으로 수요일 일정을 출입구와 함께 등록 → 월요일 일정은 DRAFT 그대로. 그 결과 SET-09 startable false(GetWeeklyPickupsService.java:97-101), SES-02 SETUP_INCOMPLETE(StartPickupService.java:137). 06 L81은…
-  - [중] FOLLOWUP의 「[사람 결정 2026-11-09] 학원은 가족 안에서 다시 쓴다, (familyId, externalPlaceId) 유니크」가 설계서 · 코드와 정반대 — 06 L31과 AcademyEntity.java:25는 전역 UNIQUE(가족 간 공유). 이 메모는 0c0108d(pickup 문서 커밋)에서 들어옴. 지금 구조에서는 한 가족의 요청이 다른 가족 학원의 이름 · 주소 · 위치를 덮어씀(ScheduleWriteRules.java:23-25). 이 위치는 place 500m 검사가 씀 → 사람 결정(메모가 유효한지. 유효하면 06 · 엔티티 · upsert를 바꾸는 항목 추가, 아니면 메모 삭제)
-  - [중] 06 L231 #58 「place 구현 전 임시 LoadPickupSpotPort는 빈 목록을 돌려준다」 문장이 지금 동작과 반대 — 7d73421 이후 SchedulePickupSpotAdapter.java:142-145가 place 실제 장소를 돌려주고, 테스트도 그것을 확인함(ScheduleModuleLinkAdaptersTest.java:66 · :81). 06 L19 · L269는 이미 고쳐졌음 → 사람 결정(항목 문장 수정) + note. user #64와 같은 유형
-  - [중] 06 L125 「days는 7일, 하루 최대 3개」를 지키지 않음 — 하루 한도는 자녀별이라(DailyScheduleLimitRule.java:15) 자녀가 2명이면 하루 6개까지 나감(GetWeeklyPickupsService.java:68-75). 자르는 코드 · 테스트 없음 → 사람 결정(자르는 규칙을 정할지, 문장을 「자녀별 3개」로 고칠지)
-  - [중] schedule in 포트가 domain 타입을 내보내 pickup이 schedule.domain을 직접 import함 — ScheduleInfo.status가 schedule.domain.ScheduleStatus이고 StartPickupService.java:29 · :137이 그대로 씀. 02:73 「다른 모듈은 in 포트만」과 어긋남. user 리뷰의 JoinCallMode [중]과 같은 결정 → 사람 결정
-  - [하] 06 L62 「weekStart(선택, 그 주 월요일)」인데 월요일이 아닌 값을 어떻게 할지 안 정해짐 — 받은 날짜부터 7일을 그대로 돌려줌(GetWeeklyPickupsService.java:50-52) → 사람 결정(422로 거절할지, 그 주 월요일로 맞출지)
-  - [하] 1자 GUARDIAN 이름이 SET-10에 가려지지 않고 그대로 나감 — GuardianNameMasker.java:14-16, NameRule.java:5(MIN_LENGTH 1), 06 L265 미정 → 사람 결정 + 테스트
-  - [하] 테스트가 없는 설계 문장 3개 — weekdays 중복 합치기(06 L82, ScheduleRequest.java:45-48), SET-10 GUARDIAN이 없으면 null(06 L136, GetVehicleSettingsSummaryService.java:33), name 100 · address 255 · phone 20 길이(AcademyRequest.java:11-15) → 항목 추가(선택)
-  - [하] 진행 기록이 실제와 다름 — 아래 4가지 → note(FOLLOWUP 정리)
-  - schedule.md:4-5에는 완료 기준 0/4 · 테스트 ERROR, :97 · REVIEW.md:11 · TODO.md:33-35에는 「리뷰 없음」. 실제로는 e398de5에 완료 기준 4/4와 리뷰 4회가 있음(마지막 11-08 02:05 조건부 통과)
-  - #12~#77은 증거가 빠짐
-  - #1 · #2 · #3 · #7 · #11 증거가 지금 DisplayName과 다름(schedule.md:9-11 · :15 · :19). NameMaskerTest는 없고 GuardianNameMaskerTest임. tdd-guard가 이 증거를 인정하는지는 미확인
-  - 후속 과제에 이 코드와 관계없는 메모 9건이 남음(designmodu · exhibition · CalendarConfig 5건, NameMasker · withExtra · pickup.session 같은 다른 실행 메모)
-  - [하] 설명 주석 — AcademyJpaRepository.java:14-17 Javadoc(02:78) → 리팩터링
-  - [하] 소스 문자열 검사 테스트 — ScheduleModuleImportTest.java:21, PickupScheduleTest.java:91, InvalidScheduleExceptionTest.java:34가 02:80 · :214 「아키텍처 규칙은 코드 리뷰로」와 어긋남 → 사람 결정(user 리뷰의 같은 항목과 함께)
-  - [하] 공통 BusinessException에 schedule 전용 칸 overlapScheduleIds와 범용 withDetail이 함께 있음 — BusinessException.java:20 · :58-62 vs :70-76. 예약 키에 overlapScheduleIds가 없어 같은 키가 두 번 나갈 수 있음(shared 리뷰 [하]와 같음) → 리팩터링(ScheduleErrors가 withDetail을 쓰면 이 칸을 지울 수 있음)
-  - [하] pickup_schedule.child_user_id 조회 인덱스 없음 — PickupScheduleEntity.java:29-30, schema.sql에 없음. loadSchedulesOfChild는 SET-02 · 03 · 04 · 07마다 불림 → 항목 추가 검토
-  - [하] SET-07 · 09 기기 상태 조회가 auth에서 자녀 1명당 쿼리 2회 — GetMemberDeviceStatusService.java:32-37 → note(auth)
-  - [하] 06 L98 「SET-03은 다음 세션부터(pickup 스냅샷)」와 달리, pickup SES-10 연락처는 일정의 학원을 그때그때 읽음 — GetContactsService.java:53-56 → note(pickup)
-  - [하] LatLng 범위 검증 없음 — `entrance: {}`가 (0,0) 출입구로 저장돼 READY가 됨, lat 999는 500(LatLng.java, AcademyRequest.java:13-14) → 사람 결정(공통에서 place와 함께)
-  - [하] 같은 자녀에 다른 Idempotency-Key로 동시에 등록하면 겹침 · 한도 검사를 둘 다 통과할 수 있음(잠금 · DB 제약 없음, CreateScheduleService.java:33-37) → note
-  - [하] 작은 정리 거리 → 리팩터링(선택)
-  - MAP_API_UNAVAILABLE을 두 곳에서 정의(KakaoMapSearchAdapter.java:24-25 · :62-64, ScheduleErrors.java:13-18)
-  - 「합류 통화 방식」(SetupApiDoc.java:15, VehicleScheduleApiDoc.java:25)과 06 L8 · 04의 「합류 안내 방식」이 다름
-  - README 환경 변수 표(README.md:32-38)에 KAKAO_REST_API_KEY가 없고 :85 Secret에만 있음
-  - HTTP 연결 2s · 읽기 3s(application.yml:16-18)가 RestClient에 실제로 적용되는지 테스트 없음(미확인)
-  - 지난 리뷰(11-08 02:05, 하 2건) 해소 여부
-  - [하] #75 증거 이름 — 남음. FOLLOWUP을 다시 만들면서 증거가 또 빠짐(schedule.md:83)
-  - [하] UpdateScheduleService가 일정을 두 번 만듦 — 남음(UpdateScheduleService.java:40 · :56-60)
-  - 지난 리뷰 뒤 바뀐 schedule 코드는 7d73421(place 연동) 하나. 공통 오류 변경(87bb58c · 98f572d · f7988f4) 뒤에도 SCHEDULE_OVERLAP 응답 테스트는 GREEN
-  - 다른 도메인 영향
-  - pickup은 findSchedules를 SES-02 · SES-10에서 1회씩 부르고, 순서 유지 · 없는 id 제외 계약과 맞게 씀(StartPickupService.java:100)
-  - place는 findAcademy로 이름 · 위치만 씀(PlaceAcademyAdapter)
-  - notification은 schedule을 쓰지 않음
-  - user FAM-07 실제 삭제로 pickup_schedule 고아 행이 남음(user 리뷰 [중]). schedule 쪽은 현재 멤버 기준으로 걸러서 깨지지 않음(GetWeeklyPickupsService.java:62-66)
-  - 완료 기준
-  - C1 사람 확인 필요 — 체크 77/77, 전체 GREEN 2261, schedule 33개 클래스 263개 실패 0. 다만 #58 문장이 지금 동작과 반대이고, FOLLOWUP 증거가 5건 다르고 72건 빠짐
-  - C2 사람 확인 필요 — API 8개의 경로 · 메서드 · 권한 · Idempotency-Key · 오류 코드, 검증 순서(06 L84-92), 학원 다시 쓰기(upsert COALESCE), 시그니처는 설계서대로. 06 L125 「하루 최대 3개」만 지키지 않음
-  - C3 미충족 — [중] 02:73(pickup이 schedule.domain.ScheduleStatus를 import), [하] 02:78 주석, 02:80 · :214 문자열 검사 테스트
-  - C4 충족 — 06 확인 필요 14행 = FOLLOWUP 표(schedule.md:99-115). 표에 없는 미정 사항(하루 3개 · 월요일 아닌 weekStart · 1자 마스킹 · 출입구가 생긴 뒤 기존 DRAFT)은 FOLLOWUP 메모로 기록됨. 다만 11-09 가족 범위 메모가 06과 충돌하므로 사람 확인 필요
-  - 후속 과제
-  - 1. NameMasker 예외 — 해소됨(GuardianNameMasker.java:9-16은 null → null, 1자는 그대로. 메모의 클래스는 이 코드에 없음)
-  - 2. 06 DeviceStatus 표기 — 해소됨(06 L166 · L170 schedule 자체 enum) / ScheduleInfo · AcademyInfo · SpotSummary 필드가 설계서에 없음 — 남음
-  - 3. 기반 리뷰 (1) N+1 해소됨(#73 #74) (2) child_user_id 인덱스 남음 (3) restore id가 Long — 해소됨 (4) SearchAcademyPort가 in 포트 record를 씀 — 남음 (5) 테스트 헬퍼 중복 — 미확인 (6) ScheduleSeed.clear — 남음(관례)
-  - 4. [사람 결정 11-09] 가족 안 재사용 — 설계 결정 필요(위 [중]) / 03에 오류 본문 추가 키 반영 — 남음(shared 영역)
-  - 5. ScheduleErrors 문구 5개 — 사람 확인 남음 / 03의 withExtra · extras 표기는 낡음(코드는 withDetail · details)
-  - 6. pickup.session.* 설정 키 — 해소됨(application.yml:39-47, schedule와 무관)
-  - 7~11. designmodu · exhibition · CalendarConfig 관련 5건 — 다른 저장소 메모, 삭제 대상
-  - 12. 1자 · 빈 문자열 마스킹 — 설계 결정 필요
-  - 13. DeviceStatus 따로 둠 · SpotSummary academyId · ScheduleInfo에 targetPickupTime 없음 — 남음(사실 기록) / joinCallMode는 schedule 자체 enum으로 해소됨
-  - 14. Machine PATH 줄바꿈 — 남음(미확인, 사람)
-  - 15. DB FK 없음 — 해소됨(06 L47)
-  - 16. LoadMemberUseCase 직접 주입을 설계서에 반영 — 해소됨(06 L8)
-  - 17. auth N+1 — 남음
-  - 18. overlapScheduleIds를 03 L89에 반영 — 남음(shared [중])
-  - 19. SET-07 가정 — 해소됨(06 L110-113)
-  - 20. 카카오 카테고리 필터 — 설계 결정 필요 / 시간 초과 값 검증 — 남음
-  - 21. 좌표가 숫자가 아니면 500 — 해소됨(KakaoMapSearchAdapter.java:84-95, #62)
-  - 22. SET-09 가정 — readiness · DRAFT 해소됨(06 L127-133) / 월요일 아닌 weekStart · 하루 3개 자르기 — 설계 결정 필요
-  - 23. query 누락 400 — 해소됨(02:173) / 2~50자 길이 기준(UTF-16) — 남음
-  - 24. findSchedules N+1 — 해소됨 / SET-10 null — 06 L136에 반영됐으나 테스트 없음
-  - 25. 중간 리뷰 — domain 예외 · status 단언 · 원인 로그 · private 생성자 · 06 구조 · 자기 제외 문구는 해소됨 / 인덱스 · DeviceStatus.valueOf(ScheduleMemberDeviceAdapter.java:25) · 지도 어댑터 lane · ContextTest가 키 비어 있음을 보장하지 않음 — 남음
-  - 26. weekdays 중복 · classEndTime 422 — 해소됨(06 L82), 중복 테스트 없음
-  - 27. AcademyRequest 길이 테스트 — 남음(externalPlaceId는 #76으로 해소됨)
-  - 28. SET-04 순서 — 해소됨(06 L107)
-  - 29. [결정] 학원 재사용 · DRAFT readiness · 도메인 예외 — 해소됨(06 반영)
-  - 30. 학원 공유 위험 — 출입구 null 덮어쓰기(#70) · 동시 등록(#71) · 06 표 반영은 해소됨 / prod DDL — 남음
-  - 31. bisect 커밋 메모 — 남음(정보)
-  - 32. 도메인 리뷰 뒤 결정 (1)~(4) — 해소됨 / LatLng 범위 · 인덱스 · prod DDL — 남음
-  - 33. 빈 문자열 · 공백 phone — 설계 결정 필요
-  - 34. 이미 있는 학원 merge 동시 수정 — 남음(06 확인 필요 표의 후속 과제) / FOLLOWUP 정리 — 남음 / 길이 테스트 — 남음 / 빈 문자열 phone — 설계 결정 필요
-  - 35. UpdateScheduleService 두 번 생성 — 남음
-  - 테스트
-  - mcp__tdd-guard__tests scope all → `.\gradlew.bat test --console=plain` GREEN 2261 passed · 206s
-  - build/test-results/test의 schedule XML 33개 → tests 263 · skipped 0 · failures 0 · errors 0
-  - 참고 파일: C:/ilink/docs/06_일정-schedule.md, C:/ilink/docs/followup/schedule.md, C:/ilink/src/main/java/com/example/pickupservice/schedule/application/service/ScheduleWriteRules.java, C:/ilink/src/main/java/com/example/pickupservice/schedule/application/service/GetWeeklyPickupsService.java, C:/ilink/src/main/java/com/example/pickupservice/pickup/application/service/StartPickupService.java
+  - [중] main 브랜치와 겹치는 user 변경이 있어 병합하면 충돌하고, #80과 같은 일을 하는 코드가 두 개가 됨 — 이 브랜치(HEAD 8e7ee5c)는 main(cc13c2b)보다 뒤에 있음. main은 이미 MemberInfo.profileImageUrl · removed와 ProfileImageUrls.of(User, ProfileImageStoragePort)(String 반환)를 넣었고, 작업 트리는 같은 이름의 새 파일 ProfileImageUrls.of(ProfileImageStoragePort, User)(Optional 반환)와 findProfileImageUrls를 넣음. 두 쪽이 함께 바꾼 파일 12개: LoadMemberService · GetMyFamilyService · Us…
+  - [중] main의 06 설계서에 새 항목 「해제된 자녀(MemberInfo.removed)에게는 일정 생성 · 수정을 404로 거절」이 있는데 이 브랜치에는 없음. FamilyChildGuard.java:14-18은 findMember의 familyId와 role만 확인함. main 04:93에서 findMember는 해제된 멤버도 돌려주므로, 병합하면 해제된 자녀에게도 일정을 등록 · 수정할 수 있음 → 항목 추가(main 병합 뒤 #84)
+  - [중] API 번호 SET-11이 두 API에 쓰임 — 04:71 SET-11은 PUT /v1/families/me/child-location, 06:66 SET-11은 GET /v1/children/me/next-pickup. Swagger summary도 둘 다 「(SET-11)」(ChildScheduleApiDoc.java:13, FamilyApiDoc.java:81) → 사람 결정(06 쪽 번호를 다시 매기기)
+  - [중] 같은 학원에 출입구가 새로 생겨도, 그 학원을 쓰는 다른 DRAFT 일정의 status는 저장된 DRAFT 그대로 남음. status를 판정하는 곳은 저장하는 일정 하나뿐이고(PickupSchedule.java:45, UpdateScheduleService.java:56-60), 같은 학원의 다른 일정을 다시 판정하는 코드는 없음. 그래서 SET-07 · SET-09 missing에 SCHEDULE이 남고, SES-02 픽업 시작도 막힘. FOLLOWUP L139의 팀장 가정 「출입구가 새로 생기면 가족 일정 status를 다시 판정」과 06 핵심 로직(저장한 일정만 판정)이 다름 → 사람 결정
+  - [하] SET-11에 남은 일정이 없을 때 실제로는 빈 문자열 본문을 줌(ChildScheduleControllerTest.java:85 content().string("")). 06:66은 「null 본문」, ChildScheduleApiDoc:15는 「빈 본문」이라 표현이 서로 다름. 클라이언트가 JSON으로 읽으면 실패할 수 있음 → 사람 결정(JSON null로 줄지) 뒤 문서 통일
+  - [하] VehicleScheduleApiDoc.java:17-18의 200 설명에 #80 profileImageUrl과 missing 값(CHILD_DEVICE · SCHEDULE · PICKUP_SPOT)이 없음 → 리팩터링
+  - [하] 06 머리 표와 구조 절이 이번 변경을 반영하지 못함: 범위 「SET-01~04, SET-07~10」에 SET-11 · SET-12 없음, 의존 칸에 08 pickup 없음, 구조 adapter/in/web에 ChildScheduleController · FamilyScheduleController 없음, 확인 필요 표 1행 「externalPlaceId UNIQUE, 가족 간 공유」가 2행(가족마다 따로)과 어긋남(FOLLOWUP L108도 같음) → note(문서 수정)
+  - [하] 다른 도메인 설계서에 이번에 쓴 포트의 시그니처 · 테스트 항목이 빠짐: 08에 LoadSessionPort.loadByFamilyAndDate 시그니처가 없고 PickupProgressQueryService 테스트 항목도 없음(테스트는 PickupProgressQueryServiceTest 6개 · PickupSessionPersistenceAdapterTest 2개 있음). 04에 findProfileImageUrls 테스트 항목 없음(LoadMemberServiceTest에는 있음) → 항목 추가(pickup · user)
+  - [하] out 포트가 in 포트 타입을 import함: LoadPickupProgressPort.java:3이 in 포트 enum TodayPickupStatus를 씀. SearchAcademyPort → AcademyCandidate와 같은 모양(FOLLOWUP L138 (4)) → note
+  - [하] TODO.md 공유모듈 절이 「대기 · 완료 기준 0/4 · 리뷰 기록 없음」으로 되돌아감. shared.md:104-111에는 C1~C4 체크와 리뷰 기록(11-14 00:02 조건부 통과)이 있음 → note(TODO 다시 만들기)
+  - [하] FOLLOWUP schedule.md에 해소됐거나 이 도메인과 상관없는 메모가 남음: L136 NameMasker(그런 클래스 없음, GuardianNameMasker는 null · 1자를 그대로 돌려줌), L141~L146 다른 저장소 메모 6건, L148 · L150 · L151 · L153 · L156 · L159 · L161 · L163 해소, L164(1) · L165는 #82로 대체됨 → note(정리)
+  - 완료 기준: C1 충족 — 체크 83/83, 전체 GREEN 2802 passed. 증거 테스트 #78~#83이 실제로 있고 단언도 구체적(STRICT JSON, containsExactly).
+  - 완료 기준: C2 사람 확인 필요 — SET-09 · SET-11 · SET-12의 정렬 · 범위(오늘~+7, 지금보다 엄격히 뒤) · status 합치기는 06과 맞음(GetNextPickupService:44-50, GetTodayPickupsService:52-58, PickupProgressQueryService:55-67). 다만 SET-11 빈 본문 표현, SET-11 번호 중복, 학원 출입구가 생긴 뒤 다른 일정 status 미갱신이 남음.
+  - 완료 기준: C3 충족(이 리뷰 기록 시) — 의존 방향 schedule → pickup은 adapter/out/pickup에서 in 포트만 부르고, 이를 ScheduleModuleImportTest 새 케이스가 확인함. 02 위반은 없음. 남은 것은 [하] 문서 · 주석 수준.
+  - 완료 기준: C4 충족 — 06 확인 필요 표의 모든 행에 현재 가정이나 결정이 적혀 있음(SET-05 확인 필요 포함). 1행 문구만 고치면 됨.
+  - 후속 과제 판정(요약): 남음 — academy 기존 DB 마이그레이션, #79 팀장 판단 사람 확인, place findAcademy 가족 확인, 자정 넘는 일정, #81 CANCELLED 표시, ScheduleInfo · AcademyInfo · SpotSummary 필드 06 기록, 기반 리뷰 (2)(4)(5)(6), 출입구 생기면 다시 판정, ScheduleErrors 문구, 1자 이름 마스킹, 시스템 PATH, auth 기기 상태 N+1, 카카오 카테고리 · 시간 초과, weekStart 월요일 아님 · 하루 3개 자르기, SET-01 query 없으면 400, name · address · phone 길이 테스트, 빈 문자열 phone, JPA merge 동시 수정, UpdateScheduleS…
+  - 테스트: GREEN 2802 passed(재사용). 병합 뒤 컴파일 · 테스트는 미확인.
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
 |---|---|
 | Academy에 externalPlaceId 칸이 없음 | 해소: externalPlaceId 컬럼(UNIQUE)으로 같은 학원을 다시 씀(가족 간 공유). 핵심 로직 「학원 다시 쓰기」 |
+| 학원을 가족 간에 공유할지 | 결정됨: 학원은 가족마다 따로 둔다. Academy에 familyId를 더하고 (familyId, externalPlaceId)를 유니크로 한다. 테스트 케이스 끝의 두 항목으로 구현(사람 결정 2026-11-13) |
 | 이미 있는 학원 갱신의 동시 수정 | 후속 과제. 이미 있는 학원 갱신은 JPA merge라 동시 수정 때 다른 가족이 막 넣은 entrance를 지울 수 있음 |
 | 일정 수정 때 학원 정보가 바뀐 경우 | 해소: 같은 externalPlaceId면 그 행을 갱신, 다르면 그 학원을 찾거나 새로 만듦 |
 | 「겹침」의 정의 | 소스는 「같은 아이의 겹치는 일정」만 있음. 같은 자녀 · 같은 요일 · 같은 classEndTime으로 가정 |
@@ -198,6 +145,13 @@
 - 다음 도메인: 장소 (07_장소-place.md). 시작: /tdd domain place
 
 ## 후속 과제
+- 사람 결정 2026-11-14: #81 today-pickups status는 schedule out 포트(예: LoadPickupStatusPort) 어댑터가 pickup in 포트를 불러 정한다. 02 의존 방향에 schedule → pickup 추가(18개, 서로 부르는 쌍 7개). #80 profileImageUrl은 user LoadMemberUseCase에 userId 목록 → 서명 URL Map 메서드를 더해 받는다(GetMyFamilyService와 같은 규칙, MemberInfo는 그대로)
+- academy 테이블이 이미 있는 DB(dev · prod)는 ddl-auto update로 스키마가 바뀌지 않음: 옛 external_place_id 단독 유니크 삭제, family_id NOT NULL 추가(기존 행은 일정의 자녀 가족으로 채움, 여러 가족이 같은 학원을 쓰면 행 복제) 마이그레이션이 따로 필요(#82)
+- #79 next-pickup(SET-11) 팀장 판단: READY 일정만 대상(DRAFT는 SES-02가 시작을 막으므로 제외), 오늘부터 7일 안에서 targetAt이 지금보다 뒤인 가장 이른 것, spotName은 그 학원의 가족 기본 장소(없으면 null). 사람 확인 필요 시 조정
+- [중 · place 도메인] 학원이 가족마다 따로 생긴 뒤(#82), place의 장소 추가 · 수정 · 목록 · 추천(AddPickupSpotService:34 등)이 findAcademy(academyId)로 읽은 학원이 요청 가족 것인지 확인하지 않아 다른 가족 academyId로 장소를 만들 수 있음. AcademyInfo에 familyId를 담고 place에서 404로 거절할지 07 장소 설계서와 함께 사람 결정 필요
+- classEndTime + targetPickup이 자정을 넘는 일정(예 23:50 + 15)은 targetPickupTime(LocalTime)이 0시로 돌아가 SET-09 · SET-11에서 같은 날짜로 계산됨. 자정 넘는 일정을 막을지(검증) 다음 날로 볼지 설계 결정 필요
+- #81 today-pickups(SET-12) 팀장 판단: DRAFT 일정도 타임라인에 보여 줌(status SCHEDULED), CANCELLED 세션만 있으면 SCHEDULED로 보임. 취소를 따로 보여 줄 값(CANCELLED)이 필요한지는 디자인과 함께 사람 확인 필요
+- 사람 결정 2026-11-14(도메인 리뷰 뒤): (1) 현재 작업 커밋 → main을 feature/schedule에 병합 → #80은 main의 MemberInfo.profileImageUrl을 쓰고 findProfileImageUrls · loadUsersByIds 제거, main의 해제된 자녀 404 항목 반영. (2) API 번호: next-pickup SET-11 → SET-12, today-pickups SET-12 → SET-13. (3) 학원에 출입구가 생기면 같은 가족의 그 학원 일정 status를 다시 판정. (4) next-pickup 남은 일정 없음은 200 + JSON null(application/json)
 - NameMasker.mask는 1자 · 빈 문자열 · null 이름에서 예외가 난다(repeat(-1) · charAt). User 이름 규칙상 이런 입력이 올 수 있는지 확인하고, 올 수 있으면 규칙을 정해 테스트부터 추가
 - 설계서 06 시그니처의 LoadMemberDeviceStatusPort 반환 타입 표기 DeviceStatus를 실제 쓰는 auth.domain.MemberDeviceStatus로 고쳐야 함(05 인증 L152가 user · schedule용으로 내놓은 타입). 모듈용 record ScheduleInfo · AcademyInfo · SpotSummary 필드도 설계서에 없어 #37 · place 500m 검사 · pickup 연락처 용도로 정함 → 설계서에 반영 필요
 - [기반 리뷰 · 하] (1) #37 findSchedules는 여러 id를 한 번에 읽는 포트가 없어 N+1 조회가 됨 (2) pickup_schedule.child_user_id에 인덱스 없음(loadSchedulesOfChild(ren) 조회 칸) (3) Academy · PickupSchedule.restore의 id 인자가 long으로 user · auth(Long)와 다름 (4) SearchAcademyPort(out)가 in 포트 record AcademyCandidate를 import함 (5) schedule 테스트 헬퍼 중복: PickupScheduleTest 학원 헬퍼 두 쌍, ScheduleOverlapRuleTest · DailyScheduleLimitRuleTest의 academy · newSchedule · savedSchedule, 포트 테스트 리플렉션 헬퍼가 모듈마다 복사됨 (6) ScheduleSeed.clear는 시드 행만 지우므로 lane 테스트가 만든 행은 각 테스트가 지워야 함
