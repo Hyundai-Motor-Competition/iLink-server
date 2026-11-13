@@ -1,8 +1,8 @@
 # FOLLOWUP · 픽업 (pickup)
 
-- 생성: 2026-11-13 10:38 KST · tdd-guard
-- 상태: 완료 (체크 244/244 · 완료 기준 4/4)
-- 테스트: ● GREEN · 2429 passed · 전체 · 219s · .\gradlew.bat test --console=plain
+- 생성: 2026-11-13 16:14 KST · tdd-guard
+- 상태: 완료 (체크 266/266 · 완료 기준 4/4)
+- 테스트: ● GREEN · 2588 passed · 전체 · 275s · .\gradlew.bat test --console=plain
 - 설계서: C:/ilink/docs/08_픽업-pickup.md
 
 ## 완료 항목
@@ -250,6 +250,28 @@
 - [x] #242 [web] POST /v1/pickup-sessions에 null이 든 scheduleIds([null] · [801, null])를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다 ← PickupSessionControllerTest.본문 "{\"scheduleIds\":[null]
 - [x] #243 [web] POST /v1/pickup-sessions/{sessionId}/completion에 null이 든 notBoardedChildUserIds([null] · [131, null])를 보내면 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다 ← PickupSessionControllerTest.본문 "{\"mode\":\"MANUAL\",\"stateVersion\":15,\"notBoardedChildUserIds\":[null]
 - [x] #244 [web] POST /v1/pickup-sessions/{sessionId}/child-locations에 범위 밖 lat(-90~90 밖) · lng(-180~180 밖)를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다 ← PickupSignalControllerTest."lat 1000"
+- [x] #245 [서비스] 차량 이벤트 DEPARTED를 받으면 철회되지 않은 호출을 철회(revokeReason VEHICLE_DEPARTED)하고 세션 자녀를 WAITING으로 돌리고 위치를 비우고 CALL_REVOKED를 저장 · 발행한다 ← ReceiveVehicleEventServiceTest.차량 이벤트 DEPARTED로 호출을 철회하면 세션 자녀를 모두 WAITING으로 돌리고
+- [x] #246 [서비스] 차량 이벤트 STOP_FAILED를 받으면 철회되지 않은 호출을 철회(revokeReason STOP_FAILED)하고 CALL_REVOKED를 저장 · 발행하며, 호출이 없으면 아무것도 바꾸지 않는다 ← ReceiveVehicleEventServiceTest.차량 이벤트 STOP_FAILED로 호출을 철회하면 CALL_REVOKED만 저장하고
+- [x] #247 [서비스] 차량 이벤트 STOPPED를 받으면 저장된 최신 ETA로 합류 호출 판정을 다시 돌려 조건이 맞으면 호출을 만든다 ← ReceiveVehicleEventServiceTest.차량 이벤트 STOPPED는 저장된 ETA가 180초 안이고 가드를 통과하는 AUTO 가족 세션이면
+- [x] #248 [기반] Guard는 vehiclePhase가 STOPPED가 아니면 G6을 unmet에 넣는다 ← GuardTest.vehiclePhase ROUTING
+- [x] #249 [서비스] 정차 전(vehiclePhase STOPPED 아님)에는 트리거와 G1~G5를 만족해도 자동 호출을 만들지 않고, 합류 안내 보내기(CALL-02)는 422 CALL_GUARD_UNMET(unmet에 G6)로 거절한다 ← SendCallServiceTest.가드 G6 미충족
+- [x] #250 [기반] PickupSession.applyTelemetry는 vehiclePhase가 ROUTING일 때 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 60이면 APPROACHING으로 바꾸고, 그 밖의 단계에서는 바꾸지 않는다 ← PickupSessionTest.applyTelemetry는 observedAt이 마지막 값보다 오래되면
+- [x] #251 [서비스] 차량 ETA 수신으로 APPROACHING이 되면 VEHICLE_APPROACHING을 세션당 한 번 저장하고 차량 · 보호자 · 자녀에게 발행한다 ← ReceiveTelemetryServiceTest.차량 ETA 수신으로 APPROACHING이 되면 저장한 VEHICLE_APPROACHING을
+- [x] #252 SessionEventType은 VEHICLE_APPROACHING · PREPARE_NOTICE_SENT · CHILD_READY를 더한 24종이다 ← SessionEventTest.SessionEventType은 VEHICLE_APPROACHING · PREPARE_NOTICE_SENT · CHILD_READY를 더한 24종
+- [x] #253 [서비스] 신호 끊김 철회는 철회되지 않은 호출이 있는 ACTIVE 세션 중 etaUpdatedAt이 1분 넘게 지난 세션의 호출을 철회(revokeReason SIGNAL_LOST)하고 세션 자녀를 WAITING으로 돌리고 CALL_REVOKED를 저장 · 발행한다 ← RevokeSignalLostCallsServiceTest.신호 끊김 철회로 호출을 철회하면 세션 자녀를 모두 WAITING으로 돌리고
+- [x] #254 [서비스] 신호 끊김 철회 스케줄러는 pickup.call.signal-lost-check-interval(기본 PT15S)마다 신호 끊김 철회를 부른다(실제 DB 통합 테스트) ← RevokeSignalLostCallsSchedulerTest.신호가 1분 넘게 끊기고 철회되지 않은 호출이 있는 ACTIVE 세션은 스케줄러 실행 뒤
+- [x] #255 [서비스] 자녀 위치는 가족의 자녀 위치 사용(childLocationEnabled)이 꺼져 있으면 403 LOCATION_CONSENT_REQUIRED로 거절한다(LoadChildReadinessPort.hasLocationConsent가 user의 가족 설정을 읽음) ← ReportChildLocationServiceTest.자녀 위치는 가족의 자녀 위치 사용이 꺼져 있으면 403 LOCATION_CONSENT_REQUIRED로 거절한다
+- [x] #256 [서비스] 차량 ETA 수신에서 remainingMeters ≤ 700 또는 navEtaSeconds ≤ 180이 처음 되면 세션 자녀에게 실내 준비 알림(Notification type PREPARE) 기록을 요청하고 PREPARE_NOTICE_SENT를 세션당 한 번 저장해 차량 · 보호자에게 발행한다 ← ReceiveTelemetryServiceTest.차량 ETA 수신에서 준비 알림 기준(700m · 180초)이 처음 되면
+- [x] #257 [기반] SessionChild.markReady는 readyAt을 기록하고 여러 번 불러도 첫 시각을 유지한다 ← SessionChildTest.SessionChild.markReady를 두 번 부르면 첫 readyAt이 유지된다
+- [x] #258 [서비스] 준비 완료(SIG-06)는 세션 자녀의 readyAt을 기록하고 CHILD_READY(payload childUserId)를 저장해 차량 · 보호자에게 발행하며, 끝난 세션이면 SESSION_ALREADY_FINISHED, 세션 자녀가 아니면 NOT_FOUND로 거절한다 ← MarkChildReadyServiceTest.준비 완료는 세션 행을 잠그고 그 자녀의 readyAt에
+- [x] #259 [web] POST /v1/pickup-sessions/{sessionId}/ready는 자녀 토큰으로 200과 childUserId · readyAt을 돌려주고, 차량 · 보호자 토큰이면 403 FORBIDDEN을 돌려준다 ← PickupSignalControllerTest.POST /v1/pickup-sessions/{sessionId}/ready는 자녀 토큰으로
+- [x] #260 [서비스] 세션 조회의 children[]는 readyAt을 담는다 ← GetSessionServiceTest.세션 조회는 자녀 주체에게도 자기 children[].readyAt을 준다
+- [x] #261 [서비스] 차량 ETA 수신은 SIG-01 location을 세션의 마지막 차량 위치(vehicleLat · vehicleLng · vehicleLocatedAt)로 저장하고 observedAt이 오래되면 무시한다 ← ReceiveTelemetryServiceTest.차량 ETA 수신은 SIG-01 location을 세션의 마지막 차량 위치 vehicleLocation으로
+- [x] #262 [persistence] pickup_session의 vehicle_lat · vehicle_lng · vehicle_located_at을 저장하고 읽는다 ← PickupSessionPersistenceAdapterTest.마지막 차량 위치가 있는 세션을 저장하면
+- [x] #263 [서비스] 세션 조회는 vehicleLocation을 차량 · 보호자에게는 늘, 자녀에게는 remainingMeters ≤ 700 또는 남은 시간 ≤ 180초일 때만 주고, 끝난 세션이면 null로 준다 ← GetSessionServiceTest.남은 거리 "700"m · 도착까지 "720"초 → 자녀에게 보임 "true"
+- [x] #264 [서비스] 끝난 세션(COMPLETED · CANCELLED)이거나 탑승을 인식한(boardingDetectedAt 있음) 세션에는 차량 이벤트 DEPARTED · STOP_FAILED와 신호 끊김 철회가 호출을 철회하지 않고 자녀 상태 · acknowledgedAt을 바꾸지 않는다(DEPARTED는 vehiclePhase · VEHICLE_DEPARTED만 남김) ← RevokeSignalLostCallsServiceTest.신호 끊김 철회는 잠가 다시 읽은 ACTIVE 세션에 boardingDetectedAt이 있으면(탑승 인식) 호출을
+- [x] #265 [서비스] ON_HOLD 세션에서는 준비 알림 기준을 넘어도 실내 준비 알림을 보내지 않고, 보류가 풀린 뒤 첫 차량 ETA 수신에서 기준 안이면 보낸다 ← ReceiveTelemetryServiceTest.ON_HOLD 세션은 준비 알림 기준을 넘어도 PREPARE 알림 기록 요청 · PREPARE_NOTICE_SENT를 하지 않고
+- [x] #266 [서비스] 탑승 인식 없이 MANUAL로 완료된 세션과 CANCELLED 세션에 DEPARTED · STOP_FAILED가 와도 살아 있는 호출을 철회하지 않는다(boardingDetectedAt이 비어 있어도 끝난 세션이면 철회 안 함) ← ReceiveVehicleEventServiceTest.MANUAL로 완료된 세션(boardingDetectedAt 없음) · 호출 SENT
 
 ## 미완료 항목
 - 없음
@@ -261,74 +283,21 @@
 - [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-13 10:38 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 6 · 하 13 · 리뷰 시점 체크 244/244
-- 리뷰 시점 테스트: ● GREEN · 2429 passed · 전체 · 219s · .\gradlew.bat test --console=plain
-  - 결론: 조건부 통과
-  - #243 · #244는 설계서 · 코드 · 테스트가 서로 맞고 GREEN이다. 지난 리뷰의 새 [중] 2건 가운데 SIG-04 범위는 해소됐고, SES-11은 null 원소만 해소됐다. 세션에 없는 ID는 사람 결정으로 남았다. 이전 [중] 5건은 코드 변경이 없어 그대로다. 동작을 지금 고쳐야 하는 [상]은 없다.
-  - ## 새 항목 확인
-  - | 확인 | 결과 | 근거 |
-  - |---|---|---|
-  - | SES-11 설계서 행 ↔ 코드 | 맞음 | 08 L174 「null 원소가 있으면 422 VALIDATION_FAILED」 ↔ `List<@NotNull Long> notBoardedChildUserIds` (CompletePickupRequest.java:13) |
-  - | SIG-04 설계서 행 ↔ 코드 | 맞음 | 08 L178 「lat(-90~90), lng(-180~180) … 범위 밖이면 422」 ↔ `@DecimalMin("-90") @DecimalMax("90")`, `@DecimalMin("-180") @DecimalMax("180")` (ChildLocationRequest.java:14-15). 기본값 inclusive라 경계값 포함 |
-  - | #243 단언 | 충분 | 422, 공통 오류 키, code, fields 비어 있지 않음, 모든 field가 `notBoardedChildUserIds`로 시작, reason 있음, 유스케이스 미호출 (PickupSessionControllerTest.java:668-675) |
-  - | #243 stub이 단언을 약하게 하는가 | 아님 | Mockito는 `given(...)` 안에서 부른 호출을 상호작용 기록에서 지운다. 그래서 :675 `shouldHaveNoInteractions()`는 그대로 뜻이 있다. 검증이 빠지면 유스케이스가 불려 200이 되므로 :668과 :675에서 실패한다. #242(:324)와 mode 테스트(:646)에는 없는 stub이라 일관성만 다르다 |
-  - | #244 단언 | 충분 | `validationFailedOn`(422 · 공통 키 · code · field · reason, :440-448), `fields.length()==1`, `fields[0].field`가 정확한 값인지, 유스케이스 미호출 (PickupSignalControllerTest.java:294-298) |
-  - | #244 경계 | 있음 | 밖: ±90.000001, ±180.000001, lat 1000. 안: ±90 · ±180이면 202이고 정확한 `ChildLocationCommand`로 호출 (:302-327) |
-  - | 실행 | 9건 통과 | XML: PickupSessionControllerTest tests 98 · 실패 0 (L41-42), PickupSignalControllerTest tests 44 · 실패 0 (L41-47) |
-  - ## NaN · Infinity (요청하신 확인)
-  - 500으로 이어지지 않는다. 코드 읽기와 라이브러리 바이트코드(javap)로 확인했고, 실행으로는 확인하지 않았다.
-  - | 입력 | 처리 | 결과 |
-  - |---|---|---|
-  - | `"lat":NaN` (따옴표 없음) | Jackson 3 기본값은 NaN 토큰을 거부 → HttpMessageNotReadableException | 400 INVALID_REQUEST (GlobalExceptionHandler.java:42-48) |
-  - | `"lat":"NaN"`, `"Infinity"`, `"-Infinity"` (문자열) | jackson-databind 3.1.7 `NumberDeserializers$DoubleDeserializer._parseDouble`이 강제 변환 설정보다 먼저 `_checkDoubleSpecialValue`를 봐서 Double.NaN · ±Infinity가 된다 | 아래 검증으로 이어짐 |
-  - | NaN · ±Infinity 검증 | hibernate-validator 9.1.5 · 9.1.3 `DecimalMinValidatorForDouble`은 NaN을 LESS_THAN(-1)으로, `DecimalMaxValidatorForDouble`은 GREATER_THAN(+1)으로 본다. `infinityCheck`가 -Inf는 -1, +Inf는 +1을 준다. `BigDecimal.valueOf(NaN)`까지 가지 않는다 | 422 VALIDATION_FAILED. NaN이면 같은 field에 오류가 2건(min · max) |
-  - | `1e400` | double로 읽으면 +Infinity | 422 |
-  - | accuracyM | 검증은 없지만 서비스 · DB가 쓰지 않음(Grep: ChildLocationCommand · Request · ApiDoc뿐) | 500 아님 |
-  - ## 발견 사항
-  - [중] (이전 · 일부 해소) SES-11에서 세션에 없는 childUserId를 조용히 무시하고, MANUAL이면 세션 자녀 전원을 탑승 처리해 COMPLETED로 끝낸다(되돌릴 수 없음). null 원소는 #243으로 해소됐다. 08 L721 「세션에 없는 childUserId → 404」와 다르다. FOLLOWUP pickup.md L432에 적혀 있다 → 사람 결정
-  - [중] (이전 · 남음) 실시간 SSE payload에 notificationIds가 섞임 — SessionEventMessages.java:21-23, 이번에 바뀌지 않음 → 사람 결정
-  - [중] (이전 · 남음) CALL-04가 markCallSent보다 먼저 오면 MEETING 자녀가 CALLED로 되돌아감 — 관련 코드 변경 없음 → 항목 추가
-  - [중] (이전 · 남음) @Scheduled 작업 4개가 스레드 1개를 나눠 씀 — application.yml에 `spring.task.scheduling` 없음 → 항목 추가(shared)
-  - [중] (이전 · 남음) SET-06 「다음 세션부터 적용」과 08 L682 가정이 서로 다름 → 사람 결정
-  - [중] (이전 · 남음) SIG-04 403 LOCATION_CONSENT_REQUIRED가 운영에서 나지 않음 — PickupChildReadinessAdapter.java:28 `return true` → 사람 결정
-  - [하] (새) SIG-04에 NaN · Infinity 테스트가 없음 — 위 표처럼 코드 읽기로는 422(문자열) · 400(토큰)이지만 고정하는 테스트가 없다. 라이브러리 버전이 바뀌면 조용히 달라질 수 있다 → note(선택: `"lat":"NaN"` · `"lng":"Infinity"`의 422 테스트 추가)
-  - [하] (이전 · 같은 모양 1건 더함) #242 · #243 테스트가 field 이름의 앞부분만 봄 — PickupSessionControllerTest.java:329 · :672. 정확한 값(`notBoardedChildUserIds[1]` 등)과 건수는 고정되지 않았다. #244(PickupSignalControllerTest.java:295-296)는 정확한 값을 단언한다 → note
-  - [하] (이전 · 남음) 스웨거 SES-02 · SES-04 설명에 본문 검증 실패가 없음 — PickupSessionApiDoc.java 변경 없음. SES-11(:154)과 SIG-04(PickupSignalApiDoc.java:71)에는 「입력값 오류」가 이미 있다 → note
-  - [하] (이전 · 남음) 한 줄 주석 2줄(auth · user PickupActivityAdapter:8), #158~#162 증거 이름, 02 L72 ProcessedVehicleEvent, 04 · 05 · 07 「임시」 문장 → note
-  - [하] (이전 · 남음) 08에 ResendGuardUseCase · FindSessionFamilyUseCase가 없고, L634 #204 문장이 그대로 → note
-  - [하] (이전 · 남음) 08 이벤트 표 「받는 쪽」과 실제 FCM 발송이 다름 → 사람 결정
-  - [하] (이전 · 남음) 08 테이블 FK 표기와 실제(FK 없음)가 다르고, ProcessedVehicleEvent가 테이블 절에 없음 → note
-  - [하] (이전 · 남음) pickup이 user.domain.JoinCallMode · schedule.domain.ScheduleStatus를 직접 씀(02 L70 허용 목록에 없음) → 사람 결정
-  - [하] (이전 · 남음) 테스트 없는 곳 — ResendGuardService 세션 · 호출 없음, 자동 완료 실패 건너뛰기, PickupProperties yml 바인딩 → 항목 추가
-  - [하] (이전 · 남음) @Scheduled 작업이 통합 테스트 중 실제 시계로 돎(미확인) → note(shared)
-  - [하] (이전 · 남음) HELP_REQUEST_TOO_SOON 429에 retryAfterSeconds가 비어 있음, CorrectOutcomeService의 Asia/Seoul 상수 중복 → note
-  - [하] (이전 · 남음) 세션이 끝나도 SSE 연결이 닫히지 않음 → note
-  - [하] (이전 · 남음) 푸시 토큰이 없는 자녀만 있으면 Call이 ACCEPTED에 머묾 → 사람 결정
-  - 합계: 상 0 · 중 6(이전 6, 그중 1건 일부 해소) · 하 13(새 1 · 이전 12)
-  - ## 완료 기준
-  - C1 충족 — 체크 244/244, GREEN 2429 passed. XML 260개 합계는 tests 2429 · 실패 0 · 오류 0이고, 새 테스트 9건(#243 2건 · #244 7건)이 들어 있다
-  - C2 사람 확인 필요 — #243 · #244는 08 L174 · L178과 맞는다. 다만 SES-11의 세션 밖 ID가 08 L721과 다르고, 이전 [중] 3건(SSE payload, SIG-04 403, SET-06과 L682)이 그대로다
-  - C3 충족 — 이번 변경은 요청 DTO의 Bean Validation뿐이다(02 L127 규칙대로). 공통 규칙 위반은 없다
-  - C4 충족 — SIG-04 범위는 해소됐다. SES-11 세션 밖 ID는 FOLLOWUP pickup.md L432에 「설계 결정 필요」로 적혀 있다
-  - ## 후속 과제 (바뀐 것만, 나머지는 2026-11-13 10:19 리뷰 판정 그대로)
-  - [설계 결정 필요 · 2026-11-13 재리뷰 중] SES-11 세션 밖 childUserId — 설계 결정 필요
-  - [web 검증 거리 · SES-11 완료] — 해소됨(mode `@Pattern`, 목록 null, 원소 null #243). 세션 밖 ID는 위 메모로 넘어감
-  - [사람 결정 2026-11-09 · 재리뷰 뒤]의 「SIG-04 lat · lng 범위」 — 해소됨(#244). SIG-01 location · headingDeg · gear, SES-04 navRouteId 검증은 남음(500 아님). 나머지 항목도 남음
-  - 새로 적을 것: SIG-04 NaN · Infinity 테스트(선택), #243 field 정확한 값 단언(선택)
-  - ## 테스트
-  - `mcp__tdd-guard__tests` scope "all" → `.\gradlew.bat test --console=plain` · 219s · GREEN 2429 passed
-  - build/test-results/test XML 260개 합계: tests 2429 · skipped 0 · failures 0 · errors 0
-  - `git diff 2563e4de --stat`: 8파일(소스 2 · 테스트 2 · 문서 4), 모두 커밋 전. 그 밖의 pickup 코드 변경은 없다
-  - 실행하지 못한 것: NaN · Infinity 요청의 실제 응답(파일을 고칠 수 없어서). javap로 jackson-databind 3.1.7과 hibernate-validator 9.1.5 · 9.1.3의 바이트코드를 읽어 확인했다
-  - 관련 파일
-  - C:/ilink/src/main/java/com/example/pickupservice/pickup/adapter/in/web/CompletePickupRequest.java
-  - C:/ilink/src/main/java/com/example/pickupservice/pickup/adapter/in/web/ChildLocationRequest.java
-  - C:/ilink/src/test/java/com/example/pickupservice/pickup/adapter/in/web/PickupSessionControllerTest.java
-  - C:/ilink/src/test/java/com/example/pickupservice/pickup/adapter/in/web/PickupSignalControllerTest.java
-  - C:/ilink/src/main/java/com/example/pickupservice/common/error/GlobalExceptionHandler.java
-  - C:/ilink/docs/08_픽업-pickup.md
-  - C:/ilink/docs/followup/pickup.md
-- 이전 리뷰: 2026-11-13 10:19 KST (조건부 통과), 2026-11-11 12:06 KST (조건부 통과), 2026-11-09 19:49 KST (통과), 2026-11-09 19:14 KST (조건부 통과)
+- 2026-11-13 16:14 KST · 도메인 리뷰어 · 결론 통과 · 상 0 · 중 2 · 하 4 · 리뷰 시점 체크 266/266
+- 리뷰 시점 테스트: ● GREEN · 2588 passed · 전체 · 275s · .\gradlew.bat test --console=plain
+  - 결론: 통과
+  - 직전 리뷰의 [중] 2건은 모두 해소됐다. 동작을 바꿔야 하는 [상] · [중]은 없다. 직전 리뷰 뒤 바뀐 파일은 ReceiveVehicleEventServiceTest.java, docs/08, docs/followup/pickup.md, TODO.md뿐이고 main 코드는 바뀌지 않았다.
+  - 이전 지적 처리
+  - [중] MANUAL · 즉시 완료 · CANCELLED 뒤 출발 테스트 없음 → 해소. ReceiveVehicleEventServiceTest.java:594-657의 #266 8건이 boardingDetectedAt null을 먼저 단언해 keepsCalls의 isFinished() 조건을 고정한다.
+  - [중] 08 핵심 로직 본문에 #264 규칙 없음 → 해소. 08 L290 · L291 · L294가 코드(ReceiveVehicleEventService.java:88 · 102, RevokeSignalLostCallsService.java:89-92)와 맞다.
+  - [하] 5건 → FOLLOWUP 「1차 개발 뒤 정리」에 기록.
+  - 발견 사항
+  - [하] 08 「확인 필요」 표 L739(SES-06 · 07 행 「이벤트 21종」)도 옛 값(지금 24종). FOLLOWUP 메모 (3)에 L739를 함께 적기 → note
+  - [하] ba90e2f 뒤 작업이 모두 미커밋(수정 66개, user 도메인 변경 섞임), 관계없는 contest-application-consent.docx · iLink_Project_Package/ 있음 → note(커밋 때 도메인별로 나누고 두 항목 제외)
+  - [하] #266은 MANUAL 완료만 다루고 IMMEDIATE는 없음. 경로가 isFinished() 하나라 지금은 문제없음 → note
+  - 완료 기준: C1 충족(266/266, GREEN 2588) / C2 충족 / C3 충족 / C4 충족
+  - 테스트: scope all GREEN 2588 passed · 275s
+- 이전 리뷰: 2026-11-13 16:06 KST (조건부 통과), 2026-11-13 15:51 KST (수정 필요), 2026-11-13 10:38 KST (조건부 통과), 2026-11-13 10:19 KST (조건부 통과)
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -341,7 +310,7 @@
 | G3 「경로 일치」의 판정 | 소스에 정의 없음. SES-04로 확정한 장소 버전과 지금 spotVersion이 같으면 통과로 가정 |
 | G5와 형제 | Call은 세션에 하나라 모든 세션 자녀의 callNotBefore가 지나야 통과로 가정. callNotBefore가 지금과 같은 시각이면 지난 것으로 본다(「이 시각 전에는 호출 안 함」) |
 | ETA_3MIN · DIST_700M이 동시에 맞을 때 triggerType | 소스에 없음. ETA_3MIN으로 가정 |
-| vehiclePhase APPROACHING 기준 | 「SIG-01 ETA · 거리 기준」만 있음. 기준값을 정해야 함 |
+| vehiclePhase APPROACHING 기준 | [사람 결정 2026-11-13] remainingMeters ≤ 700 또는 navEtaSeconds ≤ 60 |
 | spotStatus ROUTING · INVALIDATED로 바꾸는 계기 | 이 상태로 바꾸는 API가 없음. 정해야 함 |
 | navRouteId 저장 위치 | SES-04 요청에 있으나 컬럼이 없음. 저장하지 않는다고 가정 |
 | SES-05 spotVersion 불일치 오류 | 소스에 없음. 409 STATE_VERSION_CONFLICT로 가정 |
@@ -362,7 +331,7 @@
 | incident의 childUserId 저장 | [사람 결정 2026-11-09] pickup_session.incident_child_user_id 칸에 저장하고 세션 뷰 incident.childUserId는 거기서 읽는다(INCIDENT_OPENED payload에서 읽지 않음) |
 | 예외 해소(incidentResolvedAt) 방법 | 해소 API가 없음. SES-06 DELETE(보류 해제) 때 채운다고 가정 |
 | actualStopAt · predictedStopAt 값 | actualStopAt은 VEHICLE_STOPPED occurredAt. [사람 결정 2026-11-09] predictedStopAt은 SIG-02 STOPPED를 받을 때의 세션 etaAt(정차 직전 마지막 ETA)이고 VEHICLE_STOPPED payload에 담아 완료 때 읽는다. etaAt이 없으면 null |
-| SIG-02 STOP_FAILED 처리 | 소스에 없음. 상태 변화 없이 무시로 가정 |
+| SIG-02 STOP_FAILED 처리 | [사람 결정 2026-11-13] 상태는 그대로, 살아 있는 호출이 있으면 자동 철회(STOP_FAILED). 끝난 세션 · 탑승 인식 뒤에는 철회 안 함 |
 | SIG-02 eventId 저장 위치 | 「Idempotency-Key로 써서 중복 무시」. ~~idempotency_key 테이블에 저장한다고 가정~~ → 아래 「SIG-02 eventId와 idempotency_key 테이블」 결정(ProcessedVehicleEvent)으로 대체 |
 | 자녀에게 장소를 숨기는 「SES-04 전」 | [팀장 결정 2026-11-09, 사람 확인 전] 경로 확정을 한 번도 하지 않은 상태(routeVersion == 0)로 본다. 첫 확정 때 자녀에게 출발 알림이 가므로 SES-05로 장소가 다시 SELECTED가 돼도 자녀에게 다시 숨기지 않는다 |
 | SIG-04 WAITING · 철회 뒤 요청의 오류 코드 | [사람 결정 2026-11-09] 끝난 세션은 SESSION_ALREADY_FINISHED, 그 밖(WAITING · 철회 뒤)은 409 CHILD_NOT_CALLED |
@@ -415,6 +384,9 @@
 - [마지막 리뷰 하 · 후속] (1) 체크 증거 이름 갱신: #158~#162 → SessionStreamControllerTest(DisplayName 같음), #241 → SessionEventTest 「…enum 선언 순서대로 갖는다」 (2) user · auth · place PickupActivityAdapter 한 줄 주석 3줄 제거(02 L78) (3) 02 L72 네이티브 쿼리 예외에 ProcessedVehicleEvent markProcessed(INSERT … ON CONFLICT) 추가 (4) 04 L8 · L202 · L227, 05 L19 · L266, 07 L8 · L19 · L153 「임시 어댑터」 설명을 pickup 위임으로 갱신 (5) SseEmitterProbe 위치 유지(스프링 버전 업 때 확인). 주석 제거로 코드에서 사라진 임시 동작: auth 위치 동의 항상 true, notification 알림 빈 목록 — #204 후속 과제로 유지
 - [설계 결정 필요 · 2026-11-13 재리뷰 중] SES-11 notBoardedChildUserIds에 세션에 없는 childUserId가 오면 지금은 조용히 무시하고 MANUAL이면 세션 자녀 전원을 탑승 처리해 COMPLETED로 끝낸다(되돌릴 수 없음). 08의 [팀장 결정 2026-11-09] 「세션에 없는 childUserId는 404 NOT_FOUND」(SES-12 · 13에는 적용)를 SES-11에도 적용할지 사람이 정해야 함. 차량 앱이 세션 밖 자녀 ID를 함께 보내는 경우가 있으면 404로 바꿀 때 앱이 깨질 수 있어 팀장이 정하지 않음. null 원소는 #243으로 422 처리
 - [선택 · 2026-11-13 재리뷰 하] (1) SIG-04에 NaN · Infinity를 고정하는 테스트가 없다. 코드 · 라이브러리 바이트코드로는 `"lat":"NaN"` · `"lng":"Infinity"` 문자열은 422, 따옴표 없는 NaN 토큰은 400이지만 라이브러리 버전이 바뀌면 조용히 달라질 수 있다 (2) #242 · #243 테스트는 field 이름 앞부분(scheduleIds · notBoardedChildUserIds)만 본다. 앱이 field 이름으로 화면을 고르면 정확한 값(`notBoardedChildUserIds[1]` 등)과 건수 단언을 더한다 (3) 스웨거 SES-02 · SES-04 설명에 본문 검증 실패(입력값 오류) 422가 없다
+- [운영 · 2026-11-13] prod(validate) 배포 전 실행: ALTER TABLE pickup_session ADD COLUMN vehicle_lat NUMERIC(9,6) NULL, ADD COLUMN vehicle_lng NUMERIC(9,6) NULL, ADD COLUMN vehicle_located_at TIMESTAMPTZ NULL; ALTER TABLE session_child ADD COLUMN ready_at TIMESTAMPTZ NULL; (user: ALTER TABLE family ADD COLUMN child_location_enabled BOOLEAN NOT NULL DEFAULT false;). [팀장 결정 2026-11-13] 자동 철회(출발 · 정차 실패 · 신호 끊김)는 끝난 세션 · 탑승 인식 뒤에는 하지 않음(#264, 기획서 「자녀가 나오기 전에 차가 다시 출발하면」). [사람 결정 필요] (1) 정차 뒤 SIG-01이 끊기면 아이가 걷는 중에도 약 75초 뒤 철회됨: 차량 앱이 정차 뒤에도 15초마다 SIG-01을 보내는지 차량 앱 담당 확인, 아니면 STOPPED 뒤 기준 완화 (2) ETA가 오래되면 remainingSeconds 0으로 자녀에게 차량 위치가 보임 (3) 자녀 LOCATION 동의는 여전히 늘 true. [후속] PREPARE 알림이 자녀 폰으로 안 나감: notification #65(09) 구현 필요. 700 · 180 기준 4곳 분산, 테스트 전용 main 오버로드 증가, SIG-01마다 loadMembers, loadSignalLost가 자녀까지 읽음, 통합 테스트 중 신호 끊김 스케줄러 15초마다 돎
+- [1차 개발 뒤 정리 · 2026-11-13] (1) SES-12로 탑승을 취소한 뒤 차가 출발해도 호출이 철회되지 않음(rejectBoarding이 boardingDetectedAt을 남김, #264 문장대로) — 사람 결정 (2) findSignalLost 쿼리에 boardingDetectedAt is null 조건 추가(리팩터링) (3) 08 「확인 필요」 표의 SessionEvent.type 행 「19종 → 21종」은 지금 24종, 「허용 실외 대기 5분」 관련 행 정리 (4) 08 핵심 로직 본문에 #264 규칙 반영함(DEPARTED · STOP_FAILED · 신호 끊김)
+- [1차 개발 뒤 정리 추가] 08 확인 필요 표 SES-06 · 07 행의 「이벤트 21종」도 지금 24종. IMMEDIATE 완료 뒤 출발 테스트는 MANUAL과 같은 경로(isFinished)라 생략. 커밋할 때 user · pickup · 문서로 나누고 contest-application-consent.docx · iLink_Project_Package/는 제외
 - [pickup 기반 중간 정리] (1) SessionChild.extendPrep 인자 2개짜리(한도 확인 없음)는 #30 · #31 테스트를 인자 3개짜리로 옮긴 뒤 지울지 리뷰에서 결정. 한도 테스트가 15로만 불려 15를 코드에 박아도 통과함 → 다른 한도 값 테스트 추가 검토 (2) SIG-03 「호출 전 실내 대기에서만」 · 409 CALL_ALREADY_SENT는 서비스(Call 조회)에서 판정, PickupViolation에 없음 (3) PickupSession.applyTelemetry는 void라 무시됐는지 서비스가 알 수 없음 — 무시된 SIG-01 뒤 ETA_UPDATED 발행 · 호출 판정 여부를 서비스 항목에서 정할 것 (4) 기준값(ETA 180초 · 700m, ETA 유효 60초, 도움 60초, 준비 한도 15분, 탑승 취소 창 10초)은 도메인이 인자로 받음 — application.yml 키 이름은 서비스 lane에서 정함
 - [pickup 기반 리뷰 때 정리] PickupSession.restore가 15 · 18 · 19인자 세 벌로 늘었음(필드가 늘 때마다 test-writer가 기존 코드를 못 고쳐 오버로드를 더함). 15 · 18인자는 routeSpotVersion 등을 null로 채워 G3이 틀리게 판정될 수 있음 → 기반 커밋 전 리뷰어가 모든 필드를 받는 restore 하나로 합치고 테스트 헬퍼를 옮길 것. SessionChild.restore도 같은 문제가 생길 수 있음
 - [절차] #47 · #48 포트 구현자가 파일 92개를 Edit · Write 대신 scratchpad Python 스크립트(gen_ports.py)로 덮어써 tdd-guard 변경 추적을 거치지 않음. 변경은 src/main/.../pickup/application/port 골격만이고 대상 테스트는 GREEN 11 passed. 기반 체크 전 전체 테스트로 다시 확인할 것. 이후 에이전트 프롬프트에 「파일 수정은 Edit · Write로만」 명시
