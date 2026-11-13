@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -45,11 +44,7 @@ public class GetMyFamilyService implements GetMyFamilyUseCase {
 	}
 
 	private String profileImageUrl(User user) {
-		String key = user.getProfileImageKey();
-		Optional<String> url = key != null
-				? profileImageStoragePort.presignedUrl(key)
-				: profileImageStoragePort.defaultUrl();
-		return url.orElse(null);
+		return ProfileImageUrls.of(profileImageStoragePort, user).orElse(null);
 	}
 
 	private VehicleSummary loadLinkedVehicleSummary(long familyId) {

@@ -48,6 +48,8 @@ class UserOutPortsTest {
 		assertPort(LoadUserPort.class,
 				method("loadUser", generic(Optional.class, User.class), params(long.class)),
 				method("loadUsers", generic(List.class, User.class), params(long.class)),
+				method("loadUsersByIds", generic(List.class, User.class), params(List.class),
+						generic(List.class, Long.class)),
 				method("countNonChildMembers", "long", params(long.class)));
 		assertPort(SaveUserPort.class,
 				method("saveUser", User.class.getName(), params(User.class)),

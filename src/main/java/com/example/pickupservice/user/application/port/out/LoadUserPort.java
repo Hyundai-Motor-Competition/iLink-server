@@ -11,5 +11,7 @@ public interface LoadUserPort {
 
 	List<User> loadUsers(long familyId);
 
+	List<User> loadUsersByIds(List<Long> userIds);
+
 	long countNonChildMembers(long familyId);
 }

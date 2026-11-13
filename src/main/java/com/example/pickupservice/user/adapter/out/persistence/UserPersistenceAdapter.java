@@ -46,6 +46,11 @@ class UserPersistenceAdapter implements LoadFamilyPort, SaveFamilyPort, LoadUser
 	}
 
 	@Override
+	public List<User> loadUsersByIds(List<Long> userIds) {
+		return userJpaRepository.findAllById(userIds).stream().map(UserPersistenceAdapter::toDomain).toList();
+	}
+
+	@Override
 	public long countNonChildMembers(long familyId) {
 		return userJpaRepository.countByFamilyIdAndRoleNot(familyId, Role.CHILD);
 	}

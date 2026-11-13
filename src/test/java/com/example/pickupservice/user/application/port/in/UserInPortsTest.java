@@ -88,7 +88,8 @@ class UserInPortsTest {
 				method("findLinkedVehicleByVin", generic(Optional.class, VehicleInfo.class), String.class));
 		assertUseCase(LoadMemberUseCase.class,
 				method("findMember", generic(Optional.class, MemberInfo.class), long.class),
-				method("findMembers", generic(List.class, MemberInfo.class), long.class));
+				method("findMembers", generic(List.class, MemberInfo.class), long.class),
+				method("findProfileImageUrls", "java.util.Map<java.lang.Long, java.lang.String>", List.class));
 		assertUseCase(LoadFamilyUseCase.class,
 				method("findFamily", FamilyInfo.class.getName(), long.class));
 	}
