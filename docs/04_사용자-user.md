@@ -5,7 +5,7 @@
 | 항목 | 내용 |
 |---|---|
 | 범위 | 엔티티 Family · User · Vehicle. API FAM-01~03 · FAM-07(가족 멤버), LINK-05(차량 연결 해제), SET-06(합류 안내 방식), SET-11(자녀 위치 사용). 다른 모듈용 in 포트(보호자 · 가족 생성, 차량 등록 · 조회, 멤버 · 가족 조회) |
-| 의존 | 03_공유모듈-shared. auth의 in 포트(멤버 기기 상태 조회, 멤버 해제 때 기기 · 토큰 폐기, LINK-05 차량 기기 폐기), pickup의 in 포트(진행 중 픽업 여부). 둘 다 user out 포트로 둔다. auth는 연동됨(기기 상태 · 기기 폐기), pickup(CheckActivePickupPort)만 구현 전 임시 false |
+| 의존 | 03_공유모듈-shared. auth의 in 포트(멤버 기기 상태 조회, 멤버 해제 때 기기 · 토큰 폐기, LINK-05 차량 기기 폐기), pickup의 in 포트(진행 중 픽업 여부). 둘 다 user out 포트로 둔다. auth(기기 상태 · 기기 폐기)와 pickup(CheckActivePickupPort → pickup ActivePickupQueryUseCase) 모두 실제 모듈과 연동됨(사람 결정 2026-11-13) |
 | 진행 | 계층 병렬 |
 
 ## 구조
@@ -102,7 +102,7 @@ user
 
 ### 합류 안내 방식
 - SET-06은 GUARDIAN · CO_GUARDIAN만. Family.joinCallMode를 바꾸고 settingsVersion을 1 올린다.
-- 기본값이 AUTO라 처음 설정 흐름에서는 부르지 않는다. 다음 세션부터 적용된다.
+- 기본값이 AUTO라 처음 설정 흐름에서는 부르지 않는다. 바꾸면 진행 중인 세션에도 바로 적용된다. pickup은 세션 시작 때 joinCallMode를 스냅샷하지 않고 합류 호출 판정 때마다 최신 값을 읽는다(사람 결정 2026-11-13).
 
 ### 자녀 위치 사용
 - SET-11은 GUARDIAN · CO_GUARDIAN만. Family.childLocationEnabled를 바꾸고 settingsVersion을 1 올린다. 기본은 꺼짐(false).
@@ -208,7 +208,7 @@ boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);
 - [x] [기반] User.create는 userId가 빈 User를 만들고 User.restore는 userId · familyId · role · name · phone을 그대로 가진 User를 만든다
 - [x] [기반] User.changeName · changePhone · changeRole은 그 필드만 바꾸고 나머지는 그대로 둔다
 - [x] [기반] Vehicle.register는 familyId · unlinkedAt이 빈 Vehicle을 만들고 Vehicle.linkTo는 familyId를 채운다
-- [x] [기반] auth · pickup 구현 전 임시 어댑터가 빈으로 등록된다: LoadMemberDeviceStatusPort는 모든 userId에 NONE, RevokeMemberDevicesPort는 아무것도 하지 않음, CheckActivePickupPort는 false
+- [x] [기반] auth · pickup 연동 어댑터가 빈으로 등록된다: LoadMemberDeviceStatusPort는 auth GetMemberDeviceStatusUseCase 결과를, RevokeMemberDevicesPort는 auth RevokeMemberDevicesUseCase를, CheckActivePickupPort는 pickup ActivePickupQueryUseCase 결과를 쓴다(사람 결정 2026-11-13)
 - [x] [web] POST /v1/families/me/members에 role GUARDIAN을 보내면 422 VALIDATION_FAILED와 fields의 role을 돌려준다
 - [x] [web] 서비스가 필드를 지정해 던진 VALIDATION_FAILED는 422 응답의 fields에 그 field와 reason을 담는다
 - [x] [서비스] 자녀 외 멤버를 phone 없이 등록하거나 GUARDIAN이 자기 role을 바꾸려 할 때의 VALIDATION_FAILED는 fields에 phone · role을 담는다
@@ -224,6 +224,12 @@ boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);
 - [x] [web] PUT /v1/families/me/child-location은 200과 childLocationEnabled · settingsVersion을 돌려주고, enabled가 없으면 422 VALIDATION_FAILED, CHILD · DELEGATE · TEACHER 토큰이면 403 FORBIDDEN을 돌려준다
 - [x] [web] GET /v1/families/me와 LoadFamilyUseCase.findFamily의 FamilyInfo는 childLocationEnabled를 함께 돌려준다
 - [x] [서비스] 가족 조회(FAM-01)는 저장된 Family의 childLocationEnabled를 FamilyResult에 그대로 옮긴다(true면 true)
+- [ ] [서비스] 멤버 해제(FAM-07)는 User 행을 지우지 않고 removedAt을 채운다(삭제 표시, D7 사람 결정 2026-11-13)
+- [ ] [persistence] 가족 멤버 조회(loadUsers · 다른 모듈용 멤버 조회)는 removedAt이 있는 멤버를 빼고 돌려준다
+- [ ] [서비스] 해제된 멤버는 가족 인원 한도 계산과 가족 조회(FAM-01) members에서 빠진다
+- [ ] [persistence] removedAt이 있는 User도 userId로 단건 조회하면 그대로 읽혀 지난 픽업 기록의 이름을 보여줄 수 있다
+- [ ] [web] 자녀 등록(FAM-02) · 멤버 수정(FAM-03)은 선택 값 grade(1~20자, 예: 「중학교 2학년」)를 받아 저장하고 가족 조회(FAM-01) members[]에 grade를 담는다. 21자 이상이면 422 VALIDATION_FAILED(최종디자인 11/13 픽업일정등록1)
+- [ ] [서비스] 다른 모듈용 멤버 조회 in 포트는 멤버마다 profileImageUrl(사진 키 서명 URL 또는 기본 아바타 URL, 저장소 설정 없으면 null)을 함께 돌려준다(차량 · 자녀 화면 아바타용)
 
 ## 확인 필요 사항
 
@@ -239,7 +245,7 @@ boolean isInActivePickup(long userId);  boolean hasActivePickup(long vehicleId);
 | settingsVersion을 올리는 변경의 범위 | SET-06 · SET-11(자녀 위치 사용)이 올림. 일정(SET-02 · 03) · 장소(SPOT-02 · 03) · 멤버 변경도 올리는지 정해야 함(SET-08 충돌 판단에 영향) |
 | 번호판 마스킹 규칙 | 예시 「12가 ****」뿐. 마지막 숫자 4자리를 *로 바꾼다고 가정 |
 | user ↔ auth 서로 부름 | auth는 User 생성을 user에 요청하고, user는 기기 상태 · 폐기를 auth에 요청. user 쪽은 out 포트로 둔다. auth 쪽 임시 어댑터(LoadMemberDeviceStatusPort 기기 상태 · RevokeMemberDevicesPort 기기 폐기)는 auth 연동으로 교체됨 |
-| 진행 중 픽업 확인(FAM-07 · LINK-05)을 pickup in 포트로 부르는 것 | pickup이 user보다 뒤에 구현되므로 out 포트 + 테스트 대역으로 먼저 검증. pickup 쪽 CheckActivePickupPort만 아직 임시 어댑터(늘 false). pickup 구현 때 교체해야 함 |
+| 진행 중 픽업 확인(FAM-07 · LINK-05)을 pickup in 포트로 부르는 것 | 해소: pickup 구현 뒤 CheckActivePickupPort 어댑터가 pickup ActivePickupQueryUseCase를 부른다(임시 false 어댑터는 없어짐)(사람 결정 2026-11-13) |
 | 포트 · 유스케이스 이름 | 소스 2.2 예시(StartPickupUseCase, LoadSessionPort)의 이름 규칙을 따른 제안 |
-| LINK-04 NEW로 만드는 GUARDIAN의 name · phone | name은 결정됨(사람 결정 2026-11-07). LINK-04 요청 name, mode NEW일 때 필수(05_인증-auth.md와 같음). phone은 미정. 요청에 없어 null로 만들고 있어 「자녀 외 phone 필수」 규칙과 어긋남. 보호자 전화번호를 받을 곳을 정해야 함 |
+| LINK-04 NEW로 만드는 GUARDIAN의 name · phone | name은 결정됨(사람 결정 2026-11-07). LINK-04 요청 name, mode NEW일 때 필수(05_인증-auth.md와 같음). phone은 결정됨: 받지 않는다. LINK-04 NEW로 만드는 GUARDIAN은 phone null을 허용하고, 「자녀 외 phone 필수」 규칙의 예외로 둔다(사람 결정 2026-11-13) |
 | Role enum 위치 | 해소: 02에 「common 순수 타입(Role · PrincipalType · LatLng)은 domain에서 써도 된다」 예외를 둠. user/domain은 common.security.Role을 그대로 쓰고 Role enum을 따로 만들지 않음(사람 결정 2026-11-07, 03 확인 필요 사항) |

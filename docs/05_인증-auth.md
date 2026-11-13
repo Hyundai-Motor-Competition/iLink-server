@@ -5,7 +5,7 @@ QR 연결(가입 · 로그인 · RELINK), 멤버 초대 · 수락, 토큰 발급
 | 항목 | 내용 |
 |---|---|
 | 범위 | 엔티티 VehicleLinkCode · MemberInvite · Device(refresh 토큰 해시 포함). API AUTH-01~04, LINK-01~04, FAM-04~06. 다른 모듈용 in 포트(멤버 기기 상태, 멤버 기기 폐기, 차량 기기 폐기, 푸시 대상 기기 조회) |
-| 의존 | 03_공유모듈-shared(JWT 검증), 04_사용자-user(보호자 · 가족 생성, 차량 등록 · 조회, 멤버 조회). pickup의 in 포트(AUTH-04 진행 중 픽업 여부)는 out 포트 + 테스트 대역 |
+| 의존 | 03_공유모듈-shared(JWT 검증), 04_사용자-user(보호자 · 가족 생성, 차량 등록 · 조회, 멤버 조회). pickup의 in 포트(AUTH-04 진행 중 픽업 여부)는 out 포트 CheckActivePickupPort → pickup ActivePickupQueryUseCase로 연동됨(사람 결정 2026-11-13) |
 | 진행 | 계층 병렬 |
 
 ## 구조
@@ -16,7 +16,7 @@ auth
 ├─ adapter/out/persistence VehicleLinkCodeEntity · MemberInviteEntity · DeviceEntity, 저장소
 ├─ adapter/out/token       JWT 발급(access), refresh 토큰 생성 · SHA-256 해시
 ├─ adapter/out/event       RELINK 이전 기기 알림 이벤트 발행
-├─ adapter/out/pickup      CheckActivePickupPort 임시 구현(pickup 구현 전까지 false, pickup 때 교체)
+├─ adapter/out/pickup      AuthPickupActivityAdapter(CheckActivePickupPort 구현 → pickup ActivePickupQueryUseCase.hasActivePickup)(사람 결정 2026-11-13)
 ├─ application/port/in · out · service
 └─ domain                  LinkCode, MemberInvite, Device, Consent, MemberDeviceStatus · 기기 상태 판정
 ```
@@ -263,7 +263,7 @@ void publishDeviceReplaced(List<Long> previousDeviceIds);                   // P
 - [x] [기반] LinkCode · MemberInvite · Device는 restore로 저장된 값을 그대로 가진 객체를 만든다
 - [x] [기반] LinkCode.expire는 status를 EXPIRED로, MemberInvite.markUsed는 usedAt을, MemberInvite.revoke는 expiresAt을 지금으로 바꾼다
 - [x] [기반] Device.revoke는 revokedAt을, Device.updatePushToken은 pushToken · pushUpdatedAt을, Device.rotateRefreshToken은 refreshTokenHash를 바꾼다
-- [x] [기반] pickup 구현 전 임시 CheckActivePickupPort는 false를 돌려주고, PublishAuthEventPort는 이전 기기 id를 담은 스프링 이벤트를 발행한다
+- [x] [기반] CheckActivePickupPort 어댑터는 pickup ActivePickupQueryUseCase.hasActivePickup 결과를 그대로 돌려주고, PublishAuthEventPort는 이전 기기 id를 담은 스프링 이벤트를 발행한다(사람 결정 2026-11-13)
 - [x] [통합] user의 AuthMemberDeviceAdapter는 auth GetMemberDeviceStatusUseCase 결과를 user DeviceStatus로 바꿔 돌려준다
 - [x] [통합] user의 RevokeMemberDevicesPort 구현은 auth RevokeMemberDevicesUseCase를 부른다
 - [x] [서비스] user의 LoadVehicleUseCase는 findVehicle · findLinkedVehicleByVin으로 VehicleInfo를 돌려준다
@@ -286,6 +286,9 @@ void publishDeviceReplaced(List<Long> previousDeviceIds);                   // P
 - [x] [persistence] vehicle.version 컬럼은 NOT NULL에 기본값 0을 가진다(행이 있는 DB에도 컬럼을 추가할 수 있음)
 - [x] [web] POST /v1/vehicle-link-codes를 연결 전 토큰(familyId 없음)으로 부르는데 차량이 이미 가족에 연결돼 있으면 409 VEHICLE_ALREADY_LINKED를 돌려준다
 - [x] [web] POST /v1/families/me/members/{userId}/invites의 대상 멤버가 GUARDIAN이면 403 FORBIDDEN을 돌려준다
+- [ ] [web] 초대 수락(FAM-06)과 연결 승인(LINK-04)의 consents에 SERVICE_IMPROVEMENT(선택 동의)를 보낼 수 있고, 빠져도 수락 · 승인은 성공한다(C00 · 가족 프로필 등록4 「(선택) 서비스 개선」)
+- [ ] [서비스] refresh 토큰은 발급 14일(P14D) 뒤 만료되고, 만료된 refresh 토큰으로 POST /v1/auth/refresh를 부르면 유효하지 않은 refresh 토큰과 같은 401로 거절한다(사람 결정 2026-11-13)
+- [ ] [통합] access 토큰 유효 기간 PT30M · refresh 토큰 유효 기간 P14D는 application.yml 설정값으로 두고, 발급한 access 토큰의 exp가 발급 시각 + 30분이다
 
 ## 확인 필요 사항
 
@@ -303,9 +306,9 @@ void publishDeviceReplaced(List<Long> previousDeviceIds);                   // P
 | LINK-03 「기기당 5회 실패」의 기기 식별 · 저장 위치 | 인증 없는 호출이라 기기를 알 수 없고 저장 테이블도 없음. 요청 IP 기준 메모리 카운터로 가정 |
 | LINK-02 「1초보다 자주」 판단 저장 위치 | 소스에 없음. 메모리로 가정(서버 1대 전제) |
 | LINK-04 VEHICLE_MOVING 판단 근거 | 세션 밖에서는 차량 주행 상태를 받는 API가 없음. 판단 근거가 없어 미구현(API 문서에서도 뺌). 판단 방법을 정하면 설계서 · 구현 · API 문서를 함께 맞춤 |
-| 동의(consents) 저장 위치 | 저장 테이블이 없음. SIG-04의 LOCATION_CONSENT_REQUIRED가 위치 동의를 읽어야 함. 저장 위치를 정해야 함 |
-| LINK-04 NEW로 만드는 GUARDIAN의 name · phone | name은 결정됨(사람 결정 2026-11-07). LINK-04 요청 name(1~20자, 이모지 불가), mode NEW일 때 필수 · RELINK면 무시. phone은 미정. 요청에 없어 null로 만들고 있어 user의 「자녀 외 phone 필수」 규칙과 어긋남. 보호자 전화번호를 받을 곳을 정해야 함 |
-| 차량 번호판(plateNumber) 입력 경로 | AUTH-02는 vin · model만 받음. LINK-03이 번호판을 보여 주려면 입력 경로가 필요함 |
+| 동의(consents) 저장 위치 | 결정됨: 지금은 저장하지 않는다. FAM-06 CHILD 수락에서 LOCATION 동의가 필수라 연결된 자녀는 동의한 상태로 본다. 그래서 SIG-04의 403 LOCATION_CONSENT_REQUIRED는 위치 동의 철회 기능이 생기기 전까지 실제로 나지 않는다. 철회 기능을 만들 때 저장 위치를 정한다(사람 결정 2026-11-13) |
+| LINK-04 NEW로 만드는 GUARDIAN의 name · phone | name은 결정됨(사람 결정 2026-11-07). LINK-04 요청 name(1~20자, 이모지 불가), mode NEW일 때 필수 · RELINK면 무시. phone은 결정됨: 받지 않는다. GUARDIAN phone은 null을 허용하고 user의 「자녀 외 phone 필수」 규칙의 예외로 둔다(사람 결정 2026-11-13) |
+| 차량 번호판(plateNumber) 입력 경로 | 결정됨: 서버가 번호판을 받지 않는다. 차대번호(VIN) 조회로 나중에 불러올 수 있어 입력 경로를 두지 않는다(사람 결정 2026-11-13) |
 | FAM-05 inviterName | MemberInvite에 초대한 사람 컬럼이 없음. 가족의 GUARDIAN 이름으로 가정 |
 | 자녀 외 role의 필수 동의 | 소스는 CHILD만 정함. TERMS · PRIVACY로 가정 |
 | 재발급 때 이전 초대 「폐기」 방법 | MemberInvite에 상태 컬럼이 없음. 이전 초대의 expiresAt을 지금으로 당긴다고 가정 |

@@ -304,6 +304,11 @@ class BusinessException extends RuntimeException {   // 공개 생성자 없음
 - [x] [web] 공통 오류 코드(ErrorCode)로 BusinessException을 만들어 던지면 그 코드의 HTTP 상태 · code · 문구로 응답한다(429는 retryAfterSeconds 포함)
 - [x] [web] GlobalExceptionHandler는 클라이언트가 연결을 끊어 난 예외(AsyncRequestNotUsableException · Broken pipe IOException 등 DisconnectedClientHelper.isClientDisconnectedException이 true인 것)를 ERROR로 기록하지 않고 DEBUG로만 남기며 응답 본문을 쓰지 않는다
 - [x] [web] GlobalExceptionHandler는 클라이언트 끊김이 아닌 처리하지 않은 예외는 지금처럼 ERROR로 기록하고 500 INTERNAL_SERVER_ERROR 본문을 돌려준다
+- [ ] [web] ACTIVE_PICKUP_EXISTS는 common ErrorCode에 한 번만 정의하고, 로그아웃(auth)과 차량 연결 해제(user)가 같은 409 · 같은 code · 같은 문구로 응답한다(D2, 사람 결정 2026-11-13)
+- [ ] [web] SETUP_INCOMPLETE는 common ErrorCode에 한 번만 정의하고, schedule과 pickup이 같은 422 · 같은 code · 같은 문구로 응답하며 missing 목록은 추가 키로 담는다(D2)
+- [ ] [web] 도메인 code용 429 팩토리 하나가 code · 문구와 retryAfterSeconds(다시 시도할 초)를 함께 담아 응답한다(D3)
+- [ ] [web] 429인 LINK_CODE_REISSUE_LIMIT · LINK_CODE_ATTEMPT_LIMIT · HELP_REQUEST_TOO_SOON · RESEND_TOO_SOON · TOO_MANY_REQUESTS 응답은 모두 retryAfterSeconds를 담는다(HELP_REQUEST_TOO_SOON의 nextAllowedAt은 추가 키로 유지, D3)
+- [ ] [통합] spring.task.scheduling.pool.size가 4라 @Scheduled 작업이 스레드 1개를 나눠 쓰지 않는다(한 작업이 오래 걸려도 다른 작업이 제때 돈다, D6)
 
 ## 확인 필요 사항
 
@@ -341,8 +346,9 @@ class BusinessException extends RuntimeException {   // 공개 생성자 없음
 | 도메인 코드의 ResponseStatusException | Spring 4xx 예외의 code는 HttpStatus 이름(CONFLICT 등)으로 나감. 도메인 코드에서 금지하고 BusinessException만 쓸지 정함. reason 없는 404 예외와 매핑 없는 경로의 문구가 다름 |
 | 422 fields 표기 범위 | 클래스 단위 제약 오류는 fields에 안 담김. 중첩 · 배열 필드 이름 형식(a.b, a[].b 또는 children[0].name), 한 필드 여러 위반, List 본문 인덱스, 이름이 다른 @PathVariable은 정하지 않음 |
 | BusinessException 생성자 | 해소: 공개 생성자 없음. 정적 팩토리 of(ErrorCode) · of(HttpStatus, String code, String message) · tooManyRequests(int retryAfterSeconds), ErrorCode에 TOO_MANY_REQUESTS 추가(팀장 결정). conflictWithOverlap(HttpStatus, String code, String message, List<Long> overlapScheduleIds) 추가(일정 SET-02 · 03의 overlapScheduleIds용, 06 결정). IdempotencyKeyEntity 6인자 생성자, status · code null 방어, 5xx BusinessException 로그는 다음 리뷰 때 다시 봄 |
-| 도메인 코드 429의 retryAfterSeconds | of(HttpStatus, code, message)에는 retryAfterSeconds가 없고 tooManyRequests는 code가 TOO_MANY_REQUESTS로 고정됨. 05의 429 LINK_CODE_REISSUE_LIMIT · LINK_CODE_ATTEMPT_LIMIT에 retryAfterSeconds를 채울지, 채운다면 어떤 팩토리로 할지 auth 전에 정함 |
-| 이벤트 스레드 풀 크기 · 포화 정책 | 소스에 없음. 임시값 core 2 · max 4 · queue 100(pickup.async.event.*). 큐가 찬 뒤에야 core를 넘어 늘어 실제 동시 실행은 2개(제안: core = max 4). 포화 때 기본 AbortPolicy라 AFTER_COMMIT 이벤트가 버려짐(재발송 스케줄러가 보완) → 유지 또는 CallerRunsPolicy. 직접 만든 Executor 빈 때문에 Boot의 applicationTaskExecutor가 빠져 MVC 비동기가 SimpleAsyncTaskExecutor를 쓸 수 있음(SES-08 때 확인). @Scheduled 실행 스레드는 기본 1개(08 시작 때 정함) |
+| 도메인 코드 429의 retryAfterSeconds | 결정됨: 모든 429에 retryAfterSeconds를 채운다. 도메인 code용 429 팩토리 하나를 두고, HELP_REQUEST_TOO_SOON의 nextAllowedAt은 추가 키로 남긴다. 테스트 케이스 끝의 D3 항목으로 구현(사람 결정 2026-11-13) |
+| 여러 모듈이 따로 정의한 같은 code 오류 | 결정됨: ACTIVE_PICKUP_EXISTS · SETUP_INCOMPLETE는 common ErrorCode에 한 번만 두고 같은 상태 · 문구로 응답한다(SETUP_INCOMPLETE의 missing은 추가 키). 테스트 케이스 끝의 D2 항목으로 구현(사람 결정 2026-11-13) |
+| 이벤트 스레드 풀 크기 · 포화 정책 | 소스에 없음. 임시값 core 2 · max 4 · queue 100(pickup.async.event.*). 큐가 찬 뒤에야 core를 넘어 늘어 실제 동시 실행은 2개(제안: core = max 4). 포화 때 기본 AbortPolicy라 AFTER_COMMIT 이벤트가 버려짐(재발송 스케줄러가 보완) → 유지 또는 CallerRunsPolicy. 직접 만든 Executor 빈 때문에 Boot의 applicationTaskExecutor가 빠져 MVC 비동기가 SimpleAsyncTaskExecutor를 쓸 수 있음(SES-08 때 확인). @Scheduled 실행 스레드 수는 결정됨: spring.task.scheduling.pool.size 4개, 테스트 케이스 끝의 D6 항목으로 구현(사람 결정 2026-11-13) |
 | SSE 종료 줄 · 다른 비동기 응답 로그 | emitter 타임아웃 · 연결 끊김 · completeWithError 때 stream=closed 줄의 status · errorCode, Callable · DeferredResult 응답의 로그는 정하지 않음. SSE 타임아웃(AsyncRequestTimeoutException, 503)이 지금 500 + ERROR 로그로 처리됨. pickup SES-08 때 정함 |
 | JVM 시간대 고정 방식 | 지금은 TimeZoneConfig 생성자에서 바꿈(빈 순서에 기대므로 Logback 등 먼저 뜬 부품은 +09:00 유지). 대안: main에서 run 전 설정 / 배포 때 TZ=UTC · -Duser.timezone=UTC / EnvironmentPostProcessor. 테스트 JVM을 build.gradle jvmArgs로 고정할지, 운영 로그 시각을 UTC로 찍도록 로그 패턴에 시간대를 넣을지도 함께 정함 |
 | TimeUtils 경계 값 | toKst(null)을 null로 돌려줄지 호출 쪽에서 막을지, toKst가 1초 미만을 버려도 되는지, toUtc가 +09:00 말고 Z 등도 받을지 422로 거절할지 정하지 않음. prod 프로필 시간대 설정은 테스트 없이 설정 검토로만 확인함 |
