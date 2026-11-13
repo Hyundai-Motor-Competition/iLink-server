@@ -158,6 +158,19 @@ class DeletePickupSpotServiceTest {
 		verify(saveSpotPort, never()).deleteSpot(anyLong());
 	}
 
+	@Test
+	@DisplayName("임시 장소(temporary=true)를 삭제하려 하면 같은 가족의 장소여도 NOT_FOUND로 거절하고 지우지 않는다")
+	void deleteSpotRejectsWithNotFoundAndDoesNotDeleteWhenSpotIsTemporary() {
+		givenSpot(PickupSpot.restore(SPOT_ID, FAMILY_ID, ACADEMY_ID, "임시", null, NEAR_STOP, NEAR_MEETING, false,
+				GUARDIAN_ID, true));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> deletePickupSpotService.deleteSpot(new DeleteSpotCommand(FAMILY_ID, SPOT_ID)));
+
+		assertNotFound(exception);
+		verify(saveSpotPort, never()).deleteSpot(anyLong());
+	}
+
 	private static void assertNotFound(BusinessException exception) {
 		assertThat(exception).isNotNull();
 		assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);

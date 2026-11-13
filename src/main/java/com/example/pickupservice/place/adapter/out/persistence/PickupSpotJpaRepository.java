@@ -9,15 +9,17 @@ import java.util.Optional;
 
 interface PickupSpotJpaRepository extends JpaRepository<PickupSpotEntity, Long> {
 
-	List<PickupSpotEntity> findByFamilyId(Long familyId);
+	List<PickupSpotEntity> findByFamilyIdAndTemporaryFalse(Long familyId);
 
-	List<PickupSpotEntity> findByFamilyIdAndAcademyId(Long familyId, Long academyId);
+	List<PickupSpotEntity> findByFamilyIdAndAcademyIdAndTemporaryFalse(Long familyId, Long academyId);
 
-	Optional<PickupSpotEntity> findByFamilyIdAndAcademyIdAndIsDefaultTrue(Long familyId, Long academyId);
+	Optional<PickupSpotEntity> findByFamilyIdAndAcademyIdAndIsDefaultTrueAndTemporaryFalse(Long familyId,
+			Long academyId);
 
 	@Query(value = """
 			SELECT * FROM pickup_spot
 			WHERE family_id = :familyId
+			  AND NOT temporary
 			  AND ST_DWithin(stop_point, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radiusM)
 			""", nativeQuery = true)
 	List<PickupSpotEntity> findWithin(@Param("familyId") long familyId, @Param("lat") double lat,
@@ -27,6 +29,7 @@ interface PickupSpotJpaRepository extends JpaRepository<PickupSpotEntity, Long> 
 			SELECT * FROM pickup_spot
 			WHERE family_id = :familyId
 			  AND academy_id = :academyId
+			  AND NOT temporary
 			  AND ST_DWithin(stop_point, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radiusM)
 			""", nativeQuery = true)
 	List<PickupSpotEntity> findWithinByAcademy(@Param("familyId") long familyId, @Param("academyId") long academyId,

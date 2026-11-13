@@ -42,7 +42,7 @@ class PlacePersistenceEntitiesMappingTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("pickup_spot 테이블은 spot_id · family_id · academy_id · name VARCHAR(50) · memo VARCHAR(200) NULL · stop_point · meeting_point · is_default · created_by와 created_at · updated_at 컬럼만 갖는다")
+	@DisplayName("pickup_spot 테이블은 spot_id · family_id · academy_id · name VARCHAR(50) · memo VARCHAR(200) NULL · stop_point · meeting_point · is_default · temporary BOOLEAN NOT NULL · created_by와 created_at · updated_at 컬럼만 갖는다")
 	void pickupSpotTableHasDesignColumns() {
 		assertThat(columnsOf("pickup_spot")).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
 				Map.entry("spot_id", new ColumnType(BIGINT, null, NOT_NULL)),
@@ -53,6 +53,7 @@ class PlacePersistenceEntitiesMappingTest extends IntegrationTestSupport {
 				Map.entry("stop_point", new ColumnType(USER_DEFINED, null, NOT_NULL)),
 				Map.entry("meeting_point", new ColumnType(USER_DEFINED, null, NOT_NULL)),
 				Map.entry("is_default", new ColumnType(BOOLEAN, null, NOT_NULL)),
+				Map.entry("temporary", new ColumnType(BOOLEAN, null, NOT_NULL)),
 				Map.entry("created_by", new ColumnType(BIGINT, null, NOT_NULL)),
 				Map.entry("created_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL)),
 				Map.entry("updated_at", new ColumnType(TIMESTAMPTZ, null, NOT_NULL))));

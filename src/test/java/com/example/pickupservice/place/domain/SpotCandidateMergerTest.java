@@ -55,6 +55,22 @@ class SpotCandidateMergerTest {
 	}
 
 	@Test
+	@DisplayName("후보 합치기 규칙은 도로 이름이 null · 빈 문자열 · 공백뿐인 길가 후보의 name을 「이름 없는 길」로 바꾸고 이름 있는 길가 · 공영주차장 이름은 그대로 둔다")
+	void replacesBlankRoadNameWithUnnamedRoad() {
+		List<CurbStopCandidate> curbs = List.of(
+				curb(1, 2, null),
+				curb(2, 3, ""),
+				curb(3, 4, "  "),
+				curb(4, 5, "논현로"));
+
+		List<SpotCandidate> result = SpotCandidateMerger.merge(ACADEMY, List.of(parking("1", 1)), curbs);
+
+		assertThat(result).extracting(SpotCandidate::name)
+				.containsExactly("주차장1", "이름 없는 길", "이름 없는 길", "이름 없는 길", "논현로");
+		assertThat(result).extracting(SpotCandidate::name).doesNotContainNull();
+	}
+
+	@Test
 	@DisplayName("후보 합치기 규칙은 도로가 5개면 학원에 가까운 길가 후보 4곳만 남긴다")
 	void keepsAtMostFourCurbStops() {
 		List<CurbStopCandidate> curbs = List.of(

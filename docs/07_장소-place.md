@@ -4,7 +4,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| 범위 | 엔티티 PickupSpot. API SPOT-01(조회) · SPOT-02(추가) · SPOT-03(수정 · 삭제) · SPOT-04(추천). 참조 데이터 PublicParking · CurbStopCandidate. 다른 모듈용 in 포트(기본 장소 · 장소 조회) |
+| 범위 | 엔티티 PickupSpot. API SPOT-01(조회) · SPOT-02(추가) · SPOT-03(수정 · 삭제) · SPOT-04(추천) · SPOT-05(학원 기준 근처 추천). 참조 데이터 PublicParking · CurbStopCandidate. 다른 모듈용 in 포트(기본 장소 · 장소 조회 · 차량 세션용 임시 장소 저장) |
 | 의존 | 03_공유모듈-shared, 04_사용자-user(가족 · 작성자), 06_일정-schedule(Academy 위치. out 포트 LoadAcademyPort → schedule in 포트 LoadAcademyUseCase.findAcademy). pickup의 in 포트(진행 중 세션이 쓰는 장소, 자녀 현재 위치)는 out 포트 CheckActivePickupPort → pickup ActivePickupQueryUseCase로 연동됨(사람 결정 2026-11-13). schedule의 LoadPickupSpotPort는 place LoadPickupSpotUseCase.findSpots에 위임 |
 | 진행 | 계층 병렬 |
 
@@ -13,7 +13,7 @@
 ```text
 place
 ├─ adapter/in/web          PickupSpotController(SPOT-01~03), PickupSpotApiDoc,
-│                          PickupSpotRecommendationController(SPOT-04), PickupSpotRecommendationApiDoc, LatLngParam("lat,lng" 파싱)
+│                          PickupSpotRecommendationController(SPOT-04 · SPOT-05), NearbySpotsResponse, PickupSpotRecommendationApiDoc, LatLngParam("lat,lng" 파싱)
 ├─ adapter/out/persistence PickupSpotEntity, PlacePersistenceAdapter(LoadSpotPort · SaveSpotPort),
 │                          PostgisDistanceAdapter(DistancePort, ST_DWithin), PickupSpotJpaRepository(반경 네이티브 쿼리 2개),
 │                          PublicParkingEntity · CurbStopCandidateEntity(추천 참조 데이터), PublicParkingJpaRepository · CurbStopCandidateJpaRepository(반경 네이티브 쿼리),
@@ -22,7 +22,7 @@ place
 ├─ adapter/out/map         KakaoMobilityDriveTimeAdapter(DriveTimePort, 카카오모빌리티 길찾기)
 ├─ adapter/out/schedule    PlaceAcademyAdapter(LoadAcademyPort → schedule in 포트 LoadAcademyUseCase.findAcademy, academyId · name · location)
 ├─ adapter/out/pickup      PlacePickupActivityAdapter(CheckActivePickupPort 구현 → pickup ActivePickupQueryUseCase.isSpotInUse · activeChildLocation)(사람 결정 2026-11-13)
-├─ application/port/in · out · service
+├─ application/port/in · out · service   (in: SaveTemporarySpotUseCase · SaveTemporarySpotCommand, NearbySpots · NearbySpot 포함)
 └─ domain                  PickupSpot, 기본 장소 규칙,
                            추천 규칙(StraightDistance · WalkTimeRule · SpotCandidateMerger · SpotRankingRule · SpotCautionRule · ServiceArea)
 ```
@@ -41,7 +41,8 @@ place
 | stopPoint | geography(Point,4326) | GIST | 정차 지점 |
 | meetingPoint | geography(Point,4326) | | 만남 지점(WGS84) |
 | isDefault | BOOLEAN | 부분 유니크 인덱스 uk_pickup_spot_default (family_id, academy_id) WHERE is_default | 가족 · 학원마다 하나만 true |
-| createdBy | BIGINT | | User 참조(DB FK 제약 없음) |
+| createdBy | BIGINT | | User 참조(DB FK 제약 없음). 임시 장소는 0(차량 토큰엔 사용자가 없음) |
+| temporary | BOOLEAN | NOT NULL, 기본 false | 차량 세션용 임시 장소(추천 장소 선택 · 여기로 부르기). 목록 · 반경 · 기본 장소 조회에서 뺀다. spotId 단건 조회는 돌려준다 [2026-11-14 추가] |
 
 familyId · academyId · createdBy는 프로젝트 관례대로 DB FK 제약 없이 컬럼만 둔다.
 uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스라 02_공통-규칙-global 관례대로 src/main/resources/schema.sql에 CREATE UNIQUE INDEX IF NOT EXISTS로 적는다.
@@ -75,9 +76,10 @@ uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스�
 |---|---|---|---|---|---|
 | SPOT-01 | GET /v1/families/me/pickup-spots | GUARDIAN · CO_GUARDIAN · DELEGATE, 차량 앱 | 불필요 | query academyId(선택), near(한 파라미터 "lat,lng" 형식 · radiusM과 함께), radiusM(50~3000 · near와 함께) → 200 academies[](academyId · academyName · spots[](spotId · name · stopPoint · meetingPoint · memo · isDefault · walkMinutes)). 차량 토큰은 토큰의 familyId | 422 VALIDATION_FAILED(near · radiusM 중 하나만, radiusM 50~3000 밖, near 형식 오류) |
 | SPOT-02 | POST /v1/families/me/pickup-spots | GUARDIAN · CO_GUARDIAN | 필요 | academyId, name(1~50자), stopPoint{lat, lng}, meetingPoint{lat, lng}, memo(0~200자, 선택), isDefault(기본 false) → 201 spotId, isDefault | 404 NOT_FOUND(학원 없음), 409 DEFAULT_SPOT_CONFLICT(동시 요청으로 기본 장소가 겹침), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR |
-| SPOT-03 | PATCH /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 불필요 | name, stopPoint, meetingPoint, memo, isDefault(모두 선택) → 200 spotId · name · stopPoint · meetingPoint · memo · isDefault | 404 NOT_FOUND(다른 가족 · 없는 spotId, 좌표를 바꿀 때 학원 없음), 409 DEFAULT_SPOT_CONFLICT(동시 요청으로 기본 장소가 겹침), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR, 422 DEFAULT_SPOT_REQUIRED(기본 장소를 isDefault false로) |
-| SPOT-03 | DELETE /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 필요 | — → 204 | 404 NOT_FOUND, 409 SPOT_IN_USE, 422 DEFAULT_SPOT_REQUIRED |
+| SPOT-03 | PATCH /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 불필요 | name, stopPoint, meetingPoint, memo, isDefault(모두 선택) → 200 spotId · name · stopPoint · meetingPoint · memo · isDefault | 404 NOT_FOUND(다른 가족 · 없는 spotId · 임시 장소, 좌표를 바꿀 때 학원 없음), 409 DEFAULT_SPOT_CONFLICT(동시 요청으로 기본 장소가 겹침), 422 VALIDATION_FAILED, 422 SPOT_TOO_FAR, 422 DEFAULT_SPOT_REQUIRED(기본 장소를 isDefault false로) |
+| SPOT-03 | DELETE /v1/pickup-spots/{spotId} | GUARDIAN · CO_GUARDIAN | 필요 | — → 204 | 404 NOT_FOUND(다른 가족 · 없는 spotId · 임시 장소), 409 SPOT_IN_USE, 422 DEFAULT_SPOT_REQUIRED |
 | SPOT-04 | GET /v1/pickup-spot-recommendations | GUARDIAN · CO_GUARDIAN · DELEGATE, 차량 앱 | 불필요 | query academyId(저장된 학원, 필수), origin(차량 현재 좌표 "lat,lng", 필수), arriveAt(선택, ISO 시각) → 200 supported, items[](rank · kind(PUBLIC_PARKING · CURB_STOP) · name · location{lat, lng} · walkMeters · walkSeconds · driveSeconds · totalSeconds · cautions[]) 최대 3개 | 404 NOT_FOUND(학원 없음), 422 VALIDATION_FAILED(academyId · origin이 없거나 형식 오류, arriveAt이 ISO 형식이 아니거나 과거) |
+| SPOT-05 | GET /v1/pickup-spot-recommendations/nearby | GUARDIAN · CO_GUARDIAN · DELEGATE, 차량 앱 | 불필요 | query academyId(필수) → 200 supported, items[](name · location{lat, lng} · walkMeters · walkSeconds) 걷는 거리 짧은 순 최대 8개(SPOT-04의 합친 후보 8곳 그대로). 카카오 길찾기를 부르지 않는다 [2026-11-14 추가, 일정 등록 픽업일정등록8 화면] | 404 NOT_FOUND(학원 없음), 422 VALIDATION_FAILED(academyId가 없거나 숫자가 아님) |
 
 응답 예시
 - SPOT-01: `{"academies":[{"academyId":55,"academyName":"해솔영어학원","spots":[{"spotId":21,"name":"정문 앞","stopPoint":{"lat":37.501234,"lng":127.039876},"meetingPoint":{"lat":37.501301,"lng":127.039901},"memo":"편의점 앞","isDefault":true,"walkMinutes":1}]}]}`
@@ -101,7 +103,7 @@ uk_pickup_spot_default는 JPA가 만들지 못하는 부분 유니크 인덱스�
 - 동시 요청으로 uk_pickup_spot_default가 부딪히면 409 DEFAULT_SPOT_CONFLICT.
 
 ### 수정 · 삭제 (SPOT-03)
-- 다른 가족의 spotId와 없는 spotId는 404 NOT_FOUND.
+- 다른 가족의 spotId, 없는 spotId, 임시 장소(temporary=true)는 404 NOT_FOUND(사람 결정 2026-11-14).
 - PATCH는 보낸(null 아닌) 필드만 바꾼다. null은 「안 보냄」이라 memo를 지우는 방법은 아직 없다.
 - PATCH로 기본 장소를 isDefault false로 바꾸면 남은 장소 수와 상관없이 422 DEFAULT_SPOT_REQUIRED. 장소가 있는 학원엔 기본 장소가 늘 하나이고, 다른 장소를 기본으로 지정해야 바뀐다. 이 거절은 500m 검사보다 먼저 한다.
 - PATCH는 바꾼 좌표만 500m를 검사해 넘으면 422 SPOT_TOO_FAR. 좌표를 바꿀 때 학원이 없으면 404 NOT_FOUND이고 저장하지 않는다.
@@ -145,6 +147,7 @@ void deleteSpot(DeleteSpotCommand c);                           // DeletePickupS
 Optional<SpotInfo> findDefaultSpot(long familyId, long academyId);   // LoadPickupSpotUseCase (pickup SES-02)
 Optional<SpotInfo> findSpot(long spotId);                             // LoadPickupSpotUseCase (pickup SES-04 · 05)
 List<SpotSummary> findSpots(long familyId, List<Long> academyIds);    // LoadPickupSpotUseCase (schedule SET-07 · 09)
+long saveTemporarySpot(SaveTemporarySpotCommand c);                   // SaveTemporarySpotUseCase (pickup 경로 확정 · 장소 변경, familyId · academyId · name · stopPoint · meetingPoint. isDefault false · 500m · 학원 검사 없음) [2026-11-14 추가]
 
 // out 포트
 Optional<PickupSpot> loadSpot(long spotId); List<PickupSpot> loadSpots(long familyId, Long academyId); List<PickupSpot> loadSpotsWithin(long familyId, Long academyId, LatLng near, int radiusM); Optional<PickupSpot> loadDefaultSpot(long familyId, long academyId);   // LoadSpotPort
@@ -156,6 +159,7 @@ Optional<LatLng> loadActiveChildLocation(long familyId);                        
 
 // SPOT-04 추천 [2026-11-12 추가]
 SpotRecommendations recommendSpots(RecommendSpotsQuery q);                             // RecommendPickupSpotsUseCase (academyId, origin, arriveAt?)
+NearbySpots recommendNearbySpots(long academyId);                                      // RecommendPickupSpotsUseCase (SPOT-05, supported · items[](name · location · walkMeters · walkSeconds)) [2026-11-14 추가]
 boolean isSupported(LatLng point);                                                     // ServiceAreaPort (강남구 경계 도형)
 List<PublicParking> loadPublicParkingWithin(LatLng center, int radiusM); List<CurbStopCandidate> loadCurbStopsWithin(LatLng center, int radiusM);   // LoadSpotCandidatePort
 List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<Integer> driveSecondsAt(LatLng origin, List<LatLng> destinations, Instant departAt);   // DriveTimePort → 카카오모빌리티 (목적지 순서대로, 실패 시 빈 목록)
@@ -188,7 +192,7 @@ List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<In
 - [x] [서비스] 장소 삭제는 다른 장소가 남은 기본 장소면 DEFAULT_SPOT_REQUIRED로 거절한다
 - [x] [서비스] 다른 가족의 spotId를 수정 · 삭제하려 하면 NOT_FOUND로 거절한다
 - [x] [서비스] 장소 조회는 학원별로 묶어 academyName과 함께 돌려준다
-- [x] [서비스] 장소 조회는 진행 중 세션이 없으면 walkMinutes를 null로 돌려준다
+- [x] [서비스] 장소 조회는 진행 중 세션이 없어도 walkMinutes를 계산해 돌려준다(null을 주지 않음. #98로 대체, 사람 결정 2026-11-13 · 2026-11-14)
 - [x] [서비스] findDefaultSpot은 가족 · 학원의 기본 장소를 돌려주고 없으면 빈 값을 돌려준다
 - [x] [web] GET /v1/families/me/pickup-spots는 200과 academies[]를 돌려준다
 - [x] [web] GET /v1/families/me/pickup-spots는 차량 토큰으로도 200을 돌려준다
@@ -261,11 +265,14 @@ List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<In
 - [x] [기반] 블록 우회 도보 거리 규칙은 두 좌표 사이 남북 거리와 동서 거리를 더한 값을 m로 돌려준다(북쪽 300m · 동쪽 400m면 직선 500m가 아니라 700m)
 - [x] [서비스] 장소 조회는 walkMinutes를 학원 출입구(없으면 학원 위치)에서 만남 지점까지 블록 우회 도보 거리를 초속 1.1m로 나눈 시간을 분으로 올림해 돌려준다
 - [x] [persistence] LoadAcademyPort 어댑터는 schedule 학원의 출입구 좌표(entrance)를 place AcademyInfo.entrance로 넘기고, 출입구가 없으면 null로 넘긴다
-- [ ] [서비스] 차량 세션용 임시 장소 저장 in 포트는 familyId · academyId · name · stopPoint · meetingPoint로 temporary=true인 PickupSpot을 저장하고 spotId를 돌려준다(최종디자인 11/13 V02 · V03, 팀장 결정 2026-11-13)
-- [ ] [persistence] 가족 장소 목록(GET /v1/families/me/pickup-spots)과 기본 장소 판정은 temporary=true인 임시 장소를 빼고 돌려준다
-- [ ] [web] GET /v1/pickup-spot-recommendations/nearby?academyId=는 출발 위치 없이 학원 기준 근처 후보를 name · location · walkMeters · walkSeconds로 걷는 거리 짧은 순으로 돌려준다(일정 등록 픽업일정등록8 화면용)
-- [ ] [서비스] 학원 기준 근처 추천은 카카오 길찾기를 부르지 않고 driveSeconds · totalSeconds를 비운다. 지원 지역 밖 학원이면 supported false와 빈 목록을 준다
-- [ ] [서비스] 장소 추천(SPOT-04 · 학원 기준 근처 추천)은 도로 이름이 빈 길가 후보의 name을 「이름 없는 길」로 돌려준다(null을 주지 않음, 사람 결정 2026-11-13)
+- [x] [서비스] 차량 세션용 임시 장소 저장 in 포트는 familyId · academyId · name · stopPoint · meetingPoint로 temporary=true인 PickupSpot을 저장하고 spotId를 돌려준다(최종디자인 11/13 V02 · V03, 팀장 결정 2026-11-13)
+- [x] [persistence] 가족 장소 목록(GET /v1/families/me/pickup-spots)과 기본 장소 판정은 temporary=true인 임시 장소를 빼고 돌려준다
+- [x] [web] GET /v1/pickup-spot-recommendations/nearby?academyId=는 출발 위치 없이 학원 기준 근처 후보를 name · location · walkMeters · walkSeconds로 걷는 거리 짧은 순으로 돌려준다(일정 등록 픽업일정등록8 화면용)
+- [x] [서비스] 학원 기준 근처 추천은 카카오 길찾기를 부르지 않고 driveSeconds · totalSeconds를 비운다. 지원 지역 밖 학원이면 supported false와 빈 목록을 준다
+- [x] [서비스] 장소 추천(SPOT-04 · 학원 기준 근처 추천)은 도로 이름이 빈 길가 후보의 name을 「이름 없는 길」로 돌려준다(null을 주지 않음, 사람 결정 2026-11-13)
+- [x] [서비스] 장소 수정(PATCH /v1/pickup-spots/{spotId})은 temporary=true인 임시 장소면 NOT_FOUND로 거절하고 저장하지 않는다(사람 결정 2026-11-14)
+- [x] [서비스] 장소 삭제(DELETE /v1/pickup-spots/{spotId})는 temporary=true인 임시 장소면 NOT_FOUND로 거절하고 지우지 않는다(사람 결정 2026-11-14)
+- [x] [서비스] 임시 장소 저장은 name이 null · 공백뿐이거나 50자를 넘으면 VALIDATION_FAILED(fields name)로 거절하고 저장하지 않는다(사람 결정 2026-11-14: 검사는 place에서)
 
 ## 확인 필요 사항
 
@@ -294,6 +301,7 @@ List<Integer> driveSecondsNow(LatLng origin, List<LatLng> destinations); List<In
 | SPOT-04 카카오 결과 저장 | 카카오 DevTalk 답변 기준 장소 ID · place_url만 저장 가능. 추천 결과는 저장하지 않음 |
 | 도로 이름이 빈 길가 후보의 name | 결정됨: null 대신 「이름 없는 길」로 준다(사람 결정 2026-11-13) |
 | 추천 장소 선택 · 여기로 부르기의 장소 저장 | 결정됨: 차량 앱이 추천 장소를 고르거나 「여기로 부르기」를 하면 서버가 임시 장소(temporary=true인 PickupSpot)를 만든다. 임시 장소는 가족 장소 목록 · 기본 장소 판정에서 빠진다(사람 결정 2026-11-13) |
+| 임시 장소의 SPOT-03 PATCH · DELETE | 결정됨: 임시 장소(temporary=true)는 PATCH · DELETE 모두 404 NOT_FOUND. 임시 장소 이름은 place가 1~50자로 검사해 422 VALIDATION_FAILED(사람 결정 2026-11-14, #105~#107) |
 | SPOT-04 참조 데이터 갱신 | CSV를 손으로 다시 만들어 넣음. 자동 갱신 없음 |
 | SPOT-04 origin | 클라이언트가 차량 현재 좌표를 보냄. 서버가 가진 SIG-01 위치는 쓰지 않음 |
 | SPOT-04 학원 위치 | 결정됨(사람 2026-11-12): 저장된 Academy를 academyId로 조회해 location을 씀. 출입구 좌표(entrance)는 아직 쓰지 않음. 저장된 값이 카카오 검색에서 온 것이라 저장 방식은 06_일정-schedule에서 따로 정함(미정) |

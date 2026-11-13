@@ -38,6 +38,14 @@ public class PickupSpotRecommendationController implements PickupSpotRecommendat
 		return SpotRecommendationsResponse.from(recommendPickupSpotsUseCase.recommendSpots(query));
 	}
 
+	@Override
+	@PreAuthorize("hasAnyRole('GUARDIAN', 'CO_GUARDIAN', 'DELEGATE') or hasAuthority('PRINCIPAL_VEHICLE')")
+	@GetMapping("/v1/pickup-spot-recommendations/nearby")
+	public NearbySpotsResponse recommendNearbySpots(@RequestParam(required = false) String academyId) {
+		long academy = parseAcademyId(academyId);
+		return NearbySpotsResponse.from(recommendPickupSpotsUseCase.recommendNearbySpots(academy));
+	}
+
 	private static long parseAcademyId(String academyId) {
 		if (academyId == null || academyId.isBlank()) {
 			throw BusinessException.invalidField("academyId", "필수 값입니다");
