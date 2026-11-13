@@ -381,6 +381,98 @@ class PlacePersistenceAdapterTest extends IntegrationTestSupport {
 				seeded.otherSpotId())).as("다른 장소 is_default").isFalse();
 	}
 
+	@Test
+	@DisplayName("임시 장소(createTemporary)를 저장하고 다시 읽으면 temporary가 true로 남고 DB temporary 컬럼도 true다")
+	void savedTemporarySpotIsLoadedWithTemporaryTrue() {
+		PickupSpot saved = saveSpotPort.saveSpot(PickupSpot.createTemporary(familyId, academyId, "추천 장소",
+				SAVED_STOP, SAVED_MEETING, guardianId));
+
+		assertThat(saved.getSpotId()).as("저장하면 spotId가 생긴다").isNotNull();
+		assertThat(saved.isTemporary()).as("saveSpot이 돌려준 장소의 temporary").isTrue();
+		PickupSpot loaded = loadSpotPort.loadSpot(saved.getSpotId()).orElseThrow();
+		assertThat(loaded.isTemporary()).as("다시 읽은 장소의 temporary").isTrue();
+		assertThat(loaded.isDefault()).as("임시 장소는 기본 장소가 아니다").isFalse();
+		assertThat(jdbcTemplate.queryForObject("select temporary from pickup_spot where spot_id = ?", Boolean.class,
+				saved.getSpotId())).as("DB temporary 컬럼").isTrue();
+	}
+
+	@Test
+	@DisplayName("일반 장소(create)를 저장하고 다시 읽으면 temporary가 false다")
+	void savedRegularSpotIsLoadedWithTemporaryFalse() {
+		PickupSpot saved = saveSpotPort.saveSpot(PickupSpot.create(familyId, academyId, "옆문 앞", null,
+				SAVED_STOP, SAVED_MEETING, false, guardianId));
+
+		assertThat(loadSpotPort.loadSpot(saved.getSpotId()).orElseThrow().isTemporary()).isFalse();
+		assertThat(jdbcTemplate.queryForObject("select temporary from pickup_spot where spot_id = ?", Boolean.class,
+				saved.getSpotId())).as("DB temporary 컬럼").isFalse();
+	}
+
+	@Test
+	@DisplayName("loadSpots(가족 장소 목록)는 같은 가족의 temporary=true 장소를 academyId가 null이든 아니든 빼고 돌려준다")
+	void loadSpotsExcludesTemporarySpotsOfSameFamily() {
+		long otherAcademyId = persistOtherAcademy();
+		long temporaryId = saveTemporarySpot(academyId, SAVED_STOP);
+		long otherAcademyTemporaryId = saveTemporarySpot(otherAcademyId, OTHER_ACADEMY_LOCATION);
+
+		assertThat(loadSpotPort.loadSpots(familyId, null)).extracting(PickupSpot::getSpotId)
+				.as("academyId null")
+				.containsExactlyInAnyOrder(seeded.defaultSpotId(), seeded.otherSpotId())
+				.doesNotContain(temporaryId, otherAcademyTemporaryId);
+		assertThat(loadSpotPort.loadSpots(familyId, academyId)).extracting(PickupSpot::getSpotId)
+				.as("시드 학원")
+				.containsExactlyInAnyOrder(seeded.defaultSpotId(), seeded.otherSpotId())
+				.doesNotContain(temporaryId);
+	}
+
+	@Test
+	@DisplayName("loadSpotsWithin(near로 고른 가족 장소 목록)은 반경 안이어도 temporary=true 장소를 뺀다")
+	void loadSpotsWithinExcludesTemporarySpotsInsideRadius() {
+		long temporaryId = saveTemporarySpot(academyId, NEAR);
+
+		assertThat(loadSpotPort.loadSpotsWithin(familyId, academyId, NEAR, RADIUS_M)).extracting(PickupSpot::getSpotId)
+				.as("academyId 지정")
+				.containsExactlyInAnyOrder(seeded.defaultSpotId(), seeded.otherSpotId())
+				.doesNotContain(temporaryId);
+		assertThat(loadSpotPort.loadSpotsWithin(familyId, null, NEAR, RADIUS_M)).extracting(PickupSpot::getSpotId)
+				.as("academyId null")
+				.containsExactlyInAnyOrder(seeded.defaultSpotId(), seeded.otherSpotId())
+				.doesNotContain(temporaryId);
+	}
+
+	@Test
+	@DisplayName("기본 장소 판정용 읽기: 임시 장소만 있는 가족 · 학원은 loadSpots가 빈 목록, loadDefaultSpot이 빈 값이라 첫 일반 장소가 기본 장소가 된다")
+	void defaultSpotDecisionReadsIgnoreTemporarySpots() {
+		long otherAcademyId = persistOtherAcademy();
+		saveTemporarySpot(otherAcademyId, OTHER_ACADEMY_LOCATION);
+
+		assertThat(loadSpotPort.loadSpots(familyId, otherAcademyId)).as("임시 장소만 있는 학원의 장소 목록").isEmpty();
+		assertThat(loadSpotPort.loadDefaultSpot(familyId, otherAcademyId)).as("임시 장소만 있는 학원의 기본 장소").isEmpty();
+		assertThat(loadSpotPort.loadDefaultSpot(familyId, academyId)).map(PickupSpot::getSpotId)
+				.as("시드 학원 기본 장소는 그대로")
+				.contains(seeded.defaultSpotId());
+	}
+
+	@Test
+	@DisplayName("loadSpot(spotId 단건 조회)은 temporary=true 장소도 돌려준다(픽업이 임시 spotId로 경로를 확정)")
+	void loadSpotReturnsTemporarySpotBySpotId() {
+		long temporaryId = saveTemporarySpot(academyId, SAVED_STOP);
+
+		PickupSpot loaded = loadSpotPort.loadSpot(temporaryId).orElseThrow();
+
+		assertThat(loaded.getSpotId()).isEqualTo(temporaryId);
+		assertThat(loaded.getFamilyId()).isEqualTo(familyId);
+		assertThat(loaded.getAcademyId()).isEqualTo(academyId);
+		assertThat(loaded.getName()).isEqualTo("임시 장소");
+		assertThat(loaded.isTemporary()).as("temporary").isTrue();
+		assertThat(loaded.getStopPoint().lat()).isCloseTo(SAVED_STOP.lat(), within(SIX_DECIMALS));
+		assertThat(loaded.getStopPoint().lng()).isCloseTo(SAVED_STOP.lng(), within(SIX_DECIMALS));
+	}
+
+	private long saveTemporarySpot(long spotAcademyId, LatLng stop) {
+		return saveSpotPort.saveSpot(PickupSpot.createTemporary(familyId, spotAcademyId, "임시 장소", stop, stop,
+				guardianId)).getSpotId();
+	}
+
 	private List<Long> spotIdsOfFamilyAndAcademy() {
 		return jdbcTemplate.queryForList("select spot_id from pickup_spot where family_id = ? and academy_id = ?",
 				Long.class, familyId, academyId);
