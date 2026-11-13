@@ -1,6 +1,9 @@
 package com.example.pickupservice.common.error;
 
 import com.example.pickupservice.common.error.ErrorResponse.FieldError;
+import com.example.pickupservice.common.image.ProfileImageInvalidException;
+import com.example.pickupservice.common.image.ProfileImageTooLargeException;
+import com.example.pickupservice.common.image.StorageUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -24,6 +27,7 @@ import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.util.DisconnectedClientHelper;
@@ -70,6 +74,22 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(HttpMediaTypeNotSupportedException.class)
 	public ResponseEntity<ErrorResponse> handleMediaTypeNotSupported() {
 		return toResponse(ErrorCode.UNSUPPORTED_MEDIA_TYPE, null);
+	}
+
+	@ExceptionHandler(ProfileImageInvalidException.class)
+	public ResponseEntity<ErrorResponse> handleProfileImageInvalid() {
+		return toResponse(ErrorCode.PROFILE_IMAGE_INVALID, null);
+	}
+
+	@ExceptionHandler({ProfileImageTooLargeException.class, MaxUploadSizeExceededException.class})
+	public ResponseEntity<ErrorResponse> handleProfileImageTooLarge() {
+		return toResponse(ErrorCode.PROFILE_IMAGE_TOO_LARGE, null);
+	}
+
+	@ExceptionHandler(StorageUnavailableException.class)
+	public ResponseEntity<ErrorResponse> handleStorageUnavailable(StorageUnavailableException exception) {
+		log.error("Profile image storage unavailable", exception);
+		return toResponse(ErrorCode.STORAGE_UNAVAILABLE, null);
 	}
 
 	@ExceptionHandler(BusinessException.class)

@@ -37,6 +37,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -85,6 +86,8 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 	private static final String OVERLAP_PATH = "/test/common-error/business-overlap";
 	private static final String REQUIRED_HEADER_PATH = "/test/common-error/required-header";
 	private static final String JSON_ONLY_PATH = "/test/common-error/json-only";
+	private static final String MAX_UPLOAD_SIZE_EXCEEDED_PATH = "/test/common-error/max-upload-size-exceeded";
+	private static final long MULTIPART_MAX_REQUEST_SIZE = 6L * 1024 * 1024;
 	private static final String RESPONSE_STATUS_EXCEPTION_PATH = "/test/common-error/response-status-exception";
 	private static final String RESPONSE_STATUS_WITHOUT_REASON_PATH = "/test/common-error/response-status-exception-without-reason";
 	private static final String DOC_VALIDATED_ID_PATH = "/test/common-error/doc-validated/{id}";
@@ -273,6 +276,13 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 						.contentType(MediaType.TEXT_PLAIN)
 						.content("name=minwoo"))
 				.andExpect(commonError(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_MEDIA_TYPE"));
+	}
+
+	@Test
+	@DisplayName("multipart 한도를 넘어 MaxUploadSizeExceededException이 나면 413과 JSON 본문의 error.code PROFILE_IMAGE_TOO_LARGE · error.message · error.retryAfterSeconds(null) 키를 돌려주고 error.fields는 채우지 않는다")
+	void maxUploadSizeExceededReturns413ProfileImageTooLarge() throws Exception {
+		mockMvc.perform(get(MAX_UPLOAD_SIZE_EXCEEDED_PATH))
+				.andExpect(commonError(HttpStatus.CONTENT_TOO_LARGE, "PROFILE_IMAGE_TOO_LARGE"));
 	}
 
 	@Test
@@ -753,6 +763,11 @@ class GlobalExceptionHandlerTest extends IntegrationTestSupport {
 		@GetMapping(RESPONSE_STATUS_WITHOUT_REASON_PATH)
 		public String throwResponseStatusWithoutReason() {
 			throw new ResponseStatusException(HttpStatus.CONFLICT);
+		}
+
+		@GetMapping(MAX_UPLOAD_SIZE_EXCEEDED_PATH)
+		public String throwMaxUploadSizeExceeded() {
+			throw new MaxUploadSizeExceededException(MULTIPART_MAX_REQUEST_SIZE);
 		}
 
 	}
