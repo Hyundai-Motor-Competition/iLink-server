@@ -1,8 +1,8 @@
 # FOLLOWUP · 픽업 (pickup)
 
-- 생성: 2026-11-14 01:30 KST · tdd-guard
-- 상태: 진행 중 (체크 272/276 · 완료 기준 0/4)
-- 테스트: ● GREEN · 2824 passed · 전체 · 144s · .\gradlew.bat test --console=plain
+- 생성: 2026-11-14 07:36 KST · tdd-guard
+- 상태: 진행 중 (체크 277/277 · 완료 기준 0/4)
+- 테스트: ● GREEN · 2953 passed · 전체 · 126s · .\gradlew.bat test --console=plain
 - 설계서: C:/pw/pickup/docs/08_픽업-pickup.md
 
 ## 완료 항목
@@ -278,6 +278,15 @@ CompletePickupServiceTest.탑승 완료 IMMEDIATE는 notBoardedChildUserIds에 �
 - [x] #269 [web] PUT /v1/pickup-sessions/{sessionId}/route는 spotId 대신 candidate {name, location}을 받으면 임시 장소를 만들어 그 spotId로 경로를 확정한다. spotId와 candidate를 둘 다 보내거나 둘 다 빼면 422 VALIDATION_FAILED(최종디자인 11/13 V02 추천 장소, 팀장 결정 2026-11-13) ← PickupSessionControllerTest.PUT /v1/pickup-sessions/{sessionId}/route에 spotId 없이 candidate {name, location}을 보내면 Command에 candidate를 담고 spotId는 null로 두어 200을 돌려준다
 ConfirmRouteServiceTest.candidate 경로 확정은 세션 장소를 받은 임시 spotId로 바꾸고(spotVersion +1, 스냅샷 이름 · 좌표가 candidate 값) 경로를 확정해(CONFIRMED, routeVersion +1, totalMeters) 저장한다
 PickupModuleLinkAdaptersTest.SaveTemporarySpotPort.saveTemporarySpot은 place SaveTemporarySpotUseCase에 위임해 같은 가족 · 학원 · 이름 · 정차 지점 · 만남 지점의 임시 장소를 만들고 그 spotId를 돌려준다(가족 장소 목록에는 안 보인다)
+- [x] #270 [web] POST /v1/pickup-sessions/{sessionId}/spot-changes도 spotId 대신 candidate {name, location}을 받아 임시 장소로 세션 장소를 바꾼다(V03 「다른장소로 가기」) ← ChangeSpotServiceTest.candidate 장소 변경은 SPOT_CHANGED만 저장한 세션의 stateVersion · 지금 시각으로 한 번 저장하고 보호자와 세션 자녀에게 발행한다
+ChangeSpotServiceTest.candidate 장소 변경은 이동 중(MEETING) 자녀가 있으면 CHILD_ALREADY_MOVING으로 거절하고 임시 장소를 만들지 않으며 아무것도 저장 · 발행하지 않는다
+PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/spot-changes에 spotId 없이 candidate {name, location}을 보내면 Command에 candidate를 담고 spotId는 null로 두어 200을 돌려준다
+- [x] #271 [서비스] 장소 변경에 here=true를 보내면 마지막으로 받은 차량 위치로 이름 「차량 정차 위치」, stopPoint · meetingPoint가 같은 임시 장소를 만들어 세션 장소를 바꾸고 바로 합류 안내(CALL)를 보낸다(V03 「여기로 부르기」, 서버가 한 번에 처리) ← ChangeSpotServiceTest.여기로 부르기(here=true)는 세션 가족 · 지금 장소의 academyId · 이름 「차량 정차 위치」 · 정차 지점=만남 지점=마지막 차량 위치로 임시 장소를 한 번 만든다
+ChangeSpotServiceTest.여기로 부르기는 세션 장소를 임시 spotId · 「차량 정차 위치」 · 차량 위치로 바꾸고 바로 확정해(CONFIRMED, spotVersion +1, routeVersion +1, routeTotalMeters 그대로, stateVersion +2) 저장하고 그 세션 뷰를 돌려준다
+ChangeSpotServiceTest.여기로 부르기는 SPOT_CHANGED(stateVersion +1) · SPOT_CONFIRMED(+2) · CALL_TRIGGERED(+2, callId · trigger MANUAL) 순서로 지금 시각에 저장하고 같은 순서로 발행한다
+PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/spot-changes에 spotId · candidate 없이 {here: true, stateVersion, spotVersion}을 보내면 Command에 here true · spotId null · candidate null을 담아 200을 돌려준다
+- [x] #272 [서비스] here=true인데 받은 차량 위치가 없으면 422 VALIDATION_FAILED, 정차 중이 아니라 호출 가드를 못 넘으면 장소를 바꾸지 않고 409 CALL_GUARD_UNMET로 거절한다 ← ChangeSpotServiceTest.여기로 부르기는 받은 차량 위치가 없으면 422 VALIDATION_FAILED(fields here)로 거절하고 임시 장소 · 세션 · 호출 · 알림 · 이벤트를 만들지 않는다
+PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/spot-changes(here true)가 가드 미충족이면 409 CALL_GUARD_UNMET과 error.unmet [G6]을 돌려준다
 - [x] #273 [web] 세션 뷰 children[]에 profileImageUrl을, 세션 뷰에 운전 중인 보호자 driver {name, profileImageUrl}을 담는다(V03 · C03 아바타, C02 「엄마가 출발했어요」) ← GetSessionServiceTest.세션 조회는 children[].profileImageUrl에 가족 멤버 정보의 profileImageUrl을 담고 없으면 null로 돌려준다
 GetSessionServiceTest.세션 조회는 driver에 세션 가족의 GUARDIAN 멤버 name · profileImageUrl을 담는다
 GetSessionServiceTest.세션 조회는 가족에 GUARDIAN 멤버가 없으면 driver를 null로 돌려준다
@@ -290,12 +299,13 @@ PickupSessionPersistenceAdapterTest.경로를 totalMeters 4200으로 확정한 �
 RequestHelpServiceTest.HELP 알림 기록과 HELP_REQUESTED 발행의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE 모두이고 TEACHER · CHILD는 빠진다
 StartPickupServiceTest.SESSION_STARTED 알림 기록과 발행의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE와 세션 자녀이고 TEACHER는 빠진다
 AutoCompleteBoardingServiceTest.자동 완료 SESSION_COMPLETED 발행의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE와 세션 자녀이고 TEACHER는 빠진다
+- [x] #276 user의 LoadMemberService가 pickup에 주는 MemberInfo.profileImageUrl을 가족 조회(GetMyFamilyService · MemberResults)와 같은 방식의 URL로 채워, 세션 뷰 children[].profileImageUrl · driver.profileImageUrl에 실제 값이 나간다(#273 후속, 팀장 결정 2026-11-14) ← PickupModuleLinkAdaptersTest.LoadFamilyPort가 주는 MemberInfo.profileImageUrl은 가족 조회(GetMyFamily)와 같은 URL이다: 사진 있는 민준 · 보호자는 저장 키의 URL, 사진 없는 서윤은 기본 사진 URL
+- [x] #277 [서비스] 픽업 시작(StartPickup)은 해제된 자녀(user MemberInfo.removed true)의 일정을 세션 자녀에서 뺀다. 지난 기록 조회는 해제된 자녀 이름을 그대로 보인다(사람 결정 2026-11-14) ← StartPickupServiceTest.픽업 시작은 해제된 자녀(removed true)의 일정을 세션 자녀에서 빼고 나머지 자녀만 WAITING으로 저장한다
+StartPickupServiceTest.픽업 시작은 해제된 자녀(removed true)의 기기가 연결되지 않았어도 SETUP_INCOMPLETE로 거절하지 않고 남은 자녀로 세션을 시작한다
+StartPickupServiceTest.픽업 시작은 해제된 자녀(removed true)의 일정을 포함한 같은 scheduleIds로 다시 요청하면 ANOTHER_SESSION_ACTIVE가 아니라 기존 세션을 created false로 돌려준다
 
 ## 미완료 항목
-- [ ] #270 [web] POST /v1/pickup-sessions/{sessionId}/spot-changes도 spotId 대신 candidate {name, location}을 받아 임시 장소로 세션 장소를 바꾼다(V03 「다른장소로 가기」)
-- [ ] #271 [서비스] 장소 변경에 here=true를 보내면 마지막으로 받은 차량 위치로 이름 「차량 정차 위치」, stopPoint · meetingPoint가 같은 임시 장소를 만들어 세션 장소를 바꾸고 바로 합류 안내(CALL)를 보낸다(V03 「여기로 부르기」, 서버가 한 번에 처리)
-- [ ] #272 [서비스] here=true인데 받은 차량 위치가 없으면 422 VALIDATION_FAILED, 정차 중이 아니라 호출 가드를 못 넘으면 장소를 바꾸지 않고 409 CALL_GUARD_UNMET로 거절한다
-- [ ] #276 user의 LoadMemberService가 pickup에 주는 MemberInfo.profileImageUrl을 가족 조회(GetMyFamilyService · MemberResults)와 같은 방식의 URL로 채워, 세션 뷰 children[].profileImageUrl · driver.profileImageUrl에 실제 값이 나간다(#273 후속, 팀장 결정 2026-11-14)
+- 없음
 
 ## 완료 기준 (공통 규칙 문서)
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
@@ -358,6 +368,8 @@ AutoCompleteBoardingServiceTest.자동 완료 SESSION_COMPLETED 발행의 받는
 | 추천 장소 · 여기로 부르기의 임시 장소 저장 순서 | 결정됨: place #264(임시 장소 저장 in 포트) · #265(목록 · 기본 장소에서 제외)를 픽업 진행 중 메인 폴더에서 먼저 처리한 뒤 #269~#272를 진행한다(사람 결정 2026-11-14) |
 | 세션 뷰 driver(#273) | 결정됨: 세션 familyId의 role GUARDIAN 멤버 1명의 name · profileImageUrl. 없으면 null(사람 결정 2026-11-14). GUARDIAN이 여럿이면 userId가 가장 작은 사람(팀장 결정 2026-11-14) |
 | 추천 장소 candidate로 경로 확정 · 장소 변경(#269 · #270) | [팀장 결정 2026-11-14] candidate {name, location}을 받으면 place SaveTemporarySpotUseCase로 임시 장소를 만든다: SaveTemporarySpotCommand(familyId, academyId, name, stopPoint, meetingPoint)에 familyId는 세션 가족, academyId는 세션 지금 장소의 academyId, stopPoint · meetingPoint는 둘 다 location을 넣는다(createdBy는 place가 0으로 저장, main 구현을 따름). SES-04(route)는 세션 장소를 그 임시 장소로 바꾼 뒤(changeSpot과 같은 전제: CHILD_ALREADY_MOVING · CALL_ALREADY_SENT 거절) 바로 경로를 확정하고 SPOT_CHANGED · SPOT_CONFIRMED를 저장한다. 이때 spotId 불일치 409 검사는 하지 않는다. SES-05(spot-changes)는 spotId 대신 그 임시 spotId로 장소를 바꾼다. 거절이면 임시 장소를 만들지 않는다(같은 트랜잭션) |
+| 여기로 부르기 처리 순서(#271 · #272) | [팀장 결정 2026-11-14] SES-05 본문 here=true는 spotId · candidate와 함께 보낼 수 없다(422). 순서: stateVersion · 끝난 세션 · spotVersion · SpotChangeGuard(MEETING · 살아 있는 호출) → 마지막 차량 위치(vehicleLat · vehicleLng) 없으면 422 VALIDATION_FAILED(fields here) → 장소를 바꾼 뒤의 상태로 가드 판정(G2 · G3은 바로 확정하므로 통과로 보고 G1 · G4 · G5 · G6 검사)해 못 넘으면 409 CALL_GUARD_UNMET(error.unmet)이고 아무것도 바꾸지 않는다 → 임시 장소(이름 「차량 정차 위치」, stopPoint = meetingPoint = 차량 위치) 저장 → changeSpot → confirmRoute(totalMeters는 그대로 유지) → triggerType MANUAL Call 생성(joinCallMode와 상관없음, CALL 알림 기록 요청). 이벤트는 SPOT_CHANGED · SPOT_CONFIRMED · CALL_TRIGGERED 순서로 저장 · 발행 |
+| 해제된 자녀와 픽업 시작(#277) | 요청 일정이 모두 해제된 자녀(removed true)의 것이면 404 NOT_FOUND(사람 결정 2026-11-14). [팀장 결정 2026-11-14, 사람 확인 전] 해제된 자녀의 일정은 가장 먼저 빼고, 그 뒤 기기 검사(CHILD_DEVICE)와 「같은 세션이면 created false」 비교를 남은 일정으로 한다. 지난 세션 조회의 자녀 이름은 loadMember로 해제된 자녀 이름도 채운다 |
 | 세션 뷰 route.totalMeters(#274) | 결정됨: SES-04 요청에 totalMeters(0 이상 정수, 선택)를 더하고 pickup_session.route_total_meters에 저장한다. 확정 전이나 값이 없으면 null(사람 결정 2026-11-14). 다시 확정하면 요청 값으로 덮어쓰고 값이 없으면 null(팀장 결정 2026-11-14) |
 | 이벤트 payload의 시각 값 | [사람 결정 2026-11-09] etaAt · predictedStopAt · callNotBefore · nextAllowedAt 등은 +09:00 문자열 |
 | 끝난 세션의 SES-04 · SES-05 · SIG-03 · SIG-05 | [사람 결정 2026-11-09] 409 SESSION_ALREADY_FINISHED로 거절하고 저장 · 알림 · 발행하지 않음 |
@@ -383,7 +395,8 @@ AutoCompleteBoardingServiceTest.자동 완료 SESSION_COMPLETED 발행의 받는
 | SES-08 SSE 요청 로그 · 비동기 실행기 | 03 요청 로깅은 SSE를 연결(stream=open) · 종료(stream=closed) 두 줄로 남김. 타임아웃 · 연결 끊김 · completeWithError 때 종료 줄의 status · errorCode와 MVC 비동기 실행기 설정 필요 여부를 SES-08 때 정해야 함 |
 
 ## 다음 단계
-- 남은 항목 4건부터 계속: /tdd domain pickup → /tdd go
+- 도메인 리뷰: /tdd review pickup (기록 없음)
+- 커밋 · 푸시: /tdd commit (기능별 분할 커밋) · /tdd push (커밋 후 기능 브랜치 푸시)
 - 다음 도메인: 알림 (09_알림-notification.md). 시작: /tdd domain notification
 
 ## 후속 과제
@@ -393,6 +406,7 @@ AutoCompleteBoardingServiceTest.자동 완료 SESSION_COMPLETED 발행의 받는
 - #276(LoadMemberService의 MemberInfo.profileImageUrl 채우기)은 사용자 도메인 #232가 같은 LoadMemberService를 고치므로 사용자 병합 전에는 진행하지 않는다(main 병합 담당 세션 요청 2026-11-14). 사용자 MemberInfo 예정 모양: (userId, familyId, role, name, phone, profileImageUrl, removed). pickup 쪽은 profileImageUrl 6번째까지만 두고, 사용자 병합 때 user 정의를 따른다
 - user 병합 뒤 MemberInfo에 removed(D7 멤버 해제 삭제 표시)가 생김. removed=true 멤버를 pickup 알림 · 실시간 이벤트 받는 사람(SessionReceivers)과 세션 뷰 driver에서 뺄지 설계서에 없음. 사람 결정 필요(제안: 받는 사람 · driver에서 뺀다)
 - #269: candidate 경로 확정 때 세션 지금 장소를 못 찾으면(academyId를 읽을 수 없음) 422 SPOT_NOT_SAVED로 거절(구현자 임의 결정, 설계서 확인 필요). doc/PickupSessionApiDoc의 SES-04 설명에 candidate · totalMeters가 아직 없음
+- 여기로 부르기(#271): 호출 보류(callHeld true) 중에 here=true가 오면 막을지, 경로를 처음 확정하는 here일 때 자녀에게 DEPARTURE 알림을 보낼지 설계서에 없음. 사람 결정 필요
 - [팀장 결정 · 설정 키] 픽업 기준값은 application.yml `pickup.session.*` 하위 키로 둠(`pickup:` 아래는 이미 async · idempotency · jwt 등 앱 전체 설정). 롤백되면 저장하지 않는 이벤트(ETA_UPDATED)도 커밋 뒤 발행하지 않음
 - [service lane #94] AutoCompleteBoardingService에 테스트 전용 package-private 4인자 생성자가 남음(구현자는 테스트 생성 코드를 못 고침) — AutoCompleteBoardingServiceTest 생성 코드를 5인자(TransactionOperations)로 바꾸고 생성자를 하나로 정리할 것. 자동 완료 한 세션 실패 시 건너뛰기 테스트 없음, PickupProperties yml 바인딩 확인 테스트 없음
 - [리뷰 거리] (1) #137 테스트 보조 SseEmitterProbe를 src/test의 org.springframework.web.servlet.mvc.method.annotation 패키지에 둠(패키지 전용 API 접근용) — 스프링 버전이 바뀌면 깨질 수 있음 (2) #207로 auth · place · user 테스트 이름이 바뀌어 auth #98 · place #44 · user #64의 체크 증거 이름과 어긋남 — 해당 도메인 문서 증거 갱신 필요 (3) 04 · 05 · 07 설계서의 「임시 어댑터」 설명(user L8 · L202, auth L19 · L266, place L8 · L19 · L153)을 실제 위임으로 고칠 것 (4) seq 없는 이벤트(ETA_UPDATED 등)는 SSE에서 id 줄 없이 보냄 — 팀장 결정

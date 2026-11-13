@@ -724,14 +724,14 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 - [x] [서비스] 픽업 완료(SES-11)는 notBoardedChildUserIds에 세션에 없는 childUserId가 있으면 404 NOT_FOUND로 거절하고 세션 상태 · 자녀 탑승 상태를 바꾸지 않는다(사람 결정 2026-11-13)
 - [x] [web] POST 픽업 완료(SES-11)에 세션에 없는 childUserId를 notBoardedChildUserIds로 보내면 404 NOT_FOUND를 돌려준다
 - [x] [web] PUT /v1/pickup-sessions/{sessionId}/route는 spotId 대신 candidate {name, location}을 받으면 임시 장소를 만들어 그 spotId로 경로를 확정한다. spotId와 candidate를 둘 다 보내거나 둘 다 빼면 422 VALIDATION_FAILED(최종디자인 11/13 V02 추천 장소, 팀장 결정 2026-11-13)
-- [ ] [web] POST /v1/pickup-sessions/{sessionId}/spot-changes도 spotId 대신 candidate {name, location}을 받아 임시 장소로 세션 장소를 바꾼다(V03 「다른장소로 가기」)
-- [ ] [서비스] 장소 변경에 here=true를 보내면 마지막으로 받은 차량 위치로 이름 「차량 정차 위치」, stopPoint · meetingPoint가 같은 임시 장소를 만들어 세션 장소를 바꾸고 바로 합류 안내(CALL)를 보낸다(V03 「여기로 부르기」, 서버가 한 번에 처리)
-- [ ] [서비스] here=true인데 받은 차량 위치가 없으면 422 VALIDATION_FAILED, 정차 중이 아니라 호출 가드를 못 넘으면 장소를 바꾸지 않고 409 CALL_GUARD_UNMET로 거절한다
+- [x] [web] POST /v1/pickup-sessions/{sessionId}/spot-changes도 spotId 대신 candidate {name, location}을 받아 임시 장소로 세션 장소를 바꾼다(V03 「다른장소로 가기」)
+- [x] [서비스] 장소 변경에 here=true를 보내면 마지막으로 받은 차량 위치로 이름 「차량 정차 위치」, stopPoint · meetingPoint가 같은 임시 장소를 만들어 세션 장소를 바꾸고 바로 합류 안내(CALL)를 보낸다(V03 「여기로 부르기」, 서버가 한 번에 처리)
+- [x] [서비스] here=true인데 받은 차량 위치가 없으면 422 VALIDATION_FAILED, 정차 중이 아니라 호출 가드를 못 넘으면 장소를 바꾸지 않고 409 CALL_GUARD_UNMET로 거절한다
 - [x] [web] 세션 뷰 children[]에 profileImageUrl을, 세션 뷰에 운전 중인 보호자 driver {name, profileImageUrl}을 담는다(V03 · C03 아바타, C02 「엄마가 출발했어요」)
 - [x] [web] 세션 뷰 route에 경로 확정 때 전체 거리 totalMeters를 담는다(부모 메인 출발→도착 진행 막대)
 - [x] [서비스] 보호자에게 보내는 알림(출발 알림 · 준비 시간 추가 · 도움 요청 · 탑승 · 완료 등)의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE 모두다(GUARDIAN만이 아님, 사람 결정 2026-11-13)
-- [ ] user의 LoadMemberService가 pickup에 주는 MemberInfo.profileImageUrl을 가족 조회(GetMyFamilyService · MemberResults)와 같은 방식의 URL로 채워, 세션 뷰 children[].profileImageUrl · driver.profileImageUrl에 실제 값이 나간다(#273 후속, 팀장 결정 2026-11-14)
-- [ ] [서비스] 픽업 시작(StartPickup)은 해제된 자녀(user MemberInfo.removed true)의 일정을 세션 자녀에서 뺀다. 지난 기록 조회는 해제된 자녀 이름을 그대로 보인다(사람 결정 2026-11-14)
+- [x] user의 LoadMemberService가 pickup에 주는 MemberInfo.profileImageUrl을 가족 조회(GetMyFamilyService · MemberResults)와 같은 방식의 URL로 채워, 세션 뷰 children[].profileImageUrl · driver.profileImageUrl에 실제 값이 나간다(#273 후속, 팀장 결정 2026-11-14)
+- [x] [서비스] 픽업 시작(StartPickup)은 해제된 자녀(user MemberInfo.removed true)의 일정을 세션 자녀에서 뺀다. 지난 기록 조회는 해제된 자녀 이름을 그대로 보인다(사람 결정 2026-11-14)
 
 ## 확인 필요 사항
 
@@ -786,6 +786,8 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 | 추천 장소 · 여기로 부르기의 임시 장소 저장 순서 | 결정됨: place #264(임시 장소 저장 in 포트) · #265(목록 · 기본 장소에서 제외)를 픽업 진행 중 메인 폴더에서 먼저 처리한 뒤 #269~#272를 진행한다(사람 결정 2026-11-14) |
 | 세션 뷰 driver(#273) | 결정됨: 세션 familyId의 role GUARDIAN 멤버 1명의 name · profileImageUrl. 없으면 null(사람 결정 2026-11-14). GUARDIAN이 여럿이면 userId가 가장 작은 사람(팀장 결정 2026-11-14) |
 | 추천 장소 candidate로 경로 확정 · 장소 변경(#269 · #270) | [팀장 결정 2026-11-14] candidate {name, location}을 받으면 place SaveTemporarySpotUseCase로 임시 장소를 만든다: SaveTemporarySpotCommand(familyId, academyId, name, stopPoint, meetingPoint)에 familyId는 세션 가족, academyId는 세션 지금 장소의 academyId, stopPoint · meetingPoint는 둘 다 location을 넣는다(createdBy는 place가 0으로 저장, main 구현을 따름). SES-04(route)는 세션 장소를 그 임시 장소로 바꾼 뒤(changeSpot과 같은 전제: CHILD_ALREADY_MOVING · CALL_ALREADY_SENT 거절) 바로 경로를 확정하고 SPOT_CHANGED · SPOT_CONFIRMED를 저장한다. 이때 spotId 불일치 409 검사는 하지 않는다. SES-05(spot-changes)는 spotId 대신 그 임시 spotId로 장소를 바꾼다. 거절이면 임시 장소를 만들지 않는다(같은 트랜잭션) |
+| 여기로 부르기 처리 순서(#271 · #272) | [팀장 결정 2026-11-14] SES-05 본문 here=true는 spotId · candidate와 함께 보낼 수 없다(422). 순서: stateVersion · 끝난 세션 · spotVersion · SpotChangeGuard(MEETING · 살아 있는 호출) → 마지막 차량 위치(vehicleLat · vehicleLng) 없으면 422 VALIDATION_FAILED(fields here) → 장소를 바꾼 뒤의 상태로 가드 판정(G2 · G3은 바로 확정하므로 통과로 보고 G1 · G4 · G5 · G6 검사)해 못 넘으면 409 CALL_GUARD_UNMET(error.unmet)이고 아무것도 바꾸지 않는다 → 임시 장소(이름 「차량 정차 위치」, stopPoint = meetingPoint = 차량 위치) 저장 → changeSpot → confirmRoute(totalMeters는 그대로 유지) → triggerType MANUAL Call 생성(joinCallMode와 상관없음, CALL 알림 기록 요청). 이벤트는 SPOT_CHANGED · SPOT_CONFIRMED · CALL_TRIGGERED 순서로 저장 · 발행 |
+| 해제된 자녀와 픽업 시작(#277) | 요청 일정이 모두 해제된 자녀(removed true)의 것이면 404 NOT_FOUND(사람 결정 2026-11-14). [팀장 결정 2026-11-14, 사람 확인 전] 해제된 자녀의 일정은 가장 먼저 빼고, 그 뒤 기기 검사(CHILD_DEVICE)와 「같은 세션이면 created false」 비교를 남은 일정으로 한다. 지난 세션 조회의 자녀 이름은 loadMember로 해제된 자녀 이름도 채운다 |
 | 세션 뷰 route.totalMeters(#274) | 결정됨: SES-04 요청에 totalMeters(0 이상 정수, 선택)를 더하고 pickup_session.route_total_meters에 저장한다. 확정 전이나 값이 없으면 null(사람 결정 2026-11-14). 다시 확정하면 요청 값으로 덮어쓰고 값이 없으면 null(팀장 결정 2026-11-14) |
 | 이벤트 payload의 시각 값 | [사람 결정 2026-11-09] etaAt · predictedStopAt · callNotBefore · nextAllowedAt 등은 +09:00 문자열 |
 | 끝난 세션의 SES-04 · SES-05 · SIG-03 · SIG-05 | [사람 결정 2026-11-09] 409 SESSION_ALREADY_FINISHED로 거절하고 저장 · 알림 · 발행하지 않음 |
