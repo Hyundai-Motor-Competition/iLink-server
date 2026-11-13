@@ -1,5 +1,5 @@
 # dev API. Jenkins가 __IMAGE__ · __CONFIG_HASH__를 바꿔 매 배포마다 kubectl apply 한다(main push → 테스트 → Harbor → 여기)
-# 비밀값은 Secret api(DB_PASSWORD · JWT_SECRET · PHONE_ENCRYPTION_KEY · KAKAO_REST_API_KEY), Harbor pull은 Secret harbor-pull.
+# 비밀값은 Secret api(DB_PASSWORD · JWT_SECRET · PHONE_ENCRYPTION_KEY · KAKAO_REST_API_KEY · MINIO_ACCESS_KEY · MINIO_SECRET_KEY), Harbor pull은 Secret harbor-pull.
 # FCM 서비스 계정 키는 Secret fcm(service-account.json)을 파일로 붙인다.
 # 셋 다 운영자가 서버에서 만들고(ops/scripts/ilink-secrets.sh, kubectl create secret generic fcm) 저장소에는 두지 않는다
 apiVersion: v1
@@ -14,6 +14,10 @@ data:
   TZ: Asia/Seoul
   FCM_PROJECT_ID: ilink-dev-d6624
   FCM_CREDENTIALS_PATH: /etc/pickup/fcm/service-account.json
+  # 프로필 사진(10_프로필사진-profile.md). 계정 키 MINIO_ACCESS_KEY · MINIO_SECRET_KEY는 Secret api(ops/scripts/ilink-minio-setup.sh)
+  MINIO_ENDPOINT: http://minio.designmodu-dev.svc.cluster.local:9000
+  MINIO_PUBLIC_ENDPOINT: https://img-dev.chisanw.com
+  MINIO_BUCKET: ilink
 ---
 apiVersion: apps/v1
 kind: Deployment

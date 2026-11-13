@@ -12,10 +12,19 @@ spring:
   sql:
     init:
       mode: always
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   http:
     clients:
       connect-timeout: 2s
       read-timeout: 3s
+
+server:
+  tomcat:
+    # 한도(6MB)를 넘은 multipart 본문을 Tomcat이 끝까지 읽어 버려야 413 응답이 클라이언트에 닿는다(기본 2MB면 연결을 끊음)
+    max-swallow-size: 10MB
 
 pickup:
   async:
@@ -48,6 +57,13 @@ pickup:
     data-retention-days: 90
   call:
     signal-lost-check-interval: PT15S
+  profile:
+    endpoint: ${MINIO_ENDPOINT:}
+    public-endpoint: ${MINIO_PUBLIC_ENDPOINT:}
+    bucket: ${MINIO_BUCKET:}
+    access-key: ${MINIO_ACCESS_KEY:}
+    secret-key: ${MINIO_SECRET_KEY:}
+    url-ttl: PT10M
 
 logging:
   pattern:
