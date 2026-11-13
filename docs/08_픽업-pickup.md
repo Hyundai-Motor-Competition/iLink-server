@@ -171,13 +171,13 @@ pickup
 | SES-08 | GET /v1/pickup-sessions/{sessionId}/stream | 차량 앱 | 불필요 | header Last-Event-ID(선택) → 200 text/event-stream | 공통 |
 | SES-09 | GET /v1/pickup-sessions/{sessionId}/events | 그 세션의 차량, 가족 사용자 | 불필요 | query afterSeq(필수), limit(기본 100, 최대 100) → 200 items[](eventId · seq · type · stateVersion · occurredAt · payload), hasMore | 공통 |
 | SES-10 | GET /v1/pickup-sessions/{sessionId}/contacts | 그 세션의 차량, 가족 사용자 | 불필요 | — → 200 items[](name · role(GUARDIAN · CO_GUARDIAN · DELEGATE · TEACHER · ACADEMY) · phone) | 공통 |
-| SES-11 | POST /v1/pickup-sessions/{sessionId}/completion | 차량 앱 | 필요 | mode(IMMEDIATE · MANUAL), stateVersion, notBoardedChildUserIds[](선택) → 200 SessionView | 422 VEHICLE_NOT_STOPPED, 422 CHILDREN_NOT_ALL_BOARDED |
+| SES-11 | POST /v1/pickup-sessions/{sessionId}/completion | 차량 앱 | 필요 | mode(IMMEDIATE · MANUAL), stateVersion, notBoardedChildUserIds[](선택, null 원소가 있으면 422 VALIDATION_FAILED) → 200 SessionView | 422 VEHICLE_NOT_STOPPED, 422 CHILDREN_NOT_ALL_BOARDED |
 | SES-12 | POST /v1/pickup-sessions/{sessionId}/boarding-rejection | 차량 앱 | 필요 | childUserId(자녀가 여러 명이면 필수), stateVersion → 200 SessionView | 409 REJECTION_WINDOW_CLOSED |
 | SES-13 | PUT /v1/pickup-sessions/{sessionId}/incident | 차량 앱 | 필요 | type(CHILD_NOT_ON_BOARD), childUserId, stateVersion → 200 SessionView | 409 INCIDENT_ALREADY_OPEN |
 | SIG-01 | POST /v1/pickup-sessions/{sessionId}/vehicle-telemetry | 차량 앱(백그라운드, 15초마다) | 불필요 | observedAt, navEtaSeconds(0 이상), remainingMeters(0 이상), location{lat, lng}, headingDeg(0~359, 선택), speedKmh(0 이상, 선택), gear(P · R · N · D, 선택) → 202 | 공통 |
 | SIG-02 | POST /v1/pickup-sessions/{sessionId}/vehicle-events | 차량 앱(백그라운드, 즉시) | 불필요(eventId가 대신함) | eventId(UUID), type(STOPPED · DEPARTED · STOP_FAILED · DOOR_CYCLE), occurredAt, location, door(DOOR_CYCLE이면 필수: FRONT_RIGHT · REAR_LEFT · REAR_RIGHT) → 202 | 공통 |
 | SIG-03 | POST /v1/pickup-sessions/{sessionId}/prep-time-extensions | 자녀 앱 | 필요 | minutes(5 · 10 · 15) → 200 extraPrepMinutes(누적), callNotBefore | 422 PREP_EXTENSION_LIMIT, 409 CALL_ALREADY_SENT, 409 SESSION_ALREADY_FINISHED(끝난 세션) |
-| SIG-04 | POST /v1/pickup-sessions/{sessionId}/child-locations | 자녀 앱 | 불필요 | at, lat, lng, accuracyM(선택) → 202 | 403 LOCATION_CONSENT_REQUIRED, 409 SESSION_ALREADY_FINISHED, 409 CHILD_NOT_CALLED |
+| SIG-04 | POST /v1/pickup-sessions/{sessionId}/child-locations | 자녀 앱 | 불필요 | at, lat(-90~90), lng(-180~180), accuracyM(선택) → 202. 범위 밖이면 422 VALIDATION_FAILED | 403 LOCATION_CONSENT_REQUIRED, 409 SESSION_ALREADY_FINISHED, 409 CHILD_NOT_CALLED |
 | SIG-05 | POST /v1/pickup-sessions/{sessionId}/help-requests | 자녀 앱 | 필요 | type(NEED_HELP · CANT_FIND_CAR · CONTACT_PARENT) → 201 nextAllowedAt | 429 HELP_REQUEST_TOO_SOON(nextAllowedAt 함께), 409 SESSION_ALREADY_FINISHED(끝난 세션) |
 | CALL-01 | PUT /v1/pickup-sessions/{sessionId}/call-hold | 차량 앱, GUARDIAN · CO_GUARDIAN · DELEGATE | 필요 | stateVersion → 200 SessionView | 409 CALL_ALREADY_SENT |
 | CALL-01 | DELETE /v1/pickup-sessions/{sessionId}/call-hold | 차량 앱, GUARDIAN · CO_GUARDIAN · DELEGATE | 필요 | query stateVersion → 200 SessionView | 공통 |
@@ -669,7 +669,9 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 - [x] [서비스] 끝난(COMPLETED · CANCELLED) 세션에 경로 확정 · 장소 변경 · 준비 시간 추가 · 도움 요청이 오면 SESSION_ALREADY_FINISHED로 거절하고 저장 · 알림 · 발행하지 않는다
 - [x] [서비스] 완료된 세션에 온 차량 이벤트 DOOR_CYCLE은 오류 없이 무시하고 eventId는 처리한 것으로 남긴다
 - [x] SessionEventType은 SESSION_HELD · SESSION_RESUMED를 더한 21종이다
-- [ ] [web] POST /v1/pickup-sessions에 null이 든 scheduleIds([null] · [801, null])를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다
+- [x] [web] POST /v1/pickup-sessions에 null이 든 scheduleIds([null] · [801, null])를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다
+- [x] [web] POST /v1/pickup-sessions/{sessionId}/completion에 null이 든 notBoardedChildUserIds([null] · [131, null])를 보내면 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다
+- [x] [web] POST /v1/pickup-sessions/{sessionId}/child-locations에 범위 밖 lat(-90~90 밖) · lng(-180~180 밖)를 보내면 500이 아니라 422 VALIDATION_FAILED와 fields를 돌려주고 유스케이스를 부르지 않는다
 
 ## 확인 필요 사항
 
