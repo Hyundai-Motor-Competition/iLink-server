@@ -8,6 +8,12 @@ import ch.qos.logback.core.read.ListAppender;
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
+import com.example.pickupservice.common.idempotency.IdempotencyKeyRequired;
+import com.example.pickupservice.common.security.AuthPrincipalJwtConverter;
+import com.example.pickupservice.common.security.JsonAccessDeniedHandler;
+import com.example.pickupservice.common.security.JsonAuthenticationEntryPoint;
+import com.example.pickupservice.common.security.PublicEndpoint;
+import com.example.pickupservice.common.security.PublicEndpoints;
 import com.example.pickupservice.common.security.Role;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -31,13 +37,17 @@ import org.springframework.context.annotation.Import;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -59,6 +69,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -155,11 +166,36 @@ class RequestLoggingAspectTest extends IntegrationTestSupport {
 	private static final String STREAM_TOKEN = "stream-K3x9-secret";
 	private static final String CONSOLE_CHECK_REQUEST_ID = "req-51-check";
 	private static final String UNHANDLED_EXCEPTION_LOG_MESSAGE = "Unhandled exception";
+	private static final String UNKNOWN_PATH = "unknown";
+	private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+	private static final String IDEMPOTENT_ITEMS_PATH = "/test/logging/idempotent-items";
+	private static final String IDEMPOTENT_ITEM_BODY = "{\"name\":\"정문 앞\"}";
+	private static final String OTHER_IDEMPOTENT_ITEM_BODY = "{\"name\":\"후문 앞\"}";
+	private static final String REPLAYED_IDEMPOTENCY_KEY = "7b1d3f5a-9c2e-4a6b-8d0f-1e3a5c7b9d24";
+	private static final String REUSED_IDEMPOTENCY_KEY = "2e4a6c8e-0b1d-4f3a-9c5e-7a9b1d3f5e68";
+	private static final String IDEMPOTENT_ACCEPTANCE_PATH_PATTERN = "/test/logging/idempotent-invites/{token}/acceptance";
+	private static final String ACCEPTANCE_INVITE_TOKEN = "inv-9Zt4-accept-secret";
+	private static final String GUARDIAN_ZONE_PATTERN = "/test/logging-guardian-zone/**";
+	private static final String GUARDIAN_ZONE_INVITE_PATH_PATTERN = "/test/logging-guardian-zone/invites/{token}";
+	private static final String GUARDIAN_ZONE_TOKEN = "inv-4Kp8-guardian-secret";
+	private static final String PUBLIC_INVITE_PATH_PATTERN = "/test/logging-public/invites/{token}";
+	private static final String PUBLIC_INVITE_TOKEN = "inv-2Wm6-public-secret";
+	private static final String UNAUTHORIZED_CODE = "UNAUTHORIZED";
+	private static final String VALIDATION_FAILED_CODE = "VALIDATION_FAILED";
+	private static final String IDEMPOTENCY_KEY_REUSED_CODE = "IDEMPOTENCY_KEY_REUSED";
+	private static final String INTERNAL_SERVER_ERROR_CODE = "INTERNAL_SERVER_ERROR";
+	private static final String STORAGE_FAILURE_IDEMPOTENCY_KEY = "5c7e9a1b-3d5f-4b7a-8c9e-0f2a4c6e8b70";
+	private static final String STORAGE_FAILURE_CHECK_CONSTRAINT = "ck_idempotency_key_logging_70_test";
+	private static final String OPEN_ENDPOINT_PATTERN = "/test/logging-open/**";
+	private static final String OPEN_MEMBERS_ONLY_PATH = "/test/logging-open/members-only";
+	private static final String NO_ANONYMOUS_PATTERN = "/test/logging-no-anonymous/**";
+	private static final String NO_ANONYMOUS_DENIED_PATH = "/test/logging-no-anonymous/denied";
 
 	private final MockMvc mockMvc;
 	private final AccessTokenFixture accessTokenFixture;
 	private final TestSseConnections sseConnections;
 	private final ScriptedLinkCodeStatuses linkCodeStatuses;
+	private final JdbcTemplate jdbcTemplate;
 
 	private ListAppender<ILoggingEvent> logCapture;
 
@@ -174,6 +210,12 @@ class RequestLoggingAspectTest extends IntegrationTestSupport {
 	void detachLogCapture() {
 		rootLogger().detachAppender(logCapture);
 		logCapture.stop();
+	}
+
+	@AfterEach
+	void deleteIdempotencyKeys() {
+		jdbcTemplate.update("delete from idempotency_key where idempotency_key in (?, ?, ?)",
+				REPLAYED_IDEMPOTENCY_KEY, REUSED_IDEMPOTENCY_KEY, STORAGE_FAILURE_IDEMPOTENCY_KEY);
 	}
 
 	@Test
@@ -722,6 +764,192 @@ class RequestLoggingAspectTest extends IntegrationTestSupport {
 				.containsExactly(null, LINK_CODE_INVALID, LINK_CODE_INVALID);
 	}
 
+	@Test
+	@DisplayName("Idempotency-Key 대상 POST /test/logging/idempotent-items를 USER 101이 키 헤더 없이 불러 필터가 422 VALIDATION_FAILED로 끝내도 그 요청의 요청 로그가 INFO 한 줄 남고 그 줄에 requestId · principal=USER:101 · method=POST · path · status=422 · errorCode=VALIDATION_FAILED · durationMs가 들어 있다")
+	void idempotencyKeyMissingRejectedInFilterLeavesOneRequestLogLine() throws Exception {
+		String requestId = "flt-422-missing-key";
+
+		mockMvc.perform(asUser(post(IDEMPOTENT_ITEMS_PATH))
+						.header(REQUEST_ID_HEADER, requestId)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(IDEMPOTENT_ITEM_BODY))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.error.code").value(VALIDATION_FAILED_CODE));
+
+		assertSingleRequestLogLine(requestId, "USER:101", "POST", IDEMPOTENT_ITEMS_PATH, "422", VALIDATION_FAILED_CODE);
+	}
+
+	@Test
+	@DisplayName("USER 101이 Idempotency-Key 대상 API에 키 K · 본문 A로 201을 받은 뒤 같은 키 K · 다른 본문 B를 보내 필터가 409 IDEMPOTENCY_KEY_REUSED로 끝내면 두 번째 요청의 요청 로그가 한 줄(status=409 · errorCode=IDEMPOTENCY_KEY_REUSED) 남고 컨트롤러까지 간 첫 요청도 여전히 한 줄(status=201 · path는 매핑 패턴)이다")
+	void idempotencyKeyReusedWithOtherBodyRejectedInFilterLeavesOneRequestLogLine() throws Exception {
+		String firstRequestId = "flt-409-first";
+		String secondRequestId = "flt-409-second";
+
+		mockMvc.perform(idempotentItemAsUser(REUSED_IDEMPOTENCY_KEY, IDEMPOTENT_ITEM_BODY, firstRequestId))
+				.andExpect(status().isCreated());
+		mockMvc.perform(idempotentItemAsUser(REUSED_IDEMPOTENCY_KEY, OTHER_IDEMPOTENT_ITEM_BODY, secondRequestId))
+				.andExpect(commonError(HttpStatus.CONFLICT, IDEMPOTENCY_KEY_REUSED_CODE));
+
+		assertControllerReachedSingleRequestLogLine(firstRequestId, IDEMPOTENT_ITEMS_PATH, "201");
+		assertSingleRequestLogLine(secondRequestId, "USER:101", "POST", IDEMPOTENT_ITEMS_PATH, "409",
+				IDEMPOTENCY_KEY_REUSED_CODE);
+	}
+
+	@Test
+	@DisplayName("USER 101이 Idempotency-Key 대상 API에 같은 키 · 같은 본문을 두 번 보내 두 번째는 필터가 저장한 201을 그대로 재응답하면 재응답 요청의 요청 로그가 한 줄(status=201 · errorCode 없음 · principal=USER:101) 남고 첫 요청도 한 줄이다")
+	void idempotentReplayInFilterLeavesOneRequestLogLineWithFirstStatusAndNoErrorCode() throws Exception {
+		String firstRequestId = "flt-replay-first";
+		String replayRequestId = "flt-replay-second";
+
+		mockMvc.perform(idempotentItemAsUser(REPLAYED_IDEMPOTENCY_KEY, IDEMPOTENT_ITEM_BODY, firstRequestId))
+				.andExpect(status().isCreated());
+		mockMvc.perform(idempotentItemAsUser(REPLAYED_IDEMPOTENCY_KEY, IDEMPOTENT_ITEM_BODY, replayRequestId))
+				.andExpect(status().isCreated());
+
+		assertControllerReachedSingleRequestLogLine(firstRequestId, IDEMPOTENT_ITEMS_PATH, "201");
+		assertSingleRequestLogLine(replayRequestId, "USER:101", "POST", IDEMPOTENT_ITEMS_PATH, "201", null);
+	}
+
+	@Test
+	@DisplayName("경로에 초대 토큰이 든 Idempotency-Key 대상 POST /test/logging/idempotent-invites/{token}/acceptance를 실제 토큰 inv-9Zt4-accept-secret으로 키 헤더 없이 불러 필터가 422로 끝내면 요청 로그가 한 줄 남고 path는 매핑 패턴이며 어떤 로그에도 토큰 값이 없다")
+	void idempotencyRejectionOnTokenPathDoesNotLogActualToken() throws Exception {
+		String requestId = "flt-422-token-path";
+
+		mockMvc.perform(asUser(post(IDEMPOTENT_ACCEPTANCE_PATH_PATTERN, ACCEPTANCE_INVITE_TOKEN))
+						.header(REQUEST_ID_HEADER, requestId))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.error.code").value(VALIDATION_FAILED_CODE));
+
+		assertSingleRequestLogLine(requestId, "USER:101", "POST", IDEMPOTENT_ACCEPTANCE_PATH_PATTERN, "422",
+				VALIDATION_FAILED_CODE);
+		assertNoCapturedLogContains(ACCEPTANCE_INVITE_TOKEN);
+	}
+
+	@Test
+	@DisplayName("인증이 필요한 GET /test/logging/invites/{token}을 실제 토큰 inv-7Hq2-secret으로 Bearer 없이 불러 Security가 401 UNAUTHORIZED로 끝내면 요청 로그가 한 줄 남고 principal=ANONYMOUS · status=401 · errorCode=UNAUTHORIZED이며 path는 unknown이고 어떤 로그에도 토큰 값이 없다")
+	void securityUnauthorizedWithoutBearerLeavesOneAnonymousRequestLogLineWithoutPathToken() throws Exception {
+		String requestId = "flt-401-no-bearer";
+
+		mockMvc.perform(get(INVITE_PATH_PATTERN, INVITE_TOKEN).header(REQUEST_ID_HEADER, requestId))
+				.andExpect(commonError(HttpStatus.UNAUTHORIZED, UNAUTHORIZED_CODE));
+
+		assertSingleRequestLogLine(requestId, "ANONYMOUS", "GET", UNKNOWN_PATH, "401", UNAUTHORIZED_CODE);
+		assertNoCapturedLogContains(INVITE_TOKEN);
+	}
+
+	@Test
+	@DisplayName("인증이 필요한 GET /test/logging/invites/{token}을 실제 토큰 inv-7Hq2-secret으로 만료된 Bearer와 함께 불러 Security가 401로 끝내면 요청 로그가 한 줄 남고 principal=ANONYMOUS · status=401 · errorCode=UNAUTHORIZED이며 어떤 로그에도 경로 토큰 값과 만료 access 토큰 값이 없다")
+	void securityUnauthorizedWithExpiredBearerLeavesOneAnonymousRequestLogLineWithoutTokens() throws Exception {
+		String requestId = "flt-401-expired-bearer";
+		String expiredToken = accessTokenFixture.expiredUser(USER_ID, FAMILY_ID, Role.GUARDIAN);
+		String[] tokenParts = expiredToken.split("\\.");
+
+		mockMvc.perform(get(INVITE_PATH_PATTERN, INVITE_TOKEN)
+						.header(HttpHeaders.AUTHORIZATION, bearer(expiredToken))
+						.header(REQUEST_ID_HEADER, requestId))
+				.andExpect(commonError(HttpStatus.UNAUTHORIZED, UNAUTHORIZED_CODE));
+
+		assertSingleRequestLogLine(requestId, "ANONYMOUS", "GET", UNKNOWN_PATH, "401", UNAUTHORIZED_CODE);
+		assertNoCapturedLogContains(INVITE_TOKEN, expiredToken, tokenParts[1], tokenParts[2]);
+	}
+
+	@Test
+	@DisplayName("URL 규칙이 hasRole('GUARDIAN')인 GET /test/logging-guardian-zone/invites/{token}을 CHILD 토큰으로 불러 Security가 컨트롤러 전에 403 FORBIDDEN으로 끝내면 요청 로그가 한 줄 남고 principal=USER:101 · status=403 · errorCode=FORBIDDEN이며 어떤 로그에도 경로 토큰 값이 없다")
+	void securityForbiddenByRoleLeavesOneRequestLogLineWithoutPathToken() throws Exception {
+		String requestId = "flt-403-role";
+		String childToken = accessTokenFixture.user(USER_ID, FAMILY_ID, Role.CHILD);
+
+		mockMvc.perform(get(GUARDIAN_ZONE_INVITE_PATH_PATTERN, GUARDIAN_ZONE_TOKEN)
+						.header(HttpHeaders.AUTHORIZATION, bearer(childToken))
+						.header(REQUEST_ID_HEADER, requestId))
+				.andExpect(commonError(HttpStatus.FORBIDDEN, FORBIDDEN_CODE));
+
+		assertSingleRequestLogLine(requestId, "USER:101", "GET", UNKNOWN_PATH, "403",
+				FORBIDDEN_CODE);
+		assertNoCapturedLogContains(GUARDIAN_ZONE_TOKEN);
+	}
+
+	@Test
+	@DisplayName("URL 규칙이 hasRole('GUARDIAN')인 GET /test/logging-guardian-zone/invites/{token}을 GUARDIAN 토큰으로 불러 컨트롤러까지 가 200이 되면 요청 로그는 두 줄이 아니라 한 줄이고 path는 매핑 패턴이다")
+	void securityPassedRequestReachingControllerStillLeavesExactlyOneRequestLogLine() throws Exception {
+		String requestId = "flt-200-guardian";
+
+		mockMvc.perform(asUser(get(GUARDIAN_ZONE_INVITE_PATH_PATTERN, GUARDIAN_ZONE_TOKEN))
+						.header(REQUEST_ID_HEADER, requestId))
+				.andExpect(status().isOk());
+
+		assertControllerReachedSingleRequestLogLine(requestId, GUARDIAN_ZONE_INVITE_PATH_PATTERN, "200");
+		assertNoCapturedLogContains(GUARDIAN_ZONE_TOKEN);
+	}
+
+	@Test
+	@DisplayName("인증 없이 부르는 GET /test/logging-public/invites/{token}을 실제 토큰 inv-2Wm6-public-secret으로 Bearer 없이 한 번, 만료된 Bearer와 함께 한 번 부르면 둘 다 200이고 요청마다 요청 로그가 한 줄(principal=ANONYMOUS · path는 매핑 패턴)이며 어떤 로그에도 경로 토큰 값이 없다")
+	void publicTokenPathRequestWithOrWithoutExpiredBearerLeavesOneLineWithoutPathToken() throws Exception {
+		String withoutBearerRequestId = "flt-public-no-bearer";
+		String expiredBearerRequestId = "flt-public-expired-bearer";
+		String expiredToken = accessTokenFixture.expiredUser(USER_ID, FAMILY_ID, Role.GUARDIAN);
+
+		mockMvc.perform(get(PUBLIC_INVITE_PATH_PATTERN, PUBLIC_INVITE_TOKEN)
+						.header(REQUEST_ID_HEADER, withoutBearerRequestId))
+				.andExpect(status().isOk());
+		mockMvc.perform(get(PUBLIC_INVITE_PATH_PATTERN, PUBLIC_INVITE_TOKEN)
+						.header(HttpHeaders.AUTHORIZATION, bearer(expiredToken))
+						.header(REQUEST_ID_HEADER, expiredBearerRequestId))
+				.andExpect(status().isOk());
+
+		for (String requestId : List.of(withoutBearerRequestId, expiredBearerRequestId)) {
+			List<ILoggingEvent> requestLogs = requestLogsWithRequestId(requestId);
+			assertThat(requestLogs).as("requestId %s의 요청 로그 줄 수", requestId).hasSize(1);
+			assertThat(fieldsOf(requestLogs.getFirst()))
+					.containsEntry("principal", "ANONYMOUS")
+					.containsEntry("path", PUBLIC_INVITE_PATH_PATTERN)
+					.containsEntry("status", "200");
+		}
+		assertNoCapturedLogContains(PUBLIC_INVITE_TOKEN);
+	}
+
+	@Test
+	@DisplayName("idempotency_key에 그 키만 막는 CHECK 제약이 걸려 USER 101의 Idempotency-Key 대상 POST /test/logging/idempotent-items 키 예약 INSERT가 DB 오류로 실패해 필터가 500 INTERNAL_SERVER_ERROR로 끝내도 그 요청의 요청 로그가 INFO 한 줄 남고 그 줄에 principal=USER:101 · method=POST · path · status=500 · errorCode=INTERNAL_SERVER_ERROR · durationMs가 들어 있다")
+	void idempotencyReservationDbFailureEndingWith500InFilterLeavesOneRequestLogLine() throws Exception {
+		String requestId = "flt-500-reserve-db";
+		jdbcTemplate.execute("alter table idempotency_key add constraint " + STORAGE_FAILURE_CHECK_CONSTRAINT
+				+ " check (idempotency_key <> '" + STORAGE_FAILURE_IDEMPOTENCY_KEY + "') not valid");
+		try {
+			mockMvc.perform(idempotentItemAsUser(STORAGE_FAILURE_IDEMPOTENCY_KEY, IDEMPOTENT_ITEM_BODY, requestId))
+					.andExpect(commonError(HttpStatus.INTERNAL_SERVER_ERROR, INTERNAL_SERVER_ERROR_CODE));
+		} finally {
+			jdbcTemplate.execute("alter table idempotency_key drop constraint if exists "
+					+ STORAGE_FAILURE_CHECK_CONSTRAINT);
+		}
+
+		assertSingleRequestLogLine(requestId, "USER:101", "POST", IDEMPOTENT_ITEMS_PATH, "500",
+				INTERNAL_SERVER_ERROR_CODE);
+	}
+
+	@Test
+	@DisplayName("PublicEndpoints로 열린 GET /test/logging-open/members-only에 @PreAuthorize(\"isAuthenticated()\")가 붙어 토큰 없는 호출이 컨트롤러 단계에서 거절되고 GlobalExceptionHandler가 예외를 다시 던져 Security 진입점이 401 UNAUTHORIZED를 쓰면 그 요청의 요청 로그는 두 줄이 아니라 정확히 한 줄이고 그 줄은 status=200이 아니라 status=401 · errorCode=UNAUTHORIZED · principal=ANONYMOUS다")
+	void anonymousRejectedByMethodSecurityAfterReachingControllerLeavesOneRequestLogLineWithStatus401()
+			throws Exception {
+		String requestId = "ctl-401-preauthorize";
+
+		mockMvc.perform(get(OPEN_MEMBERS_ONLY_PATH).header(REQUEST_ID_HEADER, requestId))
+				.andExpect(commonError(HttpStatus.UNAUTHORIZED, UNAUTHORIZED_CODE));
+
+		assertSingleRequestLogLine(requestId, "ANONYMOUS", "GET", OPEN_MEMBERS_ONLY_PATH, "401", UNAUTHORIZED_CODE);
+	}
+
+	@Test
+	@DisplayName("익명 인증을 끈 permitAll 경로 GET /test/logging-no-anonymous/denied의 컨트롤러가 AccessDeniedException을 던지고 GlobalExceptionHandler가 예외를 다시 던져 Security 처리기가 403 FORBIDDEN을 쓰면 그 요청의 요청 로그는 두 줄이 아니라 정확히 한 줄이고 그 줄은 status=200이 아니라 status=403 · errorCode=FORBIDDEN이다")
+	void accessDeniedRethrownToSecurityHandlerAfterReachingControllerLeavesOneRequestLogLineWithStatus403()
+			throws Exception {
+		String requestId = "ctl-403-rethrown";
+
+		mockMvc.perform(get(NO_ANONYMOUS_DENIED_PATH).header(REQUEST_ID_HEADER, requestId))
+				.andExpect(commonError(HttpStatus.FORBIDDEN, FORBIDDEN_CODE));
+
+		assertSingleRequestLogLine(requestId, "ANONYMOUS", "GET", NO_ANONYMOUS_DENIED_PATH, "403", FORBIDDEN_CODE);
+	}
+
 	static Stream<Arguments> unsafeRequestIdHeaders() {
 		return Stream.of(
 				arguments(named("공백이 든 값", "req 123")),
@@ -798,6 +1026,52 @@ class RequestLoggingAspectTest extends IntegrationTestSupport {
 				.andExpect(status().isOk())
 				.andExpect(content().string(containsString("event:" + STREAM_EVENT_NAME)))
 				.andExpect(content().string(containsString("data:seq-" + STREAM_EVENT_COUNT)));
+	}
+
+	private MockHttpServletRequestBuilder idempotentItemAsUser(String idempotencyKey, String body, String requestId) {
+		return asUser(post(IDEMPOTENT_ITEMS_PATH))
+				.header(IDEMPOTENCY_KEY_HEADER, idempotencyKey)
+				.header(REQUEST_ID_HEADER, requestId)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body);
+	}
+
+	private void assertSingleRequestLogLine(String requestId, String principal, String method, String path,
+			String status, String errorCode) {
+		List<ILoggingEvent> requestLogs = requestLogsWithRequestId(requestId);
+		assertThat(requestLogs).as("requestId %s의 요청 로그 줄 수", requestId).hasSize(1);
+		ILoggingEvent requestLog = requestLogs.getFirst();
+		assertThat(requestLog.getLevel()).isEqualTo(Level.INFO);
+		assertThat(requestLog.getFormattedMessage()).doesNotContain("\n", "\r");
+		Map<String, String> fields = fieldsOf(requestLog);
+		assertThat(fields)
+				.containsEntry("requestId", requestId)
+				.containsEntry("principal", principal)
+				.containsEntry("method", method)
+				.containsEntry("path", path)
+				.containsEntry("status", status);
+		assertThat(fields.get("durationMs")).isNotNull().matches("\\d+");
+		if (errorCode == null) {
+			assertThat(fields).doesNotContainKey(ERROR_CODE_KEY);
+		} else {
+			assertThat(fields).containsEntry(ERROR_CODE_KEY, errorCode);
+		}
+	}
+
+	private void assertControllerReachedSingleRequestLogLine(String requestId, String pathPattern, String status) {
+		List<ILoggingEvent> requestLogs = requestLogsWithRequestId(requestId);
+		assertThat(requestLogs).as("requestId %s의 요청 로그 줄 수", requestId).hasSize(1);
+		assertThat(fieldsOf(requestLogs.getFirst()))
+				.containsEntry("principal", "USER:101")
+				.containsEntry("path", pathPattern)
+				.containsEntry("status", status)
+				.doesNotContainKey(ERROR_CODE_KEY);
+	}
+
+	private List<ILoggingEvent> requestLogsWithRequestId(String requestId) {
+		return capturedEvents().stream()
+				.filter(event -> requestId.equals(fieldsOf(event).get("requestId")))
+				.toList();
 	}
 
 	private List<ILoggingEvent> requestLogsFor(String path) {
@@ -971,6 +1245,58 @@ class RequestLoggingAspectTest extends IntegrationTestSupport {
 
 	}
 
+	@RestController
+	static class FilterStageLoggingTestController {
+
+		private final AtomicLong itemNumbers = new AtomicLong();
+
+		@IdempotencyKeyRequired
+		@PostMapping(IDEMPOTENT_ITEMS_PATH)
+		public ResponseEntity<IdempotentItemResponse> createIdempotentItem(@RequestBody IdempotentItemRequest request) {
+			IdempotentItemResponse response = new IdempotentItemResponse(itemNumbers.incrementAndGet(), request.name());
+			return ResponseEntity.status(HttpStatus.CREATED).body(response);
+		}
+
+		@IdempotencyKeyRequired
+		@PostMapping(IDEMPOTENT_ACCEPTANCE_PATH_PATTERN)
+		public ResponseEntity<InviteLookupResponse> acceptInvite(@PathVariable("token") String token) {
+			return ResponseEntity.status(HttpStatus.CREATED).body(new InviteLookupResponse(token));
+		}
+
+		@GetMapping(GUARDIAN_ZONE_INVITE_PATH_PATTERN)
+		public InviteLookupResponse guardianZoneInvite(@PathVariable("token") String token) {
+			return new InviteLookupResponse(token);
+		}
+
+		@GetMapping(PUBLIC_INVITE_PATH_PATTERN)
+		public InviteLookupResponse publicInvite(@PathVariable("token") String token) {
+			return new InviteLookupResponse(token);
+		}
+
+	}
+
+	@RestController
+	static class SecurityAfterControllerLoggingTestController {
+
+		@GetMapping(OPEN_MEMBERS_ONLY_PATH)
+		@PreAuthorize("isAuthenticated()")
+		public String membersOnly() {
+			return "members-ok";
+		}
+
+		@GetMapping(NO_ANONYMOUS_DENIED_PATH)
+		public String denied() {
+			throw new AccessDeniedException("controller denied");
+		}
+
+	}
+
+	record IdempotentItemRequest(String name) {
+	}
+
+	record IdempotentItemResponse(long itemNumber, String name) {
+	}
+
 	static class ScriptedLinkCodeStatuses {
 
 		private final Map<Long, Deque<String>> outcomesByCodeId = new ConcurrentHashMap<>();
@@ -1045,8 +1371,32 @@ class RequestLoggingAspectTest extends IntegrationTestSupport {
 
 	@TestConfiguration(proxyBeanMethods = false)
 	@Import({RequestLoggingTestController.class, RequestLoggingSseTestController.class, TestSseConnections.class,
-			RequestLoggingPollingTestController.class, ScriptedLinkCodeStatuses.class})
+			RequestLoggingPollingTestController.class, ScriptedLinkCodeStatuses.class,
+			FilterStageLoggingTestController.class, SecurityAfterControllerLoggingTestController.class})
 	static class RequestLoggingTestEndpointConfiguration {
+
+		// 운영 체인(SecurityConfig)이 permitAll로 여는 경로. 컨트롤러의 @PreAuthorize가 익명 호출을 거절한다
+		@Bean
+		PublicEndpoints openRequestLoggingTestEndpoints() {
+			return new PublicEndpoints(List.of(new PublicEndpoint(HttpMethod.GET, OPEN_ENDPOINT_PATTERN)));
+		}
+
+		// 익명 인증이 없는 permitAll 경로: 컨트롤러의 AccessDeniedException이 Security 403 처리기로 간다
+		@Bean
+		@Order(Ordered.HIGHEST_PRECEDENCE + 2)
+		SecurityFilterChain noAnonymousRequestLoggingSecurityFilterChain(HttpSecurity http,
+				JsonAuthenticationEntryPoint authenticationEntryPoint,
+				JsonAccessDeniedHandler accessDeniedHandler) throws Exception {
+			http.securityMatcher(NO_ANONYMOUS_PATTERN)
+					.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+					.csrf(AbstractHttpConfigurer::disable)
+					.anonymous(AbstractHttpConfigurer::disable)
+					.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+					.exceptionHandling(exceptions -> exceptions
+							.authenticationEntryPoint(authenticationEntryPoint)
+							.accessDeniedHandler(accessDeniedHandler));
+			return http.build();
+		}
 
 		@Bean
 		@Order(Ordered.HIGHEST_PRECEDENCE)
@@ -1054,6 +1404,27 @@ class RequestLoggingAspectTest extends IntegrationTestSupport {
 			http.securityMatcher(PUBLIC_ENDPOINT_PATTERN)
 					.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
 					.csrf(AbstractHttpConfigurer::disable);
+			return http.build();
+		}
+
+		// 컨트롤러 전에 Security가 role로 403을 내는 경로(운영 체인과 같은 JWT 변환 · 401 · 403 처리기)
+		@Bean
+		@Order(Ordered.HIGHEST_PRECEDENCE + 1)
+		SecurityFilterChain guardianZoneRequestLoggingSecurityFilterChain(HttpSecurity http,
+				AuthPrincipalJwtConverter authPrincipalJwtConverter,
+				JsonAuthenticationEntryPoint authenticationEntryPoint,
+				JsonAccessDeniedHandler accessDeniedHandler) throws Exception {
+			http.securityMatcher(GUARDIAN_ZONE_PATTERN)
+					.authorizeHttpRequests(authorize -> authorize.anyRequest().hasRole("GUARDIAN"))
+					.csrf(AbstractHttpConfigurer::disable)
+					.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+					.oauth2ResourceServer(oauth2 -> oauth2
+							.jwt(jwt -> jwt.jwtAuthenticationConverter(authPrincipalJwtConverter))
+							.authenticationEntryPoint(authenticationEntryPoint)
+							.accessDeniedHandler(accessDeniedHandler))
+					.exceptionHandling(exceptions -> exceptions
+							.authenticationEntryPoint(authenticationEntryPoint)
+							.accessDeniedHandler(accessDeniedHandler));
 			return http.build();
 		}
 

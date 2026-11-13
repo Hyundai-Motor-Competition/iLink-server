@@ -3,6 +3,7 @@ package com.example.pickupservice.common.idempotency;
 import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.common.error.ErrorResponse.FieldError;
 import com.example.pickupservice.common.error.ErrorResponseWriter;
+import com.example.pickupservice.common.error.FilterStageEnd;
 import com.example.pickupservice.common.security.CurrentAuthPrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -46,7 +47,7 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
 		String key = request.getHeader(IdempotencyKeyHeader.NAME);
 		Optional<FieldError> keyViolation = IdempotencyKeyHeader.violationOf(key);
 		if (keyViolation.isPresent()) {
-			errorResponseWriter.write(response, ErrorCode.VALIDATION_FAILED, List.of(keyViolation.get()));
+			errorResponseWriter.write(request, response, ErrorCode.VALIDATION_FAILED, List.of(keyViolation.get()));
 			return;
 		}
 		CachedBodyRequest cachedRequest = new CachedBodyRequest(request);
@@ -90,23 +91,24 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
 		try {
 			Optional<IdempotencyKeyEntity> reserved = store().reserve(idempotentRequest);
 			if (reserved.isEmpty()) {
-				respondToExisting(idempotentRequest, response);
+				respondToExisting(request, idempotentRequest, response);
 			}
 			return reserved;
 		} catch (DataAccessException | TransactionException storageFailure) {
 			log.error("Idempotency-Key storage failed", storageFailure);
-			errorResponseWriter.write(response, ErrorCode.INTERNAL_SERVER_ERROR);
+			errorResponseWriter.write(request, response, ErrorCode.INTERNAL_SERVER_ERROR);
 			return Optional.empty();
 		}
 	}
 
-	private void respondToExisting(IdempotentRequest request, HttpServletResponse response) throws IOException {
-		Optional<IdempotencyKeyEntity> replayable = store().findReplayable(request);
+	private void respondToExisting(HttpServletRequest request, IdempotentRequest idempotentRequest,
+			HttpServletResponse response) throws IOException {
+		Optional<IdempotencyKeyEntity> replayable = store().findReplayable(idempotentRequest);
 		if (replayable.isEmpty()) {
-			errorResponseWriter.write(response, ErrorCode.IDEMPOTENCY_KEY_REUSED);
+			errorResponseWriter.write(request, response, ErrorCode.IDEMPOTENCY_KEY_REUSED);
 			return;
 		}
-		replay(replayable.get(), response);
+		replay(request, replayable.get(), response);
 	}
 
 	private IdempotencyKeyStore store() {
@@ -118,7 +120,9 @@ public class IdempotencyKeyFilter extends OncePerRequestFilter {
 				request.getHeader(IdempotencyKeyHeader.NAME), RequestHasher.hash(request));
 	}
 
-	private static void replay(IdempotencyKeyEntity stored, HttpServletResponse response) throws IOException {
+	private static void replay(HttpServletRequest request, IdempotencyKeyEntity stored, HttpServletResponse response)
+			throws IOException {
+		FilterStageEnd.mark(request);
 		response.setStatus(stored.getResponseStatus());
 		if (stored.getResponseBody() == null) {
 			return;
