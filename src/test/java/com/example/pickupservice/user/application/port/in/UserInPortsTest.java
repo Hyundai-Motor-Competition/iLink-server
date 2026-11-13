@@ -112,14 +112,16 @@ class UserInPortsTest {
 				"name", String.class.getName(),
 				"phone", String.class.getName(),
 				"deviceStatus", DeviceStatus.class.getName(),
-				"profileImageUrl", String.class.getName()));
+				"profileImageUrl", String.class.getName(),
+				"grade", String.class.getName()));
 		assertRecord(RegisterMemberCommand.class, components(
 				"familyId", "long",
 				"requesterRole", Role.class.getName(),
 				"role", Role.class.getName(),
 				"name", String.class.getName(),
 				"phone", String.class.getName(),
-				"profileImage", ProfileImage.class.getName()));
+				"profileImage", ProfileImage.class.getName(),
+				"grade", String.class.getName()));
 		assertRecord(UpdateMemberCommand.class, components(
 				"familyId", "long",
 				"requesterId", "long",
@@ -127,7 +129,8 @@ class UserInPortsTest {
 				"userId", "long",
 				"name", String.class.getName(),
 				"phone", String.class.getName(),
-				"role", Role.class.getName()));
+				"role", Role.class.getName(),
+				"grade", String.class.getName()));
 		assertRecord(RemoveMemberCommand.class, components(
 				"familyId", "long",
 				"requesterId", "long",
@@ -168,7 +171,8 @@ class UserInPortsTest {
 				"role", Role.class.getName(),
 				"name", String.class.getName(),
 				"phone", String.class.getName(),
-				"profileImageUrl", String.class.getName()));
+				"profileImageUrl", String.class.getName(),
+				"removed", "boolean"));
 		assertRecord(FamilyInfo.class, components(
 				"familyId", "long",
 				"joinCallMode", JoinCallMode.class.getName(),

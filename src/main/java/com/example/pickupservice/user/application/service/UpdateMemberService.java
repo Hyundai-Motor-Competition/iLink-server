@@ -30,6 +30,7 @@ public class UpdateMemberService implements UpdateMemberUseCase {
 	public MemberResult updateMember(UpdateMemberCommand command) {
 		User user = loadUserPort.loadUser(command.userId())
 				.filter(found -> Objects.equals(found.getFamilyId(), command.familyId()))
+				.filter(found -> !found.isRemoved())
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
 		checkRoleChangeAllowed(command);
 		checkChildPromotionAllowed(user, command);
@@ -70,6 +71,9 @@ public class UpdateMemberService implements UpdateMemberUseCase {
 		}
 		if (command.role() != null) {
 			user.changeRole(command.role());
+		}
+		if (command.grade() != null) {
+			user.changeGrade(command.grade());
 		}
 	}
 }

@@ -731,6 +731,7 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 - [x] [web] 세션 뷰 route에 경로 확정 때 전체 거리 totalMeters를 담는다(부모 메인 출발→도착 진행 막대)
 - [x] [서비스] 보호자에게 보내는 알림(출발 알림 · 준비 시간 추가 · 도움 요청 · 탑승 · 완료 등)의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE 모두다(GUARDIAN만이 아님, 사람 결정 2026-11-13)
 - [ ] user의 LoadMemberService가 pickup에 주는 MemberInfo.profileImageUrl을 가족 조회(GetMyFamilyService · MemberResults)와 같은 방식의 URL로 채워, 세션 뷰 children[].profileImageUrl · driver.profileImageUrl에 실제 값이 나간다(#273 후속, 팀장 결정 2026-11-14)
+- [ ] [서비스] 픽업 시작(StartPickup)은 해제된 자녀(user MemberInfo.removed true)의 일정을 세션 자녀에서 뺀다. 지난 기록 조회는 해제된 자녀 이름을 그대로 보인다(사람 결정 2026-11-14)
 
 ## 확인 필요 사항
 

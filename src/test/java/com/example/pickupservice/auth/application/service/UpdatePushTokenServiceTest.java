@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -96,7 +97,8 @@ class UpdatePushTokenServiceTest {
 	@DisplayName("푸시 토큰 갱신은 폐기된 기기면 UNAUTHORIZED로 거절하고 저장하지 않는다")
 	void updatePushTokenRejectsRevokedDeviceAsUnauthorized() {
 		when(loadDevicePort.loadDevice(DEVICE_ID)).thenReturn(Optional.of(Device.restore(DEVICE_ID, OwnerType.USER,
-				USER_ID, Platform.ANDROID, OLD_PUSH_TOKEN, EARLIER, "a".repeat(64), EARLIER)));
+				USER_ID, Platform.ANDROID, OLD_PUSH_TOKEN, EARLIER, "a".repeat(64), EARLIER,
+				NOW.plus(Duration.ofDays(14)))));
 
 		assertThatThrownBy(() -> updatePushTokenService.updatePushToken(
 				new UpdatePushTokenCommand(DEVICE_ID, Platform.ANDROID, NEW_PUSH_TOKEN)))
@@ -110,7 +112,7 @@ class UpdatePushTokenServiceTest {
 
 	private static Device liveUserDevice() {
 		return Device.restore(DEVICE_ID, OwnerType.USER, USER_ID, Platform.ANDROID, OLD_PUSH_TOKEN, EARLIER,
-				"a".repeat(64), null);
+				"a".repeat(64), null, NOW.plus(Duration.ofDays(14)));
 	}
 
 }

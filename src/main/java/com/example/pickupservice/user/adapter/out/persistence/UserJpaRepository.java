@@ -7,8 +7,8 @@ import java.util.List;
 
 interface UserJpaRepository extends JpaRepository<UserEntity, Long> {
 
-	List<UserEntity> findByFamilyId(Long familyId);
+	List<UserEntity> findByFamilyIdAndRemovedAtIsNullOrderByUserIdAsc(Long familyId);
 
-	long countByFamilyIdAndRoleNot(Long familyId, Role role);
+	long countByFamilyIdAndRoleNotAndRemovedAtIsNull(Long familyId, Role role);
 
 }

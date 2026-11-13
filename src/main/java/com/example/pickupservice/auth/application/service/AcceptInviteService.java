@@ -62,7 +62,7 @@ public class AcceptInviteService implements AcceptInviteUseCase {
 
 	private IssuedTokens registerMemberDevice(MemberInfo member, AcceptInviteCommand command, Instant now) {
 		Device device = saveDevicePort.saveDevice(Device.register(OwnerType.USER, member.userId(),
-				command.platform(), command.pushToken(), now, PlaceholderRefreshHash.next()));
+				command.platform(), command.pushToken(), now, PlaceholderRefreshHash.next(), null));
 		return new DeviceTokenRotator(issueTokenPort, saveDevicePort).issueTo(device, new TokenSubject(
 				PrincipalType.USER, member.userId(), member.familyId(), member.role(), device.getDeviceId()));
 	}

@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -88,7 +89,8 @@ class RevokeMemberDevicesServiceTest {
 	}
 
 	private static Device liveUserDevice(long deviceId, Platform platform, String pushToken) {
-		return Device.restore(deviceId, OwnerType.USER, USER_ID, platform, pushToken, EARLIER, "c".repeat(64), null);
+		return Device.restore(deviceId, OwnerType.USER, USER_ID, platform, pushToken, EARLIER, "c".repeat(64), null,
+				NOW.plus(Duration.ofDays(14)));
 	}
 
 }

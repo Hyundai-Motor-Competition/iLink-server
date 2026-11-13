@@ -4,9 +4,11 @@ import com.example.pickupservice.auth.adapter.out.token.JwtTokenIssuer;
 import com.example.pickupservice.auth.application.port.in.AcceptInviteCommand;
 import com.example.pickupservice.auth.application.port.in.AcceptInviteResult;
 import com.example.pickupservice.auth.application.port.in.ConsentAgreement;
+import com.example.pickupservice.auth.application.port.out.IssuedTokens;
 import com.example.pickupservice.auth.application.port.out.LoadDevicePort;
 import com.example.pickupservice.auth.application.port.out.LoadInvitePort;
 import com.example.pickupservice.auth.application.port.out.SaveDevicePort;
+import com.example.pickupservice.auth.application.port.out.TokenSubject;
 import com.example.pickupservice.auth.application.port.out.SaveInvitePort;
 import com.example.pickupservice.auth.domain.ConsentType;
 import com.example.pickupservice.auth.domain.Device;
@@ -39,6 +41,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
@@ -47,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -58,6 +62,7 @@ class AcceptInviteServiceTest {
 	private static final byte[] SECRET_BYTES = "pickup-test-jwt-secret-0123456789abcdef".getBytes(StandardCharsets.UTF_8);
 	private static final String SECRET = Base64.getEncoder().encodeToString(SECRET_BYTES);
 	private static final Duration ACCESS_TTL = Duration.ofMinutes(30);
+	private static final Duration REFRESH_TTL = Duration.ofDays(14);
 	private static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.SECONDS);
 	private static final long FAMILY_ID = 12L;
 	private static final long CHILD_ID = 33L;
@@ -86,7 +91,8 @@ class AcceptInviteServiceTest {
 	private SaveDevicePort saveDevicePort;
 
 	@Spy
-	private JwtTokenIssuer issueTokenPort = new JwtTokenIssuer(SECRET, ACCESS_TTL, Clock.fixed(NOW, ZoneOffset.UTC));
+	private JwtTokenIssuer issueTokenPort = new JwtTokenIssuer(SECRET, ACCESS_TTL, REFRESH_TTL,
+			Clock.fixed(NOW, ZoneOffset.UTC));
 
 	@Mock
 	private Clock clock;
@@ -111,7 +117,7 @@ class AcceptInviteServiceTest {
 			}
 			return Device.restore(NEW_DEVICE_ID, device.getOwnerType(), device.getOwnerId(), device.getPlatform(),
 					device.getPushToken(), device.getPushUpdatedAt(), device.getRefreshTokenHash(),
-					device.getRevokedAt());
+					device.getRevokedAt(), device.getRefreshTokenExpiresAt());
 		});
 	}
 
@@ -186,6 +192,28 @@ class AcceptInviteServiceTest {
 		assertThat(((Number) jwt.getClaim("familyId")).longValue()).isEqualTo(FAMILY_ID);
 		assertThat(jwt.getClaimAsString("role")).isEqualTo("CHILD");
 		assertThat(((Number) jwt.getClaim("deviceId")).longValue()).isEqualTo(NEW_DEVICE_ID);
+	}
+
+	@Test
+	@DisplayName("초대 수락이 만든 Device의 refresh 토큰 만료 시각은 발급자가 준 refreshTokenExpiresAt(발급 시각 + 14일)이다")
+	void acceptInviteStoresRefreshTokenExpiryFromIssuedTokens() {
+		givenInvite(liveInvite(CHILD_ID));
+		List<IssuedTokens> issued = new ArrayList<>();
+		doAnswer(invocation -> {
+			IssuedTokens tokens = (IssuedTokens) invocation.callRealMethod();
+			issued.add(tokens);
+			return tokens;
+		}).when(issueTokenPort).issueTokens(any(TokenSubject.class));
+
+		AcceptInviteResult result = acceptInviteService.acceptInvite(TOKEN,
+				new AcceptInviteCommand(childConsents(), Platform.IOS, PUSH_TOKEN));
+
+		assertThat(issued).hasSize(1);
+		Device device = lastSavedDeviceOf(CHILD_ID);
+		assertThat(device.getRefreshTokenHash()).isEqualTo(issueTokenPort.hashRefreshToken(result.refreshToken()));
+		assertThat(device.getRefreshTokenExpiresAt())
+				.isEqualTo(issued.getFirst().refreshTokenExpiresAt())
+				.isEqualTo(NOW.plus(REFRESH_TTL));
 	}
 
 	@Test
@@ -342,7 +370,7 @@ class AcceptInviteServiceTest {
 
 	private static Device liveUserDevice(long deviceId, long userId) {
 		return Device.restore(deviceId, OwnerType.USER, userId, Platform.ANDROID, "fcm-old-" + deviceId,
-				NOW.minusSeconds(3600), OLD_REFRESH_HASH, null);
+				NOW.minusSeconds(3600), OLD_REFRESH_HASH, null, NOW.plus(Duration.ofDays(14)));
 	}
 
 	private void givenInvite(MemberInvite invite) {

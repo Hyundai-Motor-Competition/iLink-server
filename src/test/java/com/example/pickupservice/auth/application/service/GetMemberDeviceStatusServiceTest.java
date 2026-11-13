@@ -60,7 +60,7 @@ class GetMemberDeviceStatusServiceTest {
 	void getDeviceStatusesJudgesEachMemberFromDevicesAndLatestInvite() {
 		when(loadDevicePort.loadLiveDevices(OwnerType.USER, CONNECTED_ID)).thenReturn(List.of(
 				Device.restore(901L, OwnerType.USER, CONNECTED_ID, Platform.ANDROID, "fcm", EARLIER, "e".repeat(64),
-						null)));
+						null, NOW.plus(Duration.ofDays(14)))));
 		when(loadDevicePort.loadLiveDevices(OwnerType.USER, PENDING_ID)).thenReturn(List.of());
 		when(loadDevicePort.loadLiveDevices(OwnerType.USER, EXPIRED_ID)).thenReturn(List.of());
 		when(loadDevicePort.loadLiveDevices(OwnerType.USER, NONE_ID)).thenReturn(List.of());

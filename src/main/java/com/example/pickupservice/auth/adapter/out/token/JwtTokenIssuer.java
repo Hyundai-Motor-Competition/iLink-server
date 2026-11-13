@@ -32,14 +32,17 @@ public class JwtTokenIssuer implements IssueTokenPort {
 
 	private final JwtEncoder jwtEncoder;
 	private final Duration accessTtl;
+	private final Duration refreshTtl;
 	private final Clock clock;
 	private final SecureRandom secureRandom = new SecureRandom();
 
 	public JwtTokenIssuer(@Value("${pickup.jwt.secret}") String base64Secret,
-			@Value("${pickup.jwt.access-ttl}") Duration accessTtl, Clock clock) {
+			@Value("${pickup.jwt.access-ttl}") Duration accessTtl,
+			@Value("${pickup.jwt.refresh-ttl}") Duration refreshTtl, Clock clock) {
 		SecretKey key = new SecretKeySpec(Base64.getDecoder().decode(base64Secret), "HmacSHA256");
 		this.jwtEncoder = NimbusJwtEncoder.withSecretKey(key).build();
 		this.accessTtl = accessTtl;
+		this.refreshTtl = refreshTtl;
 		this.clock = clock;
 	}
 
@@ -49,7 +52,8 @@ public class JwtTokenIssuer implements IssueTokenPort {
 		Instant expiresAt = issuedAt.plus(accessTtl);
 		String accessToken = encodeAccessToken(subject, issuedAt, expiresAt);
 		String refreshToken = newRefreshToken();
-		return new IssuedTokens(accessToken, expiresAt, refreshToken, hashRefreshToken(refreshToken));
+		return new IssuedTokens(accessToken, expiresAt, refreshToken, hashRefreshToken(refreshToken),
+				issuedAt.plus(refreshTtl));
 	}
 
 	@Override

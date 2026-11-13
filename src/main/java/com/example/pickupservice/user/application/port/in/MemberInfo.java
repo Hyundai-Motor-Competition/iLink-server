@@ -8,10 +8,12 @@ public record MemberInfo(
 		Role role,
 		String name,
 		String phone,
-		String profileImageUrl
+		String profileImageUrl,
+		boolean removed
 ) {
 
 	public MemberInfo(long userId, long familyId, Role role, String name, String phone) {
-		this(userId, familyId, role, name, phone, null);
+		this(userId, familyId, role, name, phone, null, false);
 	}
+
 }

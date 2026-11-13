@@ -23,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -87,6 +88,8 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 	private static final byte[] PNG_BYTES = {
 			(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52};
 
+	private static final String GRADE = "중학교 2학년";
+
 	private static final String GUARDIAN_PROFILE_URL =
 			"https://img-dev.chisanw.com/ilink/profiles/3f6c.webp?X-Amz-Expires=600&X-Amz-Signature=abc";
 
@@ -106,8 +109,8 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 						 "joinCallMode":"AUTO",
 						 "vehicle":{"vehicleId":77,"model":"아이오닉 5","plateNumberMasked":"12가 ****"},
 						 "members":[
-						   {"userId":101,"role":"GUARDIAN","name":"김보호","phone":"+821012345678","deviceStatus":"CONNECTED","profileImageUrl":null},
-						   {"userId":131,"role":"CHILD","name":"민준","phone":null,"deviceStatus":"INVITE_PENDING","profileImageUrl":null}
+						   {"userId":101,"role":"GUARDIAN","name":"김보호","phone":"+821012345678","grade":null,"deviceStatus":"CONNECTED","profileImageUrl":null},
+						   {"userId":131,"role":"CHILD","name":"민준","phone":null,"grade":null,"deviceStatus":"INVITE_PENDING","profileImageUrl":null}
 						 ]}
 						""", JsonCompareMode.STRICT))
 				.andExpect(jsonPath("$.members[1]", hasKey("phone")))
@@ -418,7 +421,7 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 	}
 
 	@Test
-	@DisplayName("PATCH /v1/families/me/members/{userId}는 200과 userId · role · name · phone · deviceStatus를 돌려준다")
+	@DisplayName("PATCH /v1/families/me/members/{userId}는 200과 userId · role · name · phone · grade · deviceStatus를 돌려준다")
 	void updateMemberReturns200WithMemberFields() throws Exception {
 		given(updateMemberUseCase.updateMember(any())).willReturn(
 				new MemberResult(CHILD_USER_ID, Role.CHILD, "민준", null, DeviceStatus.CONNECTED, null));
@@ -428,7 +431,7 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 						"""))
 				.andExpect(status().isOk())
 				.andExpect(content().json("""
-						{"userId":131,"role":"CHILD","name":"민준","phone":null,"deviceStatus":"CONNECTED"}
+						{"userId":131,"role":"CHILD","name":"민준","phone":null,"grade":null,"deviceStatus":"CONNECTED"}
 						""", JsonCompareMode.STRICT))
 				.andExpect(jsonPath("$", hasKey("phone")))
 				.andExpect(jsonPath("$.phone").value(nullValue()));
@@ -696,6 +699,135 @@ class FamilyControllerTest extends FamilyWebTestSupport {
 				.andExpect(jsonPath("$.error.fields[*].field", hasItem("enabled")));
 
 		then(changeChildLocationUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("GET /v1/families/me는 members[]마다 grade를 담고 grade가 없는 멤버는 \"grade\":null로 돌려준다")
+	void getMyFamilyReturnsGradeForEachMember() throws Exception {
+		FamilyResult family = new FamilyResult(FAMILY_ID, JoinCallMode.AUTO, null, List.of(
+				new MemberResult(GUARDIAN_USER_ID, Role.GUARDIAN, "김보호", "+821012345678", DeviceStatus.CONNECTED, null),
+				new MemberResult(CHILD_USER_ID, Role.CHILD, "민준", null, DeviceStatus.INVITE_PENDING, null)
+						.withGrade(GRADE)));
+		given(getMyFamilyUseCase.getMyFamily(any())).willReturn(family);
+
+		mockMvc.perform(get(MY_FAMILY_PATH).header(HttpHeaders.AUTHORIZATION, guardianBearer()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.members[0]", hasKey("grade")))
+				.andExpect(jsonPath("$.members[0].grade").value(nullValue()))
+				.andExpect(jsonPath("$.members[1].grade").value(GRADE));
+	}
+
+	@Test
+	@DisplayName("POST /v1/families/me/members에 grade를 보내면 RegisterMemberCommand의 grade로 유스케이스에 넘긴다")
+	void registerMemberPassesGradeToUseCase() throws Exception {
+		given(registerMemberUseCase.registerMember(any())).willReturn(CHILD_USER_ID);
+
+		mockMvc.perform(registerMemberRequest("""
+						{"role":"CHILD","name":"민준","phone":null,"grade":"%s"}
+						""".formatted(GRADE)))
+				.andExpect(status().isCreated());
+
+		RegisterMemberCommand expected =
+				new RegisterMemberCommand(FAMILY_ID, Role.GUARDIAN, Role.CHILD, "민준", null).withGrade(GRADE);
+		then(registerMemberUseCase).should().registerMember(expected);
+	}
+
+	@Test
+	@DisplayName("POST /v1/families/me/members에 20자 grade를 보내면 201을 돌려주고 grade를 그대로 넘긴다")
+	void registerMemberAccepts20CharGrade() throws Exception {
+		String grade20 = "가".repeat(20);
+		given(registerMemberUseCase.registerMember(any())).willReturn(CHILD_USER_ID);
+
+		mockMvc.perform(registerMemberRequest("""
+						{"role":"CHILD","name":"민준","phone":null,"grade":"%s"}
+						""".formatted(grade20)))
+				.andExpect(status().isCreated());
+
+		RegisterMemberCommand expected =
+				new RegisterMemberCommand(FAMILY_ID, Role.GUARDIAN, Role.CHILD, "민준", null).withGrade(grade20);
+		then(registerMemberUseCase).should().registerMember(expected);
+	}
+
+	@ParameterizedTest(name = "POST grade {0}자면 422")
+	@ValueSource(ints = {0, 21})
+	@DisplayName("POST /v1/families/me/members에 0자(빈 문자열) · 21자 grade를 보내면 422 VALIDATION_FAILED와 fields의 grade를 돌려주고 유스케이스를 부르지 않는다")
+	void registerMemberWithInvalidGradeLengthReturns422WithGradeField(int length) throws Exception {
+		mockMvc.perform(registerMemberRequest("""
+						{"role":"CHILD","name":"민준","phone":null,"grade":"%s"}
+						""".formatted("가".repeat(length))))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("grade")));
+
+		then(registerMemberUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/families/me/members multipart의 request 파트에 grade를 보내면 사진과 함께 RegisterMemberCommand의 grade로 넘긴다")
+	void registerMemberMultipartPassesGradeWithProfileImage() throws Exception {
+		given(registerMemberUseCase.registerMember(any())).willReturn(CHILD_USER_ID);
+
+		mockMvc.perform(registerMemberMultipartRequest("""
+						{"role":"CHILD","name":"민준","phone":null,"grade":"%s"}
+						""".formatted(GRADE),
+						new MockMultipartFile(PROFILE_IMAGE_PART, "child.png", MediaType.IMAGE_PNG_VALUE, PNG_BYTES)))
+				.andExpect(status().isCreated());
+
+		ArgumentCaptor<RegisterMemberCommand> captor = ArgumentCaptor.forClass(RegisterMemberCommand.class);
+		then(registerMemberUseCase).should().registerMember(captor.capture());
+		assertThat(captor.getValue().grade()).isEqualTo(GRADE);
+		assertThat(captor.getValue().profileImage()).isNotNull();
+	}
+
+	@Test
+	@DisplayName("POST /v1/families/me/members multipart의 request 파트 grade가 21자면 422 VALIDATION_FAILED와 fields의 grade를 돌려주고 유스케이스를 부르지 않는다")
+	void registerMemberMultipartWith21CharGradeReturns422WithGradeField() throws Exception {
+		mockMvc.perform(registerMemberMultipartRequest("""
+						{"role":"CHILD","name":"민준","phone":null,"grade":"%s"}
+						""".formatted("가".repeat(21)),
+						new MockMultipartFile(PROFILE_IMAGE_PART, "child.png", MediaType.IMAGE_PNG_VALUE, PNG_BYTES)))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("grade")));
+
+		then(registerMemberUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("PATCH /v1/families/me/members/{userId}에 grade를 보내면 UpdateMemberCommand의 grade로 넘기고 응답에 grade를 담는다")
+	void updateMemberPassesGradeToUseCaseAndReturnsGrade() throws Exception {
+		MemberResult updated =
+				new MemberResult(CHILD_USER_ID, Role.CHILD, "민준", null, DeviceStatus.CONNECTED, null).withGrade(GRADE);
+		given(updateMemberUseCase.updateMember(any())).willReturn(updated);
+
+		mockMvc.perform(updateMemberRequest(CHILD_USER_ID, """
+						{"grade":"%s"}
+						""".formatted(GRADE)))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"userId":131,"role":"CHILD","name":"민준","phone":null,"grade":"%s","deviceStatus":"CONNECTED"}
+						""".formatted(GRADE), JsonCompareMode.STRICT));
+
+		UpdateMemberCommand expected = new UpdateMemberCommand(
+				FAMILY_ID, GUARDIAN_USER_ID, Role.GUARDIAN, CHILD_USER_ID, null, null, null).withGrade(GRADE);
+		then(updateMemberUseCase).should().updateMember(expected);
+	}
+
+	@ParameterizedTest(name = "PATCH grade {0}자면 422")
+	@ValueSource(ints = {0, 21})
+	@DisplayName("PATCH /v1/families/me/members/{userId}에 0자(빈 문자열) · 21자 grade를 보내면 422 VALIDATION_FAILED와 fields의 grade를 돌려주고 유스케이스를 부르지 않는다")
+	void updateMemberWithInvalidGradeLengthReturns422WithGradeField(int length) throws Exception {
+		mockMvc.perform(updateMemberRequest(CHILD_USER_ID, """
+						{"grade":"%s"}
+						""".formatted("가".repeat(length))))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("grade")));
+
+		then(updateMemberUseCase).shouldHaveNoInteractions();
 	}
 
 	private MockHttpServletRequestBuilder changeChildLocationRequest(String bearer, String body) {

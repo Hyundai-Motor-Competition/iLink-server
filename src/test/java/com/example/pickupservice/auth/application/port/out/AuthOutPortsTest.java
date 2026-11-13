@@ -94,7 +94,8 @@ class AuthOutPortsTest {
 				"accessToken", String.class.getName(),
 				"accessTokenExpiresAt", Instant.class.getName(),
 				"refreshToken", String.class.getName(),
-				"refreshTokenHash", String.class.getName()));
+				"refreshTokenHash", String.class.getName(),
+				"refreshTokenExpiresAt", Instant.class.getName()));
 	}
 
 	private record ExpectedMethod(String name, String genericReturnType, Class<?>[] parameterTypes,

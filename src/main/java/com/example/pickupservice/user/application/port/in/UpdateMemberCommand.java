@@ -9,6 +9,16 @@ public record UpdateMemberCommand(
 		long userId,
 		String name,
 		String phone,
-		Role role
+		Role role,
+		String grade
 ) {
+
+	public UpdateMemberCommand(long familyId, long requesterId, Role requesterRole, long userId, String name,
+			String phone, Role role) {
+		this(familyId, requesterId, requesterRole, userId, name, phone, role, null);
+	}
+
+	public UpdateMemberCommand withGrade(String grade) {
+		return new UpdateMemberCommand(familyId, requesterId, requesterRole, userId, name, phone, role, grade);
+	}
 }

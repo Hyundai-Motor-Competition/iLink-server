@@ -11,7 +11,7 @@ import java.util.List;
 public record AcceptInviteRequest(
 		@NotNull List<@Valid @NotNull ConsentRequest> consents,
 		@GuardianPlatform Platform platform,
-		@Size(max = 255) String pushToken
+		@Size(min = 1, max = 255) String pushToken
 ) {
 
 	public AcceptInviteCommand toCommand() {

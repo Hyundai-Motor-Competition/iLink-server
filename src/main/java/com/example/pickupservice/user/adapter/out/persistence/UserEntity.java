@@ -11,6 +11,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -42,17 +43,26 @@ public class UserEntity extends BaseTimeEntity {
 	@Column(name = "profile_image_key", length = 200)
 	private String profileImageKey;
 
+	@Column(name = "removed_at")
+	private Instant removedAt;
+
+	@Column(length = 20)
+	private String grade;
+
 	public UserEntity(Long userId, Long familyId, Role role, String name, String phone) {
-		this(userId, familyId, role, name, phone, null);
+		this(userId, familyId, role, name, phone, null, null, null);
 	}
 
-	public UserEntity(Long userId, Long familyId, Role role, String name, String phone, String profileImageKey) {
+	public UserEntity(Long userId, Long familyId, Role role, String name, String phone, String profileImageKey,
+			Instant removedAt, String grade) {
 		this.userId = userId;
 		this.familyId = familyId;
 		this.role = role;
 		this.name = name;
 		this.phone = phone;
 		this.profileImageKey = profileImageKey;
+		this.removedAt = removedAt;
+		this.grade = grade;
 	}
 
 }

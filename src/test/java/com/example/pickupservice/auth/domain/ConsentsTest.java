@@ -34,10 +34,23 @@ class ConsentsTest {
 	}
 
 	@Test
-	@DisplayName("동의 종류는 TERMS · PRIVACY · MARKETING · LOCATION · PUSH 다섯 가지다")
-	void consentTypesAreTheFiveDefinedValues() {
+	@DisplayName("동의 종류는 TERMS · PRIVACY · MARKETING · LOCATION · PUSH · SERVICE_IMPROVEMENT 여섯 가지다")
+	void consentTypesAreTheSixDefinedValues() {
 		assertThat(ConsentType.values())
 				.containsExactlyInAnyOrder(ConsentType.TERMS, ConsentType.PRIVACY, ConsentType.MARKETING,
-						ConsentType.LOCATION, ConsentType.PUSH);
+						ConsentType.LOCATION, ConsentType.PUSH, ConsentType.SERVICE_IMPROVEMENT);
+	}
+
+	@ParameterizedTest(name = "[{index}] {0}")
+	@EnumSource(Role.class)
+	@DisplayName("SERVICE_IMPROVEMENT는 선택 동의라 초대 필수 동의 어디에도 들어가지 않는다")
+	void serviceImprovementIsNotRequiredForInvite(Role role) {
+		assertThat(Consents.requiredForInvite(role)).doesNotContain(ConsentType.SERVICE_IMPROVEMENT);
+	}
+
+	@Test
+	@DisplayName("SERVICE_IMPROVEMENT는 보호자 연결 필수 동의에 들어가지 않는다")
+	void serviceImprovementIsNotRequiredForGuardianLink() {
+		assertThat(Consents.requiredForGuardianLink()).doesNotContain(ConsentType.SERVICE_IMPROVEMENT);
 	}
 }

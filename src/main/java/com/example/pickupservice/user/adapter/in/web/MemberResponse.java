@@ -9,11 +9,13 @@ public record MemberResponse(
 		Role role,
 		String name,
 		String phone,
+		String grade,
 		DeviceStatus deviceStatus
 ) {
 
 	public static MemberResponse from(MemberResult member) {
-		return new MemberResponse(member.userId(), member.role(), member.name(), member.phone(), member.deviceStatus());
+		return new MemberResponse(member.userId(), member.role(), member.name(), member.phone(), member.grade(),
+				member.deviceStatus());
 	}
 
 }

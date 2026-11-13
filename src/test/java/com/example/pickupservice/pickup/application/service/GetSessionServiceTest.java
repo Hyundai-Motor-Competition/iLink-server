@@ -364,10 +364,10 @@ class GetSessionServiceTest {
 	void getSessionGivesNullDriverWithoutGuardian() {
 		givenMembers(List.of(
 				new MemberInfo(CO_GUARDIAN_ID, FAMILY_ID, Role.CO_GUARDIAN, "이공동", "010-3333-4444",
-						CO_GUARDIAN_PROFILE_IMAGE_URL),
-				new MemberInfo(DELEGATE_ID, FAMILY_ID, Role.DELEGATE, "박대리", "010-5555-6666", null),
-				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", "010-7777-8888", MINJUN_PROFILE_IMAGE_URL),
-				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", "010-9999-0000", null)));
+						CO_GUARDIAN_PROFILE_IMAGE_URL, false),
+				new MemberInfo(DELEGATE_ID, FAMILY_ID, Role.DELEGATE, "박대리", "010-5555-6666", null, false),
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", "010-7777-8888", MINJUN_PROFILE_IMAGE_URL, false),
+				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", "010-9999-0000", null, false)));
 		givenSession(afterRouteConfirmedWithCalledChildren());
 
 		SessionView view = getSessionService.getSession(new SessionQuery(vehicle(), SESSION_ID));
@@ -489,12 +489,12 @@ class GetSessionServiceTest {
 	private static List<MemberInfo> membersWithProfileImages() {
 		return List.of(
 				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1111-2222",
-						GUARDIAN_PROFILE_IMAGE_URL),
+						GUARDIAN_PROFILE_IMAGE_URL, false),
 				new MemberInfo(CO_GUARDIAN_ID, FAMILY_ID, Role.CO_GUARDIAN, "이공동", "010-3333-4444",
-						CO_GUARDIAN_PROFILE_IMAGE_URL),
-				new MemberInfo(DELEGATE_ID, FAMILY_ID, Role.DELEGATE, "박대리", "010-5555-6666", null),
-				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", "010-7777-8888", MINJUN_PROFILE_IMAGE_URL),
-				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", "010-9999-0000", null));
+						CO_GUARDIAN_PROFILE_IMAGE_URL, false),
+				new MemberInfo(DELEGATE_ID, FAMILY_ID, Role.DELEGATE, "박대리", "010-5555-6666", null, false),
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", "010-7777-8888", MINJUN_PROFILE_IMAGE_URL, false),
+				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", "010-9999-0000", null, false));
 	}
 
 	private static AuthPrincipal vehicle() {

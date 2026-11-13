@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +38,7 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 
 	private static final Instant AT = Instant.parse("2026-11-07T01:02:03.123456Z");
 	private static final Instant LATER = Instant.parse("2026-11-07T03:04:05.654321Z");
+	private static final Instant EXPIRES_AT = AT.plus(Duration.ofDays(14));
 	private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
 
 	private final SaveDevicePort saveDevicePort;
@@ -67,15 +69,41 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 		long userId = randomId();
 		String hash = AuthSeed.sha256(randomToken());
 		Device saved = saveDevice(Device.restore(null, OwnerType.USER, userId, Platform.ANDROID, "fcm-token-1", AT,
-				hash, LATER));
+				hash, LATER, EXPIRES_AT));
 		assertThat(saved.getDeviceId()).as("저장된 deviceId").isNotNull();
 		clearPersistenceContext();
 
 		assertThat(loadDevicePort.loadDevice(saved.getDeviceId())).get()
 				.usingRecursiveComparison()
 				.isEqualTo(Device.restore(saved.getDeviceId(), OwnerType.USER, userId, Platform.ANDROID, "fcm-token-1",
-						AT, hash, LATER));
+						AT, hash, LATER, EXPIRES_AT));
 		assertThat(loadDevicePort.loadDevice(Long.MAX_VALUE)).as("없는 deviceId").isEmpty();
+	}
+
+	@Test
+	@DisplayName("Device를 refreshTokenExpiresAt과 함께 저장했다 다시 읽으면 값이 같고, rotateRefreshToken(hash, expiresAt) 뒤 저장하면 새 만료 시각이 읽힌다")
+	void refreshTokenExpiresAtIsSavedAndRotated() {
+		long userId = randomId();
+		String hash = AuthSeed.sha256(randomToken());
+		Instant expiresAt = Instant.parse("2026-12-07T01:02:03.123456Z");
+		Instant newExpiresAt = Instant.parse("2027-01-07T04:05:06.654321Z");
+		Device saved = saveDevice(Device.register(OwnerType.USER, userId, Platform.ANDROID, "fcm-token-1", AT, hash,
+				expiresAt));
+		clearPersistenceContext();
+
+		Device loaded = loadDevicePort.loadDevice(saved.getDeviceId()).orElseThrow();
+		assertThat(loaded.getRefreshTokenExpiresAt()).as("저장 직후 읽은 만료 시각").isEqualTo(expiresAt);
+
+		String newHash = AuthSeed.sha256(randomToken());
+		loaded.rotateRefreshToken(newHash, newExpiresAt);
+		saveDevicePort.saveDevice(loaded);
+		clearPersistenceContext();
+
+		Device reloaded = loadDevicePort.loadDevice(saved.getDeviceId()).orElseThrow();
+		assertThat(reloaded.getRefreshTokenHash()).as("새 해시").isEqualTo(newHash);
+		assertThat(reloaded.getRefreshTokenExpiresAt()).as("회전 뒤 만료 시각").isEqualTo(newExpiresAt);
+		assertThat(Device.restore(saved.getDeviceId(), OwnerType.USER, userId, Platform.ANDROID, "fcm-token-1", AT,
+				hash, null, expiresAt).getRefreshTokenExpiresAt()).isEqualTo(expiresAt);
 	}
 
 	@Test
@@ -117,7 +145,7 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 		long vehicleId = randomId();
 		long issuedDeviceId = randomId();
 		Device device = saveDevice(Device.register(OwnerType.USER, userId, Platform.IOS, null, AT,
-				AuthSeed.sha256(randomToken())));
+				AuthSeed.sha256(randomToken()), EXPIRES_AT));
 		LinkCode linkCode = saveLinkCode(LinkCode.issue(vehicleId, issuedDeviceId, true, randomCode(), AT));
 		String token = randomToken();
 		MemberInvite invite = saveInvite(MemberInvite.issue(userId, token, AT));
@@ -126,7 +154,8 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 		String newHash = AuthSeed.sha256(randomToken());
 		Device loadedDevice = loadDevicePort.loadDevice(device.getDeviceId()).orElseThrow();
 		loadedDevice.updatePushToken("fcm-new", LATER);
-		loadedDevice.rotateRefreshToken(newHash);
+		Instant rotatedExpiresAt = LATER.plus(Duration.ofDays(14));
+		loadedDevice.rotateRefreshToken(newHash, rotatedExpiresAt);
 		loadedDevice.revoke(LATER);
 		saveDevicePort.saveDevice(loadedDevice);
 
@@ -142,7 +171,7 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 		assertThat(loadDevicePort.loadDevice(device.getDeviceId())).get()
 				.usingRecursiveComparison()
 				.isEqualTo(Device.restore(device.getDeviceId(), OwnerType.USER, userId, Platform.IOS, "fcm-new",
-						LATER, newHash, LATER));
+						LATER, newHash, LATER, rotatedExpiresAt));
 		assertThat(loadLinkCodePort.loadLinkCode(linkCode.getCodeId())).get()
 				.usingRecursiveComparison()
 				.isEqualTo(LinkCode.restore(linkCode.getCodeId(), vehicleId, issuedDeviceId, true, linkCode.getCode(),
@@ -166,14 +195,15 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 		String targetHash = AuthSeed.sha256(randomToken());
 		String otherHash = AuthSeed.sha256(randomToken());
 		Device target = saveDevice(Device.register(OwnerType.VEHICLE, vehicleId, Platform.VEHICLE, null, AT,
-				targetHash));
-		saveDevice(Device.register(OwnerType.USER, userId, Platform.ANDROID, "fcm-token", AT, otherHash));
+				targetHash, EXPIRES_AT));
+		saveDevice(Device.register(OwnerType.USER, userId, Platform.ANDROID, "fcm-token", AT, otherHash,
+				EXPIRES_AT));
 		clearPersistenceContext();
 
 		assertThat(loadDevicePort.loadByRefreshTokenHash(targetHash)).get()
 				.usingRecursiveComparison()
 				.isEqualTo(Device.restore(target.getDeviceId(), OwnerType.VEHICLE, vehicleId, Platform.VEHICLE, null,
-						null, targetHash, null));
+						null, targetHash, null, EXPIRES_AT));
 		assertThat(loadDevicePort.loadByRefreshTokenHash(AuthSeed.sha256(randomToken())))
 				.as("저장되지 않은 해시").isEmpty();
 	}
@@ -184,15 +214,15 @@ class AuthPersistenceAdapterTest extends IntegrationTestSupport {
 		long ownerId = randomId();
 		long otherUserId = randomId();
 		Device liveAndroid = saveDevice(Device.register(OwnerType.USER, ownerId, Platform.ANDROID, "fcm-a", AT,
-				AuthSeed.sha256(randomToken())));
+				AuthSeed.sha256(randomToken()), EXPIRES_AT));
 		Device liveIos = saveDevice(Device.register(OwnerType.USER, ownerId, Platform.IOS, null, AT,
-				AuthSeed.sha256(randomToken())));
+				AuthSeed.sha256(randomToken()), EXPIRES_AT));
 		saveDevice(Device.restore(null, OwnerType.USER, ownerId, Platform.ANDROID, "fcm-old", AT,
-				AuthSeed.sha256(randomToken()), LATER));
+				AuthSeed.sha256(randomToken()), LATER, EXPIRES_AT));
 		saveDevice(Device.register(OwnerType.VEHICLE, ownerId, Platform.VEHICLE, null, AT,
-				AuthSeed.sha256(randomToken())));
+				AuthSeed.sha256(randomToken()), EXPIRES_AT));
 		saveDevice(Device.register(OwnerType.USER, otherUserId, Platform.ANDROID, "fcm-other", AT,
-				AuthSeed.sha256(randomToken())));
+				AuthSeed.sha256(randomToken()), EXPIRES_AT));
 		clearPersistenceContext();
 
 		List<Device> liveDevices = loadDevicePort.loadLiveDevices(OwnerType.USER, ownerId);

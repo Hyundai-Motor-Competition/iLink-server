@@ -9,12 +9,13 @@ public record FamilyMemberResponse(
 		Role role,
 		String name,
 		String phone,
+		String grade,
 		DeviceStatus deviceStatus,
 		String profileImageUrl
 ) {
 
 	public static FamilyMemberResponse from(MemberResult member) {
-		return new FamilyMemberResponse(member.userId(), member.role(), member.name(), member.phone(),
+		return new FamilyMemberResponse(member.userId(), member.role(), member.name(), member.phone(), member.grade(),
 				member.deviceStatus(), member.profileImageUrl());
 	}
 

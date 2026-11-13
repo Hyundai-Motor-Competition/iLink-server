@@ -47,10 +47,12 @@ public class DeviceEntity extends BaseTimeEntity {
 	@Column(nullable = false, columnDefinition = "char(64)")
 	private String refreshTokenHash;
 
+	private Instant refreshTokenExpiresAt;
+
 	private Instant revokedAt;
 
 	public DeviceEntity(Long deviceId, OwnerType ownerType, Long ownerId, Platform platform, String pushToken,
-			Instant pushUpdatedAt, String refreshTokenHash, Instant revokedAt) {
+			Instant pushUpdatedAt, String refreshTokenHash, Instant revokedAt, Instant refreshTokenExpiresAt) {
 		this.deviceId = deviceId;
 		this.ownerType = ownerType;
 		this.ownerId = ownerId;
@@ -59,6 +61,7 @@ public class DeviceEntity extends BaseTimeEntity {
 		this.pushUpdatedAt = pushUpdatedAt;
 		this.refreshTokenHash = refreshTokenHash;
 		this.revokedAt = revokedAt;
+		this.refreshTokenExpiresAt = refreshTokenExpiresAt;
 	}
 
 }

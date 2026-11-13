@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
@@ -115,7 +116,7 @@ class LogoutVehicleServiceTest {
 	@DisplayName("차량 로그아웃은 VEHICLE 기기가 아니면 NOT_FOUND로 거절한다")
 	void logoutVehicleRejectsUserDeviceAsNotFound() {
 		when(loadDevicePort.loadDevice(DEVICE_ID)).thenReturn(Optional.of(Device.restore(DEVICE_ID, OwnerType.USER,
-				31L, Platform.ANDROID, "fcm-token", EARLIER, REFRESH_HASH, null)));
+				31L, Platform.ANDROID, "fcm-token", EARLIER, REFRESH_HASH, null, NOW.plus(Duration.ofDays(14)))));
 
 		assertThatThrownBy(() -> logoutVehicleService.logoutVehicle(DEVICE_ID))
 				.isInstanceOfSatisfying(BusinessException.class, e -> {
@@ -129,7 +130,7 @@ class LogoutVehicleServiceTest {
 
 	private static Device liveVehicleDevice() {
 		return Device.restore(DEVICE_ID, OwnerType.VEHICLE, VEHICLE_ID, Platform.VEHICLE, null, null, REFRESH_HASH,
-				null);
+				null, NOW.plus(Duration.ofDays(14)));
 	}
 
 }
