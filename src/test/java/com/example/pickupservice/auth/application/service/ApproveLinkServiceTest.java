@@ -17,7 +17,10 @@ import com.example.pickupservice.auth.domain.LinkMode;
 import com.example.pickupservice.auth.domain.OwnerType;
 import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.image.ProfileImage;
 import com.example.pickupservice.common.security.Role;
+import com.example.pickupservice.user.application.port.in.ChangeProfileImageCommand;
+import com.example.pickupservice.user.application.port.in.ChangeProfileImageUseCase;
 import com.example.pickupservice.user.application.port.in.CreateGuardianCommand;
 import com.example.pickupservice.user.application.port.in.CreateGuardianUseCase;
 import com.example.pickupservice.user.application.port.in.GuardianAccount;
@@ -51,6 +54,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
+import static com.example.pickupservice.common.fixture.TestImages.PNG_BYTES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -85,7 +89,6 @@ class ApproveLinkServiceTest {
 	private static final String GUARDIAN_NAME = "김보호";
 	private static final String PUSH_TOKEN = "fcm-token-abc";
 	private static final String OLD_REFRESH_HASH = "0".repeat(64);
-
 	@Mock
 	private LoadLinkCodePort loadLinkCodePort;
 
@@ -100,6 +103,9 @@ class ApproveLinkServiceTest {
 
 	@Mock
 	private LoadMemberUseCase loadMemberUseCase;
+
+	@Mock
+	private ChangeProfileImageUseCase changeProfileImageUseCase;
 
 	@Mock
 	private LoadDevicePort loadDevicePort;
@@ -509,6 +515,82 @@ class ApproveLinkServiceTest {
 				HttpStatus.GONE, "LINK_CODE_EXPIRED");
 
 		assertNothingChanged();
+	}
+
+	@Test
+	@DisplayName("연결 승인 NEW는 사진이 있으면 그 사진을 CreateGuardianCommand에 담아 보호자 생성에 넘긴다")
+	void approveLinkNewPassesProfileImageToCreateGuardian() {
+		givenCode(issuedCode());
+		givenVehicle(pendingVehicle());
+		ProfileImage image = ProfileImage.of(PNG_BYTES);
+
+		approveLinkService.approveLink(command(LinkMode.NEW, requiredConsents(), PUSH_TOKEN).withProfileImage(image));
+
+		ArgumentCaptor<CreateGuardianCommand> created = ArgumentCaptor.forClass(CreateGuardianCommand.class);
+		verify(createGuardianUseCase).createGuardian(created.capture());
+		assertThat(created.getValue().vehicleId()).isEqualTo(VEHICLE_ID);
+		assertThat(created.getValue().name()).isEqualTo(GUARDIAN_NAME);
+		assertThat(created.getValue().profileImage()).isSameAs(image);
+		verify(changeProfileImageUseCase, never()).changeProfileImage(any());
+	}
+
+	@Test
+	@DisplayName("연결 승인이 코드 검증에서 실패하면 사진이 있어도 보호자 생성 · 사진 변경을 부르지 않아 저장소에 아무것도 올리지 않는다")
+	void approveLinkUploadsNothingWhenCodeIsInvalid() {
+		when(loadLinkCodePort.loadLinkCodeByCode(CODE)).thenReturn(Optional.empty());
+		ApproveLinkCommand command = command(LinkMode.NEW, requiredConsents(), PUSH_TOKEN)
+				.withProfileImage(ProfileImage.of(PNG_BYTES));
+
+		assertError(() -> approveLinkService.approveLink(command), HttpStatus.NOT_FOUND, "LINK_CODE_INVALID");
+
+		assertNothingChanged();
+		verify(changeProfileImageUseCase, never()).changeProfileImage(any());
+	}
+
+	@Test
+	@DisplayName("연결 승인이 동의 검증에서 실패하면 사진이 있어도 보호자 생성 · 사진 변경을 부르지 않아 저장소에 아무것도 올리지 않는다")
+	void approveLinkUploadsNothingWhenConsentIsMissing() {
+		givenCode(issuedCode());
+		givenVehicle(linkedVehicle());
+		lenient().when(loadMemberUseCase.findMembers(FAMILY_ID)).thenReturn(List.of(
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, GUARDIAN_NAME, null)));
+		ApproveLinkCommand command = command(LinkMode.RELINK,
+				List.of(new ConsentAgreement(ConsentType.TERMS, true)), PUSH_TOKEN)
+				.withProfileImage(ProfileImage.of(PNG_BYTES));
+
+		assertError(() -> approveLinkService.approveLink(command),
+				HttpStatus.UNPROCESSABLE_CONTENT, "CONSENT_REQUIRED");
+
+		assertNothingChanged();
+		verify(changeProfileImageUseCase, never()).changeProfileImage(any());
+	}
+
+	@Test
+	@DisplayName("연결 승인 RELINK에 사진이 있으면 기존 GUARDIAN의 사진 변경을 그 사진으로 부른다")
+	void approveLinkRelinkWithImageChangesExistingGuardianProfileImage() {
+		givenRelinkFamily();
+		when(loadDevicePort.loadLiveDevices(OwnerType.USER, GUARDIAN_ID)).thenReturn(List.of());
+		ProfileImage image = ProfileImage.of(PNG_BYTES);
+
+		VehicleLinkResult result = approveLinkService.approveLink(
+				command(LinkMode.RELINK, requiredConsents(), PUSH_TOKEN).withProfileImage(image));
+
+		assertThat(result.userId()).isEqualTo(GUARDIAN_ID);
+		verify(changeProfileImageUseCase).changeProfileImage(new ChangeProfileImageCommand(GUARDIAN_ID, image));
+		verify(createGuardianUseCase, never()).createGuardian(any());
+	}
+
+	@Test
+	@DisplayName("연결 승인 RELINK에 사진이 없으면 사진 변경을 부르지 않아 보호자의 profileImageKey를 그대로 둔다")
+	void approveLinkRelinkWithoutImageKeepsGuardianProfileImage() {
+		givenRelinkFamily();
+		when(loadDevicePort.loadLiveDevices(OwnerType.USER, GUARDIAN_ID)).thenReturn(List.of());
+
+		VehicleLinkResult result = approveLinkService.approveLink(
+				command(LinkMode.RELINK, requiredConsents(), PUSH_TOKEN).withProfileImage(null));
+
+		assertThat(result.userId()).isEqualTo(GUARDIAN_ID);
+		verify(changeProfileImageUseCase, never()).changeProfileImage(any());
 	}
 
 	private void givenCode(LinkCode code) {
