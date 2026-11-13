@@ -14,6 +14,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.List;
 
@@ -30,6 +33,7 @@ public class AuthSeed {
 	private final UserSeed userSeed;
 	private final EntityManager entityManager;
 	private final TransactionTemplate transactionTemplate;
+	private final Clock clock;
 
 	public Result seed() {
 		UserSeed.Result user = userSeed.seed();
@@ -69,9 +73,9 @@ public class AuthSeed {
 		}
 	}
 
-	private static DeviceEntity vehicleDevice(long vehicleId, String rawRefreshToken) {
+	private DeviceEntity vehicleDevice(long vehicleId, String rawRefreshToken) {
 		return new DeviceEntity(null, OwnerType.VEHICLE, vehicleId, Platform.VEHICLE, null, null,
-				sha256(rawRefreshToken), null);
+				sha256(rawRefreshToken), null, clock.instant().plus(Duration.ofDays(14)).truncatedTo(ChronoUnit.MICROS));
 	}
 
 	private <T> T persist(T entity) {

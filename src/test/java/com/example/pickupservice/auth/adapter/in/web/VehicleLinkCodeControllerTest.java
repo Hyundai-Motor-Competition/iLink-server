@@ -428,6 +428,18 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	}
 
 	@Test
+	@DisplayName("GET /v1/vehicle-link-codes/by-code/{code}가 같은 기기 5번 실패 뒤면 429 LINK_CODE_ATTEMPT_LIMIT과 retryAfterSeconds 42를 돌려준다")
+	void checkLinkCodeAfterAttemptLimitReturns429WithRetryAfterSeconds() throws Exception {
+		given(checkLinkCodeUseCase.checkLinkCode(anyString(), anyString()))
+				.willThrow(BusinessException.tooManyRequests(
+						"LINK_CODE_ATTEMPT_LIMIT", "연결 코드 확인 실패가 많아 잠시 뒤에 다시 시도해 주세요", 42));
+
+		mockMvc.perform(byCodeRequest(CODE))
+				.andExpect(tooManyRequestsError("LINK_CODE_ATTEMPT_LIMIT", 42))
+				.andExpect(jsonPath("$.error.message").isNotEmpty());
+	}
+
+	@Test
 	@DisplayName("POST /v1/vehicle-links는 인증 헤더 없이 201과 vehicleId · familyId · userId · accessToken · refreshToken을 돌려준다")
 	void approveLinkWithoutAuthorizationHeaderReturns201WithGuardianTokens() throws Exception {
 		given(approveLinkUseCase.approveLink(any())).willReturn(vehicleLinkResult());
@@ -496,6 +508,38 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 	}
 
 	@Test
+	@DisplayName("POST /v1/vehicle-links의 consents에 SERVICE_IMPROVEMENT를 담아도 201을 돌려주고 그대로 넘긴다")
+	void approveLinkWithServiceImprovementConsentReturns201AndPassesIt() throws Exception {
+		given(approveLinkUseCase.approveLink(any())).willReturn(vehicleLinkResult());
+		String consents = "[{\"type\": \"TERMS\", \"agreed\": true}, {\"type\": \"PRIVACY\", \"agreed\": true}, "
+				+ "{\"type\": \"SERVICE_IMPROVEMENT\", \"agreed\": true}]";
+
+		mockMvc.perform(approveRequest(approveBody("NEW", "ANDROID", GUARDIAN_NAME, consents)))
+				.andExpect(status().isCreated());
+
+		then(approveLinkUseCase).should().approveLink(new ApproveLinkCommand(
+				CODE,
+				LinkMode.NEW,
+				List.of(
+						new ConsentAgreement(ConsentType.TERMS, true),
+						new ConsentAgreement(ConsentType.PRIVACY, true),
+						new ConsentAgreement(ConsentType.SERVICE_IMPROVEMENT, true)),
+				Platform.ANDROID,
+				PUSH_TOKEN,
+				GUARDIAN_NAME));
+	}
+
+	@Test
+	@DisplayName("POST /v1/vehicle-links의 consents에서 SERVICE_IMPROVEMENT가 빠져도 201을 돌려준다")
+	void approveLinkWithoutServiceImprovementConsentReturns201() throws Exception {
+		given(approveLinkUseCase.approveLink(any())).willReturn(vehicleLinkResult());
+		String consents = "[{\"type\": \"TERMS\", \"agreed\": true}, {\"type\": \"PRIVACY\", \"agreed\": true}]";
+
+		mockMvc.perform(approveRequest(approveBody("NEW", "ANDROID", GUARDIAN_NAME, consents)))
+				.andExpect(status().isCreated());
+	}
+
+	@Test
 	@DisplayName("POST /v1/vehicle-links에 mode NEW로 name 없이 보내면 422 VALIDATION_FAILED와 fields의 name을 돌려준다")
 	void approveLinkNewWithoutNameReturns422WithNameField() throws Exception {
 		mockMvc.perform(approveRequest(approveBody("NEW", "ANDROID", null, REQUIRED_CONSENTS_JSON)))
@@ -558,6 +602,50 @@ class VehicleLinkCodeControllerTest extends AuthWebTestSupport {
 				.andExpect(jsonPath("$.error.fields[0].field").value("platform"));
 
 		then(approveLinkUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/vehicle-links에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려준다")
+	void approveLinkWithEmptyPushTokenReturns422WithPushTokenField() throws Exception {
+		String body = approveBody("NEW", "ANDROID", GUARDIAN_NAME, REQUIRED_CONSENTS_JSON)
+				.replace("\"pushToken\": \"" + PUSH_TOKEN + "\"", "\"pushToken\": \"\"");
+
+		mockMvc.perform(approveRequest(body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[0].field").value("pushToken"));
+
+		then(approveLinkUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/vehicle-links의 multipart request 파트에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려준다")
+	void approveLinkMultipartWithEmptyPushTokenReturns422WithPushTokenField() throws Exception {
+		String body = approveBody("NEW", "ANDROID", GUARDIAN_NAME, REQUIRED_CONSENTS_JSON)
+				.replace("\"pushToken\": \"" + PUSH_TOKEN + "\"", "\"pushToken\": \"\"");
+
+		mockMvc.perform(approveMultipartRequest(body,
+						new MockMultipartFile(PROFILE_IMAGE_PART, "guardian.png", MediaType.IMAGE_PNG_VALUE, PNG_BYTES)))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[0].field").value("pushToken"));
+
+		then(approveLinkUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/vehicle-links에 pushToken을 빼면 201을 돌려주고 pushToken null을 넘긴다")
+	void approveLinkWithoutPushTokenReturns201AndPassesNull() throws Exception {
+		given(approveLinkUseCase.approveLink(any())).willReturn(vehicleLinkResult());
+		String body = approveBody("NEW", "ANDROID", GUARDIAN_NAME, REQUIRED_CONSENTS_JSON)
+				.replace(", \"pushToken\": \"" + PUSH_TOKEN + "\"", "");
+
+		mockMvc.perform(approveRequest(body))
+				.andExpect(status().isCreated());
+
+		ArgumentCaptor<ApproveLinkCommand> captor = ArgumentCaptor.forClass(ApproveLinkCommand.class);
+		then(approveLinkUseCase).should().approveLink(captor.capture());
+		assertThat(captor.getValue().pushToken()).isNull();
 	}
 
 	@Test

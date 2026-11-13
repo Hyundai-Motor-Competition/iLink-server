@@ -1,5 +1,6 @@
 package com.example.pickupservice.auth.domain;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -16,12 +17,12 @@ class DeviceStatusJudgeTest {
 
 	private static Device liveUserDevice(long deviceId) {
 		return Device.restore(deviceId, OwnerType.USER, USER_ID, Platform.ANDROID, "fcm_live", NOW.minusSeconds(3600),
-				REFRESH_HASH, null);
+				REFRESH_HASH, null, NOW.plus(Duration.ofDays(14)));
 	}
 
 	private static Device revokedUserDevice(long deviceId) {
 		return Device.restore(deviceId, OwnerType.USER, USER_ID, Platform.IOS, "fcm_old", NOW.minusSeconds(7200),
-				REFRESH_HASH, NOW.minusSeconds(60));
+				REFRESH_HASH, NOW.minusSeconds(60), NOW.plus(Duration.ofDays(14)));
 	}
 
 	private static MemberInvite pendingInvite() {

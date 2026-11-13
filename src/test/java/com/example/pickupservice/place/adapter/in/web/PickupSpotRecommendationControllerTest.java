@@ -5,6 +5,8 @@ import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
 import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.common.security.Role;
+import com.example.pickupservice.place.application.port.in.NearbySpot;
+import com.example.pickupservice.place.application.port.in.NearbySpots;
 import com.example.pickupservice.place.application.port.in.RecommendSpotsQuery;
 import com.example.pickupservice.place.application.port.in.SpotRecommendations;
 import com.example.pickupservice.place.domain.LineKind;
@@ -36,6 +38,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -45,6 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PickupSpotRecommendationControllerTest extends PlaceWebTestSupport {
 
 	private static final String PATH = "/v1/pickup-spot-recommendations";
+	private static final String NEARBY_PATH = "/v1/pickup-spot-recommendations/nearby";
 	private static final long FAMILY_ID = 12L;
 	private static final long VEHICLE_FAMILY_ID = 34L;
 	private static final long GUARDIAN_USER_ID = 101L;
@@ -273,6 +277,123 @@ class PickupSpotRecommendationControllerTest extends PlaceWebTestSupport {
 				.andExpect(commonError(HttpStatus.NOT_FOUND, "NOT_FOUND"));
 
 		then(recommendPickupSpotsUseCase).should().recommendSpots(any());
+	}
+
+	// ---- SPOT-05 GET /v1/pickup-spot-recommendations/nearby (#102)
+
+	@Test
+	@DisplayName("GET /v1/pickup-spot-recommendations/nearby는 200과 supported · items[](name · location · walkMeters · walkSeconds)를 유스케이스가 준 걷는 거리 순서 그대로 돌려주고 driveSeconds · totalSeconds 필드는 없다")
+	void nearbyReturns200WithItemsInWalkOrderWithoutDriveFields() throws Exception {
+		given(recommendPickupSpotsUseCase.recommendNearbySpots(ACADEMY_ID)).willReturn(sampleNearbySpots());
+
+		mockMvc.perform(nearbyRequest(guardianBearer()).queryParam("academyId", String.valueOf(ACADEMY_ID)))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"supported":true,"items":[
+						  {"name":"삼성동 공영주차장","location":{"lat":37.497001,"lng":127.060002},
+						   "walkMeters":120,"walkSeconds":110},
+						  {"name":"이름 없는 길","location":{"lat":37.498000,"lng":127.061000},
+						   "walkMeters":250,"walkSeconds":228},
+						  {"name":"영동대로50길","location":{"lat":37.498527,"lng":127.069331},
+						   "walkMeters":346,"walkSeconds":315}]}
+						""", JsonCompareMode.STRICT))
+				.andExpect(jsonPath("$.items[0].driveSeconds").doesNotExist())
+				.andExpect(jsonPath("$.items[0].totalSeconds").doesNotExist());
+
+		then(recommendPickupSpotsUseCase).should().recommendNearbySpots(ACADEMY_ID);
+		then(recommendPickupSpotsUseCase).should(never()).recommendSpots(any());
+	}
+
+	@Test
+	@DisplayName("GET /v1/pickup-spot-recommendations/nearby는 지원 지역 밖이면 200과 supported false, 빈 items[]를 돌려준다")
+	void nearbyOutsideServiceAreaReturns200WithEmptyItems() throws Exception {
+		given(recommendPickupSpotsUseCase.recommendNearbySpots(ACADEMY_ID)).willReturn(new NearbySpots(false, List.of()));
+
+		mockMvc.perform(nearbyRequest(guardianBearer()).queryParam("academyId", String.valueOf(ACADEMY_ID)))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"supported":false,"items":[]}
+						""", JsonCompareMode.STRICT));
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = Role.class, names = {"CO_GUARDIAN", "DELEGATE"})
+	@DisplayName("GET /v1/pickup-spot-recommendations/nearby는 CO_GUARDIAN · DELEGATE 토큰으로도 200을 돌려준다")
+	void nearbyWithCoGuardianOrDelegateTokenReturns200(Role role) throws Exception {
+		given(recommendPickupSpotsUseCase.recommendNearbySpots(ACADEMY_ID)).willReturn(sampleNearbySpots());
+
+		mockMvc.perform(nearbyRequest(bearer(accessTokenFixture.user(GUARDIAN_USER_ID + 10, FAMILY_ID, role)))
+						.queryParam("academyId", String.valueOf(ACADEMY_ID)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.items.length()").value(3));
+	}
+
+	@Test
+	@DisplayName("GET /v1/pickup-spot-recommendations/nearby는 차량 토큰으로도 출발 위치 없이 200과 supported · items[]를 돌려준다")
+	void nearbyWithVehicleTokenReturns200() throws Exception {
+		given(recommendPickupSpotsUseCase.recommendNearbySpots(ACADEMY_ID)).willReturn(sampleNearbySpots());
+
+		mockMvc.perform(nearbyRequest(vehicleBearer()).queryParam("academyId", String.valueOf(ACADEMY_ID)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.supported").value(true))
+				.andExpect(jsonPath("$.items[0].name").value("삼성동 공영주차장"));
+	}
+
+	@Test
+	@DisplayName("GET /v1/pickup-spot-recommendations/nearby에 academyId가 없으면 422 VALIDATION_FAILED와 fields의 academyId를 돌려주고 유스케이스를 부르지 않는다")
+	void nearbyWithoutAcademyIdReturns422ValidationFailed() throws Exception {
+		mockMvc.perform(nearbyRequest(guardianBearer()))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("academyId")));
+
+		then(recommendPickupSpotsUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("GET /v1/pickup-spot-recommendations/nearby에 숫자가 아닌 academyId를 보내면 422 VALIDATION_FAILED와 fields의 academyId를 돌려주고 유스케이스를 부르지 않는다")
+	void nearbyWithNonNumericAcademyIdReturns422ValidationFailed() throws Exception {
+		mockMvc.perform(nearbyRequest(guardianBearer()).queryParam("academyId", "abc"))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[*].field", hasItem("academyId")));
+
+		then(recommendPickupSpotsUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("GET /v1/pickup-spot-recommendations/nearby를 TEACHER 토큰으로 부르면 403 FORBIDDEN을 돌려주고 유스케이스를 부르지 않는다")
+	void nearbyWithTeacherTokenReturns403Forbidden() throws Exception {
+		mockMvc.perform(nearbyRequest(bearer(accessTokenFixture.user(GUARDIAN_USER_ID + 20, FAMILY_ID, Role.TEACHER)))
+						.queryParam("academyId", String.valueOf(ACADEMY_ID)))
+				.andExpect(commonError(HttpStatus.FORBIDDEN, "FORBIDDEN"));
+
+		then(recommendPickupSpotsUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("GET /v1/pickup-spot-recommendations/nearby가 유스케이스에서 던진 NOT_FOUND를 404 NOT_FOUND로 돌려준다")
+	void nearbyWithUnknownAcademyIdReturns404NotFound() throws Exception {
+		given(recommendPickupSpotsUseCase.recommendNearbySpots(ACADEMY_ID))
+				.willThrow(BusinessException.of(ErrorCode.NOT_FOUND));
+
+		mockMvc.perform(nearbyRequest(guardianBearer()).queryParam("academyId", String.valueOf(ACADEMY_ID)))
+				.andExpect(commonError(HttpStatus.NOT_FOUND, "NOT_FOUND"));
+
+		then(recommendPickupSpotsUseCase).should().recommendNearbySpots(ACADEMY_ID);
+	}
+
+	private static NearbySpots sampleNearbySpots() {
+		return new NearbySpots(true, List.of(
+				new NearbySpot("삼성동 공영주차장", new LatLng(37.497001, 127.060002), 120, 110),
+				new NearbySpot("이름 없는 길", new LatLng(37.498000, 127.061000), 250, 228),
+				new NearbySpot("영동대로50길", new LatLng(37.498527, 127.069331), 346, 315)));
+	}
+
+	private MockHttpServletRequestBuilder nearbyRequest(String bearer) {
+		return get(NEARBY_PATH).header(HttpHeaders.AUTHORIZATION, bearer);
 	}
 
 	private RecommendSpotsQuery capturedQuery() {

@@ -324,6 +324,37 @@ class InviteControllerTest extends AuthWebTestSupport {
 	}
 
 	@Test
+	@DisplayName("POST /v1/invites/{token}/acceptance의 consents에 SERVICE_IMPROVEMENT를 담아도 201을 돌려주고 그대로 넘긴다")
+	void acceptInviteWithServiceImprovementConsentReturns201AndPassesIt() throws Exception {
+		given(acceptInviteUseCase.acceptInvite(anyString(), any())).willReturn(acceptInviteResult());
+		String consents = "[{\"type\": \"TERMS\", \"agreed\": true}, {\"type\": \"PRIVACY\", \"agreed\": true}, "
+				+ "{\"type\": \"LOCATION\", \"agreed\": true}, {\"type\": \"PUSH\", \"agreed\": true}, "
+				+ "{\"type\": \"SERVICE_IMPROVEMENT\", \"agreed\": true}]";
+
+		mockMvc.perform(acceptRequest(acceptBody(consents, "ANDROID", PUSH_TOKEN)))
+				.andExpect(status().isCreated());
+
+		then(acceptInviteUseCase).should().acceptInvite(INVITE_TOKEN, new AcceptInviteCommand(
+				List.of(
+						new ConsentAgreement(ConsentType.TERMS, true),
+						new ConsentAgreement(ConsentType.PRIVACY, true),
+						new ConsentAgreement(ConsentType.LOCATION, true),
+						new ConsentAgreement(ConsentType.PUSH, true),
+						new ConsentAgreement(ConsentType.SERVICE_IMPROVEMENT, true)),
+				Platform.ANDROID,
+				PUSH_TOKEN));
+	}
+
+	@Test
+	@DisplayName("POST /v1/invites/{token}/acceptance의 consents에서 SERVICE_IMPROVEMENT가 빠져도 201을 돌려준다")
+	void acceptInviteWithoutServiceImprovementConsentReturns201() throws Exception {
+		given(acceptInviteUseCase.acceptInvite(anyString(), any())).willReturn(acceptInviteResult());
+
+		mockMvc.perform(acceptRequest(acceptBody(ALL_CHILD_CONSENTS_JSON, "ANDROID", PUSH_TOKEN)))
+				.andExpect(status().isCreated());
+	}
+
+	@Test
 	@DisplayName("POST /v1/invites/{token}/acceptance에 platform VEHICLE을 보내면 422 VALIDATION_FAILED와 fields의 platform을 돌려준다")
 	void acceptInviteWithVehiclePlatformReturns422WithPlatformField() throws Exception {
 		mockMvc.perform(acceptRequest(acceptBody(ALL_CHILD_CONSENTS_JSON, "VEHICLE", PUSH_TOKEN)))
@@ -338,6 +369,17 @@ class InviteControllerTest extends AuthWebTestSupport {
 	@DisplayName("POST /v1/invites/{token}/acceptance에 256자 pushToken을 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려준다")
 	void acceptInviteWith256CharPushTokenReturns422WithPushTokenField() throws Exception {
 		mockMvc.perform(acceptRequest(acceptBody(ALL_CHILD_CONSENTS_JSON, "ANDROID", "a".repeat(256))))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields[0].field").value("pushToken"));
+
+		then(acceptInviteUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/invites/{token}/acceptance에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려준다")
+	void acceptInviteWithEmptyPushTokenReturns422WithPushTokenField() throws Exception {
+		mockMvc.perform(acceptRequest(acceptBody(ALL_CHILD_CONSENTS_JSON, "ANDROID", "")))
 				.andExpect(status().isUnprocessableContent())
 				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
 				.andExpect(jsonPath("$.error.fields[0].field").value("pushToken"));

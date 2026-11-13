@@ -134,6 +134,13 @@ class AuthPersistenceEntitiesMappingTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	@DisplayName("device 테이블은 값이 없는 옛 행을 위해 NULL을 허용하는 refresh_token_expires_at TIMESTAMPTZ 컬럼을 갖는다")
+	void deviceTableHasNullableRefreshTokenExpiresAtColumn() {
+		assertThat(columnsOf("device"))
+				.containsEntry("refresh_token_expires_at", new ColumnType(TIMESTAMPTZ, null, NULLABLE));
+	}
+
+	@Test
 	@DisplayName("device 테이블은 (owner_type, owner_id) 순서의 인덱스를 갖는다")
 	void deviceTableHasOwnerIndex() {
 		assertThat(indexDefinitionsOf("device"))

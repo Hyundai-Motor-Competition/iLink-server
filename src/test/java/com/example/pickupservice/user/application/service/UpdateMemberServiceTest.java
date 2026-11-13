@@ -20,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 
@@ -286,6 +287,68 @@ class UpdateMemberServiceTest {
 	void rejectsUpdatingMemberOfOtherFamily() {
 		given(loadUserPort.loadUser(DELEGATE_ID)).willReturn(Optional.of(
 				User.restore(DELEGATE_ID, OTHER_FAMILY_ID, Role.DELEGATE, "남대리", "+821033334444")));
+		lenient().when(saveUserPort.saveUser(any())).thenAnswer(returnsFirstArg());
+		lenient().when(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList())).thenReturn(Map.of());
+		UpdateMemberCommand command = new UpdateMemberCommand(
+				FAMILY_ID, GUARDIAN_ID, Role.GUARDIAN, DELEGATE_ID, "바꾼이름", null, null);
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> updateMemberService.updateMember(command));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.code()).isEqualTo(ErrorCode.NOT_FOUND.name());
+		assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
+		verify(saveUserPort, never()).saveUser(any());
+	}
+
+	@Test
+	@DisplayName("멤버 수정은 grade를 보내면 grade를 바꿔 저장하고 결과에 담는다")
+	void updatesGradeWhenGradeIsSent() {
+		given(loadUserPort.loadUser(CHILD_ID)).willReturn(Optional.of(
+				User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null)));
+		given(saveUserPort.saveUser(any())).willAnswer(returnsFirstArg());
+		given(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList()))
+				.willReturn(Map.of(CHILD_ID, DeviceStatus.CONNECTED));
+		UpdateMemberCommand command = new UpdateMemberCommand(
+				FAMILY_ID, GUARDIAN_ID, Role.GUARDIAN, CHILD_ID, null, null, null)
+				.withGrade("중학교 2학년");
+
+		MemberResult result = updateMemberService.updateMember(command);
+
+		ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+		verify(saveUserPort).saveUser(savedUser.capture());
+		assertThat(savedUser.getValue().getGrade()).isEqualTo("중학교 2학년");
+		assertThat(savedUser.getValue().getName()).isEqualTo("민준");
+		assertThat(result.grade()).isEqualTo("중학교 2학년");
+		assertThat(result.name()).isEqualTo("민준");
+	}
+
+	@Test
+	@DisplayName("멤버 수정은 grade를 보내지 않으면 기존 grade를 그대로 두고 결과에 담는다")
+	void keepsGradeWhenGradeIsNotSent() {
+		User childWithGrade = User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null, null, null, "중학교 2학년");
+		given(loadUserPort.loadUser(CHILD_ID)).willReturn(Optional.of(childWithGrade));
+		given(saveUserPort.saveUser(any())).willAnswer(returnsFirstArg());
+		given(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList()))
+				.willReturn(Map.of(CHILD_ID, DeviceStatus.CONNECTED));
+		UpdateMemberCommand command = new UpdateMemberCommand(
+				FAMILY_ID, GUARDIAN_ID, Role.GUARDIAN, CHILD_ID, "김민준", null, null);
+
+		MemberResult result = updateMemberService.updateMember(command);
+
+		ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+		verify(saveUserPort).saveUser(savedUser.capture());
+		assertThat(savedUser.getValue().getName()).isEqualTo("김민준");
+		assertThat(savedUser.getValue().getGrade()).isEqualTo("중학교 2학년");
+		assertThat(result.grade()).isEqualTo("중학교 2학년");
+	}
+
+	@Test
+	@DisplayName("이미 해제된(removedAt이 있는) 멤버를 수정하려 하면 NOT_FOUND로 거절하고 저장하지 않는다")
+	void rejectsUpdatingAlreadyRemovedMember() {
+		User alreadyRemoved = User.restore(DELEGATE_ID, FAMILY_ID, Role.DELEGATE, "남대리", "+821033334444", null,
+				Instant.parse("2026-11-01T09:00:00Z"));
+		given(loadUserPort.loadUser(DELEGATE_ID)).willReturn(Optional.of(alreadyRemoved));
 		lenient().when(saveUserPort.saveUser(any())).thenAnswer(returnsFirstArg());
 		lenient().when(loadMemberDeviceStatusPort.loadDeviceStatuses(anyList())).thenReturn(Map.of());
 		UpdateMemberCommand command = new UpdateMemberCommand(

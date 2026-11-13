@@ -89,7 +89,8 @@ class AuthPersistenceAdapter implements LoadDevicePort, SaveDevicePort, LoadLink
 
 	private static DeviceEntity toEntity(Device device) {
 		return new DeviceEntity(device.getDeviceId(), device.getOwnerType(), device.getOwnerId(), device.getPlatform(),
-				device.getPushToken(), device.getPushUpdatedAt(), device.getRefreshTokenHash(), device.getRevokedAt());
+				device.getPushToken(), device.getPushUpdatedAt(), device.getRefreshTokenHash(), device.getRevokedAt(),
+				device.getRefreshTokenExpiresAt());
 	}
 
 	private static VehicleLinkCodeEntity toEntity(LinkCode linkCode) {
@@ -107,7 +108,7 @@ class AuthPersistenceAdapter implements LoadDevicePort, SaveDevicePort, LoadLink
 	private static Device toDomain(DeviceEntity entity) {
 		return Device.restore(entity.getDeviceId(), entity.getOwnerType(), entity.getOwnerId(), entity.getPlatform(),
 				entity.getPushToken(), entity.getPushUpdatedAt(), entity.getRefreshTokenHash(),
-				entity.getRevokedAt());
+				entity.getRevokedAt(), entity.getRefreshTokenExpiresAt());
 	}
 
 	private static LinkCode toDomain(VehicleLinkCodeEntity entity) {

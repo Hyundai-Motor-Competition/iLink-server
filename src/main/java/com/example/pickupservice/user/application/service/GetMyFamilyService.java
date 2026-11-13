@@ -44,7 +44,7 @@ public class GetMyFamilyService implements GetMyFamilyUseCase {
 	}
 
 	private String profileImageUrl(User user) {
-		return ProfileImageUrls.of(profileImageStoragePort, user).orElse(null);
+		return ProfileImageUrls.of(user, profileImageStoragePort);
 	}
 
 	private VehicleSummary loadLinkedVehicleSummary(long familyId) {

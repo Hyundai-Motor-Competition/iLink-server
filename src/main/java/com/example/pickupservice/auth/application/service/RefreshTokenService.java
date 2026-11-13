@@ -18,6 +18,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenService implements RefreshTokenUseCase {
@@ -27,12 +29,14 @@ public class RefreshTokenService implements RefreshTokenUseCase {
 	private final IssueTokenPort issueTokenPort;
 	private final LoadMemberUseCase loadMemberUseCase;
 	private final LoadVehicleUseCase loadVehicleUseCase;
+	private final Clock clock;
 
 	@Override
 	@Transactional
 	public TokenResult refresh(String refreshToken) {
 		Device device = loadDevicePort.loadByRefreshTokenHash(issueTokenPort.hashRefreshToken(refreshToken))
 				.filter(Device::isLive)
+				.filter(live -> !live.isRefreshTokenExpired(clock.instant()))
 				.orElseThrow(AuthErrors::refreshTokenInvalid);
 		IssuedTokens tokens = new DeviceTokenRotator(issueTokenPort, saveDevicePort).issueTo(device, subjectOf(device));
 		return new TokenResult(tokens.accessToken(), tokens.refreshToken(), tokens.accessTokenExpiresAt());

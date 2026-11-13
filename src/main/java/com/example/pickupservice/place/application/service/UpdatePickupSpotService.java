@@ -76,7 +76,7 @@ public class UpdatePickupSpotService implements UpdatePickupSpotUseCase {
 				valueOr(command.stopPoint(), current.getStopPoint()),
 				valueOr(command.meetingPoint(), current.getMeetingPoint()),
 				valueOr(command.isDefault(), current.isDefault()),
-				current.getCreatedBy());
+				current.getCreatedBy(), current.isTemporary());
 	}
 
 	private static SpotView toView(PickupSpot spot) {

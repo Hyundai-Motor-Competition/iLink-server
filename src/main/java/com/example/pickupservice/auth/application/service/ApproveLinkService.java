@@ -121,7 +121,7 @@ public class ApproveLinkService implements ApproveLinkUseCase {
 
 	private IssuedTokens registerGuardianDevice(GuardianAccount guardian, ApproveLinkCommand command, Instant now) {
 		Device device = saveDevicePort.saveDevice(Device.register(OwnerType.USER, guardian.userId(),
-				command.platform(), command.pushToken(), now, PlaceholderRefreshHash.next()));
+				command.platform(), command.pushToken(), now, PlaceholderRefreshHash.next(), null));
 		return new DeviceTokenRotator(issueTokenPort, saveDevicePort).issueTo(device, new TokenSubject(
 				PrincipalType.USER, guardian.userId(), guardian.familyId(), Role.GUARDIAN, device.getDeviceId()));
 	}

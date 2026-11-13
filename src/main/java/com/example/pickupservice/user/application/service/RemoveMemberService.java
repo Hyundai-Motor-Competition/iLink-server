@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Objects;
 
 @Service
@@ -24,12 +26,14 @@ public class RemoveMemberService implements RemoveMemberUseCase {
 	private final SaveUserPort saveUserPort;
 	private final CheckActivePickupPort checkActivePickupPort;
 	private final RevokeMemberDevicesPort revokeMemberDevicesPort;
+	private final Clock clock;
 
 	@Override
 	@Transactional
 	public void removeMember(RemoveMemberCommand command) {
 		User user = loadUserPort.loadUser(command.userId())
 				.filter(found -> Objects.equals(found.getFamilyId(), command.familyId()))
+				.filter(found -> !found.isRemoved())
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
 		if (command.userId() == command.requesterId() || user.getRole() == Role.GUARDIAN) {
 			throw UserErrors.cannotRemoveGuardian();
@@ -37,7 +41,8 @@ public class RemoveMemberService implements RemoveMemberUseCase {
 		if (checkActivePickupPort.isInActivePickup(command.userId())) {
 			throw UserErrors.memberInActivePickup();
 		}
-		saveUserPort.deleteUser(command.userId());
+		user.remove(Instant.now(clock));
+		saveUserPort.saveUser(user);
 		revokeMemberDevicesPort.revokeDevicesOf(command.userId());
 	}
 }

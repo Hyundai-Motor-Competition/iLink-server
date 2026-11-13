@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RecommendPickupSpotsUseCaseTest {
 
 	@Test
-	@DisplayName("핵심 로직 「시그니처」의 SPOT-04 in 포트 RecommendPickupSpotsUseCase는 interface이고 recommendSpots(RecommendSpotsQuery)만 갖는다")
+	@DisplayName("핵심 로직 「시그니처」의 SPOT-04 · 05 in 포트 RecommendPickupSpotsUseCase는 interface이고 recommendSpots(RecommendSpotsQuery) · recommendNearbySpots(long)만 갖는다")
 	void recommendUseCaseHasDesignSignature() throws NoSuchMethodException {
 		assertThat(RecommendPickupSpotsUseCase.class.isInterface())
 				.as("RecommendPickupSpotsUseCase는 interface여야 한다")
@@ -26,10 +26,24 @@ class RecommendPickupSpotsUseCaseTest {
 				.filter(m -> Modifier.isAbstract(m.getModifiers()))
 				.map(Method::getName)
 				.toList();
-		assertThat(abstractMethodNames).containsExactly("recommendSpots");
+		assertThat(abstractMethodNames).containsExactlyInAnyOrder("recommendSpots", "recommendNearbySpots");
 
 		Method method = RecommendPickupSpotsUseCase.class.getMethod("recommendSpots", RecommendSpotsQuery.class);
 		assertThat(method.getGenericReturnType().getTypeName()).isEqualTo(SpotRecommendations.class.getName());
+
+		Method nearby = RecommendPickupSpotsUseCase.class.getMethod("recommendNearbySpots", long.class);
+		assertThat(nearby.getGenericReturnType().getTypeName()).isEqualTo(NearbySpots.class.getName());
+	}
+
+	@Test
+	@DisplayName("NearbySpots는 supported · items(List<NearbySpot>) 순서의 record이고 NearbySpot은 name · location · walkMeters · walkSeconds만 갖는다(driveSeconds · totalSeconds 없음)")
+	void nearbySpotsHasDesignComponents() {
+		assertRecord(NearbySpots.class,
+				new String[] {"supported", "items"},
+				new String[] {"boolean", List.class.getName() + "<" + NearbySpot.class.getName() + ">"});
+		assertRecord(NearbySpot.class,
+				new String[] {"name", "location", "walkMeters", "walkSeconds"},
+				new String[] {String.class.getName(), LatLng.class.getName(), "int", "int"});
 	}
 
 	@Test

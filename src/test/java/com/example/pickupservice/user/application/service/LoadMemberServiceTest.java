@@ -14,12 +14,14 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
@@ -36,6 +38,8 @@ class LoadMemberServiceTest {
 	private static final long OTHER_CHILD_ID = 132L;
 	private static final long CO_GUARDIAN_ID = 105L;
 	private static final long TEACHER_ID = 140L;
+	private static final String PHOTO_KEY = "profiles/guardian-photo.jpg";
+	private static final Instant REMOVED_AT = Instant.parse("2026-11-13T09:00:00Z");
 
 	@Mock
 	private LoadUserPort loadUserPort;
@@ -54,8 +58,10 @@ class LoadMemberServiceTest {
 
 		Optional<MemberInfo> result = loadMemberService.findMember(GUARDIAN_ID);
 
-		assertThat(result).contains(
-				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678"));
+		assertThat(result).get()
+				.extracting(MemberInfo::userId, MemberInfo::familyId, MemberInfo::role, MemberInfo::name,
+						MemberInfo::phone)
+				.containsExactly(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678");
 	}
 
 	@Test
@@ -75,9 +81,12 @@ class LoadMemberServiceTest {
 
 		List<MemberInfo> result = loadMemberService.findMembers(FAMILY_ID);
 
-		assertThat(result).containsExactly(
-				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678"),
-				new MemberInfo(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null));
+		assertThat(result)
+				.extracting(MemberInfo::userId, MemberInfo::familyId, MemberInfo::role, MemberInfo::name,
+						MemberInfo::phone)
+				.containsExactly(
+						tuple(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678"),
+						tuple(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null));
 	}
 
 	@Test
@@ -101,6 +110,110 @@ class LoadMemberServiceTest {
 		given(loadUserPort.loadUsers(FAMILY_ID)).willReturn(List.of());
 
 		assertThat(loadMemberService.findMembers(FAMILY_ID)).isEmpty();
+	}
+
+	@Test
+	@DisplayName("findMember는 사진 키가 있는 멤버에게 그 키의 서명 URL을 profileImageUrl로 준다")
+	void findMemberGivesPresignedUrlOfPhotoKeyAsProfileImageUrl() {
+		given(loadUserPort.loadUser(GUARDIAN_ID)).willReturn(Optional.of(
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678", PHOTO_KEY)));
+
+		MemberInfo result = loadMemberService.findMember(GUARDIAN_ID).orElseThrow();
+
+		String keyUrl = profileImageStorage.presignedUrl(PHOTO_KEY).orElseThrow();
+		assertThat(result.profileImageUrl()).isEqualTo(keyUrl);
+		assertThat(keyUrl).isNotEqualTo(profileImageStorage.defaultUrl().orElseThrow());
+	}
+
+	@Test
+	@DisplayName("findMember는 사진 키가 없는 멤버에게 기본 아바타 URL을 profileImageUrl로 준다")
+	void findMemberGivesDefaultAvatarUrlWhenNoPhotoKey() {
+		given(loadUserPort.loadUser(CHILD_ID)).willReturn(Optional.of(
+				User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null)));
+
+		MemberInfo result = loadMemberService.findMember(CHILD_ID).orElseThrow();
+
+		assertThat(result.profileImageUrl()).isEqualTo(profileImageStorage.defaultUrl().orElseThrow());
+	}
+
+	@Test
+	@DisplayName("findMember는 저장소 설정이 없으면 profileImageUrl을 null로 준다")
+	void findMemberGivesNullProfileImageUrlWhenStorageIsNotConfigured() {
+		profileImageStorage.unconfigure();
+		given(loadUserPort.loadUser(GUARDIAN_ID)).willReturn(Optional.of(
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678", PHOTO_KEY)));
+
+		MemberInfo result = loadMemberService.findMember(GUARDIAN_ID).orElseThrow();
+
+		assertThat(result.profileImageUrl()).isNull();
+	}
+
+	@Test
+	@DisplayName("findMembers는 멤버마다 사진 키 서명 URL 또는 기본 아바타 URL을 profileImageUrl로 준다")
+	void findMembersGivesPhotoKeyUrlOrDefaultAvatarUrlPerMember() {
+		given(loadUserPort.loadUsers(FAMILY_ID)).willReturn(List.of(
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678", PHOTO_KEY),
+				User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null)));
+
+		List<MemberInfo> result = loadMemberService.findMembers(FAMILY_ID);
+
+		String keyUrl = profileImageStorage.presignedUrl(PHOTO_KEY).orElseThrow();
+		String defaultUrl = profileImageStorage.defaultUrl().orElseThrow();
+		assertThat(result)
+				.extracting(MemberInfo::userId, MemberInfo::profileImageUrl)
+				.containsExactly(
+						tuple(GUARDIAN_ID, keyUrl),
+						tuple(CHILD_ID, defaultUrl));
+	}
+
+	@Test
+	@DisplayName("findMembers는 저장소 설정이 없으면 모든 멤버의 profileImageUrl을 null로 준다")
+	void findMembersGivesNullProfileImageUrlToAllWhenStorageIsNotConfigured() {
+		profileImageStorage.unconfigure();
+		given(loadUserPort.loadUsers(FAMILY_ID)).willReturn(List.of(
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678", PHOTO_KEY),
+				User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null)));
+
+		List<MemberInfo> result = loadMemberService.findMembers(FAMILY_ID);
+
+		assertThat(result).hasSize(2);
+		assertThat(result).extracting(MemberInfo::profileImageUrl).containsOnlyNulls();
+	}
+
+	@Test
+	@DisplayName("findMember는 해제된 멤버도 돌려주고 removed를 true로 담는다")
+	void findMemberReturnsRemovedMemberWithRemovedTrue() {
+		given(loadUserPort.loadUser(TEACHER_ID)).willReturn(Optional.of(
+				User.restore(TEACHER_ID, FAMILY_ID, Role.TEACHER, "이선생", "+821098765432", null, REMOVED_AT)));
+
+		Optional<MemberInfo> result = loadMemberService.findMember(TEACHER_ID);
+
+		assertThat(result).get()
+				.extracting(MemberInfo::userId, MemberInfo::name, MemberInfo::removed)
+				.containsExactly(TEACHER_ID, "이선생", true);
+	}
+
+	@Test
+	@DisplayName("findMember는 해제되지 않은 멤버의 removed를 false로 담는다")
+	void findMemberReturnsActiveMemberWithRemovedFalse() {
+		given(loadUserPort.loadUser(GUARDIAN_ID)).willReturn(Optional.of(
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678")));
+
+		MemberInfo result = loadMemberService.findMember(GUARDIAN_ID).orElseThrow();
+
+		assertThat(result.removed()).isFalse();
+	}
+
+	@Test
+	@DisplayName("findMembers의 MemberInfo는 해제되지 않은 멤버의 removed를 false로 담는다")
+	void findMembersReturnsMembersWithRemovedFalse() {
+		given(loadUserPort.loadUsers(FAMILY_ID)).willReturn(List.of(
+				User.restore(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "+821012345678"),
+				User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null)));
+
+		List<MemberInfo> result = loadMemberService.findMembers(FAMILY_ID);
+
+		assertThat(result).extracting(MemberInfo::removed).containsExactly(false, false);
 	}
 
 	// #80 (user 04 #85 · findProfileImageUrls)

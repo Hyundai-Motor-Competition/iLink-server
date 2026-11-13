@@ -44,6 +44,7 @@ pickup:
     ping-interval: PT30S
   jwt:
     access-ttl: PT30M
+    refresh-ttl: P14D
   invite:
     base-url: https://app.example/invite/
   map:

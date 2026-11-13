@@ -42,7 +42,9 @@ class UserPersistenceAdapter implements LoadFamilyPort, SaveFamilyPort, LoadUser
 
 	@Override
 	public List<User> loadUsers(long familyId) {
-		return userJpaRepository.findByFamilyId(familyId).stream().map(UserPersistenceAdapter::toDomain).toList();
+		return userJpaRepository.findByFamilyIdAndRemovedAtIsNullOrderByUserIdAsc(familyId).stream()
+				.map(UserPersistenceAdapter::toDomain)
+				.toList();
 	}
 
 	@Override
@@ -52,7 +54,7 @@ class UserPersistenceAdapter implements LoadFamilyPort, SaveFamilyPort, LoadUser
 
 	@Override
 	public long countNonChildMembers(long familyId) {
-		return userJpaRepository.countByFamilyIdAndRoleNot(familyId, Role.CHILD);
+		return userJpaRepository.countByFamilyIdAndRoleNotAndRemovedAtIsNull(familyId, Role.CHILD);
 	}
 
 	@Override
@@ -99,7 +101,7 @@ class UserPersistenceAdapter implements LoadFamilyPort, SaveFamilyPort, LoadUser
 
 	private static UserEntity toEntity(User user) {
 		return new UserEntity(user.getUserId(), user.getFamilyId(), user.getRole(), user.getName(), user.getPhone(),
-				user.getProfileImageKey());
+				user.getProfileImageKey(), user.getRemovedAt(), user.getGrade());
 	}
 
 	private static VehicleEntity toEntity(Vehicle vehicle, Long version) {
@@ -114,7 +116,7 @@ class UserPersistenceAdapter implements LoadFamilyPort, SaveFamilyPort, LoadUser
 
 	private static User toDomain(UserEntity entity) {
 		return User.restore(entity.getUserId(), entity.getFamilyId(), entity.getRole(), entity.getName(),
-				entity.getPhone(), entity.getProfileImageKey());
+				entity.getPhone(), entity.getProfileImageKey(), entity.getRemovedAt(), entity.getGrade());
 	}
 
 	private static Vehicle toDomain(VehicleEntity entity) {

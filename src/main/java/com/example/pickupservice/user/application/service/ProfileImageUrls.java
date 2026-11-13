@@ -10,8 +10,9 @@ final class ProfileImageUrls {
 	private ProfileImageUrls() {
 	}
 
-	static Optional<String> of(ProfileImageStoragePort storagePort, User user) {
+	static String of(User user, ProfileImageStoragePort storage) {
 		String key = user.getProfileImageKey();
-		return key != null ? storagePort.presignedUrl(key) : storagePort.defaultUrl();
+		Optional<String> url = key != null ? storage.presignedUrl(key) : storage.defaultUrl();
+		return url.orElse(null);
 	}
 }

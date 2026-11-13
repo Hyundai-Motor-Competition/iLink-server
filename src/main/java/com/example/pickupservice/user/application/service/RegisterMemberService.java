@@ -36,6 +36,7 @@ public class RegisterMemberService implements RegisterMemberUseCase {
 			throw BusinessException.invalidField("phone", "자녀 외 멤버는 국제 형식 전화번호가 필요합니다");
 		}
 		User user = User.create(command.familyId(), command.role(), command.name(), command.phone());
+		user.changeGrade(command.grade());
 		ProfileImage image = command.profileImage();
 		if (image != null) {
 			user.changeProfileImageKey(ProfileImageUploads.upload(profileImageStoragePort, image));

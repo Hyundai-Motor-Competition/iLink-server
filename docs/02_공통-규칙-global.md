@@ -173,7 +173,7 @@ code 이름은 기획안 「4. 이벤트 · 상태」 탭의 ERR 이름을 그�
 
 | HTTP | code | 언제 |
 |---|---|---|
-| 400 | INVALID_REQUEST | JSON 형식이 틀림, 필수 요청 파라미터 · 요청 헤더가 빠짐, 요청 파라미터 타입이 틀림 (Idempotency-Key 헤더가 빠지면 400이 아니라 422 VALIDATION_FAILED) |
+| 400 | INVALID_REQUEST | JSON 형식이 틀림, 필수 요청 파라미터 · 요청 헤더가 빠짐, 요청 파라미터 타입이 틀림 (Idempotency-Key 헤더가 빠지면 400이 아니라 422 VALIDATION_FAILED. 예외: place SPOT-01 · SPOT-04 · SPOT-05는 필수 · 짝 쿼리(academyId · origin · near · radiusM)가 빠지거나 문자열 쿼리(academyId · origin · near · arriveAt)의 형식이 틀리면 fields와 함께 422 VALIDATION_FAILED. 숫자로 받는 radiusM이 숫자가 아니면 400 INVALID_REQUEST 그대로. 사람 결정 2026-11-14) |
 | 401 | UNAUTHORIZED | 토큰이 없거나 만료 · 폐기됨 |
 | 403 | FORBIDDEN | 토큰의 role로는 할 수 없는 동작 |
 | 404 | NOT_FOUND | 대상이 없거나 다른 가족의 것, 매핑 없는 경로 |
@@ -214,7 +214,7 @@ code 이름은 기획안 「4. 이벤트 · 상태」 탭의 ERR 이름을 그�
 
 - JUnit 5. DB가 닿는 테스트는 PostgreSQL 17 + PostGIS 3 실제 DB를 띄운다. Windows는 embedded-postgres로 로컬 프로세스(Docker 없음), 그 밖의 OS(Linux CI 등)는 Testcontainers(postgis/postgis:17-3.7). `-Ppickup.test.db=embedded|testcontainers`로 강제한다.
 - 테스트 픽스처는 common에 한 번만 만들고 모든 모듈이 같이 쓴다.
-- 아키텍처 규칙(의존 방향, domain에 Spring · JPA 없음)은 테스트가 아니라 코드 리뷰로 확인한다.
+- 아키텍처 규칙(의존 방향, domain에 Spring · JPA 없음)은 테스트가 아니라 코드 리뷰로 확인한다. 예외: 소스 글자를 훑어 모듈 간 import를 보는 ScheduleModuleImportTest · PlaceDomainImportTest는 그대로 둔다(사람 결정 2026-11-14).
 
 ## 도메인 완료 기준
 - [ ] 설계서의 테스트 케이스가 모두 GREEN

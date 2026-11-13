@@ -348,6 +348,23 @@ class UpdatePickupSpotServiceTest {
 		verify(saveSpotPort, never()).saveSpot(any());
 	}
 
+	@Test
+	@DisplayName("임시 장소(temporary=true)를 수정하려 하면 isDefault true를 보내도 NOT_FOUND로 거절하고 이전 기본 장소를 건드리지 않고 저장하지 않는다")
+	void updateSpotRejectsWithNotFoundAndDoesNotSaveWhenSpotIsTemporary() {
+		givenSpot(PickupSpot.restore(SPOT_ID, FAMILY_ID, ACADEMY_ID, "임시", null, NEAR_STOP, NEAR_MEETING, false,
+				GUARDIAN_ID, true));
+		lenient().when(loadSpotPort.loadSpots(FAMILY_ID, ACADEMY_ID)).thenReturn(List.of(
+				spot(PREVIOUS_DEFAULT_SPOT_ID, FAMILY_ID, "정문 앞", null, NEAR_STOP, NEAR_MEETING, true)));
+		givenAcademyLeniently();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> updatePickupSpotService.updateSpot(
+						new UpdateSpotCommand(FAMILY_ID, SPOT_ID, "새 이름", null, null, null, true)));
+
+		assertNotFound(exception);
+		verify(saveSpotPort, never()).saveSpot(any());
+	}
+
 	private static void assertSpotTooFar(BusinessException exception) {
 		assertThat(exception).isNotNull();
 		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);

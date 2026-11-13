@@ -15,6 +15,7 @@ import org.springframework.boot.test.context.TestComponent;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
@@ -38,7 +39,8 @@ public class NotificationSeed {
 			CallEntity call = persist(new CallEntity(null, pickup.sessionId(), null, CallTriggerType.MANUAL,
 					CallStatus.SENT, 0, sentAt, null, null, null, null));
 			DeviceEntity device = persist(new DeviceEntity(null, OwnerType.USER, pickup.minjunId(), Platform.ANDROID,
-					CHILD_PUSH_TOKEN, sentAt, AuthSeed.sha256(CHILD_REFRESH_TOKEN), null));
+					CHILD_PUSH_TOKEN, sentAt, AuthSeed.sha256(CHILD_REFRESH_TOKEN), null,
+					sentAt.plus(Duration.ofDays(14))));
 			entityManager.flush();
 			NotificationEntity notification = persist(new NotificationEntity(null, pickup.sessionId(),
 					call.getCallId(), CALL_TYPE, device.getDeviceId(), sentAt, null, null));

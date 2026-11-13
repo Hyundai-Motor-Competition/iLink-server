@@ -25,14 +25,14 @@ public class LoadMemberService implements LoadMemberUseCase {
 
 	@Override
 	public Optional<MemberInfo> findMember(long userId) {
-		return loadUserPort.loadUser(userId).map(LoadMemberService::toInfo);
+		return loadUserPort.loadUser(userId).map(this::toInfo);
 	}
 
 	@Override
 	public List<MemberInfo> findMembers(long familyId) {
 		return loadUserPort.loadUsers(familyId).stream()
 				.sorted(Comparator.comparing(User::getUserId))
-				.map(LoadMemberService::toInfo)
+				.map(this::toInfo)
 				.toList();
 	}
 
@@ -40,12 +40,16 @@ public class LoadMemberService implements LoadMemberUseCase {
 	public Map<Long, String> findProfileImageUrls(List<Long> userIds) {
 		Map<Long, String> urls = new HashMap<>();
 		for (User user : loadUserPort.loadUsersByIds(userIds)) {
-			ProfileImageUrls.of(profileImageStoragePort, user).ifPresent(url -> urls.put(user.getUserId(), url));
+			String url = ProfileImageUrls.of(user, profileImageStoragePort);
+			if (url != null) {
+				urls.put(user.getUserId(), url);
+			}
 		}
 		return urls;
 	}
 
-	private static MemberInfo toInfo(User user) {
-		return new MemberInfo(user.getUserId(), user.getFamilyId(), user.getRole(), user.getName(), user.getPhone());
+	private MemberInfo toInfo(User user) {
+		return new MemberInfo(user.getUserId(), user.getFamilyId(), user.getRole(), user.getName(), user.getPhone(),
+				ProfileImageUrls.of(user, profileImageStoragePort), user.isRemoved());
 	}
 }

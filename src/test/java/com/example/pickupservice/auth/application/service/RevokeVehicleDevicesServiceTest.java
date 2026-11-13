@@ -43,7 +43,7 @@ class RevokeVehicleDevicesServiceTest {
 	private static final long FAMILY_ID = 12L;
 
 	private final InMemoryDevices devices = new InMemoryDevices();
-	private final JwtTokenIssuer tokenIssuer = new JwtTokenIssuer(SECRET, Duration.ofMinutes(30),
+	private final JwtTokenIssuer tokenIssuer = new JwtTokenIssuer(SECRET, Duration.ofMinutes(30), Duration.ofDays(14),
 			Clock.fixed(NOW, ZoneOffset.UTC));
 	private final LoadVehicleUseCase loadVehicleUseCase = mock(LoadVehicleUseCase.class);
 
@@ -55,7 +55,7 @@ class RevokeVehicleDevicesServiceTest {
 		revokeVehicleDevicesService = new RevokeVehicleDevicesService(devices, devices,
 				Clock.fixed(NOW, ZoneOffset.UTC));
 		refreshTokenService = new RefreshTokenService(devices, devices, tokenIssuer, mock(LoadMemberUseCase.class),
-				loadVehicleUseCase);
+				loadVehicleUseCase, Clock.fixed(NOW, ZoneOffset.UTC));
 	}
 
 	@Test
@@ -65,7 +65,8 @@ class RevokeVehicleDevicesServiceTest {
 		Device second = devices.add(vehicleDevice(602L, VEHICLE_ID, "rt_vehicle-602"));
 		Device otherVehicle = devices.add(vehicleDevice(603L, OTHER_VEHICLE_ID, "rt_vehicle-603"));
 		Device sameIdUser = devices.add(Device.restore(701L, OwnerType.USER, VEHICLE_ID, Platform.ANDROID, "fcm-701",
-				EARLIER, tokenIssuer.hashRefreshToken("rt_user-701"), null));
+				EARLIER, tokenIssuer.hashRefreshToken("rt_user-701"), null,
+				NOW.plus(Duration.ofDays(3))));
 
 		revokeVehicleDevicesService.revokeDevicesOfVehicle(VEHICLE_ID);
 
@@ -96,7 +97,7 @@ class RevokeVehicleDevicesServiceTest {
 	@DisplayName("차량 기기 폐기는 그 차량에 살아 있는 기기가 없으면 아무것도 바꾸지 않는다")
 	void doesNothingWhenVehicleHasNoLiveDevice() {
 		Device revoked = devices.add(Device.restore(601L, OwnerType.VEHICLE, VEHICLE_ID, Platform.VEHICLE, null, null,
-				tokenIssuer.hashRefreshToken("rt_vehicle-601"), EARLIER));
+				tokenIssuer.hashRefreshToken("rt_vehicle-601"), EARLIER, NOW.plus(Duration.ofDays(3))));
 
 		revokeVehicleDevicesService.revokeDevicesOfVehicle(VEHICLE_ID);
 
@@ -106,7 +107,7 @@ class RevokeVehicleDevicesServiceTest {
 
 	private Device vehicleDevice(long deviceId, long vehicleId, String refreshToken) {
 		return Device.restore(deviceId, OwnerType.VEHICLE, vehicleId, Platform.VEHICLE, null, null,
-				tokenIssuer.hashRefreshToken(refreshToken), null);
+				tokenIssuer.hashRefreshToken(refreshToken), null, NOW.plus(Duration.ofDays(3)));
 	}
 
 	private static final class InMemoryDevices implements LoadDevicePort, SaveDevicePort {
