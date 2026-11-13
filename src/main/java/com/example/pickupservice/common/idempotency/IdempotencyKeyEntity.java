@@ -42,18 +42,11 @@ public class IdempotencyKeyEntity extends BaseTimeEntity {
 	@JdbcTypeCode(SqlTypes.JSON)
 	private String responseBody;
 
-	IdempotencyKeyEntity(PrincipalType principalType, Long principalId, String idempotencyKey,
-			String requestHash, Integer responseStatus, String responseBody) {
-		this.principalType = principalType;
-		this.principalId = principalId;
-		this.idempotencyKey = idempotencyKey;
-		this.requestHash = requestHash;
-		this.responseStatus = responseStatus;
-		this.responseBody = responseBody;
-	}
-
 	IdempotencyKeyEntity(IdempotentRequest request) {
-		this(request.principalType(), request.principalId(), request.key(), request.requestHash(), null, null);
+		this.principalType = request.principalType();
+		this.principalId = request.principalId();
+		this.idempotencyKey = request.key();
+		this.requestHash = request.requestHash();
 	}
 
 	void complete(int status, String body) {

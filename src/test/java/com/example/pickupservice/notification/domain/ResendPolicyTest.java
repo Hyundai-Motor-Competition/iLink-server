@@ -78,15 +78,13 @@ class ResendPolicyTest {
 	}
 
 	@Test
-	@DisplayName("마지막 발송 뒤 30초가 지났으면 RESEND_TOO_SOON으로 거절하고 retryAfterSeconds는 남은 30초다")
+	@DisplayName("마지막 발송 뒤 30초가 지났으면 RESEND_TOO_SOON으로 거절한다")
 	void rejectsResendWithin30SecondsAfterLastSent() {
 		Instant now = SENT_AT.plusSeconds(30);
 
 		assertThatThrownBy(() -> ResendPolicy.ensureResendAllowed(SENT_AT, now))
-				.isInstanceOfSatisfying(NotificationRuleException.class, exception -> {
-					assertThat(exception.violation()).isEqualTo(NotificationViolation.RESEND_TOO_SOON);
-					assertThat(exception.retryAfterSeconds()).isEqualTo(30);
-				});
+				.isInstanceOfSatisfying(NotificationRuleException.class,
+						exception -> assertThat(exception.violation()).isEqualTo(NotificationViolation.RESEND_TOO_SOON));
 	}
 
 	@Test
@@ -95,6 +93,17 @@ class ResendPolicyTest {
 		Instant now = SENT_AT.plusSeconds(59);
 
 		assertThatThrownBy(() -> ResendPolicy.ensureResendAllowed(SENT_AT, now))
+				.isInstanceOfSatisfying(NotificationRuleException.class,
+						exception -> assertThat(exception.violation()).isEqualTo(NotificationViolation.RESEND_TOO_SOON));
+	}
+
+	@Test
+	@DisplayName("마지막 발송 뒤 59.5초가 지났으면(초 단위 경계를 넘어도) RESEND_TOO_SOON으로 거절한다")
+	void rejectsResendWhenHalfSecondLeftAcrossSecondBoundary() {
+		Instant lastSentAt = Instant.parse("2026-11-05T09:09:02.700Z");
+		Instant now = lastSentAt.plusMillis(59_500);
+
+		assertThatThrownBy(() -> ResendPolicy.ensureResendAllowed(lastSentAt, now))
 				.isInstanceOfSatisfying(NotificationRuleException.class,
 						exception -> assertThat(exception.violation()).isEqualTo(NotificationViolation.RESEND_TOO_SOON));
 	}

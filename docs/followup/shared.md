@@ -1,9 +1,9 @@
 # FOLLOWUP · 공유모듈 (shared)
 
-- 생성: 2026-11-13 14:11 KST · tdd-guard
-- 상태: 진행 중 (체크 59/59 · 완료 기준 0/4)
-- 테스트: ● RED · 2457 passed · 8 failed · 전체 · 275s · .\gradlew.bat test --console=plain
-- 설계서: C:/ilink/docs/03_공유모듈-shared.md
+- 생성: 2026-11-14 00:02 KST · tdd-guard
+- 상태: 완료 (체크 72/72 · 완료 기준 4/4)
+- 테스트: ● GREEN · 2738 passed · 전체 · 161s · .\gradlew.bat test --console=plain
+- 설계서: C:/pickup/docs/03_공유모듈-shared.md
 
 ## 완료 항목
 - [x] #1 [기반] BaseTimeEntity를 상속한 엔티티를 저장하면 createdAt과 updatedAt이 채워진다
@@ -63,102 +63,71 @@
 - [x] #55 [web] 각 도메인이 PublicEndpoints 빈으로 등록한 메서드 · 경로는 토큰 없이 부를 수 있고 만료된 Bearer 토큰을 붙여도 401이 아니라 그대로 처리된다
 - [x] #56 [web] dev API 문서(/v3/api-docs)는 Bearer JWT 보안 스키마를 담는다
 - [x] #57 [web] 공통 오류 코드(ErrorCode)로 BusinessException을 만들어 던지면 그 코드의 HTTP 상태 · code · 문구로 응답한다(429는 retryAfterSeconds 포함)
-- [x] #58 [web] GlobalExceptionHandler는 클라이언트가 연결을 끊어 난 예외(AsyncRequestNotUsableException · Broken pipe IOException 등 DisconnectedClientHelper.isClientDisconnectedException이 true인 것)를 ERROR로 기록하지 않고 DEBUG로만 남기며 응답 본문을 쓰지 않는다 ← GlobalExceptionHandlerClientDisconnectTest."/disconnect/async-request-not-usable"
-- [x] #59 [web] GlobalExceptionHandler는 클라이언트 끊김이 아닌 처리하지 않은 예외는 지금처럼 ERROR로 기록하고 500 INTERNAL_SERVER_ERROR 본문을 돌려준다 ← GlobalExceptionHandlerClientDisconnectTest.클라이언트 끊김이 아닌 처리하지 않은 예외(IllegalStateException)는 ERROR로 기록하고
+- [x] #58 [web] GlobalExceptionHandler는 클라이언트가 연결을 끊어 난 예외(AsyncRequestNotUsableException · Broken pipe IOException 등 DisconnectedClientHelper.isClientDisconnectedException이 true인 것)를 ERROR로 기록하지 않고 DEBUG로만 남기며 응답 본문을 쓰지 않는다
+- [x] #59 [web] GlobalExceptionHandler는 클라이언트 끊김이 아닌 처리하지 않은 예외는 지금처럼 ERROR로 기록하고 500 INTERNAL_SERVER_ERROR 본문을 돌려준다
+- [x] #60 [web] ACTIVE_PICKUP_EXISTS는 common ErrorCode에 한 번만 정의하고, 로그아웃(auth)과 차량 연결 해제(user)가 같은 409 · 같은 code · 같은 문구로 응답한다(D2, 사람 결정 2026-11-13) ← LogoutVehicleServiceTest.차량 로그아웃은 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS · common ErrorCode 문구로 거절한다(D2)
+UnlinkVehicleServiceTest.차량 연결 해제는 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS · common ErrorCode 문구로 거절한다(D2)
+ErrorCodeTest.common ErrorCode.ACTIVE_PICKUP_EXISTS는 409 「진행 중인 픽업이 있어 처리할 수 없습니다」다(D2)
+- [x] #61 [web] SETUP_INCOMPLETE는 common ErrorCode에 한 번만 정의하고, schedule과 pickup이 같은 422 · 같은 code · 같은 문구로 응답하며 missing 목록은 추가 키로 담는다(D2) ← CompleteSetupServiceTest.설정 완료가 missing 때문에 거절되면 common ErrorCode.SETUP_INCOMPLETE 문구를 쓰고 남은 missing 목록을 추가 키 missing으로 담는다(D2)
+ErrorCodeTest.common ErrorCode.SETUP_INCOMPLETE는 422 「픽업 준비가 끝나지 않았습니다」다(D2)
+- [x] #62 [web] 도메인 code용 429 팩토리 하나가 code · 문구와 retryAfterSeconds(다시 시도할 초)를 함께 담아 응답한다(D3) ← BusinessExceptionTest.도메인 code용 tooManyRequests(LINK_CODE_REISSUE_LIMIT · 메시지 · 300)로 만든 예외는 status 429 · code LINK_CODE_REISSUE_LIMIT · 메시지 그대로 · retryAfterSeconds 300 · fields null · overlapScheduleIds null · details 비어 있음이다
+GlobalExceptionHandlerTest.컨트롤러가 도메인 code용 BusinessException.tooManyRequests(LINK_CODE_ATTEMPT_LIMIT · 메시지 · 40)을 던지면 429와 JSON 본문의 error.code LINK_CODE_ATTEMPT_LIMIT · 던진 메시지 그대로의 error.message · error.retryAfterSeconds 40을 돌려주고 error.fields는 채우지 않는다
+- [x] #63 [web] 429인 LINK_CODE_REISSUE_LIMIT · LINK_CODE_ATTEMPT_LIMIT · HELP_REQUEST_TOO_SOON · RESEND_TOO_SOON · TOO_MANY_REQUESTS 응답은 모두 retryAfterSeconds를 담는다(HELP_REQUEST_TOO_SOON의 nextAllowedAt은 추가 키로 유지, D3) ← IssueLinkCodeServiceTest.연결 코드 6번째 발급의 LINK_CODE_REISSUE_LIMIT 거절은 retryAfterSeconds 300(마지막 코드 유효 시간 5분)을 담는다
+CheckLinkCodeServiceTest.연결 코드 확인이 5번 실패로 막힌 뒤 20초 지나 부르면 LINK_CODE_ATTEMPT_LIMIT과 retryAfterSeconds 40(차단 시각 + 60초 - 지금)을 담는다
+RequestHelpServiceTest.도움 요청 60초 안 재요청의 HELP_REQUEST_TOO_SOON은 retryAfterSeconds 30(nextAllowedAt 18:09:30 - 지금 18:09:00)을 담고 추가 키 nextAllowedAt도 그대로 담는다
+GlobalExceptionHandlerTest.컨트롤러가 BusinessException.tooManyRequests(ErrorCode.RESEND_TOO_SOON, 30)을 던지면 429와 JSON 본문의 error.code RESEND_TOO_SOON · error.message 「잠시 뒤에 다시 보내 주세요」 · error.retryAfterSeconds 30을 돌려주고 error.fields는 채우지 않는다
+GlobalExceptionHandlerTest.컨트롤러가 retryAfterSeconds 30을 담은 BusinessException.tooManyRequests(30)을 던지면 429와 JSON 본문의 error.code TOO_MANY_REQUESTS · error.message · error.retryAfterSeconds 30을 돌려주고 error.fields는 채우지 않는다
+- [x] #64 [통합] spring.task.scheduling.pool.size가 4라 @Scheduled 작업이 스레드 1개를 나눠 쓰지 않는다(한 작업이 오래 걸려도 다른 작업이 제때 돈다, D6) ← SchedulingConfigTest.@Scheduled 작업을 돌리는 ThreadPoolTaskScheduler의 스레드 풀 크기는 spring.task.scheduling.pool.size 값인 4다
+SchedulingConfigTest.한 @Scheduled 작업이 막혀 있는 동안에도 다른 @Scheduled 작업이 다른 스레드에서 제때 실행된다
+- [x] #65 [기반] 공통 테스트 설정은 자동 완료 · 신호 끊김 철회 · SSE ping · 미전달 알림 재발송 스케줄러 주기를 아주 길게(P1D) 두어 테스트 중에 돌지 않게 하고, 재발송 스케줄러 주기도 설정 값으로 바꿀 수 있다(스케줄러 테스트 격리, 팀장 결정) ← TestPostgisConfigurationTest.공통 테스트 설정은 Idempotency-Key 정리 · 자동 완료 · 신호 끊김 철회 · SSE ping · 미전달 알림 재발송 주기 설정을 모두 P1D로 둔다
+TestPostgisConfigurationTest.공통 테스트 컨텍스트에 등록된 @Scheduled 작업 5개(정리 · 자동 완료 · 신호 끊김 철회 · SSE ping · 재발송)의 실제 실행 주기는 모두 1일 이상이다
+ResendUndeliveredSchedulerTest.재발송 스케줄러의 resendUndelivered에는 @Scheduled(fixedDelayString = ${pickup.notification.resend-interval})가 붙어 있어 주기를 설정으로 바꿀 수 있다
+- [x] #66 [web] 5xx로 끝나는 BusinessException(예: 502)은 GlobalExceptionHandler가 원인 예외 스택과 함께 ERROR 로그를 남기고 공통 오류 본문을 돌려준다 ← GlobalExceptionHandlerClientDisconnectTest.5xx로 끝나는 BusinessException(502 MAP_API_UNAVAILABLE · 원인 예외 연결)은 원인 예외 스택과 함께 ERROR 로그를 1건 남기고 502 공통 오류 본문(code · message · retryAfterSeconds null)을 돌려준다
+- [x] #67 [web] BusinessException.of(HttpStatus, code, message)에 429를 넣으면 IllegalArgumentException으로 막아 retryAfterSeconds 없는 429를 만들 수 없다(429는 tooManyRequests로만, D3) ← BusinessExceptionTest.of(429 · HELP_REQUEST_TOO_SOON · 메시지)처럼 of(HttpStatus, code, message)에 429를 넣으면 IllegalArgumentException으로 막아 retryAfterSeconds 없는 429를 만들 수 없다(429는 tooManyRequests로만, D3)
+- [x] #68 [기반] common의 남은 초 계산 하나(지금 시각과 허용 시각의 차이를 초로 올림, 최소 1)를 LINK_CODE_ATTEMPT_LIMIT · HELP_REQUEST_TOO_SOON · RESEND_TOO_SOON이 같이 쓰고, RESEND_TOO_SOON도 다시 보낼 수 있는 시각까지 0.5초 남았으면 retryAfterSeconds 1을 담는다(사람 결정 2026-11-13) ← TimeUtilsTest.TimeUtils.secondsUntil은 허용 시각까지 29.5초 남았으면 30초로 올린다
+TimeUtilsTest.TimeUtils.secondsUntil은 허용 시각이 이미 지났으면 최소값 1을 돌려준다
+ResendNotificationServiceTest.다시 보내기는 다시 보낼 수 있는 시각까지 0.5초 남았으면 RESEND_TOO_SOON으로 거절하고 retryAfterSeconds 1을 담는다
+- [x] #69 [web] 필터 단계에서 끝난 요청(Idempotency 422 · 409 · 같은 키 재응답, Security 401 · 403)도 요청 로그 한 줄(requestId · 주체 · 메서드 · 경로 · status · errorCode · 걸린 시간)을 남기고, 경로에 토큰 · 연결 코드 값이 그대로 남지 않는다(사람 결정 2026-11-13) ← RequestLoggingAspectTest.Idempotency-Key 대상 POST /test/logging/idempotent-items를 USER 101이 키 헤더 없이 불러 필터가 422 VALIDATION_FAILED로 끝내도 그 요청의 요청 로그가 INFO 한 줄 남고 그 줄에 requestId · principal=USER:101 · method=POST · path · status=422 · errorCode=VALIDATION_FAILED · durationMs가 들어 있다
+RequestLoggingAspectTest.USER 101이 Idempotency-Key 대상 API에 같은 키 · 같은 본문을 두 번 보내 두 번째는 필터가 저장한 201을 그대로 재응답하면 재응답 요청의 요청 로그가 한 줄(status=201 · errorCode 없음 · principal=USER:101) 남고 첫 요청도 한 줄이다
+RequestLoggingAspectTest.인증이 필요한 GET /test/logging/invites/{token}을 실제 토큰 inv-7Hq2-secret으로 Bearer 없이 불러 Security가 401 UNAUTHORIZED로 끝내면 요청 로그가 한 줄 남고 principal=ANONYMOUS · status=401 · errorCode=UNAUTHORIZED이며 path는 매핑 패턴이거나 unknown이고 어떤 로그에도 토큰 값이 없다
+RequestLoggingAspectTest.URL 규칙이 hasRole('GUARDIAN')인 GET /test/logging-guardian-zone/invites/{token}을 CHILD 토큰으로 불러 Security가 컨트롤러 전에 403 FORBIDDEN으로 끝내면 요청 로그가 한 줄 남고 principal=USER:101 · status=403 · errorCode=FORBIDDEN이며 어떤 로그에도 경로 토큰 값이 없다
+- [x] #70 [web] Idempotency-Key 조회 · 예약 단계 DB 오류로 필터가 500 INTERNAL_SERVER_ERROR로 끝낸 요청도 요청 로그 한 줄(status=500 · errorCode=INTERNAL_SERVER_ERROR)을 남긴다 ← RequestLoggingAspectTest.idempotency_key에 그 키만 막는 CHECK 제약이 걸려 USER 101의 Idempotency-Key 대상 POST /test/logging/idempotent-items 키 예약 INSERT가 DB 오류로 실패해 필터가 500 INTERNAL_SERVER_ERROR로 끝내도 그 요청의 요청 로그가 INFO 한 줄 남고 그 줄에 principal=USER:101 · method=POST · path · status=500 · errorCode=INTERNAL_SERVER_ERROR · durationMs가 들어 있다
+- [x] #71 [web] 컨트롤러까지 간 요청이 인증 · 권한 예외로 끝나 Security 처리기가 응답을 쓰더라도 요청 로그는 정확히 한 줄이고 status는 실제 응답 상태(401 · 403)다 ← RequestLoggingAspectTest.PublicEndpoints로 열린 GET /test/logging-open/members-only에 @PreAuthorize("isAuthenticated()")가 붙어 토큰 없는 호출이 컨트롤러 단계에서 거절되고 GlobalExceptionHandler가 예외를 다시 던져 Security 진입점이 401 UNAUTHORIZED를 쓰면 그 요청의 요청 로그는 두 줄이 아니라 정확히 한 줄이고 그 줄은 status=200이 아니라 status=401 · errorCode=UNAUTHORIZED · principal=ANONYMOUS다
+RequestLoggingAspectTest.익명 인증을 끈 permitAll 경로 GET /test/logging-no-anonymous/denied의 컨트롤러가 AccessDeniedException을 던지고 GlobalExceptionHandler가 예외를 다시 던져 Security 처리기가 403 FORBIDDEN을 쓰면 그 요청의 요청 로그는 두 줄이 아니라 정확히 한 줄이고 그 줄은 status=200이 아니라 status=403 · errorCode=FORBIDDEN이다
+- [x] #72 [web] of(ErrorCode)에 429 코드(TOO_MANY_REQUESTS · RESEND_TOO_SOON)를 넣거나 tooManyRequests(ErrorCode, int)에 429가 아닌 코드를 넣으면 IllegalArgumentException으로 막는다(D3) ← BusinessExceptionTest.of(ErrorCode)에 429 코드(TOO_MANY_REQUESTS)를 넣으면 IllegalArgumentException으로 막는다(D3)
+BusinessExceptionTest.of(ErrorCode)에 429 코드(RESEND_TOO_SOON)를 넣으면 IllegalArgumentException으로 막는다(D3)
+BusinessExceptionTest.tooManyRequests(ErrorCode, int)에 429가 아닌 코드(NOT_FOUND)를 넣으면 IllegalArgumentException으로 막는다(D3)
 
 ## 미완료 항목
 - 없음
 
 ## 완료 기준 (공통 규칙 문서)
-- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
-- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+- [x] C1 설계서의 테스트 케이스가 모두 GREEN
+- [x] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [x] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 다시 리뷰 필요: 2026-11-11 11:48 KST 리뷰 뒤에 체크 · 추가된 항목 #58, #59
-- 2026-11-11 11:48 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 8 · 하 22 · 리뷰 시점 체크 57/57
-- 리뷰 시점 테스트: ● GREEN · 275 passed · *, RealServerStartupTest · 165s · .\gradlew.bat test --tests com.example.pickupservice.common.* --tests com.example.pickupservice.RealServerStartupTest --console=plain
+- 2026-11-14 00:02 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 3 · 하 7 · 리뷰 시점 체크 72/72
+- 리뷰 시점 테스트: ● GREEN · 2738 passed · 전체 · 161s · .\gradlew.bat test --console=plain
   - 결론: 조건부 통과
-  - [중] 필터 단계에서 끝난 요청은 요청 로그 줄이 남지 않음(Idempotency 재응답 · 409 · 422 키 없음 · 예약 500 · Security 401). 지난 리뷰의 [중]이고 "05 시작 전 사람 결정"이었는데 05 · 08 · 09가 끝난 지금도 결정 기록이 없음 — IdempotencyKeyFilter.java:57-60 · 73-96(체인을 부르지 않고 끝남), RequestLoggingConfig.java:12(인터셉터는 DispatcherServlet 안에서만 돎), 02 「로그」 203행 "요청 하나에 INFO 한 줄", FOLLOWUP shared.md:183 (2) → 사람 결정
-  - [중] 5xx BusinessException이 서버 로그에 아무것도 남기지 않음. 이제 실제 사용처가 생김: SearchAcademyService.java:24-25가 예상 못 한 RuntimeException을 ScheduleErrors.java:13-17(502, initCause)로 바꾸는데, GlobalExceptionHandler.java:74-77이 로그 없이 응답만 써서 원인 스택이 사라짐. 03 102행 "예외 내용은 서버 로그에만"과 어긋남 → 항목 추가(5xx BusinessException은 원인과 함께 ERROR 로그)
-  - [중] 스케줄러 테스트 격리가 03 205행 결정과 다름. TestPostgisConfiguration.java:71-74는 idempotency cleanup만 P1D로 둠. AutoCompleteBoardingScheduler.java:38(PT10S)은 테스트에서도 돎(AutoCompleteBoardingSchedulerTest.java:119가 10초를 단언함). ResendUndeliveredScheduler.java:17은 fixedDelay=60_000L로 고정돼 설정으로 끌 수 없음. 둘 다 컨텍스트마다 기동 직후 공유 테스트 DB에서 실행되고, IdempotencyKeyCleanerTest.java:116-124처럼 고정 Clock(2026-01-15)을 쓰는 컨텍스트에서도 그 시계로 돎 …
-  - [중] @Scheduled 실행 스레드가 1개인데 작업은 4개(만료 키 삭제 · 10초 자동 완료 · 60초 재발송 · 30초 SSE ping). ResendUndeliveredService.java:83이 FCM을 같은 스레드에서 동기로 보내므로 자동 완료(AutoCompleteBoardingScheduler.java:38)와 ping(SessionStreamRegistry.java:86)이 늦어질 수 있음. application.yml에 spring.task.scheduling.pool.size 없음. 03 확인 필요 341행 "08 시작 때 정함"은 아직 미결 → 사람 결정
-  - [중] 03의 오류 형식 · ErrorCode · BusinessException 절이 코드와 다름. 코드에만 있는 것: tooManyRequests(ErrorCode,int)(BusinessException.java:47), invalidField(52), stateVersionConflict(64), withDetail · details(70-80), 오류 본문 추가 키 · 최상위 session(ErrorResponse.java:13 · 41-46), ErrorCode의 SESSION_ALREADY_FINISHED · CALL_ALREADY_REVOKED · RESEND_TOO_SOON(ErrorCode.java:21-22 · 25). RESEND_TOO_SOON은 notification만 써서 03 …
-  - [중] 도메인 429 응답 모양이 네 가지임: AuthErrors.java:26 · 41(retryAfterSeconds 없음), PickupErrors.java:88-90(retryAfterSeconds 없이 추가 키 nextAllowedAt), ResendNotificationService.java:61(ErrorCode + retryAfterSeconds), LinkStatusPollGuard.java:37(TOO_MANY_REQUESTS + retryAfterSeconds). 02 183행은 "429는 retryAfterSeconds에 다시 시도할 초"를 요구함. 03 340행 "auth 전에 정함"은 미결 → 사람 결정(도메인 429 팩토리 하나로)
-  - [중] 마감이 지난 열린 질문이 03에 그대로 남음: access 토큰 폐기(02 174행 "폐기면 401" vs 05 315행 "만료까지 유효"), 주체 종류별 필수 클레임(03 327행), JWT 키 길이 검사(03 328행), 인증 없는 공용 Idempotency 공간(03 · 05 321행), /error permitAll(03 323행) → 사람 결정
-  - [하] IdempotencyKeyEntity 6인자 생성자가 남음(IdempotencyKeyEntity.java:45-53, 테스트 9곳). 팀장 결정 "다음 shared 정리 때 삭제"가 아직 안 됨 → 리팩터링
-  - [하] 3a 응답 저장 실패 경로 테스트가 없음. release가 실패하면 원래 예외가 덮이고, 필터 밖으로 나간 예외 로그에는 requestId가 없음(IdempotencyKeyFilter.java:62-70) → note
-  - [하] 만료 삭제 경계 "정확히 24시간인 행은 남김"(03 169행) 테스트가 없음. 25시간 · 23시간만 확인함(IdempotencyKeyCleanerTest.java:25-27) → 항목 추가
-  - [하] withDetail 예약 키에 overlapScheduleIds가 없어 같은 키가 JSON에 두 번 나갈 수 있음(BusinessException.java:14 vs ErrorResponse.java:40) → 리팩터링
-  - [하] 03 구조 표 누락: common.text(NameRule · PlateNumberMasker) 패키지 전체, PollStateCaptureAdvice · PollStateStore · RequestLoggingConfig · RequestLogAttributes, ErrorCodeAttribute, IdempotencyKeyStore · IdempotencyKeyRequiredMatcher · RequestHasher, CurrentAuthPrincipal, JpaAuditingConfig. 02 11행 책임 목록도 같음 → note
-  - [하] common/text 테스트가 user · auth 소스 파일을 글자로 훑는 구조 검사임(NameRuleTest.java:110-126, PlateNumberMaskerTest.java:50-64). 02 80 · 214행 "아키텍처 규칙은 테스트로 하지 않는다"와 어긋나고, user · auth 파일 이름을 바꾸면 common 테스트가 깨짐 → 사람 결정(삭제 또는 해당 도메인으로 이동)
-  - [하] 테스트 코드 9개 파일에 Javadoc · 설명 주석이 있음(TestPostgisConfiguration.java:11-14, TestPostgis.java:6-14, EmbeddedPostgis.java:26-29, PostgisContainer.java:12-16, GeoOffsets.java:5-16 등). 02 78행 위반 → 리팩터링
-  - [하] toKst(null)을 호출 쪽에서 막는 코드가 3곳에 중복됨(KstTime.java:13, NotificationItemResponse.java:31-33, ReceiveVehicleEventService.java:66). Instant를 KST 날짜로 바꾸는 코드도 중복됨(CorrectOutcomeService.java:25 · 38) → 사람 결정(TimeUtils에 null 허용 변환 · KST 날짜 변환 추가)
-  - [하] JWT 키 만드는 코드가 3곳(JwtDecoderConfig.java:25, JwtTokenIssuer.java:40, AccessTokenFixture.java:100)이고 클레임 이름은 문자열로 중복됨(JwtTokenIssuer.java:68-76). auth가 더한 deviceId 클레임이 03 122행 클레임 표에 없고, CurrentDevice.java:10-17은 AuthPrincipal이 아니라 Jwt를 직접 읽음 → note(03 표 갱신) · 리팩터링
-  - [하] 배포가 JVM에 TZ=Asia/Seoul을 줌(Dockerfile:16, ops/k8s/dev/api.yaml:14). 03 343행의 대안 "배포 때 TZ=UTC"와 반대 방향이라 TimeZoneConfig 빈 순서에 기댐. #6 테스트가 KST로 뜬 뒤 UTC로 바뀌는 것은 확인함 → 사람 결정
-  - [하] 좌표 6자리 반올림 가정(03 316행)이 구현되지 않음. GeoPoints.java:16-18은 값을 그대로 쓰고 반올림 코드가 0건임 → 사람 결정
-  - [하] 실제로는 정해졌는데 03에 반영되지 않은 것: 스웨거 자물쇠(auth doc 5곳의 @SecurityRequirements), 도메인 ResponseStatusException 사용 0건, SSE 타임아웃 없음(SessionStreamRegistry.java:32 NO_TIMEOUT), SIG-02 eventId(08 420행) → note
-  - [하] 진행 기록이 서로 맞지 않음: FOLLOWUP shared.md:4-6은 "완료 기준 4/4 · C:/pickup 경로 · 191 passed"인데 TODO.md:12-20 · REVIEW.md:8은 "리뷰 없음 · 0/4". #8 문장은 "Testcontainers 컨테이너에서"인데 Windows에서는 내장 서버로 돎(TestPostgis.java:48). 증거 인용 #14 · #31이 지금 테스트 이름과 다름 → note
-  - 지난 리뷰(2026-11-07 15:37) 지적 확인
-  - [중] 필터 단계 요청 로그 — 남음(위 첫 [중])
-  - [하] 증거 인용 #14 · #31 — 남음(note)
-  - [하] FOLLOWUP 설계서 사본 — 남음(shared.md:96-135에 conflictWithOverlap 행 없음)
-  - [하] IdempotencyKeyEntity 6인자 — 남음
-  - [하] 5xx 로그 · null 방어 — 남음, 502 사용처가 생겨 [중]으로 올림
-  - [하] 3a 테스트 — 남음
-  - [하] ErrorCode STATE_VERSION_CONFLICT — 해소(ErrorCode.java:18)
-  - [하] prod CREATE TABLE 스크립트 — 남음(README.md:72는 안내만 있음)
-  - [하] 03 구조 표 PollState* — 남음(누락 범위가 더 커짐)
-  - [하] 연결 전 기기 권한 — 해소(PreLinkTokenInterceptor.java:21-27)
+  - [중] 사람이 지운 소스 훑기 테스트 3개가 다른 도메인에서 체크된 항목의 증거였음 — ErrorCodeTest.vehicleAlreadyLinkedIsNotRedefinedOutsideCommonErrorCode(user #73), NameRuleTest.nameRuleLivesOnlyInCommon…(auth #103), PlateNumberMaskerTest.plateNumberMaskerLivesOnlyInCommon…(auth #104). 동작은 다른 테스트가 덮음(CreateGuardianServiceTest · VehicleLinkCodeControllerTest, FamilyControllerTest · CheckLinkCodeServiceTest). 「common에 한 번만 둔다」 구조 문…
+  - [중] 새로 넣은 auth 미체크 항목 #124의 경로가 실제 API와 다름 — 「POST /v1/vehicle-link-codes/check(LINK-03)」인데 LINK-03은 GET /v1/vehicle-link-codes/by-code/{code}(05:74, VehicleLinkCodeController.java:61) → 항목 수정
+  - [중] 마감(auth · 05 전)이 지난 사람 결정 5건 — /error permitAll, access 토큰 폐기, 주체별 필수 클레임, JWT 키 검사와 키 만드는 곳 3군데, 인증 없는 Idempotency 공용 공간 → 사람 결정
+  - [하] 03 「시그니처」 블록(03:245-253)에 invalidField · stateVersionConflict · withDetail · details() · session() · fields() 없음 → note(03 블록 보강)
+  - [하] 03:370 「IdempotencyKeyEntity 6인자 생성자 … 다음 리뷰 때 다시 봄」 — 이미 지움 → note
+  - [하] REVIEW.md · shared.md 11-11 기록 덮어쓰기 미복구 → note(커밋 전에 git HEAD에서 복구)
+  - [하] 도메인 설계서 D2 · D3 미반영(05:72 · 74, 08:184 · 328, 06:61 · 119) → note(각 도메인 진행 때)
+  - [하] 테스트 설명 주석 4줄(RequestLoggingAspectTest.java:1378 · 1384 · 1410, ErrorResponseMatchers.java:28) — 02:80 「최대한」 범위 → 리팩터링(선택)
+  - [하] 남은 작은 과제 — RESERVED_DETAIL_KEYS overlapScheduleIds(사람 결정 대기), conflictWithOverlap 429 · tooManyRequests 0 이하 검사 없음, 24시간 경계 테스트 없음, SchedulingConfigTest 100ms 작업, TimeUtils toMillis, AuthErrors 300 상수 → note
+  - [하] Security 401 · 403 필터 로그 path unknown → 사람 결정
   - 완료 기준
-  - C1 충족 — 57/57 체크, common 범위 GREEN 275 passed, 전체 GREEN 2261 passed
-  - C2 미충족 — 03이 BusinessException · ErrorCode · 오류 본문 추가 키 · common.text를 담지 않음, 스케줄러 테스트 격리가 03 205행과 다름, 좌표 반올림 가정 미구현, 필터 단계 요청 로그 미결
-  - C3 사람 확인 필요 — 규칙 어긋남 3건: IdempotencyKeyEntity 6인자(팀장 예외, 삭제 약속 미이행), 테스트 주석 9개 파일, common/text 소스 훑기 테스트
-  - C4 충족 — 03 확인 필요 표와 FOLLOWUP 후속 42건에 기록됨. 다만 "05 전 · 08 전" 마감 항목 다수가 미결
-  - 후속 과제
-  - toKst(null) 처리 — 설계 결정 필요(호출 쪽 3곳 중복)
-  - toKst 1초 미만 버림 — 설계 결정 필요
-  - BaseTimeEntity 보조 테스트 · merge 때 createdAt null — 남음
-  - Logback 로그 시각 +09:00 — 설계 결정 필요(배포 TZ=Asia/Seoul로 굳어짐)
-  - JVM 시간대 고정 방식 — 설계 결정 필요
-  - prod 시간대 · Clock 빈 위치 · toUtc Z 허용 — Clock 빈 해소(ClockConfig), 나머지 남음
-  - JWT 클레임 이름 05 반영 — 해소(05 318행, JwtTokenIssuerTest 계약 테스트). deviceId는 03 표에 없음
-  - Role enum 중복 — 해소(02 70행, Role은 common.security 하나)
-  - 키 길이 미검사 · 키 생성 중복 · 좌표 반올림 · Nimbus 60초 — 60초만 해소, 키 생성은 3곳으로 늘어 남음, 반올림 남음
-  - 이벤트 풀 임시값 · applicationTaskExecutor — 설계 결정 필요
-  - 422 파라미터 field 이름 — 해소(#35), 클래스 단위 · 중첩 표기는 남음
-  - 이벤트 풀 core=max · AbortPolicy · 본문 형식 오류 400 — 설계 결정 필요
-  - FieldError 이름 · AsyncConfig @Value · 405/415 형식 — 405/415 해소, 나머지 남음
-  - 테스트 DB 연결 수 — 해소(풀 3, max_connections 200)
-  - 키 없음 400 vs 422 · /error · Allow 헤더 — 422 해소, /error와 Allow는 남음
-  - access 토큰 폐기 — 설계 결정 필요
-  - BusinessException 4인자 · null 방어 · WWW-Authenticate · 500 로그 requestId — 4인자와 requestId 해소, 나머지 남음
-  - familyId null · 클레임 상수 위치 — familyId 해소, 상수 위치 남음
-  - #19 role 검사 방식 — 해소
-  - 소수 familyId · role 없는 USER — 설계 결정 필요
-  - 4xx code=HttpStatus 이름 · charset — RSE는 도메인 사용 0건으로 사실상 해소(03 갱신 필요), charset 남음
-  - #38 JSON 전용 — 해소
-  - doc 인터페이스 HV000151 — 해소(#41)
-  - NULLS NOT DISTINCT · SIG-02 eventId · 6인자 — 앞 둘 해소, 6인자 남음
-  - 인증 없는 키 null 저장 — 해소(#42)
-  - Idempotency 대상 · 해시 · 2xx만 저장 — 해소
-  - jsonb 재응답 · 쿼리 문자열 · 빈 조기 생성 — 빈 조기 생성 해소(#43), 나머지 남음
-  - 기동 실패 · 동시 요청 — 해소(#43 · #44)
-  - #44 구현 메모(duplicate-key 로그 · 처리 중 행 409) — 남음
-  - 3a 저장 실패 · 남은 처리 중 행 · charset — 설계 결정 필요
-  - 인증 없는 공용 공간 보안 — 설계 결정 필요
-  - prod sql.init · 유니크 두 개 · prod DDL — 앞 둘 해소, prod DDL 스크립트 남음
-  - 만료 삭제 경계 — 해소(경계 24시간 테스트는 없음)
-  - 스케줄러 테스트 격리 · 03 반영 — 03 반영 해소, 격리는 남음(위 [중])
-  - 요청 로그 형식 — 해소
-  - 인터셉터로 이동 — 해소(테스트 클래스 이름 RequestLoggingAspectTest는 남음)
-  - 예외 메시지 개인정보 규칙 — 해소(02 199행)
-  - SSE 로그 — 해소, 타임아웃 등의 종료 줄은 남음
-  - 폴링 로그 — 해소(VehicleLinkCodeController.java:45)
-  - springdoc 경로 — 해소(#33)
-  - 리뷰 후 사람 결정(path 패턴 · Role · PublicEndpoints · exp) — 해소. SSE 503 · 스케줄 스레드 1개는 남음
-  - 재리뷰 후 결정(6인자 · 필터 단계 로그 · 증거 인용) — 6인자 남음, 필터 단계 로그는 설계 결정 필요, 증거 인용 남음
+  - C1 충족 — 체크 72/72, 전체 GREEN 2738 passed.
+  - C2 충족 — 03 오류 형식 · 구조 표 · 클레임 표 · 스케줄링 · 요청 로깅 · Idempotency 절이 코드와 맞음. 좌표 가정은 사람 결정으로 없어짐. 03 시그니처 블록과 03:370 문장만 덜 고쳐짐(동작 차이 없음).
+  - C3 충족 — shared 코드에서 공통 규칙 위반 없음. 6인자 생성자 · Javadoc · 소스 훑기 테스트 정리됨. 테스트 삭제로 auth #103 · #104 · user #73 증거가 없어진 것은 그 도메인에서 처리.
+  - C4 충족 — 03 확인 필요 표(03:337-377)와 FOLLOWUP에 기록. 마감 지난 사람 결정 5건은 미결.
+  - 테스트: GREEN 2738 passed(161s, 재사용)
+- 이전 리뷰: 2026-11-13 23:32 KST (조건부 통과), 2026-11-13 23:14 KST (조건부 통과), 2026-11-13 22:37 KST (조건부 통과)
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -171,7 +140,7 @@
 | 같은 키 요청이 동시에 두 개 들어올 때 | 해소: 실행 전에 행을 예약(response_status null)하고 유니크 인덱스로 두 번째 예약을 막음. 처리 중인 키로 온 요청은 409 IDEMPOTENCY_KEY_REUSED(팀장 결정) |
 | 409 STATE_VERSION_CONFLICT 본문에 세션 뷰를 싣는 필드 이름 | 소스에 없음. error와 나란히 session 필드로 가정 |
 | 좌표 변환을 common에 둠 | 소스의 common 목록에는 없으나 schedule · place · pickup이 같이 써서 재사용 규칙(2.2)을 적용 |
-| 좌표 소수점 6자리 초과 입력 | 반올림할지 422로 거절할지 소스에 없음. 반올림으로 가정. 반올림 위치(GeoPoints 또는 요청 DTO)도 정하지 않음 |
+| 좌표 소수점 6자리 초과 입력 | 결정됨: 반올림 · 거절 없이 받은 값을 그대로 저장한다(geography double 정밀도, 사람 결정 2026-11-13) |
 | JWT 서명 방식 · 키 형식 | 해소: HS256, 설정 pickup.jwt.secret(Base64, 32바이트 이상), 환경 변수 JWT_SECRET. 클레임은 sub · principalType · familyId · role · iat · exp이고 exp는 필수(없으면 401, 사람 결정). 핵심 로직 「인증」 |
 | SSE · LINK-02 로그 예외를 AOP가 아는 방법 | 해소: 경로 기준이 아님. SSE는 비동기 처리 시작(afterConcurrentHandlingStarted), 폴링은 @PollingLog(stateField)로 구분. 로깅도 AOP가 아니라 RequestLoggingInterceptor(팀장 결정) |
 | 요청 로그 path에 경로 변수 값 | 해소: path는 매핑 패턴, 패턴이 없으면 "unknown". 폴링 직전 값 키만 메모리에서 실제 URI(사람 결정 2026-11-07 리뷰 후) |
@@ -183,7 +152,7 @@
 | access 토큰 「폐기」 기준 | 02는 「만료 · 폐기면 401」인데 common은 서명 · exp만 검사하고 05의 폐기는 Device.revokedAt(refresh)뿐. 폐기한 기기의 access 토큰이 만료까지 통과함. 「폐기는 refresh 기준」으로 문서를 고칠지, 요청마다 기기 폐기를 확인할지 auth 전에 정함(05 「AUTH-04 뒤 이미 발급된 access 토큰」과 같이) |
 | Role enum 중복 | 해소: 02에 「common 순수 타입(Role · PrincipalType · LatLng)은 domain에서 써도 된다」 예외를 둠. Role은 common.security.Role 하나만 두고 user/domain에 따로 만들지 않음(사람 결정 2026-11-07 리뷰 후) |
 | 주체 종류별 필수 클레임 | 지금 role 없는 USER 토큰은 role null로 통과하고, 소수 familyId(12.5)는 잘려 12가 됨. 05 토큰 형식과 함께 정함 |
-| JWT 키 검사 · 키와 클레임 이름의 위치 | 키가 32바이트보다 짧아도 기동되고 모든 인증이 401. 기동 때 막을지 정함. 키 만드는 코드가 JwtDecoderConfig · AccessTokenFixture 두 곳이고 클레임 이름 상수는 AuthPrincipalJwtConverter 안에만 있음. auth 발급기가 생길 때 SecretKey 빈 · 상수 위치를 하나로 모을지 정함 |
+| JWT 키 검사 · 키와 클레임 이름의 위치 | 키가 32바이트보다 짧아도 기동되고 모든 인증이 401. 기동 때 막을지 정함. 키 만드는 코드가 JwtDecoderConfig · JwtTokenIssuer · AccessTokenFixture 세 곳이고 클레임 이름 상수는 AuthPrincipalJwtConverter 안에만 있음. auth 발급기가 생길 때 SecretKey 빈 · 상수 위치를 하나로 모을지 정함 |
 | 인증 없는 Idempotency-Key 공용 공간의 보안 | 다른 기기가 같은 키 · 같은 본문을 보내면 첫 기기의 응답(토큰 포함 가능, AUTH-02 · LINK-04 · FAM-06)이 그대로 감. 키가 무작위 UUID이고 본문에 1회용 코드가 있어 위험은 낮다고 봄. 토큰을 돌려주는 인증 없는 API는 재응답 대신 409로 할지 05에서 정함 |
 | 응답 저장(완료) 실패 때 처리 | 컨트롤러가 2xx로 끝났는데 응답 저장이 실패하면 지금은 행을 지우고 2xx를 보냄. 같은 키로 다시 보내면 유스케이스가 다시 실행될 수 있음. 대안: 행을 남겨 24시간 409 / 처리 중 행에 짧은 만료 |
 | 남은 처리 중 행 | 처리 도중 서버가 꺼지거나 Error로 끝나 남은 처리 중 행은 만료 삭제 전까지 같은 키를 409로 막음. 행 삭제가 실패하면 원래 예외가 덮임. 그대로 둘지 처리 중 행만 짧게 지울지 정함 |
@@ -194,20 +163,28 @@
 | 본문 형식 오류의 코드 | JSON 값 타입 · enum · 시각 형식 오류와 빠진 본문이 모두 400 INVALID_REQUEST(fields 없음). 유지할지 422로 바꿀지 정함. INVALID_REQUEST 문구 「요청 형식을 확인해 주세요」는 구현자가 정함 |
 | 도메인 코드의 ResponseStatusException | Spring 4xx 예외의 code는 HttpStatus 이름(CONFLICT 등)으로 나감. 도메인 코드에서 금지하고 BusinessException만 쓸지 정함. reason 없는 404 예외와 매핑 없는 경로의 문구가 다름 |
 | 422 fields 표기 범위 | 클래스 단위 제약 오류는 fields에 안 담김. 중첩 · 배열 필드 이름 형식(a.b, a[].b 또는 children[0].name), 한 필드 여러 위반, List 본문 인덱스, 이름이 다른 @PathVariable은 정하지 않음 |
-| BusinessException 생성자 | 해소: 공개 생성자 없음. 정적 팩토리 of(ErrorCode) · of(HttpStatus, String code, String message) · tooManyRequests(int retryAfterSeconds), ErrorCode에 TOO_MANY_REQUESTS 추가(팀장 결정). conflictWithOverlap(HttpStatus, String code, String message, List<Long> overlapScheduleIds) 추가(일정 SET-02 · 03의 overlapScheduleIds용, 06 결정). IdempotencyKeyEntity 6인자 생성자, status · code null 방어, 5xx BusinessException 로그는 다음 리뷰 때 다시 봄 |
-| 도메인 코드 429의 retryAfterSeconds | of(HttpStatus, code, message)에는 retryAfterSeconds가 없고 tooManyRequests는 code가 TOO_MANY_REQUESTS로 고정됨. 05의 429 LINK_CODE_REISSUE_LIMIT · LINK_CODE_ATTEMPT_LIMIT에 retryAfterSeconds를 채울지, 채운다면 어떤 팩토리로 할지 auth 전에 정함 |
-| 이벤트 스레드 풀 크기 · 포화 정책 | 소스에 없음. 임시값 core 2 · max 4 · queue 100(pickup.async.event.*). 큐가 찬 뒤에야 core를 넘어 늘어 실제 동시 실행은 2개(제안: core = max 4). 포화 때 기본 AbortPolicy라 AFTER_COMMIT 이벤트가 버려짐(재발송 스케줄러가 보완) → 유지 또는 CallerRunsPolicy. 직접 만든 Executor 빈 때문에 Boot의 applicationTaskExecutor가 빠져 MVC 비동기가 SimpleAsyncTaskExecutor를 쓸 수 있음(SES-08 때 확인). @Scheduled 실행 스레드는 기본 1개(08 시작 때 정함) |
+| BusinessException 생성자 | 해소: 공개 생성자 없음. 정적 팩토리 of(ErrorCode) · of(HttpStatus, String code, String message) · tooManyRequests(int retryAfterSeconds), ErrorCode에 TOO_MANY_REQUESTS 추가(팀장 결정). conflictWithOverlap(HttpStatus, String code, String message, List<Long> overlapScheduleIds) 추가(일정 SET-02 · 03의 overlapScheduleIds용, 06 결정). IdempotencyKeyEntity 6인자 생성자는 삭제됨(11-13). status · code null 방어는 다음 리뷰 때 다시 봄. 5xx BusinessException 로그는 해소(#66). tooManyRequests(ErrorCode, int) · tooManyRequests(String, String, int) 추가(D3) |
+| 도메인 코드 429의 retryAfterSeconds | 결정됨: 모든 429에 retryAfterSeconds를 채운다. 도메인 code용 429 팩토리 하나를 두고, HELP_REQUEST_TOO_SOON의 nextAllowedAt은 추가 키로 남긴다. 테스트 케이스 끝의 D3 항목으로 구현(사람 결정 2026-11-13) |
+| 여러 모듈이 따로 정의한 같은 code 오류 | 결정됨: ACTIVE_PICKUP_EXISTS · SETUP_INCOMPLETE는 common ErrorCode에 한 번만 두고 같은 상태 · 문구로 응답한다(SETUP_INCOMPLETE의 missing은 추가 키). 테스트 케이스 끝의 D2 항목으로 구현(사람 결정 2026-11-13) |
+| 이벤트 스레드 풀 크기 · 포화 정책 | 소스에 없음. 임시값 core 2 · max 4 · queue 100(pickup.async.event.*). 큐가 찬 뒤에야 core를 넘어 늘어 실제 동시 실행은 2개(제안: core = max 4). 포화 때 기본 AbortPolicy라 AFTER_COMMIT 이벤트가 버려짐(재발송 스케줄러가 보완) → 유지 또는 CallerRunsPolicy. 직접 만든 Executor 빈 때문에 Boot의 applicationTaskExecutor가 빠져 MVC 비동기가 SimpleAsyncTaskExecutor를 쓸 수 있음(SES-08 때 확인). @Scheduled 실행 스레드 수는 결정됨: spring.task.scheduling.pool.size 4개, 테스트 케이스 끝의 D6 항목으로 구현(사람 결정 2026-11-13) |
 | SSE 종료 줄 · 다른 비동기 응답 로그 | emitter 타임아웃 · 연결 끊김 · completeWithError 때 stream=closed 줄의 status · errorCode, Callable · DeferredResult 응답의 로그는 정하지 않음. SSE 타임아웃(AsyncRequestTimeoutException, 503)이 지금 500 + ERROR 로그로 처리됨. pickup SES-08 때 정함 |
 | JVM 시간대 고정 방식 | 지금은 TimeZoneConfig 생성자에서 바꿈(빈 순서에 기대므로 Logback 등 먼저 뜬 부품은 +09:00 유지). 대안: main에서 run 전 설정 / 배포 때 TZ=UTC · -Duser.timezone=UTC / EnvironmentPostProcessor. 테스트 JVM을 build.gradle jvmArgs로 고정할지, 운영 로그 시각을 UTC로 찍도록 로그 패턴에 시간대를 넣을지도 함께 정함 |
 | TimeUtils 경계 값 | toKst(null)을 null로 돌려줄지 호출 쪽에서 막을지, toKst가 1초 미만을 버려도 되는지, toUtc가 +09:00 말고 Z 등도 받을지 422로 거절할지 정하지 않음. prod 프로필 시간대 설정은 테스트 없이 설정 검토로만 확인함 |
 | BaseTimeEntity 보조 테스트 | TIMESTAMPTZ 컬럼 테스트가 체크리스트 밖 보조 테스트로 있음. 테스트 케이스로 올릴지 정함. createdAt이 updatable=false라 merge 저장 때 돌려받은 엔티티의 createdAt이 null일 수 있음(04~09 변환 때 주의) |
 
 ## 다음 단계
-- 도메인 리뷰: /tdd review shared (2026-11-11 11:48 KST 리뷰 뒤에 체크 · 추가된 항목 #58, #59)
 - 커밋 · 푸시: /tdd commit (기능별 분할 커밋) · /tdd push (커밋 후 기능 브랜치 푸시)
 - 다음 도메인: 사용자 (04_사용자-user.md). 시작: /tdd domain user
 
 ## 후속 과제
+- 사람 결정 2026-11-13: LINK_CODE_REISSUE_LIMIT 429의 retryAfterSeconds는 300초 고정(마지막 코드 유효 시간 5분). 재발급 카운터 동작(연결 승인 때만 0)은 그대로. 공통 문구: ACTIVE_PICKUP_EXISTS "진행 중인 픽업이 있어 처리할 수 없습니다", SETUP_INCOMPLETE "픽업 준비가 끝나지 않았습니다"(팀장 선택, 설계서에 문구 지정 없음)
+- 중간 리뷰(#60~#63) 남은 일: (1) "남은 초 올림 · 최소 1" 계산이 LinkCodeAttemptLimiter · PickupErrors 두 곳에 중복, RESEND_TOO_SOON(ResendPolicy)은 epoch 초 차이(버림)라 방식이 다름 → common 한 곳으로 모을지 설계 결정 필요. (2) LINK_CODE_REISSUE_LIMIT retryAfterSeconds 300 고정이지만 재발급 카운터는 연결 승인 때만 0이 되어 300초 뒤에도 429가 반복됨(사람 결정대로 유지, 클라이언트 안내 문구 확인 필요). (3) AuthErrors.REISSUE_LIMIT_RETRY_AFTER_SECONDS(300)가 LinkCode.VALID_DURATION과 같은 값을 따로 적음.
+- 도메인 리뷰(11-13) 남은 일 — 문서: (1) 03 「오류 형식」에 추가 키(withDetail · details) · 최상위 session 본문, invalidField · stateVersionConflict 팩토리, ErrorCode 전체 목록(SESSION_ALREADY_FINISHED · CALL_ALREADY_REVOKED · PROFILE_IMAGE_* · STORAGE_UNAVAILABLE) 반영, RESEND_TOO_SOON이 enum에 있는 이유 정리. (2) 도메인 설계서 D2 · D3 반영: 06 SET-08 SETUP_INCOMPLETE missing, 05 LINK-01 · LINK-03 429 retryAfterSeconds, 08 HELP_REQUEST_TOO_SOON retryAfterSeconds, 09 NOTI-03 남은 초 올림. (3) 03 구조 표에 common.text · common.image · common.web.ProfileImageParts, 클레임 표에 deviceId. (4) missing 값이 pickup 문자열 상수(StartPickupService) · schedule enum(MissingSetupItem) 두 곳. (5) SchedulingConfigTest의 100ms 테스트 스케줄러 컨텍스트가 캐시돼 테스트 끝까지 돎. (6) followup/shared.md에서 11-11 리뷰 상세(상 0 · 중 8 · 하 22)가 tdd-guard 재생성으로 지워짐 → git HEAD에서 복구 필요. #1~#59 증거 기록 없음 lint 경고 59건.
+- 도메인 리뷰(11-13) 사람 결정 필요(마감 지남, 「auth · 05 전」): /error permitAll(03 확인 필요 표), access 토큰 폐기, 주체별 필수 클레임, JWT 키 길이 검사와 키 생성 위치 3곳(JwtDecoderConfig · JwtTokenIssuer · AccessTokenFixture), 인증 없는 공용 Idempotency 공간. 리팩터링 남음: IdempotencyKeyEntity 6인자 생성자 삭제 약속, RESERVED_DETAIL_KEYS에 overlapScheduleIds 없음, 정확히 24시간 경계 테스트, 테스트 Javadoc 5개 파일, 소스 파일 훑기 테스트 3개(NameRuleTest · PlateNumberMaskerTest · ErrorCodeTest, 02:217), RequestLoggingAspectTest 이름, 좌표 6자리 반올림 미구현.
+- 도메인 재리뷰(11-13) 남은 일: (1) common.error ↔ common.logging 순환(ErrorResponseWriter → RequestLogAttributes → CurrentAuthPrincipal) — #70~#72 뒤 reviewer 리팩터링으로 풀 예정(표시 키를 common.error에, principal은 요청 속성의 SecurityContext에서 읽기 검토). (2) 요청 로그 형식 · pathPatternOf · errorCodeFieldOf가 인터셉터 · 필터 두 곳에 중복 — 리팩터링. (3) #69 테스트 path 단언 분리(Idempotency는 패턴과 정확히, Security 401 · 403은 unknown) — 리팩터링. Security 401 · 403 로그 path가 늘 unknown이라 운영에서 어느 API였는지 모름 — 설계 결정 필요. (4) TimeUtils.secondsUntil이 toMillis로 1ms 미만을 버림(1.0005초 → 1) — 영향 작아 유지 여부 결정 필요. (5) 새 테스트 Javadoc: TestPostgisConfiguration.java:26, MainApplicationYaml.java — 리팩터링. (6) 03 구조 표에 FilterStageRequestLoggingFilter · RequestLogAttributes · PollStateStore · RequestLoggingConfig 없음. (7) REVIEW.md가 11-11 전체 리뷰와 다른 도메인 리뷰를 「리뷰 없음」으로 덮어씀 — 커밋 전에 git HEAD와 비교해 복구.
+- 도메인 재리뷰 2(11-13) 처리: 03 「오류 형식」(추가 키 · session · invalidField · stateVersionConflict · withDetail · ErrorCode 범위 · #72 규칙), 구조 표(common.text · common.image · ValidationConfig · ProfileImageParts), 키 생성 위치 세 곳을 팀장이 문서에 반영함. 남은 것: (1) C2 — 03 좌표 6자리 반올림 가정 미구현(설계 결정 필요), 클레임 표 deviceId. (2) C3 사람 확인 — IdempotencyKeyEntity 6인자, 테스트 Javadoc 5개 파일, 소스 훑기 테스트 3개. (3) conflictWithOverlap에 429를 넣는 것과 tooManyRequests의 retryAfterSeconds 0 이하를 막지 않음(영향 0). (4) 도메인 설계서 05 · 06 · 08 · 09의 D2 · D3 반영은 각 도메인 진행 때.
+- C3 정리(11-13) 결과: 소스 훑기 테스트 3개 삭제(사람 승인), IdempotencyKeyEntity 6인자 생성자 삭제, shared 테스트 Javadoc 5개 파일 정리, GeoOffsets 근거는 03 「테스트 픽스처」로 옮김. 남은 것: (1) RESERVED_DETAIL_KEYS에 overlapScheduleIds 추가 보류 — 03 L92가 예약 키를 4개로 정해 설계 변경이 됨, 부르는 곳 0, 사람 결정 필요. (2) shared 밖 Javadoc: 테스트 29개 파일(notification 4 · pickup 20 · place 4 · SseEmitterProbe), main schedule AcademyJpaRepository.java:14 — 각 도메인 C3 정리 때 처리.
+- 도메인 재리뷰 3(11-14) 처리: auth #124 경로를 실제 LINK-03(GET /v1/vehicle-link-codes/by-code/{code})으로 고침, 03 시그니처 블록 보강, 03:370 6인자 문장 갱신. 다른 도메인으로 넘길 것: 소스 훑기 테스트 3개 삭제(사람 승인)로 user #73 · auth #103 · #104의 증거 테스트가 없어짐 — user · auth 진행 때 증거를 동작 테스트(CreateGuardianServiceTest · VehicleLinkCodeControllerTest · FamilyControllerTest · CheckLinkCodeServiceTest)로 바꾸거나 「코드 리뷰로 확인」으로 적을 것. 남은 선택 리팩터링: 테스트 설명 주석 4줄(RequestLoggingAspectTest.java:1378 · 1384 · 1410, ErrorResponseMatchers.java:28).
 - [설계 확인] TimeUtils.toKst(null) 처리: null을 그대로 돌려줄지 호출 쪽에서 막을지 미정. 응답에 null 가능 시각(unlinkedAt 등)이 많음
 - [설계 확인] toKst 형식 yyyy-MM-dd'T'HH:mm:ssXXX는 1초 미만 값을 버림. 응답에서 버려도 되는지 확인 필요
 - BaseTimeEntityTest의 TIMESTAMPTZ 컬럼 테스트는 체크리스트 밖 보조 테스트(공통 규칙 근거). 설계서 테스트 케이스로 올릴지 결정 필요. createdAt updatable=false라 merge 저장 시 반환 엔티티의 createdAt이 null이 되는 점은 04~09 도메인↔엔티티 변환에서 주의

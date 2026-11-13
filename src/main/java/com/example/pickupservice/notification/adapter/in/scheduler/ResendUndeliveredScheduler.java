@@ -14,7 +14,8 @@ public class ResendUndeliveredScheduler {
 	private final ResendUndeliveredUseCase resendUndeliveredUseCase;
 	private final Clock clock;
 
-	@Scheduled(fixedDelay = 60_000L)
+	@Scheduled(fixedDelayString = "${pickup.notification.resend-interval}",
+			initialDelayString = "${pickup.notification.resend-interval}")
 	void resendUndelivered() {
 		resendUndeliveredUseCase.resendUndelivered(clock.instant());
 	}

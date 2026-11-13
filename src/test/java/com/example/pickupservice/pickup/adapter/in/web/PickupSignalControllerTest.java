@@ -37,6 +37,7 @@ import java.util.stream.Stream;
 import static com.example.pickupservice.common.fixture.AccessTokenFixture.bearer;
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonError;
 import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.commonErrorKeys;
+import static com.example.pickupservice.common.fixture.ErrorResponseMatchers.tooManyRequestsError;
 import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
@@ -347,13 +348,14 @@ class PickupSignalControllerTest extends PickupWebTestSupport {
 	}
 
 	@Test
-	@DisplayName("POST /v1/pickup-sessions/{sessionId}/help-requests가 1분 안 재요청이면 429 HELP_REQUEST_TOO_SOON과 nextAllowedAt을 돌려준다")
-	void requestHelpWithinOneMinuteReturns429HelpRequestTooSoonWithNextAllowedAt() throws Exception {
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/help-requests가 1분 안 재요청이면 429 HELP_REQUEST_TOO_SOON과 retryAfterSeconds 45 · nextAllowedAt을 돌려준다")
+	void requestHelpWithinOneMinuteReturns429HelpRequestTooSoonWithRetryAfterSecondsAndNextAllowedAt() throws Exception {
 		given(requestHelpUseCase.request(any()))
-				.willThrow(PickupErrors.helpRequestTooSoon(Instant.parse("2026-11-09T09:21:30Z")));
+				.willThrow(PickupErrors.helpRequestTooSoon(Instant.parse("2026-11-09T09:21:30Z"),
+						Instant.parse("2026-11-09T09:20:45Z")));
 
 		mockMvc.perform(helpRequest(childBearer()))
-				.andExpect(commonError(HttpStatus.TOO_MANY_REQUESTS, "HELP_REQUEST_TOO_SOON"))
+				.andExpect(tooManyRequestsError("HELP_REQUEST_TOO_SOON", 45))
 				.andExpect(jsonPath("$.error.nextAllowedAt").value("2026-11-09T18:21:30+09:00"));
 
 		then(requestHelpUseCase).should().request(new HelpRequestCommand(CHILD, SESSION_ID, "NEED_HELP"));

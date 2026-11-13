@@ -1,7 +1,5 @@
 package com.example.pickupservice.common.logging;
 
-import com.example.pickupservice.common.error.ErrorCodeAttribute;
-import com.example.pickupservice.common.security.CurrentAuthPrincipal;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -10,10 +8,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.AsyncHandlerInterceptor;
-import org.springframework.web.servlet.HandlerMapping;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -23,9 +22,7 @@ import java.util.concurrent.TimeUnit;
 public class RequestLoggingInterceptor implements AsyncHandlerInterceptor {
 
 	private static final String STARTED_AT_NANOS = RequestLoggingInterceptor.class.getName() + ".startedAtNanos";
-	private static final String ANONYMOUS = "ANONYMOUS";
 	private static final String STREAM_CLOSED_FIELD = " stream=closed";
-	private static final String UNKNOWN_PATH = "unknown";
 
 	private final PollStateStore pollStateStore;
 
@@ -41,21 +38,26 @@ public class RequestLoggingInterceptor implements AsyncHandlerInterceptor {
 	public void afterConcurrentHandlingStarted(HttpServletRequest request, HttpServletResponse response,
 			Object handler) {
 		if (isLogged(request)) {
-			log.info("requestId={} principal={} method={} path={} status={} stream=open",
-					MDC.get(RequestIdFilter.MDC_KEY), principalOf(), request.getMethod(), pathPatternOf(request),
-					response.getStatus());
+			log.info(RequestLogLine.STREAM_OPENED_FORMAT,
+					MDC.get(RequestIdFilter.MDC_KEY), RequestLogLine.currentPrincipal(), request.getMethod(),
+					RequestLogLine.pathPatternOf(request), response.getStatus());
 		}
 	}
 
 	@Override
 	public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler,
 			Exception exception) {
-		if (isLogged(request) && !isUnchangedPollState(request, response, handler)) {
-			log.info("requestId={} principal={} method={} path={} status={} durationMs={}{}{}",
-					MDC.get(RequestIdFilter.MDC_KEY), principalOf(), request.getMethod(), pathPatternOf(request),
-					response.getStatus(), elapsedMillisOf(request), errorCodeFieldOf(request),
-					streamClosedFieldOf(request));
+		if (isLogged(request) && !isLeftToSecurityHandler(exception)
+				&& !isUnchangedPollState(request, response, handler)) {
+			log.info(RequestLogLine.COMPLETED_FORMAT,
+					MDC.get(RequestIdFilter.MDC_KEY), RequestLogLine.currentPrincipal(), request.getMethod(),
+					RequestLogLine.pathPatternOf(request), response.getStatus(), elapsedMillisOf(request),
+					RequestLogLine.errorCodeFieldOf(request), streamClosedFieldOf(request));
 		}
+	}
+
+	private static boolean isLeftToSecurityHandler(Exception exception) {
+		return exception instanceof AccessDeniedException || exception instanceof AuthenticationException;
 	}
 
 	private boolean isUnchangedPollState(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -83,24 +85,8 @@ public class RequestLoggingInterceptor implements AsyncHandlerInterceptor {
 		return MDC.get(RequestIdFilter.MDC_KEY) != null && request.getAttribute(STARTED_AT_NANOS) instanceof Long;
 	}
 
-	private static String principalOf() {
-		return CurrentAuthPrincipal.find()
-				.map(principal -> principal.type() + ":" + principal.id())
-				.orElse(ANONYMOUS);
-	}
-
-	private static String pathPatternOf(HttpServletRequest request) {
-		Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
-		return pattern == null ? UNKNOWN_PATH : String.valueOf(pattern);
-	}
-
-	private static String errorCodeFieldOf(HttpServletRequest request) {
-		Object errorCode = request.getAttribute(ErrorCodeAttribute.NAME);
-		return errorCode == null ? "" : " errorCode=" + errorCode;
-	}
-
 	private static String streamClosedFieldOf(HttpServletRequest request) {
-		return isAsyncDispatch(request) ? STREAM_CLOSED_FIELD : "";
+		return isAsyncDispatch(request) ? STREAM_CLOSED_FIELD : RequestLogLine.NO_FIELD;
 	}
 
 	private static long elapsedMillisOf(HttpServletRequest request) {

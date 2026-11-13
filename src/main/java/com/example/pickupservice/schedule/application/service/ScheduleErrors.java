@@ -1,6 +1,8 @@
 package com.example.pickupservice.schedule.application.service;
 
 import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.error.ErrorCode;
+import com.example.pickupservice.schedule.domain.MissingSetupItem;
 import org.springframework.http.HttpStatus;
 
 import java.util.List;
@@ -32,8 +34,8 @@ final class ScheduleErrors {
 				"설정이 변경되었습니다. 다시 확인해 주세요");
 	}
 
-	static BusinessException setupIncomplete() {
-		return BusinessException.of(HttpStatus.UNPROCESSABLE_CONTENT, "SETUP_INCOMPLETE",
-				"아직 끝나지 않은 설정이 있습니다");
+	static BusinessException setupIncomplete(List<MissingSetupItem> missing) {
+		return BusinessException.of(ErrorCode.SETUP_INCOMPLETE)
+				.withDetail("missing", missing.stream().map(MissingSetupItem::name).toList());
 	}
 }

@@ -271,6 +271,35 @@ class ResendNotificationServiceTest {
 	}
 
 	@Test
+	@DisplayName("다시 보내기는 다시 보낼 수 있는 시각까지 0.5초 남았으면 RESEND_TOO_SOON으로 거절하고 retryAfterSeconds 1을 담는다")
+	void rejectsWithRetryAfterOneWhenHalfSecondLeft() {
+		Notification original = row(ORIGINAL_ID, "CALL", CALL_ID, CHILD_DEVICE_ID, Instant.parse("2026-11-09T06:09:00.500Z"));
+		givenOriginal(original, List.of(original));
+
+		assertThatThrownBy(() -> service.resend(command()))
+				.isInstanceOfSatisfying(BusinessException.class, e -> {
+					assertThat(e.code()).isEqualTo(ErrorCode.RESEND_TOO_SOON.name());
+					assertThat(e.retryAfterSeconds()).isEqualTo(1);
+				});
+
+		verify(saveNotificationPort, never()).save(any());
+		verify(sendPushPort, never()).send(any());
+	}
+
+	@Test
+	@DisplayName("다시 보내기는 다시 보낼 수 있는 시각까지 29.5초 남았으면 retryAfterSeconds를 30으로 올려 담는다")
+	void roundsUpRetryAfterWhenFractionalSecondsLeft() {
+		Notification original = row(ORIGINAL_ID, "CALL", CALL_ID, CHILD_DEVICE_ID, Instant.parse("2026-11-09T06:09:29.500Z"));
+		givenOriginal(original, List.of(original));
+
+		assertThatThrownBy(() -> service.resend(command()))
+				.isInstanceOfSatisfying(BusinessException.class, e -> {
+					assertThat(e.code()).isEqualTo(ErrorCode.RESEND_TOO_SOON.name());
+					assertThat(e.retryAfterSeconds()).isEqualTo(30);
+				});
+	}
+
+	@Test
 	@DisplayName("다시 보내기는 같은 묶음의 가장 최근 sentAt을 마지막 발송으로 본다")
 	void usesLatestSentAtOfSameGroupAsLastSend() {
 		Notification original = row(ORIGINAL_ID, "CALL", CALL_ID, CHILD_DEVICE_ID, Instant.parse("2026-11-09T06:00:00Z"));

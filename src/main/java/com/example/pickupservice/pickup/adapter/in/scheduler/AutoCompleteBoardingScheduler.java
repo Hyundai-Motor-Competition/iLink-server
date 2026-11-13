@@ -14,7 +14,8 @@ public class AutoCompleteBoardingScheduler {
 	private final AutoCompleteBoardingUseCase autoCompleteBoardingUseCase;
 	private final Clock clock;
 
-	@Scheduled(fixedDelayString = "${pickup.session.auto-complete-interval}")
+	@Scheduled(fixedDelayString = "${pickup.session.auto-complete-interval}",
+			initialDelayString = "${pickup.session.auto-complete-interval}")
 	void completeExpiredBoardings() {
 		autoCompleteBoardingUseCase.completeExpiredBoardings(clock.instant());
 	}

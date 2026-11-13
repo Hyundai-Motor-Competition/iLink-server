@@ -12,9 +12,13 @@ public final class CurrentAuthPrincipal {
 
 	public static Optional<AuthPrincipal> find() {
 		return Optional.ofNullable(SecurityContextHolder.getContext().getAuthentication())
-				.map(Authentication::getPrincipal)
-				.filter(AuthPrincipal.class::isInstance)
-				.map(AuthPrincipal.class::cast);
+				.flatMap(CurrentAuthPrincipal::of);
+	}
+
+	public static Optional<AuthPrincipal> of(Authentication authentication) {
+		return authentication.getPrincipal() instanceof AuthPrincipal principal
+				? Optional.of(principal)
+				: Optional.empty();
 	}
 
 }

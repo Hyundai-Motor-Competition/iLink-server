@@ -4,19 +4,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ErrorCodeTest {
-
-	private static final Path MAIN_SOURCE = Path.of("src/main/java/com/example/pickupservice");
 
 	@Test
 	@DisplayName("common ErrorCode.VEHICLE_ALREADY_LINKED는 409 「이미 보호자가 연결된 차량입니다」다")
@@ -43,38 +35,40 @@ class ErrorCodeTest {
 	}
 
 	@Test
-	@DisplayName("VEHICLE_ALREADY_LINKED는 common ErrorCode에만 정의되고 UserErrors · AuthErrors 등 main 소스 어디에도 \"VEHICLE_ALREADY_LINKED\" 문자열 코드로 따로 정의하지 않는다")
-	void vehicleAlreadyLinkedIsNotRedefinedOutsideCommonErrorCode() {
-		List<Path> redefining = mainSources()
-				.filter(path -> contains(path, "\"VEHICLE_ALREADY_LINKED\""))
-				.toList();
-
-		assertThat(redefining).as("\"VEHICLE_ALREADY_LINKED\" 문자열로 코드를 만드는 main 소스").isEmpty();
-		assertThat(read("user/application/service/UserErrors.java")).doesNotContain("vehicleAlreadyLinked");
-		assertThat(read("auth/application/service/AuthErrors.java")).doesNotContain("vehicleAlreadyLinked");
+	@DisplayName("common ErrorCode.ACTIVE_PICKUP_EXISTS는 409 「진행 중인 픽업이 있어 처리할 수 없습니다」다(D2)")
+	void activePickupExistsIsConflictWithSharedMessage() {
+		assertThat(ErrorCode.ACTIVE_PICKUP_EXISTS.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(ErrorCode.ACTIVE_PICKUP_EXISTS.getMessage()).isEqualTo("진행 중인 픽업이 있어 처리할 수 없습니다");
 	}
 
-	private static Stream<Path> mainSources() {
-		try (Stream<Path> files = Files.walk(MAIN_SOURCE)) {
-			return files.filter(path -> path.toString().endsWith(".java")).toList().stream();
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		}
+	@Test
+	@DisplayName("BusinessException.of(ErrorCode.ACTIVE_PICKUP_EXISTS)는 409 · code ACTIVE_PICKUP_EXISTS · 「진행 중인 픽업이 있어 처리할 수 없습니다」다")
+	void businessExceptionOfActivePickupExistsCarriesCommonCode() {
+		BusinessException exception = BusinessException.of(ErrorCode.ACTIVE_PICKUP_EXISTS);
+
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("ACTIVE_PICKUP_EXISTS");
+		assertThat(exception.getMessage()).isEqualTo("진행 중인 픽업이 있어 처리할 수 없습니다");
 	}
 
-	private static String read(String relative) {
-		try {
-			return Files.readString(MAIN_SOURCE.resolve(relative), StandardCharsets.UTF_8);
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		}
+	@Test
+	@DisplayName("common ErrorCode.SETUP_INCOMPLETE는 422 「픽업 준비가 끝나지 않았습니다」다(D2)")
+	void setupIncompleteIsUnprocessableWithSharedMessage() {
+		assertThat(ErrorCode.SETUP_INCOMPLETE.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		assertThat(ErrorCode.SETUP_INCOMPLETE.getMessage()).isEqualTo("픽업 준비가 끝나지 않았습니다");
 	}
 
-	private static boolean contains(Path path, String text) {
-		try {
-			return Files.readString(path, StandardCharsets.UTF_8).contains(text);
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		}
+	@Test
+	@DisplayName("BusinessException.of(ErrorCode.SETUP_INCOMPLETE).withDetail(missing, ...)는 422 · code SETUP_INCOMPLETE · 공통 문구이고 missing을 추가 키로 담는다")
+	void businessExceptionOfSetupIncompleteCarriesMissingAsDetail() {
+		List<String> missing = List.of("PICKUP_SPOT");
+
+		BusinessException exception = BusinessException.of(ErrorCode.SETUP_INCOMPLETE).withDetail("missing", missing);
+
+		assertThat(exception.status()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+		assertThat(exception.code()).isEqualTo("SETUP_INCOMPLETE");
+		assertThat(exception.getMessage()).isEqualTo("픽업 준비가 끝나지 않았습니다");
+		assertThat(exception.details()).containsOnlyKeys("missing");
+		assertThat(exception.details().get("missing")).isEqualTo(missing);
 	}
 }

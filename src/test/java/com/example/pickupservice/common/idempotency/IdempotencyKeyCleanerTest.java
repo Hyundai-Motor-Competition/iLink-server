@@ -1,6 +1,7 @@
 package com.example.pickupservice.common.idempotency;
 
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
+import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.AfterEach;
@@ -72,15 +73,19 @@ class IdempotencyKeyCleanerTest extends IntegrationTestSupport {
 	}
 
 	private void saveCompletedRow(String key, Instant createdAt) {
-		idempotencyKeyRepository.save(
-				new IdempotencyKeyEntity(PrincipalType.USER, USER_ID, key, REQUEST_HASH, CREATED, RESPONSE_BODY));
+		IdempotencyKeyEntity row = new IdempotencyKeyEntity(userRequest(key));
+		row.complete(CREATED, RESPONSE_BODY);
+		idempotencyKeyRepository.save(row);
 		moveCreatedAt(key, createdAt);
 	}
 
 	private void saveProcessingRow(String key, Instant createdAt) {
-		idempotencyKeyRepository.save(
-				new IdempotencyKeyEntity(PrincipalType.USER, USER_ID, key, REQUEST_HASH, null, null));
+		idempotencyKeyRepository.save(new IdempotencyKeyEntity(userRequest(key)));
 		moveCreatedAt(key, createdAt);
+	}
+
+	private static IdempotentRequest userRequest(String key) {
+		return new IdempotentRequest(new AuthPrincipal(PrincipalType.USER, USER_ID, null, null), key, REQUEST_HASH);
 	}
 
 	private void moveCreatedAt(String key, Instant createdAt) {

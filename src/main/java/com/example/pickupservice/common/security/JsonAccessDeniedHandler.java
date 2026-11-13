@@ -20,7 +20,7 @@ public class JsonAccessDeniedHandler implements AccessDeniedHandler {
 	@Override
 	public void handle(HttpServletRequest request, HttpServletResponse response,
 			AccessDeniedException accessDeniedException) throws IOException {
-		errorResponseWriter.write(response, ErrorCode.FORBIDDEN);
+		errorResponseWriter.write(request, response, ErrorCode.FORBIDDEN);
 	}
 
 }

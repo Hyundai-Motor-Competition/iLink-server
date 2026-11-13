@@ -165,6 +165,22 @@ class IssueLinkCodeServiceTest {
 	}
 
 	@Test
+	@DisplayName("연결 코드 6번째 발급의 LINK_CODE_REISSUE_LIMIT 거절은 retryAfterSeconds 300(마지막 코드 유효 시간 5분)을 담는다")
+	void issueLinkCodeReissueLimitCarriesRetryAfterSecondsThreeHundred() {
+		for (int i = 0; i < 5; i++) {
+			issueLinkCodeService.issueLinkCode(command(VEHICLE_ID));
+		}
+
+		assertThatThrownBy(() -> issueLinkCodeService.issueLinkCode(command(VEHICLE_ID)))
+				.isInstanceOfSatisfying(BusinessException.class, e -> {
+					assertThat(e.status()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+					assertThat(e.code()).isEqualTo("LINK_CODE_REISSUE_LIMIT");
+					assertThat(e.getMessage()).isEqualTo("연결 코드 재발급 한도를 넘었습니다");
+					assertThat(e.retryAfterSeconds()).isEqualTo(300);
+				});
+	}
+
+	@Test
 	@DisplayName("연결 코드 발급 횟수는 기기(deviceId) 단위로 센다")
 	void issueLinkCodeCountsIssuesPerDevice() {
 		for (int i = 0; i < 5; i++) {

@@ -1,6 +1,7 @@
 package com.example.pickupservice.common.error;
 
 import com.example.pickupservice.common.error.ErrorResponse.FieldError;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -17,11 +18,15 @@ public class ErrorResponseWriter {
 
 	private final JsonMapper jsonMapper;
 
-	public void write(HttpServletResponse response, ErrorCode errorCode) throws IOException {
-		write(response, errorCode, null);
+	public void write(HttpServletRequest request, HttpServletResponse response, ErrorCode errorCode)
+			throws IOException {
+		write(request, response, errorCode, null);
 	}
 
-	public void write(HttpServletResponse response, ErrorCode errorCode, List<FieldError> fields) throws IOException {
+	public void write(HttpServletRequest request, HttpServletResponse response, ErrorCode errorCode,
+			List<FieldError> fields) throws IOException {
+		request.setAttribute(ErrorCodeAttribute.NAME, errorCode.name());
+		FilterStageEnd.mark(request);
 		response.setStatus(errorCode.getStatus().value());
 		response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 		response.setCharacterEncoding(StandardCharsets.UTF_8.name());

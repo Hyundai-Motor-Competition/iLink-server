@@ -1,6 +1,7 @@
 package com.example.pickupservice.common.time;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -26,6 +27,10 @@ public final class TimeUtils {
 
 	public static LocalDate todayKst(Clock clock) {
 		return LocalDate.ofInstant(clock.instant(), SEOUL);
+	}
+
+	public static int secondsUntil(Instant now, Instant until) {
+		return (int) Math.max(1, Math.ceilDiv(Duration.between(now, until).toMillis(), 1000L));
 	}
 
 }

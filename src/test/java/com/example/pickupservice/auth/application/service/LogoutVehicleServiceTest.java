@@ -7,6 +7,7 @@ import com.example.pickupservice.auth.domain.Device;
 import com.example.pickupservice.auth.domain.OwnerType;
 import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -62,7 +63,7 @@ class LogoutVehicleServiceTest {
 	}
 
 	@Test
-	@DisplayName("차량 로그아웃은 진행 중 픽업이 있으면 ACTIVE_PICKUP_EXISTS로 거절한다")
+	@DisplayName("차량 로그아웃은 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS · common ErrorCode 문구로 거절한다(D2)")
 	void logoutVehicleRejectsWhenVehicleHasActivePickup() {
 		when(loadDevicePort.loadDevice(DEVICE_ID)).thenReturn(Optional.of(liveVehicleDevice()));
 		when(checkActivePickupPort.hasActivePickup(VEHICLE_ID)).thenReturn(true);
@@ -71,6 +72,7 @@ class LogoutVehicleServiceTest {
 				.isInstanceOfSatisfying(BusinessException.class, e -> {
 					assertThat(e.status()).isEqualTo(HttpStatus.CONFLICT);
 					assertThat(e.code()).isEqualTo("ACTIVE_PICKUP_EXISTS");
+					assertThat(e.getMessage()).isEqualTo(ErrorCode.ACTIVE_PICKUP_EXISTS.getMessage());
 				});
 
 		verify(saveDevicePort, never()).saveDevice(any());

@@ -1,6 +1,7 @@
 package com.example.pickupservice.pickup.adapter.in.scheduler;
 
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
+import com.example.pickupservice.common.fixture.MainApplicationYaml;
 import com.example.pickupservice.pickup.fixture.PickupSeed;
 import com.example.pickupservice.place.fixture.PlaceSeed;
 import com.example.pickupservice.schedule.fixture.ScheduleSeed;
@@ -11,7 +12,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.util.ClassUtils;
@@ -37,7 +37,6 @@ class AutoCompleteBoardingSchedulerTest extends IntegrationTestSupport {
 	private final PickupSeed pickupSeed;
 	private final JdbcTemplate jdbcTemplate;
 	private final Clock clock;
-	private final Environment environment;
 
 	private PickupSeed.Result seeded;
 
@@ -107,7 +106,7 @@ class AutoCompleteBoardingSchedulerTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("completeExpiredBoardings에는 @Scheduled(fixedDelayString = ${pickup.session.auto-complete-interval})가 붙어 있고 그 설정값은 10초이다")
+	@DisplayName("completeExpiredBoardings에는 @Scheduled(fixedDelayString = ${pickup.session.auto-complete-interval})가 붙어 있고 그 운영 기본값(application.yml)은 10초이다")
 	void completeExpiredBoardingsIsScheduledEveryTenSecondsFromConfiguration() throws NoSuchMethodException {
 		Method method = ClassUtils.getUserClass(scheduler).getDeclaredMethod("completeExpiredBoardings");
 
@@ -115,7 +114,7 @@ class AutoCompleteBoardingSchedulerTest extends IntegrationTestSupport {
 
 		assertThat(scheduled).isNotNull();
 		assertThat(scheduled.fixedDelayString()).isEqualTo("${" + INTERVAL_PROPERTY + "}");
-		assertThat(environment.getProperty(INTERVAL_PROPERTY, Duration.class)).isEqualTo(Duration.ofSeconds(10));
+		assertThat(MainApplicationYaml.baseDuration(INTERVAL_PROPERTY)).isEqualTo(Duration.ofSeconds(10));
 	}
 
 	private void markBoardingDetected(Instant cancelableUntil) {

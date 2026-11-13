@@ -31,10 +31,16 @@ public class BusinessException extends RuntimeException {
 	}
 
 	public static BusinessException of(ErrorCode errorCode) {
+		if (errorCode.getStatus() == HttpStatus.TOO_MANY_REQUESTS) {
+			throw new IllegalArgumentException("429는 tooManyRequests로 만들어 주세요");
+		}
 		return new BusinessException(StatusCode.from(errorCode), errorCode.getMessage(), Details.NONE);
 	}
 
 	public static BusinessException of(HttpStatus status, String code, String message) {
+		if (status == HttpStatus.TOO_MANY_REQUESTS) {
+			throw new IllegalArgumentException("429는 tooManyRequests로 만들어 주세요");
+		}
 		return new BusinessException(new StatusCode(status, code), message, Details.NONE);
 	}
 
@@ -45,7 +51,15 @@ public class BusinessException extends RuntimeException {
 	}
 
 	public static BusinessException tooManyRequests(ErrorCode errorCode, int retryAfterSeconds) {
+		if (errorCode.getStatus() != HttpStatus.TOO_MANY_REQUESTS) {
+			throw new IllegalArgumentException("429 코드만 쓸 수 있습니다: " + errorCode.name());
+		}
 		return new BusinessException(StatusCode.from(errorCode), errorCode.getMessage(),
+				new Details(retryAfterSeconds, null, null));
+	}
+
+	public static BusinessException tooManyRequests(String code, String message, int retryAfterSeconds) {
+		return new BusinessException(new StatusCode(HttpStatus.TOO_MANY_REQUESTS, code), message,
 				new Details(retryAfterSeconds, null, null));
 	}
 

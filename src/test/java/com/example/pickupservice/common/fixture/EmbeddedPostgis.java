@@ -23,10 +23,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-/**
- * Windows용 테스트 DB: zonky 내장 PostgreSQL 17에 OSGeo PostGIS Windows 묶음을 얹어 로컬 프로세스로 띄운다(Docker 없음).
- * JVM당 서버 1개를 처음 쓸 때 빈 포트로 띄우고, JVM이 끝나면 멈추고 데이터 폴더를 지운다.
- */
 final class EmbeddedPostgis {
 
 	private static final String POSTGIS_DIR_PROPERTY = "pickup.test.postgis-dir";

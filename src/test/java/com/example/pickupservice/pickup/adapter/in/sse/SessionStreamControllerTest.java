@@ -1,6 +1,7 @@
 package com.example.pickupservice.pickup.adapter.in.sse;
 
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
+import com.example.pickupservice.common.fixture.MainApplicationYaml;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
@@ -18,7 +19,7 @@ import org.skyscreamer.jsonassert.JSONAssert;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -46,7 +47,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @RequiredArgsConstructor
-@TestPropertySource(properties = "pickup.sse.ping-interval=PT0.1S")
 class SessionStreamControllerTest extends PickupWebTestSupport {
 
 	private static final String STREAM_PATH = "/v1/pickup-sessions/{sessionId}/stream";
@@ -60,6 +60,7 @@ class SessionStreamControllerTest extends PickupWebTestSupport {
 			Role.GUARDIAN);
 	private static final Duration WAIT_LIMIT = Duration.ofSeconds(5);
 	private static final long POLL_MILLIS = 20L;
+	private static final String PING_INTERVAL_PROPERTY = "pickup.sse.ping-interval";
 	private static final Pattern PING_COMMENT = Pattern.compile("(?m)^:\\s*ping\\s*$");
 	private static final String CALL_SENT_DATA = """
 			{"eventId":9001,"seq":42,"stateVersion":16,"occurredAt":"2026-11-05T18:09:02+09:00",
@@ -154,7 +155,7 @@ class SessionStreamControllerTest extends PickupWebTestSupport {
 	}
 
 	@Test
-	@DisplayName("GET /v1/pickup-sessions/{sessionId}/stream은 ping 간격마다 빈 주석 `: ping`을 보낸다")
+	@DisplayName("GET /v1/pickup-sessions/{sessionId}/stream은 ping이 돌 때마다 빈 주석 `: ping`을 보낸다")
 	void streamSendsPingCommentEveryInterval() throws Exception {
 		given(getSessionUseCase.getSession(any(SessionQuery.class))).willReturn(sessionView());
 
@@ -164,6 +165,16 @@ class SessionStreamControllerTest extends PickupWebTestSupport {
 
 		awaitPings(result, 2);
 		assertThat(parseEvents(result.getResponse().getContentAsString())).isEmpty();
+	}
+
+	@Test
+	@DisplayName("SSE ping에는 @Scheduled(fixedDelayString = ${pickup.sse.ping-interval})가 붙어 있고 그 운영 기본값(application.yml)은 30초이다")
+	void pingIsScheduledEveryThirtySecondsFromConfiguration() throws NoSuchMethodException {
+		Scheduled scheduled = SessionStreamRegistry.class.getDeclaredMethod("ping").getAnnotation(Scheduled.class);
+
+		assertThat(scheduled).isNotNull();
+		assertThat(scheduled.fixedDelayString()).isEqualTo("${" + PING_INTERVAL_PROPERTY + "}");
+		assertThat(MainApplicationYaml.baseDuration(PING_INTERVAL_PROPERTY)).isEqualTo(Duration.ofSeconds(30));
 	}
 
 	private List<Map<String, String>> awaitEvents(MvcResult result, int count) throws Exception {
@@ -179,9 +190,11 @@ class SessionStreamControllerTest extends PickupWebTestSupport {
 
 	private void awaitPings(MvcResult result, int count) throws Exception {
 		long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
+		sessionStreamRegistry.ping();
 		int pings = countPings(result.getResponse().getContentAsString());
 		while (pings < count && System.nanoTime() < deadline) {
 			Thread.sleep(POLL_MILLIS);
+			sessionStreamRegistry.ping();
 			pings = countPings(result.getResponse().getContentAsString());
 		}
 		assertThat(pings).isGreaterThanOrEqualTo(count);

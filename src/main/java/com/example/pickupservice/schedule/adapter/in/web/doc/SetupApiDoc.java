@@ -30,7 +30,7 @@ public interface SetupApiDoc {
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (내 가족의 CHILD가 아님)")
 	@ApiResponse(responseCode = "409", description = "SETTINGS_VERSION_CONFLICT (요약 이후 설정이 바뀜)")
 	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (settingsVersion 필수 · Idempotency-Key 필수) · "
-			+ "SETUP_INCOMPLETE (누락 항목 있음)")
+			+ "SETUP_INCOMPLETE (누락 항목 있음, missing 함께)")
 	SetupCompletionResponse completeSetup(@Parameter(hidden = true) AuthPrincipal principal,
 			@Parameter(description = "자녀 userId", required = true) long childId,
 			SetupCompletionRequest request);

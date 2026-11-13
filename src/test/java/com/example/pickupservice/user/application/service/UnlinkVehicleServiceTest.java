@@ -69,7 +69,7 @@ class UnlinkVehicleServiceTest {
 	}
 
 	@Test
-	@DisplayName("차량 연결 해제는 진행 중 픽업이 있으면 ACTIVE_PICKUP_EXISTS로 거절한다")
+	@DisplayName("차량 연결 해제는 진행 중 픽업이 있으면 409 ACTIVE_PICKUP_EXISTS · common ErrorCode 문구로 거절한다(D2)")
 	void rejectsUnlinkWhenActivePickupExists() {
 		given(loadVehiclePort.loadVehicle(VEHICLE_ID)).willReturn(Optional.of(linkedVehicleOf(FAMILY_ID)));
 		given(checkActivePickupPort.hasActivePickup(VEHICLE_ID)).willReturn(true);
@@ -81,6 +81,7 @@ class UnlinkVehicleServiceTest {
 		assertThat(exception).isNotNull();
 		assertThat(exception.code()).isEqualTo("ACTIVE_PICKUP_EXISTS");
 		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.getMessage()).isEqualTo(ErrorCode.ACTIVE_PICKUP_EXISTS.getMessage());
 		verify(saveVehiclePort, never()).saveVehicle(any());
 		verify(revokeVehicleDevicesPort, never()).revokeDevicesOfVehicle(anyLong());
 	}

@@ -3,15 +3,6 @@ package com.example.pickupservice.common.fixture;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-/**
- * 테스트 DB(PostgreSQL 17 + PostGIS 3) 입구. 시스템 속성 pickup.test.db로 방식을 고른다.
- * <ul>
- *   <li>auto(없을 때): Windows는 EMBEDDED, 그 밖의 OS는 TESTCONTAINERS</li>
- *   <li>embedded: 내장 PostgreSQL 17 + PostGIS Windows 묶음(Docker 없음, Windows x64만)</li>
- *   <li>testcontainers: postgis/postgis:17-3.7 컨테이너(Docker 필요)</li>
- * </ul>
- * Gradle은 같은 규칙으로 고른 값을 이 속성으로 넘긴다(build.gradle의 -Ppickup.test.db).
- */
 public final class TestPostgis {
 
 	public static final String MODE_PROPERTY = "pickup.test.db";
