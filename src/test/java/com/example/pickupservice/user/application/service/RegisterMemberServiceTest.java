@@ -366,4 +366,36 @@ class RegisterMemberServiceTest {
 		assertThat(savedUser.getValue().getName()).isEqualTo("서윤");
 		assertThat(savedUser.getValue().getPhone()).isNull();
 	}
+
+	@Test
+	@DisplayName("멤버 등록은 grade를 보내면 저장하는 User에 grade를 담는다")
+	void savesGradeWhenGradeIsSent() {
+		given(saveUserPort.saveUser(any())).willReturn(
+				User.restore(135L, FAMILY_ID, Role.CHILD, "민준", null));
+		RegisterMemberCommand command = new RegisterMemberCommand(
+				FAMILY_ID, Role.GUARDIAN, Role.CHILD, "민준", null)
+				.withGrade("중학교 2학년");
+
+		long userId = registerMemberService.registerMember(command);
+
+		assertThat(userId).isEqualTo(135L);
+		ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+		verify(saveUserPort).saveUser(savedUser.capture());
+		assertThat(savedUser.getValue().getGrade()).isEqualTo("중학교 2학년");
+	}
+
+	@Test
+	@DisplayName("멤버 등록은 grade를 보내지 않으면 저장하는 User의 grade를 비워 둔다")
+	void leavesGradeEmptyWhenGradeIsNotSent() {
+		given(saveUserPort.saveUser(any())).willReturn(
+				User.restore(136L, FAMILY_ID, Role.CHILD, "서윤", null));
+		RegisterMemberCommand command = new RegisterMemberCommand(
+				FAMILY_ID, Role.GUARDIAN, Role.CHILD, "서윤", null);
+
+		registerMemberService.registerMember(command);
+
+		ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
+		verify(saveUserPort).saveUser(savedUser.capture());
+		assertThat(savedUser.getValue().getGrade()).isNull();
+	}
 }
