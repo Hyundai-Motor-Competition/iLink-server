@@ -375,6 +375,25 @@ class GetSessionServiceTest {
 		assertThat(view.driver()).isNull();
 	}
 
+	@ParameterizedTest(name = "세션 {0}")
+	@EnumSource(value = SessionStatus.class, names = {"COMPLETED", "CANCELLED"})
+	@DisplayName("세션 조회는 지난 세션의 자녀가 가족에서 해제됐어도(removed true) children[].name에 그 자녀 이름을 그대로 준다")
+	void getSessionGivesRemovedChildNameInFinishedSession(SessionStatus finished) {
+		// user 모듈은 해제된 멤버를 loadMembers에서 빼고, loadMember로는 removed true로 돌려준다
+		givenMembers(List.of(
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1111-2222"),
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", "010-7777-8888")));
+		lenient().when(loadFamilyPort.loadMember(SEOYUN_ID)).thenReturn(Optional.of(
+				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", "010-9999-0000", null, true)));
+		givenSession(sessionWithVehicleLocation(finished, NOW, 0));
+
+		SessionView view = getSessionService.getSession(new SessionQuery(user(GUARDIAN_ID, Role.GUARDIAN), SESSION_ID));
+
+		assertThat(view.children())
+				.extracting(SessionChildView::childUserId, SessionChildView::name)
+				.containsExactlyInAnyOrder(tuple(MINJUN_ID, "민준"), tuple(SEOYUN_ID, "서윤"));
+	}
+
 	@ParameterizedTest(name = "{0}")
 	@MethodSource("vehicleAndGuardians")
 	@DisplayName("세션 조회는 열린 예외가 있으면 incident에 type · childUserId · openedAt을 채워 돌려준다")

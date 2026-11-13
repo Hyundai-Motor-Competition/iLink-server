@@ -102,6 +102,20 @@ class GetPickupHistoryServiceTest {
 		verify(loadHistoryPort, never()).loadHistory(anyLong(), any(), any());
 	}
 
+	@Test
+	@DisplayName("픽업 이력은 자녀가 가족에서 해제됐어도(removed true) 그 자녀의 지난 기록을 그대로 돌려준다")
+	void historyOfRemovedChildStillReturnsPastSessions() {
+		lenient().when(loadFamilyPort.loadMember(MINJUN_ID)).thenReturn(Optional.of(
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", null, null, true)));
+		lenient().when(loadFamilyPort.loadMembers(FAMILY_ID)).thenReturn(List.of(
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1234-5678"),
+				new MemberInfo(CO_GUARDIAN_ID, FAMILY_ID, Role.CO_GUARDIAN, "이보호", "010-2345-6789")));
+
+		List<HistoryItem> items = getPickupHistoryService.history(query(GUARDIAN_ID, Role.GUARDIAN, MINJUN_ID));
+
+		assertThat(items).containsExactlyElementsOf(NOVEMBER_ITEMS);
+	}
+
 	private static HistoryQuery query(long guardianId, Role role, long childId) {
 		AuthPrincipal guardian = new AuthPrincipal(PrincipalType.USER, guardianId, FAMILY_ID, role);
 		return new HistoryQuery(guardian, childId, NOVEMBER_2026);
