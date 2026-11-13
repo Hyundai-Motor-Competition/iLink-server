@@ -1,8 +1,8 @@
 # FOLLOWUP · 알림 (notification)
 
-- 생성: 2026-11-11 12:11 KST · tdd-guard
-- 상태: 완료 (체크 64/64 · 완료 기준 4/4)
-- 테스트: ● GREEN · 2261 passed · 전체 · 206s · .\gradlew.bat test --console=plain
+- 생성: 2026-11-13 16:42 KST · tdd-guard
+- 상태: 완료 (체크 65/65 · 완료 기준 4/4)
+- 테스트: ● GREEN · 2589 passed · 전체 · 341s · .\gradlew.bat test --console=plain
 - 설계서: C:/ilink/docs/09_알림-notification.md
 
 ## 완료 항목
@@ -70,6 +70,7 @@
 - [x] #62 [서비스] 재발송 작업은 묶음 시도가 3번 이상인 행을 대상 판단 전에 거른다(세션별 조회 · 멈춤 확인을 부르지 않는다) ← ResendUndeliveredServiceTest.재발송 작업은 시도가 3번
 - [x] #63 [서비스] 다시 보내기는 세션이 끝났거나 호출이 철회됐으면 409로 거절하고 새 행을 만들지 않는다 ← ResendNotificationServiceTest.다시 보내기는 세션이 끝났으면 409로
 - [x] #64 [서비스] 다시 보내기의 1분 제한은 묶음 마지막 행의 sentAt(없으면 그 행의 createdAt) 기준이다(재발송 작업과 같은 규칙) ← ResendNotificationServiceTest.다시 보내기의 마지막 행은
+- [x] #65 [서비스] PREPARE_NOTICE_SENT 이벤트의 알림은 세션 자녀에게 type PREPARE(제목 「준비 알림」, 본문 「곧 도착해요. 실내에서 준비해 주세요」)로 기록 · 발송한다 ← DispatchSessionEventServiceTest.발송 리스너는 PREPARE_NOTICE_SENT의 notificationIds 행을 세션 자녀 기기로 보내며
 
 ## 미완료 항목
 - 없음
@@ -81,48 +82,26 @@
 - [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-11 12:11 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 1 · 하 17 · 리뷰 시점 체크 64/64
-- 리뷰 시점 테스트: ● GREEN · 2261 passed · 전체 · 206s · .\gradlew.bat test --console=plain
+- 2026-11-13 16:42 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 1 · 하 5 · 리뷰 시점 체크 65/65
+- 리뷰 시점 테스트: ● GREEN · 2589 passed · 전체 · 341s · .\gradlew.bat test --console=plain
   - 결론: 조건부 통과
-  - 이전 리뷰(11-09 23:02, 하 7건): 7건 모두 그대로 남아 있다. 마지막 알림 커밋 7c1c94c 뒤로 바뀐 파일은 build.gradle과 ops/k8s/dev/api.yaml 두 개뿐이다(`git diff 7c1c94c HEAD --stat`). 알림 코드 · 테스트와 03 · 05 · 08 문서는 바뀌지 않았다.
-  - [중] 재발송 작업이 @Scheduled 스레드에서 FCM을 동기로 보낸다. 스케줄러 스레드는 Spring Boot 기본값인 1개다(spring.task.scheduling 설정도, TaskScheduler 빈도 없음). 그래서 pickup 10초 자동 완료(AutoCompleteBoardingScheduler.java:17), SSE ping(SessionStreamRegistry.java:86), 키 정리 작업과 같은 스레드를 쓴다. e58000a로 dev가 실제 FCM을 부르게 됐으므로 FCM이 느려지면 자동 완료가 밀린다. FcmConfig.java:24-27에는 timeout 설정이 없다(SDK 기본 timeout · 재시도 값은 미확인) — 근거 C:/ilink/src/main/java/com/…
-  - [하] (shared 단서 확인) C:/ilink/src/main/java/com/example/pickupservice/notification/adapter/in/scheduler/ResendUndeliveredScheduler.java:17이 fixedDelay=60_000L로 고정돼 있다. pickup(AutoCompleteBoardingScheduler.java:17)과 common(IdempotencyKeyCleaner.java:20)은 설정 키를 쓴다. SchedulingConfig.java:7은 조건 없이 켜지고 IntegrationTestSupport.java:10은 dev 프로필과 실제 Clock을 쓴다. 그래서 캐시된 테스트 컨텍스트마다 재발송 작업이 1분마다 같은 DB에서 돈다. 실패 …
-  - [하] (이전 지적 남음) 1분 · 최대 3회 값이 여러 곳에 있다: C:/ilink/src/main/java/com/example/pickupservice/notification/application/service/ResendUndeliveredService.java:30 · :65, ResendPolicy.java:12-13, 스케줄러 :17. 마지막 행도 두 번 구한다(:61-64). 경계 계산 방식도 다르다(:65 isAfter, ResendPolicy.java:33은 초 단위로 버림) → 리팩터링
-  - [하] (shared 단서 확인 · 이전 지적 남음) RESEND_TOO_SOON이 C:/ilink/src/main/java/com/example/pickupservice/common/error/ErrorCode.java:25에 있는데 쓰는 곳은 ResendNotificationService.java:61 하나다. 한 모듈만 쓰는 다른 429 코드는 각 모듈에서 BusinessException.of(HttpStatus, code, message)로 만든다(AuthErrors.java:27 · :42, PickupErrors.java:88). 03 L95 · L100 · L230, 02 L169와 맞지 않는다 → 사람 결정(03 규칙을 고치거나, retryAfterSeconds를 받는 팩토리를 만들어 옮김)
-  - [하] (auth 단서 확인 · 이전 지적 남음) 05에 LoadPushTargetByDeviceUseCase(findPushTargetByDeviceId · findLivePushTargetByDeviceId)가 없고, 08에 ResendGuardUseCase · FindSessionFamilyUseCase · payload notificationIds가 없다(grep 0건) → note
-  - [하] (auth 단서 확인) C:/ilink/src/main/java/com/example/pickupservice/notification/application/service/DispatchSessionEventService.java:14가 auth.domain.Platform을 import한다. auth in 포트 record인 PushTarget(auth/application/port/in/PushTarget.java:3)이 도메인 enum을 그대로 담고 있어서 생긴 일이다. pickup도 auth.domain.MemberDeviceStatus · schedule.domain.ScheduleStatus를 같은 방식으로 쓴다 → note(프로젝트 공통 형태)
-  - [하] (user 단서 확인, 줄 번호는 틀림) C:/ilink/src/main/java/com/example/pickupservice/notification/adapter/out/user/NotificationMemberNameAdapter.java:24-27이 사용자마다 findMember를 따로 부른다(파일은 31줄이라 59-62줄은 없음). ListNotificationsService.java:43-48도 기기마다 loadPushTargetIncludingRevoked를 부른다. LoadMemberUseCase에는 여러 명을 한 번에 읽는 메서드가 없고 findMembers(familyId)만 있다 → 리팩터링(가족 단위 findMembers 사용)
-  - [하] 발송과 저장 사이에 경합이 있다. C:/ilink/src/main/java/com/example/pickupservice/notification/adapter/out/persistence/NotificationPersistenceAdapter.java:64-69는 모든 칸을 덮어쓰는 merge이고 NotificationEntity에는 @Version이 없다. DispatchSessionEventService.java:67 · :76-78은 읽기 → FCM → 저장 순서라, 그 사이에 NOTI-01이 오면 deliveredAt이 null로 돌아갈 수 있다. NOTI-03은 @Transactional 안에서 FCM을 보내므로(ResendNotificationService.java:42 · :66) 커밋…
-  - [하] 폐기된 기기에도 새 행을 먼저 만든다. ResendUndeliveredService.java:81-83 · ResendNotificationService.java:64-66에서 저장한 뒤 ResendDelivery.java:22-25가 대상이 없으면 false를 돌려준다. 그 결과 스케줄러는 보내지 못한 행을 시도 3회까지 쌓고, NOTI-03은 실제로 보내지 않았는데 202와 새 notificationId를 돌려준다. ResendNotificationServiceTest:304가 이 동작을 굳히고 있다 → 사람 결정
-  - [하] C:/ilink/src/main/java/com/example/pickupservice/notification/adapter/in/web/DeliveryReceiptRequest.java:14가 receivedAt.toInstant()를 쓴다. 02 L156은 요청 시각도 TimeUtils로 바꾸라고 하고, pickup 요청 DTO 4곳은 TimeUtils.toUtc를 쓴다 → 리팩터링
-  - [하] notification 테이블에 조회 인덱스가 없다. NotificationEntity.java:17 @Table에도, schema.sql에도 없다. findResendTargets(NotificationJpaRepository.java:22-26)는 1분마다 created_at 조건으로 테이블 전체를 읽고, loadBySession · countAttempts는 session_id로 찾는다. device · pickup_session 테이블은 @Index가 있다 → 항목 추가(설계서 테이블에 인덱스 추가) 또는 note
-  - [하] (CI 영향) dev 기본 project-id가 실제 값과 다르다: C:/ilink/src/main/resources/application-dev.yml:16은 pickup-service-dev, ops/k8s/dev/api.yaml:15는 ilink-dev-d6624. FcmPropertiesDevProfileTest.java:21-24는 FCM_PROJECT_ID 환경 변수가 있으면 실패한다(:31처럼 값을 비워 두지 않음). 로컬에 FCM_CREDENTIALS_PATH가 있으면 FcmConfig.java:28 initializeApp(기본 이름)이 두 번째 테스트 컨텍스트부터 예외를 낼 수 있다(재현 안 함). Jenkins Test 단계에는 FCM 변수가 없다 → note
-  - [하] (CI 영향) api.yaml:51-55의 Secret fcm이 optional이 아니어서 Secret이 없으면 파드가 뜨지 않고 롤백된다. ilink-secrets.sh는 Secret api만 다룬다 → note(운영 점검표)
-  - [하] (이전 지적 남음) 재발송 작업에 「마지막 행 sentAt이 없으면 createdAt」 테스트가 없다(ResendUndeliveredServiceTest의 모든 행에 sentAt 있음). ResendPolicyTest에 lastAttemptAt 테스트도 없다 → 항목 추가
-  - [하] (이전 지적 남음) web 테스트 빈칸: NOTI-03 409(SESSION_ALREADY_FINISHED · CALL_ALREADY_REVOKED), NOTI-02 TEACHER 403(NotificationApiDoc.java:29는 TEACHER · CHILD 403이라고 적음). C:/ilink/src/test/java/com/example/pickupservice/notification/adapter/in/web/NotificationControllerTest.java에 없음 → 항목 추가 또는 note
-  - [하] (이전 지적 남음) 테스트 주석이 남아 있다: ResendNotificationServiceTest:90 · :137, ResendUndeliveredServiceTest:75 · :172 · :229, NotificationPersistenceAdapterTest:46-49 · :185-199 · :365, NotificationControllerTest:69-78. NotificationPersistenceAdapterTest:348-363은 들여쓰기가 한 칸 더 들어가 있다 → 리팩터링
-  - [하] (이전 지적 남음) ResendNotificationServiceTest:175(#59)와 :388(#64)이 거의 같은 것을 검증한다 → note
-  - [하] NotificationApiDoc.java:12 @Tag 설명 「알림 수신 확인 · 이력 조회」에 다시 보내기가 빠져 있다 → 리팩터링
-  - 완료 기준: C1 충족 — 체크 64/64, GREEN 2261 passed / C2 충족 — NOTI-01~03의 경로 · 메서드 · 상태 · 권한 · 응답 필드(NotificationController.java:31-60, NotificationItemResponse.java:8-17), 시그니처(포트 in · out 대조), 09 결정(묶음 마지막 행 · 24시간 · 3회 · 멈춤 조건 · 1분 기준)이 일치 / C3 사람 확인 필요 — [중] 1건(스케줄러 스레드) 결정 필요, 공통 규칙 어긋남은 [하] 3건(TimeUtils · 주석 · ErrorCode 위치) / C4 충족(기록됨) — openedAt · 나머지 문구 · UNREGISTERED 처리는 09 확인 필요 사항과 FOLLOWUP L1…
-  - 후속 과제:
-  - 재발송 대상 중복 — 해소됨(ResendUndeliveredService.java:44-63, 묶음 마지막 행 기준)
-  - #24 자녀 제외를 pickup에 맡김 — 남음(CallEngine.java:82 SessionReceivers.guardians로 지켜짐)
-  - 계층 병렬 한계 — 해소됨(병합 뒤 GREEN)
-  - 05 LoadPushTargetByDeviceUseCase 반영 — 남음
-  - 1차 [하] 메모 — 남음(#16 DB 롤백 통합 테스트 없음 · Platform import · NOTI-02 N+1 · 05/08 문서). 09 구조 · 시그니처는 해소
-  - prod FCM 환경 변수 누락 시에도 기동됨 — 남음(application-prod.yml:16-17 빈 기본값). dev는 e58000a로 값이 들어감
-  - HELP 재발송 기본 문구 — 해소됨(09 「HELP 알림 문구」 결정으로 받아들임)
-  - loadPending을 쓰는 곳 없음 — 설계 결정 필요(main에서 포트 · 어댑터 선언 말고는 0건)
-  - 재발송 작업에 트랜잭션 없음 · 예외 나면 멈춤 — 설계 결정 필요(ResendUndeliveredService.java:41-89에 try/catch 없음)
-  - 재리뷰 [하] 메모(확인한 자녀에게도 CALL 재발송 · SSE payload notificationIds · FQCN · 문서) — 남음
-  - 최종 리뷰 [하] 7건 — 남음(위 「이전 지적 남음」 항목들)
-  - 테스트: mcp__tdd-guard__tests scope "all" → 소스 변경이 없어 14분 전 결과를 재사용. `.\gradlew.bat test --console=plain` GREEN 2261 passed · 206s. 47a1229(build.gradle)는 알림 테스트에 영향 없음: 알림 테스트는 EmbeddedPostgis · zonky를 직접 쓰지 않는다(grep 0건).
-- 이전 리뷰: 2026-11-09 23:02 KST (통과), 2026-11-09 22:43 KST (조건부 통과), 2026-11-09 22:12 KST (수정 필요), 2026-11-09 21:32 KST (수정 필요)
+  - #65 변경분에서 [상] · [중]은 없다. 이전 리뷰의 [중](스케줄러 스레드)이 남아 통과로 올리지 않음. 전체 GREEN 2589 passed.
+  - #65 확인(이상 없음): DispatchSessionEventService.java:35 PREPARE_NOTICE_SENT → PREPARE, NotificationTexts.java:10 문구, 08 L330 · 09 L39와 맞음. pickup ReceiveTelemetryService.java:85-91이 자녀에게 PREPARE 행 기록 · notificationIds 발행, 리스너가 그 행만 자녀 기기로 보냄. 재발송(ResendUndeliveredService.java:73, ResendDelivery.java:27-28), 다시 보내기(ResendNotificationService.java:53 · :74), 수신 확인(RecordDeliveryService.java:38), 이력 제목(Li…
+  - 발견 사항
+  - [중] (이전 남음, 영향 커짐) 재발송 작업이 @Scheduled 스레드에서 FCM을 동기로 보냄, 스레드 풀 설정 없음. 한 스레드를 쓰는 작업 5개(재발송 · 자동 완료 · 신호 끊김 철회 · SSE ping · 키 정리) → 사람 결정
+  - [하] 09 L180 「행을 만드는 알림 종류」가 다섯으로 적혀 있음(지금 PREPARE 포함 여섯) → note(문서)
+  - [하] PREPARE가 수신 안 되면 1 · 2분 뒤 재발송이 정차 · CALL 뒤 도착할 수 있음(멈춤 조건은 세션 종료 · 호출 철회뿐) → 사람 결정
+  - [하] 행이 있는 이벤트는 dispatchRows만 타 보호자에게 데이터 메시지가 안 감(기존 형태) → note
+  - [하] type 문자열 "PREPARE"가 pickup · notification에 따로 적힘(기존 형태) → note
+  - [하] 이전 리뷰 [하] 17건 남음
+  - 완료 기준: C1 충족(65/65, GREEN 2589) / C2 충족 / C3 사람 확인 필요(스케줄러 스레드 미결정) / C4 충족(09 L180 문구만 갱신 필요)
+  - 테스트: scope all GREEN 2589 passed · 341s
+- 이전 리뷰: 2026-11-11 12:11 KST (조건부 통과), 2026-11-09 23:02 KST (통과), 2026-11-09 22:43 KST (조건부 통과), 2026-11-09 22:12 KST (수정 필요)
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
 |---|---|
-| Notification 행을 만드는 알림 종류 | type 예시가 SESSION_STARTED · DEPARTURE · CALL · PREP_EXTENDED · HELP 「등」. 이 다섯만 행을 만들고 나머지 상태 이벤트는 행 없이 데이터 메시지만 보낸다고 가정 |
+| Notification 행을 만드는 알림 종류 | type 예시가 SESSION_STARTED · DEPARTURE · PREPARE · CALL · PREP_EXTENDED · HELP 「등」. 이 여섯만(PREPARE는 2026-11-13 추가) 행을 만들고 나머지 상태 이벤트는 행 없이 데이터 메시지만 보낸다고 가정 |
 | 데이터 메시지 발송 대상 | 4.12 「받는 쪽」 열대로 보호자 · 자녀를 고름. 「보호자」에 TEACHER가 들어가는지 소스에 없음. 빼는 것으로 가정 |
 | attempt 저장 | Notification에 attempt 컬럼이 없음. 같은 세션 · callId · type · deviceId 행 수로 계산한다고 가정 |
 | openedAt을 채우는 방법 | 열람을 알리는 API가 없음. 정해야 함 |
@@ -155,3 +134,4 @@
 - 재발송 작업은 트랜잭션 없이 포트 호출마다 커밋한다. 한 건 예외면 그 자리에서 멈추고 나머지는 다음 주기(60초)로 밀림 — 묶음마다 try/catch · 로그를 넣을지 결정 필요. 발송 실패 · 예외로 sentAt 없는 행이 남으면 다음 주기 재발송 대상이 됨(설계서 미규정)
 - 도메인 재리뷰 [하] 메모: 스케줄러가 이미 확인한 자녀 기기에도 CALL을 다시 보냄(판단은 Call 단위) · notificationIds가 발행 메시지 payload에 섞여 차량 SSE에도 나가고 저장 이벤트와 payload가 다름(08 문서 미반영) · SessionEventPushListener의 notification SessionEventMessage FQCN은 pickup record와 이름이 같아 남김 · 문서 갱신 필요(09 구조, 05 LoadPushTargetByDeviceUseCase의 findLive · findPushTargetByDeviceId, 08 ResendGuardUseCase · FindSessionFamilyUseCase · payload notificationIds)
 - 최종 리뷰 [하]: 03 공유모듈 문서의 ErrorCode 설명 갱신 필요(SESSION_ALREADY_FINISHED · CALL_ALREADY_REVOKED · RESEND_TOO_SOON) · 1분 · 최대 3회 상수가 ResendUndeliveredService와 ResendPolicy에 중복, 마지막 행 두 번 계산(리팩터링) · 재발송 작업의 「마지막 행 sentAt 없으면 createdAt」 테스트와 ResendPolicy.lastAttemptAt 단위 테스트 없음 · NOTI-03 409 web 테스트 없음 · 알림 테스트 구획 주석 남음(ResendNotificationServiceTest 90 · 137, ResendUndeliveredServiceTest 75 · 172 · 229, NotificationPersistenceAdapterTest 181-199) · ResendNotificationServiceTest #59 · #64 테스트 거의 중복
+- [1차 개발 뒤 정리 · 2026-11-13] (1) [중] 스케줄러 스레드 1개를 작업 5개(재발송 · 자동 완료 · 신호 끊김 철회 · SSE ping · 키 정리)가 같이 씀, FCM이 느리면 신호 끊김 철회까지 밀림 — 스케줄러 풀 크기 설정 또는 재발송 발송 @Async 분리 결정 (2) PREPARE가 수신 안 되면 1 · 2분 뒤 재발송이 정차 · CALL 뒤에 도착할 수 있음 — CALL이 생기면 PREPARE 재발송을 멈출지 결정(DEPARTURE도 같은 형태) (3) 행이 있는 이벤트는 보호자에게 데이터 메시지를 안 보냄(보호자는 SES-03 조회) — 09 발송 규칙에 명시 (4) 09 L180 「행을 만드는 알림 종류」를 여섯(PREPARE 추가)으로 갱신함
