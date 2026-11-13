@@ -160,10 +160,14 @@ class PickupInPortsTest {
 		assertRecord(ConfirmRouteCommand.class, components(
 				"principal", PRINCIPAL,
 				"sessionId", "long",
-				"spotId", "long",
+				"spotId", LONG_OR_NULL,
 				"navRouteId", STRING,
 				"stateVersion", "int",
-				"totalMeters", INTEGER_OR_NULL));
+				"totalMeters", INTEGER_OR_NULL,
+				"candidate", SpotCandidate.class.getName()));
+		assertRecord(SpotCandidate.class, components(
+				"name", STRING,
+				"location", LatLng.class.getName()));
 		assertRecord(ChangeSpotCommand.class, components(
 				"principal", PRINCIPAL,
 				"sessionId", "long",

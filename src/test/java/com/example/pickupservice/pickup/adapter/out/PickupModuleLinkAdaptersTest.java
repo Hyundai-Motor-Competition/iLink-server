@@ -9,6 +9,7 @@ import com.example.pickupservice.auth.domain.MemberInvite;
 import com.example.pickupservice.auth.domain.OwnerType;
 import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
+import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.pickup.application.port.out.LoadChildReadinessPort;
 import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
@@ -16,8 +17,10 @@ import com.example.pickupservice.pickup.application.port.out.LoadSchedulePort;
 import com.example.pickupservice.pickup.application.port.out.LoadSpotPort;
 import com.example.pickupservice.pickup.application.port.out.NotificationRequest;
 import com.example.pickupservice.pickup.application.port.out.RecordNotificationPort;
+import com.example.pickupservice.pickup.application.port.out.SaveTemporarySpotPort;
 import com.example.pickupservice.place.application.port.in.LoadPickupSpotUseCase;
 import com.example.pickupservice.place.application.port.in.SpotInfo;
+import com.example.pickupservice.place.application.port.in.SpotSummary;
 import com.example.pickupservice.place.fixture.PlaceSeed;
 import com.example.pickupservice.schedule.application.port.in.LoadScheduleUseCase;
 import com.example.pickupservice.schedule.application.port.in.ScheduleInfo;
@@ -155,6 +158,33 @@ class PickupModuleLinkAdaptersTest extends IntegrationTestSupport {
 		assertThat(otherSpot).isEqualTo(loadPickupSpotUseCase.findSpot(seededPlace.otherSpotId()).orElseThrow());
 		assertThat(otherSpot.spotId()).isEqualTo(seededPlace.otherSpotId());
 		assertThat(otherSpot.name()).isEqualTo(PlaceSeed.OTHER_SPOT_NAME);
+	}
+
+	@Test
+	@DisplayName("SaveTemporarySpotPort는 빈이 정확히 1개이고 pickup.adapter.out.place 아래 클래스가 구현한다")
+	void temporarySpotPortHasExactlyOneBeanInPickupOutPlacePackage() {
+		Object bean = onlyBeanOf(SaveTemporarySpotPort.class);
+
+		assertThat(AopUtils.getTargetClass(bean).getName()).startsWith(OUT_ADAPTER_PACKAGE + "place.");
+	}
+
+	@Test
+	@DisplayName("SaveTemporarySpotPort.saveTemporarySpot은 place SaveTemporarySpotUseCase에 위임해 같은 가족 · 학원 · 이름 · 정차 지점 · 만남 지점의 임시 장소를 만들고 그 spotId를 돌려준다(가족 장소 목록에는 안 보인다)")
+	void temporarySpotPortDelegatesToPlaceSaveTemporarySpot() {
+		SaveTemporarySpotPort temporarySpotPort = onlyBeanOf(SaveTemporarySpotPort.class);
+		seededPlace = placeSeed.seed();
+		long familyId = seededPlace.schedule().user().familyId();
+		long academyId = seededPlace.schedule().academyId();
+		LatLng location = new LatLng(37.500900, 127.040500);
+
+		long spotId = temporarySpotPort.saveTemporarySpot(familyId, academyId, "학원 옆 편의점 앞", location, location);
+
+		assertThat(spotId).isPositive().isNotIn(seededPlace.defaultSpotId(), seededPlace.otherSpotId());
+		assertThat(loadPickupSpotUseCase.findSpot(spotId)).contains(
+				new SpotInfo(spotId, familyId, academyId, "학원 옆 편의점 앞", location, location));
+		assertThat(loadPickupSpotUseCase.findSpots(familyId, List.of(academyId)))
+				.extracting(SpotSummary::spotId)
+				.doesNotContain(spotId);
 	}
 
 	@Test

@@ -10,7 +10,6 @@ import com.example.pickupservice.pickup.application.port.out.LoadSpotPort;
 import com.example.pickupservice.pickup.application.port.out.PublishSessionEventPort;
 import com.example.pickupservice.pickup.application.port.out.SaveSessionPort;
 import com.example.pickupservice.pickup.application.port.out.SessionEventPort;
-import com.example.pickupservice.pickup.domain.PickupRuleException;
 import com.example.pickupservice.pickup.domain.PickupSession;
 import com.example.pickupservice.pickup.domain.SessionEvent;
 import com.example.pickupservice.pickup.domain.SessionEventType;
@@ -55,10 +54,8 @@ public class ChangeSpotService implements ChangeSpotUseCase {
 			throw PickupErrors.stateVersionConflict(sessionAccess.latestView(locked, command.principal()));
 		}
 		SpotSnapshot spot = savedSpotOf(command.spotId(), locked.getFamilyId());
-		changeSpot(locked, spot);
-		if (loadCallPort.loadLiveCall(locked.getSessionId()).isPresent()) {
-			throw PickupErrors.callAlreadySent();
-		}
+		SpotChangeGuard.requireSpotChangeable(locked, loadCallPort);
+		locked.changeSpot(spot);
 		PickupSession session = saveSessionPort.save(locked);
 		Instant now = clock.instant();
 		long familyId = session.getFamilyId();
@@ -76,14 +73,6 @@ public class ChangeSpotService implements ChangeSpotUseCase {
 				.filter(spot -> spot.familyId() == familyId)
 				.map(spot -> new SpotSnapshot(spot.spotId(), spot.name(), spot.stopPoint(), spot.meetingPoint()))
 				.orElseThrow(PickupErrors::spotNotSaved);
-	}
-
-	private static void changeSpot(PickupSession session, SpotSnapshot spot) {
-		try {
-			session.changeSpot(spot);
-		} catch (PickupRuleException exception) {
-			throw PickupErrors.from(exception);
-		}
 	}
 
 }

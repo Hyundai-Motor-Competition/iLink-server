@@ -252,11 +252,15 @@ public class PickupSession {
 		raiseStateVersion();
 	}
 
-	public void changeSpot(SpotSnapshot spot) {
+	public void requireSpotChangeable() {
 		boolean childMoving = children.stream().anyMatch(child -> child.getChildPhase() == ChildPhase.MEETING);
 		if (childMoving) {
 			throw new PickupRuleException(PickupViolation.CHILD_ALREADY_MOVING);
 		}
+	}
+
+	public void changeSpot(SpotSnapshot spot) {
+		requireSpotChangeable();
 		spotStatus = SpotStatus.SELECTED;
 		spotVersion++;
 		spotId = spot.spotId();

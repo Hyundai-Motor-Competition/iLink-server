@@ -1,6 +1,7 @@
 package com.example.pickupservice.pickup.adapter.in.web;
 
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
+import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
@@ -28,6 +29,7 @@ import com.example.pickupservice.pickup.application.port.in.SessionRouteView;
 import com.example.pickupservice.pickup.application.port.in.SessionSpotView;
 import com.example.pickupservice.pickup.application.port.in.SessionStatusView;
 import com.example.pickupservice.pickup.application.port.in.SessionView;
+import com.example.pickupservice.pickup.application.port.in.SpotCandidate;
 import com.example.pickupservice.pickup.application.port.in.StartPickupCommand;
 import com.example.pickupservice.pickup.application.port.in.StartPickupResult;
 import com.example.pickupservice.pickup.application.service.PickupErrors;
@@ -125,6 +127,12 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 			""";
 	private static final String NEGATIVE_TOTAL_METERS_ROUTE_BODY = """
 			{"spotId":21,"navRouteId":"nav-route-7f3a","stateVersion":15,"totalMeters":-1}
+			""";
+	private static final String CANDIDATE_NAME = "학원 옆 편의점 앞";
+	private static final LatLng CANDIDATE_LOCATION = new LatLng(37.500900, 127.040500);
+	private static final String CANDIDATE_ROUTE_BODY = """
+			{"candidate":{"name":"학원 옆 편의점 앞","location":{"lat":37.500900,"lng":127.040500}},\
+			"navRouteId":"nav-route-7f3a","stateVersion":15,"totalMeters":3800}
 			""";
 	private static final long FAMILY_ID = 12L;
 	private static final long VEHICLE_ID = 77L;
@@ -478,6 +486,105 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
 
 		then(confirmRouteUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route에 spotId 없이 candidate {name, location}을 보내면 Command에 candidate를 담고 spotId는 null로 두어 200을 돌려준다")
+	void confirmRouteWithCandidatePassesCandidateAndNullSpotIdToCommand() throws Exception {
+		given(confirmRouteUseCase.confirmRoute(any())).willReturn(sessionView());
+
+		mockMvc.perform(confirmRouteRequest(VEHICLE, CANDIDATE_ROUTE_BODY))
+				.andExpect(status().isOk())
+				.andExpect(content().json(SESSION_VIEW_JSON, JsonCompareMode.STRICT));
+
+		ArgumentCaptor<ConfirmRouteCommand> captor = ArgumentCaptor.forClass(ConfirmRouteCommand.class);
+		then(confirmRouteUseCase).should().confirmRoute(captor.capture());
+		ConfirmRouteCommand command = captor.getValue();
+		assertThat(command.candidate()).isEqualTo(new SpotCandidate(CANDIDATE_NAME, CANDIDATE_LOCATION));
+		assertThat(command.spotId()).isNull();
+		assertThat(command.principal()).isEqualTo(VEHICLE);
+		assertThat(command.sessionId()).isEqualTo(SESSION_ID);
+		assertThat(command.navRouteId()).isEqualTo(NAV_ROUTE_ID);
+		assertThat(command.stateVersion()).isEqualTo(STATE_VERSION);
+		assertThat(command.totalMeters()).isEqualTo(3_800);
+	}
+
+	@Test
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route의 candidate name이 50자면 받아서 Command에 그대로 담는다")
+	void confirmRouteWithFiftyCharCandidateNameIsAccepted() throws Exception {
+		given(confirmRouteUseCase.confirmRoute(any())).willReturn(sessionView());
+		String name50 = "가".repeat(50);
+
+		mockMvc.perform(confirmRouteRequest(VEHICLE, candidateRouteBody("\"" + name50 + "\"", "37.5009", "127.0405")))
+				.andExpect(status().isOk());
+
+		ArgumentCaptor<ConfirmRouteCommand> captor = ArgumentCaptor.forClass(ConfirmRouteCommand.class);
+		then(confirmRouteUseCase).should().confirmRoute(captor.capture());
+		assertThat(captor.getValue().candidate()).isEqualTo(new SpotCandidate(name50, CANDIDATE_LOCATION));
+	}
+
+	static Stream<Arguments> routeBodiesWithBothOrNeitherSpotIdAndCandidate() {
+		return Stream.of(
+				Arguments.of("spotId · candidate 둘 다", """
+						{"spotId":21,"candidate":{"name":"학원 옆 편의점 앞","location":{"lat":37.5009,"lng":127.0405}},\
+						"navRouteId":"nav-route-7f3a","stateVersion":15}
+						"""),
+				Arguments.of("spotId · candidate 둘 다 없음", """
+						{"navRouteId":"nav-route-7f3a","stateVersion":15}
+						"""));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("routeBodiesWithBothOrNeitherSpotIdAndCandidate")
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route에 spotId와 candidate를 둘 다 보내거나 둘 다 빼면 422 VALIDATION_FAILED를 돌려주고 유스케이스를 부르지 않는다")
+	void confirmRouteWithBothOrNeitherSpotIdAndCandidateReturns422ValidationFailed(String caseName, String body)
+			throws Exception {
+		mockMvc.perform(confirmRouteRequest(VEHICLE, body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", not(org.hamcrest.Matchers.empty())))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(confirmRouteUseCase).shouldHaveNoInteractions();
+	}
+
+	static Stream<Arguments> routeBodiesWithInvalidCandidate() {
+		return Stream.of(
+				Arguments.of("name 빈 값", candidateRouteBody("\"\"", "37.5009", "127.0405")),
+				Arguments.of("name 공백만", candidateRouteBody("\"   \"", "37.5009", "127.0405")),
+				Arguments.of("name 없음", candidateRouteBody("null", "37.5009", "127.0405")),
+				Arguments.of("name 51자", candidateRouteBody("\"" + "가".repeat(51) + "\"", "37.5009", "127.0405")),
+				Arguments.of("lat 90 초과", candidateRouteBody("\"편의점 앞\"", "90.000001", "127.0405")),
+				Arguments.of("lat -90 미만", candidateRouteBody("\"편의점 앞\"", "-90.000001", "127.0405")),
+				Arguments.of("lng 180 초과", candidateRouteBody("\"편의점 앞\"", "37.5009", "180.000001")),
+				Arguments.of("lng -180 미만", candidateRouteBody("\"편의점 앞\"", "37.5009", "-180.000001")),
+				Arguments.of("lat 없음", candidateRouteBody("\"편의점 앞\"", "null", "127.0405")),
+				Arguments.of("location 없음", """
+						{"candidate":{"name":"편의점 앞"},"navRouteId":"nav-route-7f3a","stateVersion":15}
+						"""));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("routeBodiesWithInvalidCandidate")
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route의 candidate name이 비었거나 50자를 넘거나 location이 없거나 범위 밖이면 422 VALIDATION_FAILED(fields candidate.*)를 돌려주고 유스케이스를 부르지 않는다")
+	void confirmRouteWithInvalidCandidateReturns422ValidationFailedOnCandidateField(String caseName, String body)
+			throws Exception {
+		mockMvc.perform(confirmRouteRequest(VEHICLE, body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", hasSize(1)))
+				.andExpect(jsonPath("$.error.fields[0].field", startsWith("candidate.")))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(confirmRouteUseCase).shouldHaveNoInteractions();
+	}
+
+	private static String candidateRouteBody(String nameJson, String lat, String lng) {
+		return """
+				{"candidate":{"name":%s,"location":{"lat":%s,"lng":%s}},"navRouteId":"nav-route-7f3a","stateVersion":15}
+				""".formatted(nameJson, lat, lng);
 	}
 
 	@Test
