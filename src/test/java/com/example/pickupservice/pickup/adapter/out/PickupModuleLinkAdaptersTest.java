@@ -27,6 +27,12 @@ import com.example.pickupservice.schedule.application.port.in.ScheduleInfo;
 import com.example.pickupservice.schedule.domain.ScheduleStatus;
 import com.example.pickupservice.schedule.fixture.ScheduleSeed;
 import com.example.pickupservice.user.application.port.in.FamilyInfo;
+import com.example.pickupservice.user.application.port.in.GetMyFamilyQuery;
+import com.example.pickupservice.user.application.port.in.GetMyFamilyUseCase;
+import com.example.pickupservice.user.application.port.out.ProfileImageStoragePort;
+import jakarta.persistence.EntityManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import java.util.HashMap;
 import com.example.pickupservice.user.application.port.in.LoadFamilyUseCase;
 import com.example.pickupservice.user.application.port.in.LoadMemberUseCase;
 import com.example.pickupservice.user.application.port.in.MemberInfo;
@@ -73,6 +79,10 @@ class PickupModuleLinkAdaptersTest extends IntegrationTestSupport {
 	private final GetMemberDeviceStatusUseCase getMemberDeviceStatusUseCase;
 	private final SaveDevicePort saveDevicePort;
 	private final SaveInvitePort saveInvitePort;
+	private final GetMyFamilyUseCase getMyFamilyUseCase;
+	private final ProfileImageStoragePort profileImageStoragePort;
+	private final EntityManager entityManager;
+	private final TransactionTemplate transactionTemplate;
 
 	private UserSeed.Result seededUser;
 	private ScheduleSeed.Result seededSchedule;
@@ -214,6 +224,43 @@ class PickupModuleLinkAdaptersTest extends IntegrationTestSupport {
 				.containsExactlyInAnyOrder(seededUser.guardianId(), seededUser.minjunId(), seededUser.seoyunId());
 		assertThat(members).extracting(MemberInfo::name)
 				.containsExactlyInAnyOrder(UserSeed.GUARDIAN_NAME, UserSeed.MINJUN_NAME, UserSeed.SEOYUN_NAME);
+	}
+
+	@Test
+	@DisplayName("LoadFamilyPort가 주는 MemberInfo.profileImageUrl은 가족 조회(GetMyFamily)와 같은 URL이다: 사진 있는 민준 · 보호자는 저장 키의 URL, 사진 없는 서윤은 기본 사진 URL")
+	void familyPortFillsProfileImageUrlSameAsGetMyFamily() {
+		LoadFamilyPort familyPort = onlyBeanOf(LoadFamilyPort.class);
+		seededUser = userSeed.seed();
+		long familyId = seededUser.familyId();
+		String minjunKey = "profiles/minjun-" + UUID.randomUUID() + ".png";
+		String guardianKey = "profiles/guardian-" + UUID.randomUUID() + ".png";
+		setProfileImageKey(seededUser.minjunId(), minjunKey);
+		setProfileImageKey(seededUser.guardianId(), guardianKey);
+
+		List<MemberInfo> members = familyPort.loadMembers(familyId);
+		Map<Long, String> pickupUrls = new HashMap<>();
+		members.forEach(member -> pickupUrls.put(member.userId(), member.profileImageUrl()));
+		Map<Long, String> familyUrls = new HashMap<>();
+		getMyFamilyUseCase.getMyFamily(new GetMyFamilyQuery(familyId))
+				.members().forEach(member -> familyUrls.put(member.userId(), member.profileImageUrl()));
+
+		assertThat(pickupUrls).containsOnlyKeys(seededUser.guardianId(), seededUser.minjunId(), seededUser.seoyunId());
+		assertThat(pickupUrls).isEqualTo(familyUrls);
+		assertThat(pickupUrls.get(seededUser.minjunId())).isNotNull().contains(minjunKey);
+		assertThat(pickupUrls.get(seededUser.guardianId())).isNotNull().contains(guardianKey);
+		assertThat(pickupUrls.get(seededUser.seoyunId()))
+				.isNotNull()
+				.isEqualTo(profileImageStoragePort.defaultUrl().orElseThrow());
+		assertThat(familyPort.loadMember(seededUser.minjunId()).orElseThrow().profileImageUrl())
+				.isEqualTo(pickupUrls.get(seededUser.minjunId()));
+	}
+
+	private void setProfileImageKey(long userId, String key) {
+		transactionTemplate.executeWithoutResult(status -> entityManager
+				.createQuery("update UserEntity u set u.profileImageKey = :key where u.userId = :userId")
+				.setParameter("key", key)
+				.setParameter("userId", userId)
+				.executeUpdate());
 	}
 
 	@Test
