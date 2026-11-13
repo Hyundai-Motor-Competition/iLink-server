@@ -654,6 +654,27 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 		then(completePickupUseCase).shouldHaveNoInteractions();
 	}
 
+	@ParameterizedTest(name = "본문 {0}")
+	@ValueSource(strings = {
+			"{\"mode\":\"MANUAL\",\"stateVersion\":15,\"notBoardedChildUserIds\":[null]}",
+			"{\"mode\":\"MANUAL\",\"stateVersion\":15,\"notBoardedChildUserIds\":[131,null]}"
+	})
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/completion에 notBoardedChildUserIds 원소가 null이면 422 VALIDATION_FAILED(fields notBoardedChildUserIds)를 돌려주고 유스케이스를 부르지 않는다")
+	void completeWithNullNotBoardedChildUserIdElementReturns422ValidationFailedOnNotBoardedChildUserIds(String body)
+			throws Exception {
+		given(completePickupUseCase.complete(any())).willReturn(completedSessionView());
+
+		mockMvc.perform(completionRequest(VEHICLE, body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields").isNotEmpty())
+				.andExpect(jsonPath("$.error.fields[*].field", everyItem(startsWith("notBoardedChildUserIds"))))
+				.andExpect(jsonPath("$.error.fields[*].reason", everyItem(not(emptyOrNullString()))));
+
+		then(completePickupUseCase).shouldHaveNoInteractions();
+	}
+
 	@Test
 	@DisplayName("POST /v1/pickup-sessions/{sessionId}/boarding-rejection은 200과 SessionView를 돌려준다")
 	void rejectBoardingReturns200WithSessionView() throws Exception {
