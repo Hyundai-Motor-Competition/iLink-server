@@ -15,6 +15,7 @@
 | 07_장소-place.md | place | 보호자가 지정한 픽업 장소, 학원별 기본 장소 |
 | 08_픽업-pickup.md | pickup | 픽업 한 건의 시작~완료: 경로 확정, 합류 호출, 정차 · 탑승, 예외, 결과 |
 | 09_알림-notification.md | notification | 푸시 발송, 수신 확인, 재발송 |
+| 10_프로필사진-profile.md | profile (user · auth · common.image에 걸침) | 가입(LINK-04) · 멤버 등록(FAM-02) 때 프로필 사진 받기, MinIO 저장, 가족 조회(FAM-01) 서명 URL |
 
 의존 방향(소스 2장): auth → user(User 생성 요청), place → schedule(Academy 참조), pickup → schedule · place(세션 시작 때 스냅샷), notification은 pickup이 발행한 이벤트를 커밋 뒤에 받고 푸시 토큰은 auth의 Device에서 읽는다.
 
@@ -64,7 +65,7 @@ com.{team}.pickupservice
 │  │  │  └─ out          Load...Port, Save...Port, Publish...Port
 │  │  └─ service         ...Service (in 포트 구현, 트랜잭션 경계)
 │  └─ domain             도메인 객체와 규칙
-└─ common                보안 설정, 오류 형식, Idempotency-Key 필터, 스웨거 공통 설정, 요청 로깅(인터셉터), 비동기 설정, TimeUtils, BaseTimeEntity
+└─ common                보안 설정, 오류 형식, Idempotency-Key 필터, 스웨거 공통 설정, 요청 로깅(인터셉터), 비동기 설정, TimeUtils, BaseTimeEntity, 프로필 사진 값 객체(common.image, 10_프로필사진-profile.md)
 ```
 
 - 의존 방향은 항상 안쪽이다. adapter → application → domain. domain은 어떤 패키지도 모른다. 예외: 프레임워크에 기대지 않는 common의 순수 타입(enum · 값 객체: `common.security.Role` · `common.security.PrincipalType` · `common.geo.LatLng`)은 domain에서 써도 된다. 그래서 Role enum은 `common.security.Role` 하나만 둔다.
