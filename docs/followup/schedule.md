@@ -1,6 +1,6 @@
 # FOLLOWUP · 일정 (schedule)
 
-- 생성: 2026-11-14 01:29 KST · tdd-guard
+- 생성: 2026-11-14 01:30 KST · tdd-guard
 - 상태: 진행 중 (체크 83/83 · 완료 기준 0/4)
 - 테스트: ● GREEN · 2802 passed · 전체 · 217s · .\gradlew.bat test --console=plain
 - 설계서: C:/pw/schedule/docs/06_일정-schedule.md
@@ -152,6 +152,7 @@
 - classEndTime + targetPickup이 자정을 넘는 일정(예 23:50 + 15)은 targetPickupTime(LocalTime)이 0시로 돌아가 SET-09 · SET-11에서 같은 날짜로 계산됨. 자정 넘는 일정을 막을지(검증) 다음 날로 볼지 설계 결정 필요
 - #81 today-pickups(SET-12) 팀장 판단: DRAFT 일정도 타임라인에 보여 줌(status SCHEDULED), CANCELLED 세션만 있으면 SCHEDULED로 보임. 취소를 따로 보여 줄 값(CANCELLED)이 필요한지는 디자인과 함께 사람 확인 필요
 - 사람 결정 2026-11-14(도메인 리뷰 뒤): (1) 현재 작업 커밋 → main을 feature/schedule에 병합 → #80은 main의 MemberInfo.profileImageUrl을 쓰고 findProfileImageUrls · loadUsersByIds 제거, main의 해제된 자녀 404 항목 반영. (2) API 번호: next-pickup SET-11 → SET-12, today-pickups SET-12 → SET-13. (3) 학원에 출입구가 생기면 같은 가족의 그 학원 일정 status를 다시 판정. (4) next-pickup 남은 일정 없음은 200 + JSON null(application/json)
+- bisect 주의: 5678ff9(#82 · #83)와 6b93839(#79) 커밋은 테스트 코드가 컴파일되지 않음(프로덕션은 컴파일됨). d6e4bf9부터 전체 GREEN
 - NameMasker.mask는 1자 · 빈 문자열 · null 이름에서 예외가 난다(repeat(-1) · charAt). User 이름 규칙상 이런 입력이 올 수 있는지 확인하고, 올 수 있으면 규칙을 정해 테스트부터 추가
 - 설계서 06 시그니처의 LoadMemberDeviceStatusPort 반환 타입 표기 DeviceStatus를 실제 쓰는 auth.domain.MemberDeviceStatus로 고쳐야 함(05 인증 L152가 user · schedule용으로 내놓은 타입). 모듈용 record ScheduleInfo · AcademyInfo · SpotSummary 필드도 설계서에 없어 #37 · place 500m 검사 · pickup 연락처 용도로 정함 → 설계서에 반영 필요
 - [기반 리뷰 · 하] (1) #37 findSchedules는 여러 id를 한 번에 읽는 포트가 없어 N+1 조회가 됨 (2) pickup_schedule.child_user_id에 인덱스 없음(loadSchedulesOfChild(ren) 조회 칸) (3) Academy · PickupSchedule.restore의 id 인자가 long으로 user · auth(Long)와 다름 (4) SearchAcademyPort(out)가 in 포트 record AcademyCandidate를 import함 (5) schedule 테스트 헬퍼 중복: PickupScheduleTest 학원 헬퍼 두 쌍, ScheduleOverlapRuleTest · DailyScheduleLimitRuleTest의 academy · newSchedule · savedSchedule, 포트 테스트 리플렉션 헬퍼가 모듈마다 복사됨 (6) ScheduleSeed.clear는 시드 행만 지우므로 lane 테스트가 만든 행은 각 테스트가 지워야 함

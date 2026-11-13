@@ -1,6 +1,6 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-14 01:29 KST · tdd-guard
+- 생성: 2026-11-14 01:30 KST · tdd-guard
 - 설계서: C:/pw/schedule/docs
 - 프로젝트: gradle · C:/pw/schedule
 - 테스트: ● GREEN · 2802 passed · 전체 · 217s
