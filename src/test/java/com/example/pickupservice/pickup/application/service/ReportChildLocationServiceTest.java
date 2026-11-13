@@ -7,6 +7,7 @@ import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.pickup.application.port.in.ChildLocationCommand;
 import com.example.pickupservice.pickup.application.port.out.LoadChildReadinessPort;
+import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
 import com.example.pickupservice.pickup.application.port.out.LoadSessionPort;
 import com.example.pickupservice.pickup.application.port.out.SaveSessionPort;
 import com.example.pickupservice.pickup.domain.ChildPhase;
@@ -15,6 +16,8 @@ import com.example.pickupservice.pickup.domain.SessionChild;
 import com.example.pickupservice.pickup.domain.SessionStatus;
 import com.example.pickupservice.pickup.domain.SpotStatus;
 import com.example.pickupservice.pickup.domain.VehiclePhase;
+import com.example.pickupservice.user.application.port.in.FamilyInfo;
+import com.example.pickupservice.user.domain.JoinCallMode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -82,13 +85,17 @@ class ReportChildLocationServiceTest {
 	@Mock
 	private LoadChildReadinessPort loadChildReadinessPort;
 
+	@Mock
+	private LoadFamilyPort loadFamilyPort;
+
 	private ReportChildLocationService reportChildLocationService;
 
 	@BeforeEach
 	void setUp() {
 		reportChildLocationService = new ReportChildLocationService(loadSessionPort, saveSessionPort,
-				loadChildReadinessPort);
+				loadChildReadinessPort, loadFamilyPort);
 		lenient().when(loadChildReadinessPort.hasLocationConsent(anyLong())).thenReturn(true);
+		lenient().when(loadFamilyPort.loadFamily(FAMILY_ID)).thenReturn(familyInfo(true));
 		lenient().when(saveSessionPort.save(any(PickupSession.class)))
 				.thenAnswer(invocation -> invocation.getArgument(0));
 	}
@@ -106,6 +113,23 @@ class ReportChildLocationServiceTest {
 		assertThat(exception.status()).isEqualTo(HttpStatus.FORBIDDEN);
 		assertThat(exception.code()).isEqualTo("LOCATION_CONSENT_REQUIRED");
 		verify(loadChildReadinessPort).hasLocationConsent(MINJUN_ID);
+		verifyNoInteractions(saveSessionPort);
+	}
+
+	@Test
+	@DisplayName("자녀 위치는 가족의 자녀 위치 사용이 꺼져 있으면 403 LOCATION_CONSENT_REQUIRED로 거절한다 — 자녀 동의가 true여도 거절하고 세션을 저장하지 않는다")
+	void reportRejectsWhenFamilyChildLocationDisabled() {
+		givenLockedSession(calledSession(ChildPhase.CALLED));
+		lenient().when(loadChildReadinessPort.hasLocationConsent(MINJUN_ID)).thenReturn(true);
+		lenient().when(loadFamilyPort.loadFamily(FAMILY_ID)).thenReturn(familyInfo(false));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> reportChildLocationService.report(minjunCommand()));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.FORBIDDEN);
+		assertThat(exception.code()).isEqualTo("LOCATION_CONSENT_REQUIRED");
+		verify(loadFamilyPort).loadFamily(FAMILY_ID);
 		verifyNoInteractions(saveSessionPort);
 	}
 
@@ -221,6 +245,11 @@ class ReportChildLocationServiceTest {
 				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, status, VehiclePhase.APPROACHING,
 				SpotStatus.CONFIRMED, STATE_VERSION, 0, 1, 0, false, NOW.plus(Duration.ofMinutes(2)), 600,
 				NOW.minusSeconds(10), null, null, null, null, null, null, null, null, children);
+	}
+
+	// 가족의 자녀 위치 사용(childLocationEnabled) 설정을 담은 FamilyInfo
+	private static FamilyInfo familyInfo(boolean childLocationEnabled) {
+		return new FamilyInfo(FAMILY_ID, JoinCallMode.AUTO, 0, childLocationEnabled);
 	}
 
 	private static ChildLocationCommand minjunCommand() {
