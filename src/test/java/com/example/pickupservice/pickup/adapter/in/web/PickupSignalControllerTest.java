@@ -285,6 +285,51 @@ class PickupSignalControllerTest extends PickupWebTestSupport {
 				new ChildLocationCommand(CHILD, SESSION_ID, CHILD_LOCATION_AT, 37.501234, 127.039876, 12.5));
 	}
 
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("outOfRangeChildLocationBodies")
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/child-locations에 범위 밖 lat(-90~90 밖) · lng(-180~180 밖)를 보내면 422 VALIDATION_FAILED(fields 그 필드)를 돌려주고 유스케이스를 부르지 않는다")
+	void reportChildLocationOutOfRangeReturns422ValidationFailedOnThatField(String caseName, String body, String field)
+			throws Exception {
+		mockMvc.perform(childLocationRequest(body))
+				.andExpect(validationFailedOn(field))
+				.andExpect(jsonPath("$.error.fields.length()").value(1))
+				.andExpect(jsonPath("$.error.fields[0].field").value(field));
+
+		then(reportChildLocationUseCase).shouldHaveNoInteractions();
+	}
+
+	static Stream<Arguments> outOfRangeChildLocationBodies() {
+		return Stream.of(
+				Arguments.of("lat 90.000001", childLocationBody("90.000001", "127.039876"), "lat"),
+				Arguments.of("lat -90.000001", childLocationBody("-90.000001", "127.039876"), "lat"),
+				Arguments.of("lng 180.000001", childLocationBody("37.501234", "180.000001"), "lng"),
+				Arguments.of("lng -180.000001", childLocationBody("37.501234", "-180.000001"), "lng"),
+				Arguments.of("lat 1000", childLocationBody("1000", "127.039876"), "lat"));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("boundaryChildLocationBodies")
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/child-locations에 경계값 lat 90 · lng 180, lat -90 · lng -180을 보내면 202를 돌려주고 유스케이스를 부른다")
+	void reportChildLocationAtRangeBoundaryReturns202(String caseName, String body, Double lat, Double lng)
+			throws Exception {
+		mockMvc.perform(childLocationRequest(body))
+				.andExpect(status().isAccepted())
+				.andExpect(content().string(""));
+
+		then(reportChildLocationUseCase).should().report(
+				new ChildLocationCommand(CHILD, SESSION_ID, CHILD_LOCATION_AT, lat, lng, null));
+	}
+
+	static Stream<Arguments> boundaryChildLocationBodies() {
+		return Stream.of(
+				Arguments.of("lat 90 · lng 180", childLocationBody("90", "180"), 90.0, 180.0),
+				Arguments.of("lat -90 · lng -180", childLocationBody("-90", "-180"), -90.0, -180.0));
+	}
+
+	private static String childLocationBody(String lat, String lng) {
+		return "{\"at\":\"2026-11-09T18:20:30+09:00\",\"lat\":%s,\"lng\":%s}".formatted(lat, lng);
+	}
+
 	@Test
 	@DisplayName("POST /v1/pickup-sessions/{sessionId}/help-requests는 201과 nextAllowedAt을 돌려준다")
 	void requestHelpReturns201WithNextAllowedAt() throws Exception {
