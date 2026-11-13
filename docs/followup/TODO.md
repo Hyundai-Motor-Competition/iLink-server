@@ -1,10 +1,10 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-14 01:04 KST · tdd-guard
+- 생성: 2026-11-14 01:11 KST · tdd-guard
 - 설계서: C:/pw/pickup/docs
 - 프로젝트: gradle · C:/pw/pickup
-- 테스트: ● GREEN · 2774 passed · 전체 · 281s
-- 진행: 공유모듈 72/72 · 사용자 79/85 · 인증 120/124 · 일정 77/83 · 장소 99/104 · 픽업 271/276 · 알림 65/65 · 프로필사진 39/39 · 남은 항목 26/848
+- 테스트: ● GREEN · 2797 passed · 전체 · 252s
+- 진행: 공유모듈 72/72 · 사용자 79/85 · 인증 120/124 · 일정 77/83 · 장소 107/107 · 픽업 271/276 · 알림 65/65 · 프로필사진 39/39 · 남은 항목 21/851
 - 현재 도메인: 픽업 (08_픽업-pickup.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
@@ -58,13 +58,9 @@
 - [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
 - [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
-## 5. 장소 (place) · 07_장소-place.md · 대기 · 항목 99/104 · 완료 기준 0/4
-### 테스트 케이스
-- [ ] #100 [서비스] 차량 세션용 임시 장소 저장 in 포트는 familyId · academyId · name · stopPoint · meetingPoint로 temporary=true인 PickupSpot을 저장하고 spotId를 돌려준다(최종디자인 11/13 V02 · V03, 팀장 결정 2026-11-13)
-- [ ] #101 [persistence] 가족 장소 목록(GET /v1/families/me/pickup-spots)과 기본 장소 판정은 temporary=true인 임시 장소를 빼고 돌려준다
-- [ ] #102 [web] GET /v1/pickup-spot-recommendations/nearby?academyId=는 출발 위치 없이 학원 기준 근처 후보를 name · location · walkMeters · walkSeconds로 걷는 거리 짧은 순으로 돌려준다(일정 등록 픽업일정등록8 화면용)
-- [ ] #103 [서비스] 학원 기준 근처 추천은 카카오 길찾기를 부르지 않고 driveSeconds · totalSeconds를 비운다. 지원 지역 밖 학원이면 supported false와 빈 목록을 준다
-- [ ] #104 [서비스] 장소 추천(SPOT-04 · 학원 기준 근처 추천)은 도로 이름이 빈 길가 후보의 name을 「이름 없는 길」로 돌려준다(null을 주지 않음, 사람 결정 2026-11-13)
+## 5. 장소 (place) · 07_장소-place.md · 대기 · 항목 107/107 · 완료 기준 0/4
+### 도메인 리뷰
+- [ ] 기록 없음 → /tdd review place
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치

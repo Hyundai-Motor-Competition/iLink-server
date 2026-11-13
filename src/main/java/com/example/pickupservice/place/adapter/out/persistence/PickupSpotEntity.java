@@ -10,6 +10,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.locationtech.jts.geom.Point;
 
 @Entity
@@ -46,7 +47,8 @@ public class PickupSpotEntity extends BaseTimeEntity {
 	@Column(nullable = false)
 	private Long createdBy;
 
-	@Column(nullable = false, columnDefinition = "boolean default false not null")
+	@ColumnDefault("false")
+	@Column(nullable = false)
 	private boolean temporary;
 
 	public PickupSpotEntity(Long spotId, Long familyId, Long academyId, String name, String memo, Point stopPoint,

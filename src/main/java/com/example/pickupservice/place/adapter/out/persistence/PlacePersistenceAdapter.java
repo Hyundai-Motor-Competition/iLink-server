@@ -45,7 +45,7 @@ class PlacePersistenceAdapter implements LoadSpotPort, SaveSpotPort {
 
 	@Override
 	public Optional<PickupSpot> loadDefaultSpot(long familyId, long academyId) {
-		return pickupSpotJpaRepository.findByFamilyIdAndAcademyIdAndIsDefaultTrue(familyId, academyId)
+		return pickupSpotJpaRepository.findByFamilyIdAndAcademyIdAndIsDefaultTrueAndTemporaryFalse(familyId, academyId)
 				.map(PlacePersistenceAdapter::toDomain);
 	}
 

@@ -9,18 +9,17 @@ import java.util.Optional;
 
 interface PickupSpotJpaRepository extends JpaRepository<PickupSpotEntity, Long> {
 
-	/** 가족 장소 목록. 임시 장소(temporary=true)는 뺀다. */
 	List<PickupSpotEntity> findByFamilyIdAndTemporaryFalse(Long familyId);
 
-	/** 가족 · 학원 장소 목록. 임시 장소(temporary=true)는 뺀다. */
 	List<PickupSpotEntity> findByFamilyIdAndAcademyIdAndTemporaryFalse(Long familyId, Long academyId);
 
-	Optional<PickupSpotEntity> findByFamilyIdAndAcademyIdAndIsDefaultTrue(Long familyId, Long academyId);
+	Optional<PickupSpotEntity> findByFamilyIdAndAcademyIdAndIsDefaultTrueAndTemporaryFalse(Long familyId,
+			Long academyId);
 
 	@Query(value = """
 			SELECT * FROM pickup_spot
 			WHERE family_id = :familyId
-			  AND temporary = false
+			  AND NOT temporary
 			  AND ST_DWithin(stop_point, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radiusM)
 			""", nativeQuery = true)
 	List<PickupSpotEntity> findWithin(@Param("familyId") long familyId, @Param("lat") double lat,
@@ -30,7 +29,7 @@ interface PickupSpotJpaRepository extends JpaRepository<PickupSpotEntity, Long> 
 			SELECT * FROM pickup_spot
 			WHERE family_id = :familyId
 			  AND academy_id = :academyId
-			  AND temporary = false
+			  AND NOT temporary
 			  AND ST_DWithin(stop_point, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radiusM)
 			""", nativeQuery = true)
 	List<PickupSpotEntity> findWithinByAcademy(@Param("familyId") long familyId, @Param("academyId") long academyId,

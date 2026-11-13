@@ -5,7 +5,6 @@ import com.example.pickupservice.common.geo.LatLng;
 public record SaveTemporarySpotCommand(
 		long familyId,
 		long academyId,
-		long createdBy,
 		String name,
 		LatLng stopPoint,
 		LatLng meetingPoint

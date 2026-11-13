@@ -3,6 +3,8 @@ package com.example.pickupservice.place.application.service;
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.common.geo.LatLng;
+import com.example.pickupservice.place.application.port.in.NearbySpot;
+import com.example.pickupservice.place.application.port.in.NearbySpots;
 import com.example.pickupservice.place.application.port.in.RecommendPickupSpotsUseCase;
 import com.example.pickupservice.place.application.port.in.RecommendSpotsQuery;
 import com.example.pickupservice.place.application.port.in.SpotRecommendations;
@@ -32,15 +34,12 @@ public class RecommendPickupSpotsService implements RecommendPickupSpotsUseCase 
 
 	@Override
 	public SpotRecommendations recommendSpots(RecommendSpotsQuery q) {
-		LatLng academy = loadAcademyPort.loadAcademy(q.academyId())
-				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND)).location();
+		LatLng academy = loadAcademyLocation(q.academyId());
 		if (!serviceAreaPort.isSupported(academy)) {
 			return new SpotRecommendations(false, List.of());
 		}
 
-		List<SpotCandidate> candidates = SpotCandidateMerger.merge(academy,
-				loadSpotCandidatePort.loadPublicParkingWithin(academy, PARKING_RADIUS_M),
-				loadSpotCandidatePort.loadCurbStopsWithin(academy, CURB_RADIUS_M));
+		List<SpotCandidate> candidates = mergeCandidates(academy);
 		if (candidates.isEmpty()) {
 			return new SpotRecommendations(true, List.of());
 		}
@@ -49,5 +48,28 @@ public class RecommendPickupSpotsService implements RecommendPickupSpotsUseCase 
 				? driveTimePort.driveSecondsNow(q.origin(), destinations)
 				: driveTimePort.driveSecondsAt(q.origin(), destinations, q.arriveAt());
 		return new SpotRecommendations(true, SpotRankingRule.rank(candidates, driveSeconds));
+	}
+
+	@Override
+	public NearbySpots recommendNearbySpots(long academyId) {
+		LatLng academy = loadAcademyLocation(academyId);
+		if (!serviceAreaPort.isSupported(academy)) {
+			return new NearbySpots(false, List.of());
+		}
+		List<NearbySpot> items = mergeCandidates(academy).stream()
+				.map(c -> new NearbySpot(c.name(), c.location(), c.walkMeters(), c.walkSeconds()))
+				.toList();
+		return new NearbySpots(true, items);
+	}
+
+	private LatLng loadAcademyLocation(long academyId) {
+		return loadAcademyPort.loadAcademy(academyId)
+				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND)).location();
+	}
+
+	private List<SpotCandidate> mergeCandidates(LatLng academy) {
+		return SpotCandidateMerger.merge(academy,
+				loadSpotCandidatePort.loadPublicParkingWithin(academy, PARKING_RADIUS_M),
+				loadSpotCandidatePort.loadCurbStopsWithin(academy, CURB_RADIUS_M));
 	}
 }

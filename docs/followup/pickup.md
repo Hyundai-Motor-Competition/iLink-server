@@ -1,8 +1,8 @@
 # FOLLOWUP · 픽업 (pickup)
 
-- 생성: 2026-11-14 01:04 KST · tdd-guard
+- 생성: 2026-11-14 01:11 KST · tdd-guard
 - 상태: 진행 중 (체크 271/276 · 완료 기준 0/4)
-- 테스트: ● GREEN · 2774 passed · 전체 · 281s · .\gradlew.bat test --console=plain
+- 테스트: ● GREEN · 2797 passed · 전체 · 252s · .\gradlew.bat test --console=plain
 - 설계서: C:/pw/pickup/docs/08_픽업-pickup.md
 
 ## 완료 항목
@@ -355,6 +355,7 @@ AutoCompleteBoardingServiceTest.자동 완료 SESSION_COMPLETED 발행의 받는
 | 여기로 부르기(장소 변경 here=true) | 결정됨: 서버가 한 번에 처리한다. 마지막 차량 위치로 임시 장소를 만들어 세션 장소를 바꾸고 바로 합류 안내(CALL)를 보낸다(사람 결정 2026-11-13) |
 | 추천 장소 · 여기로 부르기의 임시 장소 저장 순서 | 결정됨: place #264(임시 장소 저장 in 포트) · #265(목록 · 기본 장소에서 제외)를 픽업 진행 중 메인 폴더에서 먼저 처리한 뒤 #269~#272를 진행한다(사람 결정 2026-11-14) |
 | 세션 뷰 driver(#273) | 결정됨: 세션 familyId의 role GUARDIAN 멤버 1명의 name · profileImageUrl. 없으면 null(사람 결정 2026-11-14). GUARDIAN이 여럿이면 userId가 가장 작은 사람. 임시 장소의 createdBy도 같은 사람(팀장 결정 2026-11-14) |
+| 추천 장소 candidate로 경로 확정 · 장소 변경(#269 · #270) | [팀장 결정 2026-11-14] candidate {name, location}을 받으면 place SaveTemporarySpotUseCase로 임시 장소를 만든다: familyId는 세션 가족, academyId는 세션 지금 장소의 academyId, createdBy는 driver와 같은 GUARDIAN, stopPoint · meetingPoint는 둘 다 location. SES-04(route)는 세션 장소를 그 임시 장소로 바꾼 뒤(changeSpot과 같은 전제: CHILD_ALREADY_MOVING · CALL_ALREADY_SENT 거절) 바로 경로를 확정하고 SPOT_CHANGED · SPOT_CONFIRMED를 저장한다. 이때 spotId 불일치 409 검사는 하지 않는다. SES-05(spot-changes)는 spotId 대신 그 임시 spotId로 장소를 바꾼다. 거절이면 임시 장소를 만들지 않는다(같은 트랜잭션) |
 | 세션 뷰 route.totalMeters(#274) | 결정됨: SES-04 요청에 totalMeters(0 이상 정수, 선택)를 더하고 pickup_session.route_total_meters에 저장한다. 확정 전이나 값이 없으면 null(사람 결정 2026-11-14). 다시 확정하면 요청 값으로 덮어쓰고 값이 없으면 null(팀장 결정 2026-11-14) |
 | 이벤트 payload의 시각 값 | [사람 결정 2026-11-09] etaAt · predictedStopAt · callNotBefore · nextAllowedAt 등은 +09:00 문자열 |
 | 끝난 세션의 SES-04 · SES-05 · SIG-03 · SIG-05 | [사람 결정 2026-11-09] 409 SESSION_ALREADY_FINISHED로 거절하고 저장 · 알림 · 발행하지 않음 |
@@ -387,6 +388,7 @@ AutoCompleteBoardingServiceTest.자동 완료 SESSION_COMPLETED 발행의 받는
 - place #264 · #265는 픽업 진행 중 메인 폴더에서 구현됨(증거: SaveTemporarySpotServiceTest 2건, PlacePersistenceAdapterTest · PlacePersistenceEntitiesMappingTest 27 passed). 장소 도메인을 활성화하면 이 증거로 체크한다. 운영 DB는 배포 전에 ALTER TABLE pickup_spot ADD COLUMN temporary boolean DEFAULT false NOT NULL; 을 사람이 실행해야 한다(prod ddl-auto validate). UpdatePickupSpotService가 9인자 restore를 써서 임시 장소를 PATCH하면 temporary가 false로 바뀜: 임시 장소 PATCH 허용 여부를 장소 설계서에서 정해야 함
 - 운영 DB는 배포 전에 ALTER TABLE pickup_session ADD COLUMN route_total_meters integer NULL; 을 사람이 실행해야 한다(#274, prod ddl-auto validate)
 - 중간 리뷰(2026-11-14) [하]: GUARDIAN 2명일 때 driver 선택(userId 최소) 테스트 없음, 두 번째 경로 확정에 totalMeters를 빼면 null로 덮어쓰는 테스트 없음, 테스트 전용 짧은 생성자 · 9인자 restore 오버로드가 운영 코드에 남음, #275 테스트 5개 클래스의 가족 멤버 목록 중복(공통 픽스처 후보)
+- #276(LoadMemberService의 MemberInfo.profileImageUrl 채우기)은 사용자 도메인 #232가 같은 LoadMemberService를 고치므로 사용자 병합 전에는 진행하지 않는다(main 병합 담당 세션 요청 2026-11-14). 사용자 MemberInfo 예정 모양: (userId, familyId, role, name, phone, profileImageUrl, removed). pickup 쪽은 profileImageUrl 6번째까지만 두고, 사용자 병합 때 user 정의를 따른다
 - [팀장 결정 · 설정 키] 픽업 기준값은 application.yml `pickup.session.*` 하위 키로 둠(`pickup:` 아래는 이미 async · idempotency · jwt 등 앱 전체 설정). 롤백되면 저장하지 않는 이벤트(ETA_UPDATED)도 커밋 뒤 발행하지 않음
 - [service lane #94] AutoCompleteBoardingService에 테스트 전용 package-private 4인자 생성자가 남음(구현자는 테스트 생성 코드를 못 고침) — AutoCompleteBoardingServiceTest 생성 코드를 5인자(TransactionOperations)로 바꾸고 생성자를 하나로 정리할 것. 자동 완료 한 세션 실패 시 건너뛰기 테스트 없음, PickupProperties yml 바인딩 확인 테스트 없음
 - [리뷰 거리] (1) #137 테스트 보조 SseEmitterProbe를 src/test의 org.springframework.web.servlet.mvc.method.annotation 패키지에 둠(패키지 전용 API 접근용) — 스프링 버전이 바뀌면 깨질 수 있음 (2) #207로 auth · place · user 테스트 이름이 바뀌어 auth #98 · place #44 · user #64의 체크 증거 이름과 어긋남 — 해당 도메인 문서 증거 갱신 필요 (3) 04 · 05 · 07 설계서의 「임시 어댑터」 설명(user L8 · L202, auth L19 · L266, place L8 · L19 · L153)을 실제 위임으로 고칠 것 (4) seq 없는 이벤트(ETA_UPDATED 등)는 SSE에서 id 줄 없이 보냄 — 팀장 결정

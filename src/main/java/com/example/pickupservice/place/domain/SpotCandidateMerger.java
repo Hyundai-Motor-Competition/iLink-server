@@ -12,6 +12,7 @@ public final class SpotCandidateMerger {
 
 	private static final int MAX_CURB_STOPS = 4;
 	private static final int MAX_CANDIDATES = 8;
+	private static final String UNNAMED_ROAD = "이름 없는 길";
 
 	private SpotCandidateMerger() {
 	}
@@ -25,7 +26,7 @@ public final class SpotCandidateMerger {
 		}
 		for (CurbStopCandidate curb : nearestPerRoad(academy, curbStops)) {
 			WalkTime walk = walkTime(academy, curb.location());
-			all.add(new SpotCandidate(SpotKind.CURB_STOP, curb.roadName(), curb.location(),
+			all.add(new SpotCandidate(SpotKind.CURB_STOP, curbName(curb.roadName()), curb.location(),
 					walk.walkMeters(), walk.walkSeconds(), curb.lineKind(), curb.nearEnforcementCctv()));
 		}
 		return all.stream()
@@ -47,6 +48,10 @@ public final class SpotCandidateMerger {
 				.sorted(Comparator.comparingDouble(curb -> distance(academy, curb)))
 				.limit(MAX_CURB_STOPS)
 				.toList();
+	}
+
+	private static String curbName(String roadName) {
+		return roadName == null || roadName.isBlank() ? UNNAMED_ROAD : roadName;
 	}
 
 	private static double distance(LatLng academy, CurbStopCandidate curb) {
