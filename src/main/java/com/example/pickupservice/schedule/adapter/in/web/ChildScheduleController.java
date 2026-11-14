@@ -4,6 +4,8 @@ import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.schedule.adapter.in.web.doc.ChildScheduleApiDoc;
 import com.example.pickupservice.schedule.application.port.in.GetNextPickupUseCase;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,10 +20,12 @@ public class ChildScheduleController implements ChildScheduleApiDoc {
 	@Override
 	@PreAuthorize("hasRole('CHILD')")
 	@GetMapping("/v1/children/me/next-pickup")
-	public NextPickupResponse getNextPickup(@AuthenticationPrincipal AuthPrincipal principal) {
+	public ResponseEntity<?> getNextPickup(@AuthenticationPrincipal AuthPrincipal principal) {
 		return getNextPickupUseCase.getNextPickup(principal.familyId(), principal.id())
-				.map(NextPickupResponse::from)
-				.orElse(null);
+				.<ResponseEntity<?>>map(next -> ResponseEntity.ok(NextPickupResponse.from(next)))
+				.orElseGet(() -> ResponseEntity.ok()
+						.contentType(MediaType.APPLICATION_JSON)
+						.body("null"));
 	}
 
 }

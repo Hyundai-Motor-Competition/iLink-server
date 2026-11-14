@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -36,7 +37,7 @@ class ChildScheduleControllerTest extends ScheduleWebTestSupport {
 	private final MockMvc mockMvc;
 	private final AccessTokenFixture accessTokenFixture;
 
-	// ---- SET-11 GET /v1/children/me/next-pickup (#79)
+	// ---- SET-12 GET /v1/children/me/next-pickup (#79)
 
 	@Test
 	@DisplayName("GET /v1/children/me/next-pickup은 CHILD 토큰으로 200과 academyName · spotName · targetAt(KST +09:00)을 돌려준다")
@@ -76,13 +77,14 @@ class ChildScheduleControllerTest extends ScheduleWebTestSupport {
 	}
 
 	@Test
-	@DisplayName("GET /v1/children/me/next-pickup은 남은 일정이 없으면 200과 빈(null) 본문을 돌려준다")
-	void getNextPickupWithoutRemainingScheduleReturns200WithEmptyBody() throws Exception {
+	@DisplayName("GET /v1/children/me/next-pickup은 남은 일정이 없으면 200, Content-Type application/json, 본문 JSON null을 돌려준다")
+	void getNextPickupWithoutRemainingScheduleReturns200WithJsonNullBody() throws Exception {
 		given(getNextPickupUseCase.getNextPickup(anyLong(), anyLong())).willReturn(Optional.empty());
 
 		mockMvc.perform(nextPickupRequest(childBearer()))
 				.andExpect(status().isOk())
-				.andExpect(content().string(""));
+				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+				.andExpect(content().string("null"));
 	}
 
 	@Test
