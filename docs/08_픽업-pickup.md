@@ -759,7 +759,7 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 | navRouteId 저장 위치 | SES-04 요청에 있으나 컬럼이 없음. 저장하지 않는다고 가정 |
 | SES-05 spotVersion 불일치 오류 | 소스에 없음. 409 STATE_VERSION_CONFLICT로 가정 |
 | SES-05에서 CALL_ALREADY_SENT와 CHILD_ALREADY_MOVING이 함께 맞을 때 | MEETING이면 호출도 보낸 상태. CHILD_ALREADY_MOVING을 먼저 본다고 가정 |
-| SES-06 · 07 reason 저장 위치 | [사람 결정 2026-11-09] 세션 보류 · 해제는 이벤트 SESSION_HELD · SESSION_RESUMED로 남기고(이벤트 21종, 받는 쪽 차량(SSE) · 보호자) 해제 뒤 저장된 ETA로 호출 판정을 다시 돌린다. 세션에 사유 컬럼이 없어 보류 reason은 저장하지 않고, 취소 reason은 자동 철회 Call.revokeReason에 넣는다 |
+| SES-06 · 07 reason 저장 위치 | [사람 결정 2026-11-09] 세션 보류 · 해제는 이벤트 SESSION_HELD · SESSION_RESUMED로 남기고(이벤트 종류는 지금 24종, 받는 쪽 차량(SSE) · 보호자) 해제 뒤 저장된 ETA로 호출 판정을 다시 돌린다. 세션에 사유 컬럼이 없어 보류 reason은 저장하지 않고, 취소 reason은 자동 철회 Call.revokeReason에 넣는다 |
 | CALL-02 응답 status | [사람 결정 2026-11-09] 응답 시점의 실제 상태 ACCEPTED를 준다. 발송(SENT)은 CALL_SENT 이벤트로 알린다 |
 | Call SENT를 기록하는 주체 | notification이 FCM 성공 뒤 pickup in 포트(markCallSent)를 부른다고 가정 |
 | CALL-02가 트리거(180초 · 700m)도 검사하는지 | 소스에는 가드 미충족 오류만 있음. 가드만 검사한다고 가정 |
@@ -788,7 +788,7 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 | CALL_ALREADY_SENT의 「이미 보냄」 | [사람 결정 2026-11-09] 철회되지 않은 호출이 있으면(ACCEPTED 포함) |
 | 예외 해소 | [사람 결정 2026-11-09] 보류 해제(SES-06 DELETE) 때 열린 예외의 incidentResolvedAt을 채움 |
 | 세션에 없는 childUserId | [팀장 결정 2026-11-09] 404 NOT_FOUND |
-| SessionEvent.type | [팀장 결정 2026-11-09] 도메인에서는 enum(SessionEventType), 저장은 문자열. [사람 결정 2026-11-09] SESSION_HELD · SESSION_RESUMED가 더해져 19종 → 21종(DB 저장 안 하는 ETA_UPDATED · VEHICLE_LOCATION 포함) |
+| SessionEvent.type | [팀장 결정 2026-11-09] 도메인에서는 enum(SessionEventType), 저장은 문자열. [사람 결정 2026-11-09] SESSION_HELD · SESSION_RESUMED가 더해져 19종 → 21종, 그 뒤 VEHICLE_APPROACHING · PREPARE_NOTICE_SENT · CHILD_READY가 더해져 24종(#252, DB 저장 안 하는 ETA_UPDATED · VEHICLE_LOCATION 포함) |
 | 받는 사람 「보호자」 | [사람 결정 2026-11-09] 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE. TEACHER는 뺀다(알림 기록 · 실시간 이벤트 모두). 보호자에게 가는 FCM 알림도 GUARDIAN만이 아니라 세 role 모두에게 보낸다(사람 결정 2026-11-13) |
 | SES-11 notBoardedChildUserIds에 세션 밖 childUserId | 결정됨: 404 NOT_FOUND로 거절하고 세션 · 자녀 상태를 바꾸지 않는다(사람 결정 2026-11-13) |
 | 여기로 부르기(장소 변경 here=true) | 결정됨: 서버가 한 번에 처리한다. 마지막 차량 위치로 임시 장소를 만들어 세션 장소를 바꾸고 바로 합류 안내(CALL)를 보낸다(사람 결정 2026-11-13) |
