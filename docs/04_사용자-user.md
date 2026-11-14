@@ -135,7 +135,6 @@ Optional<VehicleInfo> findVehicle(long vehicleId);                // LoadVehicle
 Optional<VehicleInfo> findLinkedVehicleByVin(String vin);         // LoadVehicleUseCase
 Optional<MemberInfo> findMember(long userId);                     // LoadMemberUseCase
 List<MemberInfo> findMembers(long familyId);                      // LoadMemberUseCase
-Map<Long, String> findProfileImageUrls(List<Long> userIds);       // LoadMemberUseCase (schedule SET-09). FAM-01과 같은 규칙: 사진 있으면 서명 URL, 없으면 기본 아바타 URL, 저장소 설정이 없으면 null(키 빠짐). 사람 결정 2026-11-14
 FamilyInfo findFamily(long familyId);                             // LoadFamilyUseCase (joinCallMode · settingsVersion · childLocationEnabled)
 ChildLocationResult changeChildLocation(ChangeChildLocationCommand command); // ChangeChildLocationUseCase (SET-11). Command(familyId, enabled) → Result(childLocationEnabled, settingsVersion). FAM-01의 FamilyResult도 childLocationEnabled를 담는다
 
@@ -143,7 +142,6 @@ ChildLocationResult changeChildLocation(ChangeChildLocationCommand command); // 
 Optional<Family> loadFamily(long familyId);  Family saveFamily(Family family);          // LoadFamilyPort · SaveFamilyPort
 Optional<User> loadUser(long userId);  List<User> loadUsers(long familyId);  User saveUser(User user);  void deleteUser(long userId);   // LoadUserPort · SaveUserPort. loadUsers · countNonChildMembers는 removedAt이 빈 행만, loadUser는 해제된 행도 읽는다. FAM-07은 deleteUser 대신 User.remove(시각) 뒤 saveUser
 long countNonChildMembers(long familyId);                                                  // LoadUserPort
-List<User> loadUsersByIds(List<Long> userIds);                                             // LoadUserPort (findProfileImageUrls, 1회 조회)
 Optional<Vehicle> loadVehicle(long vehicleId);  Optional<Vehicle> loadLinkedVehicleByVin(String vin);  Optional<Vehicle> loadLinkedVehicleOfFamily(long familyId);  Vehicle saveVehicle(Vehicle vehicle);   // LoadVehiclePort · SaveVehiclePort
 Map<Long, DeviceStatus> loadDeviceStatuses(List<Long> userIds);   // LoadMemberDeviceStatusPort → auth
 void revokeDevicesOf(long userId);                                 // RevokeMemberDevicesPort → auth

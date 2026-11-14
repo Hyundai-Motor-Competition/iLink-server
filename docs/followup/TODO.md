@@ -1,11 +1,11 @@
 # TODO · 설계서 기준 개발 할 일
 
-- 생성: 2026-11-14 01:10 KST · tdd-guard
-- 설계서: C:/pw/user/docs
-- 프로젝트: gradle · C:/pw/user
-- 테스트: ● GREEN · 2773 passed · 전체 · 246s
-- 진행: 공유모듈 72/72 · 사용자 87/87 · 인증 120/126 · 일정 77/84 · 장소 99/104 · 픽업 266/276 · 알림 65/65 · 프로필사진 39/39 · 남은 항목 28/853
-- 현재 도메인: 사용자 (04_사용자-user.md) · 진행 시작: /tdd go
+- 생성: 2026-11-14 02:25 KST · tdd-guard
+- 설계서: C:/pw/schedule/docs
+- 프로젝트: gradle · C:/pw/schedule
+- 테스트: ● GREEN · 2914 passed · 전체 · 127s
+- 진행: 공유모듈 72/72 · 사용자 87/87 · 인증 128/130 · 일정 88/88 · 장소 107/107 · 픽업 266/278 · 알림 65/65 · 프로필사진 39/39 · 남은 항목 14/866
+- 현재 도메인: 일정 (06_일정-schedule.md) · 진행 시작: /tdd go
 
 설계서 번호 순으로 진행한다. 한 도메인의 항목 · 도메인 리뷰 · 완료 기준이 모두 끝나면 다음 도메인으로 넘어간다. 도메인별 상세 기록은 이 폴더의 <key>.md, 리뷰 모음은 REVIEW.md.
 
@@ -18,44 +18,38 @@
 - [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
 - [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
-## 2. 사용자 (user) · 04_사용자-user.md · 완료 · 항목 87/87 · 완료 기준 4/4 · 리뷰 11-14 01:05 조건부 통과 (상 0 · 중 2 · 하 12)
+## 2. 사용자 (user) · 04_사용자-user.md · 대기 · 항목 87/87 · 완료 기준 0/4
+### 도메인 리뷰
+- [ ] 기록 없음 → /tdd review user
+### 완료 기준
+- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
+- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+
+## 3. 인증 (auth) · 05_인증-auth.md · 대기 · 항목 128/130 · 완료 기준 0/4
+### 테스트 케이스
+- [ ] #129 [서비스] 초대 발급 · 초대 조회 · 초대 수락은 대상 멤버가 해제된 멤버(user MemberInfo.removed true)면 404 NOT_FOUND로 거절하고 기기 · 토큰을 만들지 않는다(user D7 삭제 표시 뒤 후속, 사람 결정 2026-11-14)
+- [ ] #130 [서비스] RevokeMemberDevicesUseCase(멤버 해제 때 호출)는 그 멤버의 기기 · 토큰과 함께 아직 쓰지 않은 초대도 폐기한다(사람 결정 2026-11-14)
+### 완료 기준
+- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
+- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
+- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
+- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
+
+## 4. 일정 (schedule) · 06_일정-schedule.md · 완료 · 항목 88/88 · 완료 기준 4/4 · 리뷰 11-14 02:24 통과 (상 0 · 중 0 · 하 7)
 - 남은 할 일 없음
 
-## 3. 인증 (auth) · 05_인증-auth.md · 대기 · 항목 120/126 · 완료 기준 0/4
-### 테스트 케이스
-- [ ] #121 [web] 초대 수락(FAM-06)과 연결 승인(LINK-04)의 consents에 SERVICE_IMPROVEMENT(선택 동의)를 보낼 수 있고, 빠져도 수락 · 승인은 성공한다(C00 · 가족 프로필 등록4 「(선택) 서비스 개선」)
-- [ ] #122 [서비스] refresh 토큰은 발급 14일(P14D) 뒤 만료되고, 만료된 refresh 토큰으로 POST /v1/auth/refresh를 부르면 유효하지 않은 refresh 토큰과 같은 401로 거절한다(사람 결정 2026-11-13)
-- [ ] #123 [통합] access 토큰 유효 기간 PT30M · refresh 토큰 유효 기간 P14D는 application.yml 설정값으로 두고, 발급한 access 토큰의 exp가 발급 시각 + 30분이다
-- [ ] #124 [web] GET /v1/vehicle-link-codes/by-code/{code}(LINK-03)가 같은 기기 5번 실패 뒤면 429 LINK_CODE_ATTEMPT_LIMIT과 error.retryAfterSeconds(차단이 풀릴 때까지 남은 초)를 돌려준다(D3)
-- [ ] #125 [서비스] 초대 발급 · 초대 조회 · 초대 수락은 대상 멤버가 해제된 멤버(user MemberInfo.removed true)면 404 NOT_FOUND로 거절하고 기기 · 토큰을 만들지 않는다(user D7 삭제 표시 뒤 후속, 사람 결정 2026-11-14)
-- [ ] #126 [서비스] RevokeMemberDevicesUseCase(멤버 해제 때 호출)는 그 멤버의 기기 · 토큰과 함께 아직 쓰지 않은 초대도 폐기한다(사람 결정 2026-11-14)
+## 5. 장소 (place) · 07_장소-place.md · 대기 · 항목 107/107 · 완료 기준 0/4
+### 도메인 리뷰
+- [ ] 기록 없음 → /tdd review place
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
 - [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
 - [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
-## 4. 일정 (schedule) · 06_일정-schedule.md · 진행 중 · 항목 83/83 · 완료 기준 0/4 · 리뷰 11-14 01:27 조건부 통과 (상 0 · 중 4 · 하 7)
-### 완료 기준
-- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
-- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
-
-## 5. 장소 (place) · 07_장소-place.md · 대기 · 항목 99/104 · 완료 기준 0/4
-### 테스트 케이스
-- [ ] #100 [서비스] 차량 세션용 임시 장소 저장 in 포트는 familyId · academyId · name · stopPoint · meetingPoint로 temporary=true인 PickupSpot을 저장하고 spotId를 돌려준다(최종디자인 11/13 V02 · V03, 팀장 결정 2026-11-13)
-- [ ] #101 [persistence] 가족 장소 목록(GET /v1/families/me/pickup-spots)과 기본 장소 판정은 temporary=true인 임시 장소를 빼고 돌려준다
-- [ ] #102 [web] GET /v1/pickup-spot-recommendations/nearby?academyId=는 출발 위치 없이 학원 기준 근처 후보를 name · location · walkMeters · walkSeconds로 걷는 거리 짧은 순으로 돌려준다(일정 등록 픽업일정등록8 화면용)
-- [ ] #103 [서비스] 학원 기준 근처 추천은 카카오 길찾기를 부르지 않고 driveSeconds · totalSeconds를 비운다. 지원 지역 밖 학원이면 supported false와 빈 목록을 준다
-- [ ] #104 [서비스] 장소 추천(SPOT-04 · 학원 기준 근처 추천)은 도로 이름이 빈 길가 후보의 name을 「이름 없는 길」로 돌려준다(null을 주지 않음, 사람 결정 2026-11-13)
-### 완료 기준
-- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
-- [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
-- [ ] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
-- [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
-
-## 6. 픽업 (pickup) · 08_픽업-pickup.md · 대기 · 항목 266/276 · 완료 기준 0/4
+## 6. 픽업 (pickup) · 08_픽업-pickup.md · 대기 · 항목 266/278 · 완료 기준 0/4
 ### 테스트 케이스
 - [ ] #267 [서비스] 픽업 완료(SES-11)는 notBoardedChildUserIds에 세션에 없는 childUserId가 있으면 404 NOT_FOUND로 거절하고 세션 상태 · 자녀 탑승 상태를 바꾸지 않는다(사람 결정 2026-11-13)
 - [ ] #268 [web] POST 픽업 완료(SES-11)에 세션에 없는 childUserId를 notBoardedChildUserIds로 보내면 404 NOT_FOUND를 돌려준다
@@ -67,6 +61,8 @@
 - [ ] #274 [web] 세션 뷰 route에 경로 확정 때 전체 거리 totalMeters를 담는다(부모 메인 출발→도착 진행 막대)
 - [ ] #275 [서비스] 보호자에게 보내는 알림(출발 알림 · 준비 시간 추가 · 도움 요청 · 탑승 · 완료 등)의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE 모두다(GUARDIAN만이 아님, 사람 결정 2026-11-13)
 - [ ] #276 [서비스] 픽업 시작(StartPickup)은 해제된 자녀(user MemberInfo.removed true)의 일정을 세션 자녀에서 뺀다. 지난 기록 조회는 해제된 자녀 이름을 그대로 보인다(사람 결정 2026-11-14)
+- [ ] #277 [서비스] PickupProgressQueryUseCase.findProgressBySchedule(familyId, date)는 그 날짜 그 가족 세션의 scheduleId별 진행을 ACTIVE · ON_HOLD → IN_PROGRESS, COMPLETED → COMPLETED로 돌려주고 CANCELLED는 빼며 여러 세션이면 COMPLETED를 앞세운다(schedule SET-13, 사람 결정 2026-11-14)
+- [ ] #278 [persistence] LoadSessionPort.loadByFamilyAndDate(familyId, date)는 상태와 상관없이 그 가족 · 그 날짜 세션을 자녀(childUserId · scheduleId)와 함께 돌려주고 다른 날짜 · 다른 가족은 뺀다
 ### 완료 기준
 - [ ] C1 설계서의 테스트 케이스가 모두 GREEN
 - [ ] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치

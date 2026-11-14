@@ -433,11 +433,12 @@ int revokeSignalLostCalls(Instant now);                              // RevokeSi
 
 // in 포트 — 다른 모듈용
 boolean hasActivePickup(long vehicleId); boolean isInActivePickup(long userId); boolean isSpotInUse(long spotId); Optional<LatLng> activeChildLocation(long familyId);   // ActivePickupQueryUseCase (auth · user · place)
-Map<Long, PickupProgress> findProgressBySchedule(long familyId, LocalDate date);   // PickupProgressQueryUseCase (schedule SET-12). scheduleId별: ACTIVE · ON_HOLD → IN_PROGRESS, COMPLETED → COMPLETED, CANCELLED 제외, 여러 세션이면 COMPLETED 우선. PickupProgress는 in 포트 enum(사람 결정 2026-11-14)
+Map<Long, PickupProgress> findProgressBySchedule(long familyId, LocalDate date);   // PickupProgressQueryUseCase (schedule SET-13). scheduleId별: ACTIVE · ON_HOLD → IN_PROGRESS, COMPLETED → COMPLETED, CANCELLED 제외, 여러 세션이면 COMPLETED 우선. PickupProgress는 in 포트 enum(사람 결정 2026-11-14)
 void markCallSent(long callId, Instant sentAt); void markCallDelivered(long callId, Instant deliveredAt); boolean isCallAcknowledged(long callId);   // CallProgressUseCase (notification)
 
 // out 포트
 Optional<PickupSession> load(long sessionId); Optional<PickupSession> loadForUpdate(long sessionId); Optional<PickupSession> loadActiveByVehicle(long vehicleId); Optional<PickupSession> loadActiveByFamily(long familyId); Optional<PickupSession> loadActiveByChild(long childUserId); Optional<PickupSession> loadActiveBySpot(long spotId); List<PickupSession> loadBoardingExpired(Instant now); List<PickupSession> loadSignalLost(Instant staleBefore);   // LoadSessionPort (loadActiveBySpot: isSpotInUse용, 팀장 결정 2026-11-09)
+List<PickupSession> loadByFamilyAndDate(long familyId, LocalDate date);   // LoadSessionPort (PickupProgressQueryUseCase용, 상태와 상관없이 자녀 포함, schedule SET-13)
 PickupSession save(PickupSession s);                                 // SaveSessionPort (SessionChild 포함)
 Optional<Call> loadCall(long callId); Optional<Call> loadLiveCall(long sessionId); Optional<Call> loadLatestCall(long sessionId); Call saveCall(Call c);   // LoadCallPort · SaveCallPort (loadLatestCall: REVOKED 포함 가장 최근, prevCallId · status.call용)
 SessionEvent append(long sessionId, String type, int stateVersion, Instant at, Map<String, Object> payload); SessionEventPage loadAfter(long sessionId, long afterSeq, int limit); Optional<SessionEvent> loadLastHelpRequest(long sessionId, long childUserId); Optional<SessionEvent> loadFirst(long sessionId, String type);   // SessionEventPort
@@ -729,6 +730,8 @@ Map<Long, MemberDeviceStatus> loadDeviceStatuses(List<Long> userIds); boolean ha
 - [ ] [web] 세션 뷰 route에 경로 확정 때 전체 거리 totalMeters를 담는다(부모 메인 출발→도착 진행 막대)
 - [ ] [서비스] 보호자에게 보내는 알림(출발 알림 · 준비 시간 추가 · 도움 요청 · 탑승 · 완료 등)의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE 모두다(GUARDIAN만이 아님, 사람 결정 2026-11-13)
 - [ ] [서비스] 픽업 시작(StartPickup)은 해제된 자녀(user MemberInfo.removed true)의 일정을 세션 자녀에서 뺀다. 지난 기록 조회는 해제된 자녀 이름을 그대로 보인다(사람 결정 2026-11-14)
+- [ ] [서비스] PickupProgressQueryUseCase.findProgressBySchedule(familyId, date)는 그 날짜 그 가족 세션의 scheduleId별 진행을 ACTIVE · ON_HOLD → IN_PROGRESS, COMPLETED → COMPLETED로 돌려주고 CANCELLED는 빼며 여러 세션이면 COMPLETED를 앞세운다(schedule SET-13, 사람 결정 2026-11-14)
+- [ ] [persistence] LoadSessionPort.loadByFamilyAndDate(familyId, date)는 상태와 상관없이 그 가족 · 그 날짜 세션을 자녀(childUserId · scheduleId)와 함께 돌려주고 다른 날짜 · 다른 가족은 뺀다
 
 ## 확인 필요 사항
 
