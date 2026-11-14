@@ -231,6 +231,19 @@ class IssueInviteServiceTest {
 		});
 	}
 
+	@Test
+	@DisplayName("초대 발급은 대상 멤버가 해제된 멤버(removed true)면 NOT_FOUND로 거절하고 초대를 만들지 않는다")
+	void issueInviteRejectsRemovedMember() {
+		when(loadMemberUseCase.findMember(CHILD_ID))
+				.thenReturn(Optional.of(new MemberInfo(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null, null, true)));
+
+		assertError(() -> issueInviteService.issueInvite(new IssueInviteCommand(FAMILY_ID, CHILD_ID, true)),
+				HttpStatus.NOT_FOUND, "NOT_FOUND");
+
+		verify(saveInvitePort, never()).saveInvite(any());
+		verify(inviteTokenGenerator, never()).generate();
+	}
+
 	private void givenMember(long userId, long familyId) {
 		givenMember(userId, familyId, Role.CHILD);
 	}

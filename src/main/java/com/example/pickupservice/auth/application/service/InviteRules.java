@@ -7,6 +7,7 @@ import com.example.pickupservice.auth.domain.MemberInvite;
 import com.example.pickupservice.common.error.BusinessException;
 import com.example.pickupservice.common.error.ErrorCode;
 import com.example.pickupservice.common.security.Role;
+import com.example.pickupservice.user.application.port.in.MemberInfo;
 
 import java.time.Instant;
 import java.util.List;
@@ -26,6 +27,13 @@ final class InviteRules {
 			throw AuthErrors.inviteExpired();
 		}
 		return invite;
+	}
+
+	static MemberInfo requireNotRemoved(MemberInfo member) {
+		if (member.removed()) {
+			throw BusinessException.of(ErrorCode.NOT_FOUND);
+		}
+		return member;
 	}
 
 	static List<ConsentType> requiredConsents(Role role) {

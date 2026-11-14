@@ -343,6 +343,24 @@ class AcceptInviteServiceTest {
 		assertNothingChanged();
 	}
 
+	@Test
+	@DisplayName("초대 수락은 대상 멤버가 해제된 멤버(removed true)면 NOT_FOUND로 거절하고 기기 · 토큰을 만들지 않는다")
+	void acceptInviteRejectsRemovedMemberWithoutCreatingDeviceOrToken() {
+		when(loadMemberUseCase.findMember(CHILD_ID))
+				.thenReturn(Optional.of(new MemberInfo(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null, null, true)));
+		MemberInvite invite = liveInvite(CHILD_ID);
+		givenInvite(invite);
+		Device oldDevice = liveUserDevice(OLD_DEVICE_ID_1, CHILD_ID);
+		lenient().when(loadDevicePort.loadLiveDevices(OwnerType.USER, CHILD_ID)).thenReturn(List.of(oldDevice));
+
+		assertError(() -> acceptInviteService.acceptInvite(TOKEN, command(childConsents(), PUSH_TOKEN)),
+				HttpStatus.NOT_FOUND, "NOT_FOUND");
+
+		assertNothingChanged();
+		assertThat(invite.getUsedAt()).isNull();
+		assertThat(oldDevice.getRevokedAt()).isNull();
+	}
+
 	private List<Device> allSavedDevices() {
 		ArgumentCaptor<Device> captor = ArgumentCaptor.forClass(Device.class);
 		verify(saveDevicePort, atLeastOnce()).saveDevice(captor.capture());

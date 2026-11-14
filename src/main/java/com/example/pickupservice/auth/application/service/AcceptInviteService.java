@@ -44,6 +44,7 @@ public class AcceptInviteService implements AcceptInviteUseCase {
 		MemberInvite invite = InviteRules.loadUsableInvite(loadInvitePort, token, now);
 		MemberInfo member = loadMemberUseCase.findMember(invite.getUserId())
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
+		InviteRules.requireNotRemoved(member);
 		ConsentRules.requireAgreed(InviteRules.requiredConsents(member.role()), command.consents());
 		revokePreviousDevices(member.userId(), now);
 		IssuedTokens tokens = registerMemberDevice(member, command, now);

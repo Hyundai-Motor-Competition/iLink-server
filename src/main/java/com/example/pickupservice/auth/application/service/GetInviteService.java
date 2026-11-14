@@ -29,6 +29,7 @@ public class GetInviteService implements GetInviteUseCase {
 		MemberInvite invite = InviteRules.loadUsableInvite(loadInvitePort, token, clock.instant());
 		MemberInfo member = loadMemberUseCase.findMember(invite.getUserId())
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
+		InviteRules.requireNotRemoved(member);
 		return new InviteInfo(findGuardianName(member.familyId()), member.name(), member.role(),
 				InviteRules.requiredConsents(member.role()), invite.getExpiresAt());
 	}

@@ -132,6 +132,16 @@ class GetInviteServiceTest {
 		assertError(() -> getInviteService.getInvite(TOKEN), HttpStatus.NOT_FOUND, "NOT_FOUND");
 	}
 
+	@Test
+	@DisplayName("초대 확인은 대상 멤버가 해제된 멤버(removed true)면 NOT_FOUND로 거절한다")
+	void getInviteRejectsRemovedMember() {
+		when(loadMemberUseCase.findMember(CHILD_ID))
+				.thenReturn(Optional.of(new MemberInfo(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null, null, true)));
+		givenInvite(MemberInvite.restore(701L, CHILD_ID, TOKEN, NOW.plus(Duration.ofHours(23)), null));
+
+		assertError(() -> getInviteService.getInvite(TOKEN), HttpStatus.NOT_FOUND, "NOT_FOUND");
+	}
+
 	private void givenInvite(MemberInvite invite) {
 		when(loadInvitePort.loadInviteByToken(TOKEN)).thenReturn(Optional.of(invite));
 	}

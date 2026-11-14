@@ -61,6 +61,7 @@ public class IssueInviteService implements IssueInviteUseCase {
 		MemberInfo member = loadMemberUseCase.findMember(userId)
 				.filter(found -> found.familyId() == familyId)
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
+		InviteRules.requireNotRemoved(member);
 		if (member.role() == Role.GUARDIAN) {
 			throw BusinessException.of(ErrorCode.FORBIDDEN);
 		}
