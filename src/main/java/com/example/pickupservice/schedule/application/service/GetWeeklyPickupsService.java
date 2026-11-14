@@ -26,9 +26,9 @@ import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 @Service
@@ -50,21 +50,22 @@ public class GetWeeklyPickupsService implements GetWeeklyPickupsUseCase {
 		LocalDate start = weekStart != null
 				? weekStart
 				: today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-		Map<Long, String> childNames = childNamesOf(familyId);
+		List<MemberInfo> children = loadMemberUseCase.findMembers(familyId).stream()
+				.filter(member -> member.role() == Role.CHILD)
+				.toList();
+		Map<Long, String> childNames = new HashMap<>();
+		Map<Long, String> profileImageUrls = new HashMap<>();
+		for (MemberInfo child : children) {
+			childNames.put(child.userId(), child.name());
+			profileImageUrls.put(child.userId(), child.profileImageUrl());
+		}
 		List<Long> childIds = List.copyOf(childNames.keySet());
 		List<PickupSchedule> schedules = loadSchedulePort.loadSchedulesOfChildren(childIds);
-		Map<Long, String> profileImageUrls = loadMemberUseCase.findProfileImageUrls(childIds);
 
 		List<DailyPickups> days = IntStream.range(0, DAYS_OF_WEEK)
 				.mapToObj(offset -> dailyPickups(start.plusDays(offset), schedules, childNames, profileImageUrls))
 				.toList();
 		return new WeeklyPickups(start, days, readiness(familyId, schedulesOn(schedules, today.getDayOfWeek())));
-	}
-
-	private Map<Long, String> childNamesOf(long familyId) {
-		return loadMemberUseCase.findMembers(familyId).stream()
-				.filter(member -> member.role() == Role.CHILD)
-				.collect(Collectors.toMap(MemberInfo::userId, MemberInfo::name));
 	}
 
 	private static DailyPickups dailyPickups(LocalDate date, List<PickupSchedule> schedules,

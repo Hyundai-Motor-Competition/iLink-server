@@ -10,9 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -34,18 +32,6 @@ public class LoadMemberService implements LoadMemberUseCase {
 				.sorted(Comparator.comparing(User::getUserId))
 				.map(this::toInfo)
 				.toList();
-	}
-
-	@Override
-	public Map<Long, String> findProfileImageUrls(List<Long> userIds) {
-		Map<Long, String> urls = new HashMap<>();
-		for (User user : loadUserPort.loadUsersByIds(userIds)) {
-			String url = ProfileImageUrls.of(user, profileImageStoragePort);
-			if (url != null) {
-				urls.put(user.getUserId(), url);
-			}
-		}
-		return urls;
 	}
 
 	private MemberInfo toInfo(User user) {

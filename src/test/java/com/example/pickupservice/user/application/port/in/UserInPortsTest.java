@@ -44,6 +44,14 @@ class UserInPortsTest {
 	}
 
 	@Test
+	@DisplayName("LoadMemberUseCase에 findProfileImageUrls가 없다(사진 URL은 MemberInfo.profileImageUrl로 준다)")
+	void loadMemberUseCaseHasNoFindProfileImageUrls() {
+		assertThat(Arrays.stream(LoadMemberUseCase.class.getDeclaredMethods()).map(Method::getName).toList())
+				.as("LoadMemberUseCase 메서드 이름")
+				.doesNotContain("findProfileImageUrls");
+	}
+
+	@Test
 	@DisplayName("web용 Query · Command · Result는 record이고 컴포넌트 이름 · 타입 · 순서가 맞다")
 	void webRecordsHaveDesignComponents() {
 		verifyWebRecords();
@@ -88,8 +96,7 @@ class UserInPortsTest {
 				method("findLinkedVehicleByVin", generic(Optional.class, VehicleInfo.class), String.class));
 		assertUseCase(LoadMemberUseCase.class,
 				method("findMember", generic(Optional.class, MemberInfo.class), long.class),
-				method("findMembers", generic(List.class, MemberInfo.class), long.class),
-				method("findProfileImageUrls", "java.util.Map<java.lang.Long, java.lang.String>", List.class));
+				method("findMembers", generic(List.class, MemberInfo.class), long.class));
 		assertUseCase(LoadFamilyUseCase.class,
 				method("findFamily", FamilyInfo.class.getName(), long.class));
 	}

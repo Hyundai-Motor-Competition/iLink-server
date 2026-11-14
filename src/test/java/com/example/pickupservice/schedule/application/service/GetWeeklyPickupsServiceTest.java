@@ -47,6 +47,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -192,12 +193,12 @@ class GetWeeklyPickupsServiceTest {
 				new WeeklyPickup(SCHEDULE_ID, "민준", null, "해솔영어학원", LocalTime.of(18, 0), LocalTime.of(18, 5)))));
 	}
 
-	// #80
+	// #80 · #85
 
 	@Test
-	@DisplayName("주간 일정은 각 픽업에 그 자녀의 profileImageUrl을 담고 URL이 없는 자녀는 null로 둔다")
+	@DisplayName("주간 일정은 각 픽업에 findMembers가 준 그 자녀의 MemberInfo.profileImageUrl을 담고 URL이 없는 자녀는 null로 둔다")
 	void getWeeklyPickupsFillsProfileImageUrlOfEachChild() {
-		givenFamilyMembers();
+		givenFamilyMembers(MINJUN_PROFILE_URL, null);
 		givenSchedules(
 				schedule(SCHEDULE_ID, MINJUN_ID, academy(ACADEMY_ID, "해솔영어학원"),
 						Set.of(DayOfWeek.MONDAY), LocalTime.of(18, 0), 5, ScheduleStatus.READY),
@@ -205,8 +206,6 @@ class GetWeeklyPickupsServiceTest {
 						Set.of(DayOfWeek.MONDAY), LocalTime.of(17, 0), 10, ScheduleStatus.READY));
 		givenDeviceStatuses(Map.of(MINJUN_ID, DeviceStatus.CONNECTED, SEOYEON_ID, DeviceStatus.CONNECTED));
 		givenSpots(defaultSpot(SPOT_ID, ACADEMY_ID), defaultSpot(OTHER_SPOT_ID, OTHER_ACADEMY_ID));
-		given(loadMemberUseCase.findProfileImageUrls(anyList()))
-				.willReturn(Map.of(MINJUN_ID, MINJUN_PROFILE_URL));
 
 		WeeklyPickups weekly = service(KST_MONDAY_UTC_SUNDAY).getWeeklyPickups(FAMILY_ID, MONDAY);
 
@@ -218,9 +217,9 @@ class GetWeeklyPickupsServiceTest {
 	}
 
 	@Test
-	@DisplayName("주간 일정은 가족 CHILD들의 userId로 findProfileImageUrls를 한 번만 부른다")
-	void getWeeklyPickupsCallsFindProfileImageUrlsOnceWithChildIds() {
-		givenFamilyMembers();
+	@DisplayName("주간 일정은 findMembers가 준 MemberInfo.profileImageUrl을 담고 findProfileImageUrls 같은 별도 조회를 하지 않는다")
+	void getWeeklyPickupsUsesMemberInfoProfileImageUrlWithoutSeparateLookup() {
+		givenFamilyMembers(MINJUN_PROFILE_URL, SEOYEON_PROFILE_URL);
 		givenSchedules(
 				schedule(SCHEDULE_ID, MINJUN_ID, academy(ACADEMY_ID, "해솔영어학원"),
 						Set.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY), LocalTime.of(18, 0), 5,
@@ -229,15 +228,16 @@ class GetWeeklyPickupsServiceTest {
 						Set.of(DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY), LocalTime.of(17, 0), 10, ScheduleStatus.READY));
 		givenDeviceStatuses(Map.of(MINJUN_ID, DeviceStatus.CONNECTED, SEOYEON_ID, DeviceStatus.CONNECTED));
 		givenSpots(defaultSpot(SPOT_ID, ACADEMY_ID), defaultSpot(OTHER_SPOT_ID, OTHER_ACADEMY_ID));
-		given(loadMemberUseCase.findProfileImageUrls(anyList()))
-				.willReturn(Map.of(MINJUN_ID, MINJUN_PROFILE_URL, SEOYEON_ID, SEOYEON_PROFILE_URL));
 
-		service(KST_MONDAY_UTC_SUNDAY).getWeeklyPickups(FAMILY_ID, MONDAY);
+		WeeklyPickups weekly = service(KST_MONDAY_UTC_SUNDAY).getWeeklyPickups(FAMILY_ID, MONDAY);
 
-		@SuppressWarnings("unchecked")
-		ArgumentCaptor<List<Long>> userIdsCaptor = ArgumentCaptor.forClass(List.class);
-		verify(loadMemberUseCase, times(1)).findProfileImageUrls(userIdsCaptor.capture());
-		assertThat(userIdsCaptor.getValue()).containsExactlyInAnyOrder(MINJUN_ID, SEOYEON_ID);
+		assertThat(weekly.days().get(2).pickups())
+				.extracting(WeeklyPickup::scheduleId, WeeklyPickup::profileImageUrl)
+				.containsExactly(
+						tuple(OTHER_SCHEDULE_ID, SEOYEON_PROFILE_URL),
+						tuple(SCHEDULE_ID, MINJUN_PROFILE_URL));
+		verify(loadMemberUseCase, times(1)).findMembers(FAMILY_ID);
+		verifyNoMoreInteractions(loadMemberUseCase);
 	}
 
 	// #35
@@ -400,6 +400,15 @@ class GetWeeklyPickupsServiceTest {
 				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1111-2222"),
 				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", "010-3333-4444"),
 				new MemberInfo(SEOYEON_ID, FAMILY_ID, Role.CHILD, "서연", "010-5555-6666")));
+	}
+
+	private void givenFamilyMembers(String minjunProfileImageUrl, String seoyeonProfileImageUrl) {
+		given(loadMemberUseCase.findMembers(FAMILY_ID)).willReturn(List.of(
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1111-2222",
+						"https://storage.test/ilink/profiles/guardian.webp?sig=test", false),
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", "010-3333-4444", minjunProfileImageUrl, false),
+				new MemberInfo(SEOYEON_ID, FAMILY_ID, Role.CHILD, "서연", "010-5555-6666", seoyeonProfileImageUrl,
+						false)));
 	}
 
 	private void givenSchedules(PickupSchedule... schedules) {

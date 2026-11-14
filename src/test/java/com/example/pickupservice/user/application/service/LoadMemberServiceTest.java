@@ -8,7 +8,6 @@ import com.example.pickupservice.user.fixture.InMemoryProfileImageStorage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -16,18 +15,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.entry;
 import static org.assertj.core.api.Assertions.tuple;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class LoadMemberServiceTest {
@@ -35,7 +27,6 @@ class LoadMemberServiceTest {
 	private static final long FAMILY_ID = 12L;
 	private static final long GUARDIAN_ID = 101L;
 	private static final long CHILD_ID = 131L;
-	private static final long OTHER_CHILD_ID = 132L;
 	private static final long CO_GUARDIAN_ID = 105L;
 	private static final long TEACHER_ID = 140L;
 	private static final String PHOTO_KEY = "profiles/guardian-photo.jpg";
@@ -214,53 +205,5 @@ class LoadMemberServiceTest {
 		List<MemberInfo> result = loadMemberService.findMembers(FAMILY_ID);
 
 		assertThat(result).extracting(MemberInfo::removed).containsExactly(false, false);
-	}
-
-	// #80 (user 04 #85 · findProfileImageUrls)
-
-	@Test
-	@DisplayName("findProfileImageUrls는 profileImageKey가 있는 사용자에게 그 키의 서명 URL을, 없는 사용자에게 기본 아바타 서명 URL을 준다")
-	void findProfileImageUrlsReturnsKeyUrlOrDefaultAvatarUrl() {
-		given(loadUserPort.loadUsersByIds(anyList())).willReturn(List.of(
-				User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null, "profiles/minjun-photo.jpg"),
-				User.restore(OTHER_CHILD_ID, FAMILY_ID, Role.CHILD, "서연", null)));
-
-		Map<Long, String> result = loadMemberService.findProfileImageUrls(List.of(CHILD_ID, OTHER_CHILD_ID));
-
-		String keyUrl = profileImageStorage.presignedUrl("profiles/minjun-photo.jpg").orElseThrow();
-		String defaultUrl = profileImageStorage.defaultUrl().orElseThrow();
-		assertThat(result).containsOnly(
-				entry(CHILD_ID, keyUrl),
-				entry(OTHER_CHILD_ID, defaultUrl));
-		assertThat(keyUrl).isNotEqualTo(defaultUrl);
-	}
-
-	@Test
-	@DisplayName("findProfileImageUrls는 저장소 설정이 없으면 그 사용자의 키를 Map에 넣지 않는다")
-	void findProfileImageUrlsOmitsUsersWhenStorageIsNotConfigured() {
-		profileImageStorage.unconfigure();
-		given(loadUserPort.loadUsersByIds(anyList())).willReturn(List.of(
-				User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null, "profiles/minjun-photo.jpg"),
-				User.restore(OTHER_CHILD_ID, FAMILY_ID, Role.CHILD, "서연", null)));
-
-		Map<Long, String> result = loadMemberService.findProfileImageUrls(List.of(CHILD_ID, OTHER_CHILD_ID));
-
-		assertThat(result).isEmpty();
-	}
-
-	@Test
-	@DisplayName("findProfileImageUrls는 여러 userId를 LoadUserPort.loadUsersByIds 한 번으로 읽는다")
-	void findProfileImageUrlsLoadsAllUsersInOneCall() {
-		given(loadUserPort.loadUsersByIds(anyList())).willReturn(List.of(
-				User.restore(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", null),
-				User.restore(OTHER_CHILD_ID, FAMILY_ID, Role.CHILD, "서연", null)));
-
-		loadMemberService.findProfileImageUrls(List.of(CHILD_ID, OTHER_CHILD_ID));
-
-		@SuppressWarnings("unchecked")
-		ArgumentCaptor<List<Long>> idsCaptor = ArgumentCaptor.forClass(List.class);
-		verify(loadUserPort, times(1)).loadUsersByIds(idsCaptor.capture());
-		assertThat(idsCaptor.getValue()).containsExactlyInAnyOrder(CHILD_ID, OTHER_CHILD_ID);
-		verify(loadUserPort, never()).loadUser(anyLong());
 	}
 }
