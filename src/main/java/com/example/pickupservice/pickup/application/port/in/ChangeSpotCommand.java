@@ -22,7 +22,6 @@ public record ChangeSpotCommand(
 		return new ChangeSpotCommand(principal, sessionId, null, stateVersion, spotVersion, candidate, false);
 	}
 
-	// 여기로 부르기(here=true): spotId · candidate 없이 마지막 차량 위치로 임시 장소를 만든다
 	public static ChangeSpotCommand ofHere(AuthPrincipal principal, long sessionId, int stateVersion,
 			int spotVersion) {
 		return new ChangeSpotCommand(principal, sessionId, null, stateVersion, spotVersion, null, true);

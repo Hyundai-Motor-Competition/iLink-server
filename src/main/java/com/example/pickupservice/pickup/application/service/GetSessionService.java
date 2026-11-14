@@ -41,7 +41,6 @@ public class GetSessionService implements GetSessionUseCase {
 				loadCallPort.loadLatestCall(session.getSessionId()), clock.instant());
 	}
 
-	// 해제된 자녀는 loadMembers에 없으므로 loadMember로 이름을 채운다(#277)
 	private List<MemberInfo> membersWithSessionChildren(PickupSession session, List<MemberInfo> members) {
 		Set<Long> memberUserIds = members.stream().map(MemberInfo::userId).collect(Collectors.toSet());
 		List<MemberInfo> removedChildren = session.getChildren().stream()

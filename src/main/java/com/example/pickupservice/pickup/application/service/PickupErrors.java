@@ -96,13 +96,6 @@ public final class PickupErrors {
 				.withDetail("unmet", unmet);
 	}
 
-	// 여기로 부르기(SES-05 here=true)의 가드 미충족: 409 CALL_GUARD_UNMET(error.unmet)
-	public static BusinessException callGuardUnmetConflict(List<String> unmet) {
-		return BusinessException.of(HttpStatus.CONFLICT, "CALL_GUARD_UNMET",
-				"합류 호출을 보낼 수 있는 조건이 아닙니다")
-				.withDetail("unmet", unmet);
-	}
-
 	public static BusinessException notGuardianConfirmMode() {
 		return BusinessException.of(HttpStatus.CONFLICT, "NOT_GUARDIAN_CONFIRM_MODE",
 				"보호자 확인 방식일 때만 직접 호출할 수 있습니다");

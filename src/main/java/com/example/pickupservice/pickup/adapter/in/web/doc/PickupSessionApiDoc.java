@@ -57,7 +57,10 @@ public interface PickupSessionApiDoc {
 			long sessionId);
 
 	@Operation(summary = "경로 확정 (SES-04)",
-			description = "차량 토큰. 내비 SDK가 길안내를 시작한 뒤 spotId · navRouteId · stateVersion으로 경로를 확정한다. "
+			description = "차량 토큰. 내비 SDK가 길안내를 시작한 뒤 경로를 확정한다. "
+					+ "spotId 또는 candidate {name(1~50자), location{lat, lng}} 중 하나, navRouteId, "
+					+ "totalMeters(선택, 0 이상), stateVersion을 보낸다. "
+					+ "candidate면 그 위치로 임시 장소를 만들어 세션 장소를 바꾼 뒤 확정한다. "
 					+ "이때부터 자녀 화면에 장소가 보인다")
 	@Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER, required = true, description = "중복 요청 방지 키")
 	@ApiResponse(responseCode = "200", description = "SessionView")
@@ -65,24 +68,33 @@ public interface PickupSessionApiDoc {
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (차량 토큰이 아님)")
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (세션이 없거나 다른 가족의 것)")
 	@ApiResponse(responseCode = "409", description = "STATE_VERSION_CONFLICT (stateVersion이 다르거나 spotId가 세션 장소와 다름, "
-			+ "최신 session 함께) · SESSION_ALREADY_FINISHED (이미 완료 · 취소된 세션)")
-	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (Idempotency-Key 없음) · "
-			+ "SPOT_NOT_SAVED (가족이 저장한 장소가 아님)")
+			+ "최신 session 함께. SPOT_NOT_SAVED를 먼저 검사) · SESSION_ALREADY_FINISHED (이미 완료 · 취소된 세션) · "
+			+ "candidate면 CHILD_ALREADY_MOVING (자녀가 이동 중) · CALL_ALREADY_SENT (합류 안내를 이미 보냄, 먼저 철회)")
+	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (Idempotency-Key 없음 · "
+			+ "spotId와 candidate가 둘 다 있거나 둘 다 없음 · 입력값 오류) · "
+			+ "SPOT_NOT_SAVED (spotId가 가족이 저장한 장소가 아님, candidate면 세션 지금 장소를 못 찾음)")
 	ResponseEntity<SessionViewResponse> confirmRoute(@Parameter(hidden = true) AuthPrincipal principal,
 			long sessionId, ConfirmRouteRequest request);
 
 	@Operation(summary = "장소 변경 (SES-05)",
-			description = "차량 앱, GUARDIAN · CO_GUARDIAN. spotId · stateVersion · spotVersion으로 저장된 다른 장소로 바꾼다. "
-					+ "차량은 다시 길안내한 뒤 경로 확정(SES-04)을 부른다")
+			description = "차량 앱, GUARDIAN · CO_GUARDIAN. spotId · candidate {name, location} · here(true) 중 하나와 "
+					+ "stateVersion · spotVersion을 보낸다. spotId는 저장된 다른 장소로, candidate는 그 위치의 임시 장소로 바꾸고, "
+					+ "차량은 다시 길안내한 뒤 경로 확정(SES-04)을 부른다. "
+					+ "here(true)는 받은 마지막 차량 위치로 임시 장소를 만들어 바로 확정하고 합류 호출(MANUAL)을 보낸다")
 	@Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER, required = true, description = "중복 요청 방지 키")
 	@ApiResponse(responseCode = "200", description = "SessionView")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (DELEGATE · TEACHER · CHILD 토큰)")
 	@ApiResponse(responseCode = "404", description = "NOT_FOUND (세션이 없거나 다른 가족의 것)")
 	@ApiResponse(responseCode = "409", description = "CHILD_ALREADY_MOVING (자녀가 이동 중) · "
-			+ "CALL_ALREADY_SENT (합류 안내를 이미 보냄, 먼저 철회) · STATE_VERSION_CONFLICT (최신 SessionView 함께) · "
+			+ "CALL_ALREADY_SENT (합류 안내를 이미 보냄, 먼저 철회) · "
+			+ "STATE_VERSION_CONFLICT (stateVersion · spotVersion이 다름, 최신 SessionView 함께) · "
 			+ "SESSION_ALREADY_FINISHED (이미 완료 · 취소된 세션)")
-	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (Idempotency-Key 없음 · 입력값 오류)")
+	@ApiResponse(responseCode = "422", description = "VALIDATION_FAILED (Idempotency-Key 없음 · "
+			+ "spotId · candidate · here(true) 중 하나가 아님 · 입력값 오류, "
+			+ "here면 fields here: 받은 차량 위치 없음) · "
+			+ "SPOT_NOT_SAVED (spotId가 가족 장소가 아님, candidate · here면 세션 지금 장소를 못 찾음) · "
+			+ "CALL_GUARD_UNMET (here면 합류 호출 조건 미충족, error.unmet 함께)")
 	ResponseEntity<SessionViewResponse> changeSpot(@Parameter(hidden = true) AuthPrincipal principal,
 			long sessionId, ChangeSpotRequest request);
 
