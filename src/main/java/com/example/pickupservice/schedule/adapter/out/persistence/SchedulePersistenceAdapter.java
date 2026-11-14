@@ -86,6 +86,11 @@ class SchedulePersistenceAdapter implements LoadAcademyPort, SaveAcademyPort, Lo
 	}
 
 	@Override
+	public List<PickupSchedule> loadSchedulesOfAcademy(long academyId) {
+		return toDomains(pickupScheduleJpaRepository.findByAcademyId(academyId));
+	}
+
+	@Override
 	public PickupSchedule saveSchedule(PickupSchedule schedule) {
 		PickupScheduleEntity saved = pickupScheduleJpaRepository.save(toEntity(schedule));
 		return toDomain(saved, schedule.getAcademy());

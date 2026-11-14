@@ -38,6 +38,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -47,6 +48,7 @@ class UpdateScheduleServiceTest {
 	private static final long FAMILY_ID = 10L;
 	private static final long OTHER_FAMILY_ID = 20L;
 	private static final long CHILD_ID = 101L;
+	private static final long SIBLING_ID = 102L;
 	private static final long OLD_ACADEMY_ID = 301L;
 	private static final long NEW_ACADEMY_ID = 302L;
 	private static final long EXISTING_NEW_PLACE_ACADEMY_ID = 303L;
@@ -433,6 +435,100 @@ class UpdateScheduleServiceTest {
 	}
 
 	@Test
+	@DisplayName("일정 수정은 해제된 자녀(removed true)의 일정이면 NOT_FOUND로 거절하고 학원 · 일정을 저장하지 않는다")
+	void updateScheduleRejectsWithNotFoundWhenChildIsRemoved() {
+		PickupSchedule existing = savedSchedule(SCHEDULE_ID, OLD_WEEKDAYS, OLD_CLASS_END_TIME,
+				oldAcademyWithEntrance(), ScheduleStatus.READY);
+		given(loadSchedulePort.loadSchedule(SCHEDULE_ID)).willReturn(Optional.of(existing));
+		given(loadMemberUseCase.findMember(CHILD_ID)).willReturn(Optional.of(
+				new MemberInfo(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", "010-0000-0000", null, true)));
+		lenient().when(loadSchedulePort.loadSchedulesOfChild(CHILD_ID)).thenReturn(List.of(existing));
+
+		BusinessException thrown = catchThrowableOfType(BusinessException.class,
+				() -> updateScheduleService.updateSchedule(
+						command(OLD_WEEKDAYS, LocalTime.of(19, 0), OLD_TARGET_PICKUP, oldAcademyInput())));
+
+		assertNotFound(thrown);
+		verifyNoInteractions(saveAcademyPort, saveSchedulePort);
+	}
+
+	@Test
+	@DisplayName("일정 수정으로 학원에 출입구가 생기면 같은 가족이 그 학원을 쓰는 다른 DRAFT 일정을 READY로 다시 저장하고 이미 READY인 일정은 다시 저장하지 않으며 수정한 일정은 한 번만 저장한다")
+	void updateScheduleRejudgesOtherDraftSchedulesOfSameAcademyToReadyWhenEntranceIsAdded() {
+		Academy oldAcademyWithoutEntrance = oldAcademyWithoutEntrance();
+		PickupSchedule existing = savedSchedule(SCHEDULE_ID, OLD_WEEKDAYS, OLD_CLASS_END_TIME,
+				oldAcademyWithoutEntrance, ScheduleStatus.DRAFT);
+		given(loadSchedulePort.loadSchedule(SCHEDULE_ID)).willReturn(Optional.of(existing));
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+		given(loadSchedulePort.loadSchedulesOfChild(CHILD_ID)).willReturn(List.of(existing));
+		given(loadAcademyPort.loadAcademyByExternalPlaceId(FAMILY_ID, OLD_EXTERNAL_PLACE_ID))
+				.willReturn(Optional.of(oldAcademyWithoutEntrance));
+		PickupSchedule siblingDraft = PickupSchedule.restore(702L, SIBLING_ID, oldAcademyWithoutEntrance,
+				Set.of(DayOfWeek.TUESDAY), LocalTime.of(17, 0), 10, ScheduleStatus.DRAFT);
+		PickupSchedule siblingReady = PickupSchedule.restore(703L, SIBLING_ID, oldAcademyWithoutEntrance,
+				Set.of(DayOfWeek.THURSDAY), LocalTime.of(17, 0), 10, ScheduleStatus.READY);
+		given(loadSchedulePort.loadSchedulesOfAcademy(OLD_ACADEMY_ID))
+				.willReturn(List.of(existing, siblingDraft, siblingReady));
+		givenSavePortsAssignIds();
+
+		ScheduleResult result = updateScheduleService.updateSchedule(
+				command(OLD_WEEKDAYS, OLD_CLASS_END_TIME, OLD_TARGET_PICKUP, oldAcademyInput()));
+
+		assertThat(result).as("수정 결과")
+				.isEqualTo(new ScheduleResult(SCHEDULE_ID, OLD_ACADEMY_ID, ScheduleStatus.READY));
+		ArgumentCaptor<PickupSchedule> scheduleCaptor = ArgumentCaptor.forClass(PickupSchedule.class);
+		verify(saveSchedulePort, times(2)).saveSchedule(scheduleCaptor.capture());
+		List<PickupSchedule> savedSchedules = scheduleCaptor.getAllValues();
+		assertThat(savedSchedules).extracting(PickupSchedule::getScheduleId)
+				.as("저장한 일정 (수정한 일정 1번 + 다른 DRAFT 일정 702, 이미 READY인 703은 빠짐)")
+				.containsExactlyInAnyOrder(SCHEDULE_ID, 702L);
+		assertThat(savedSchedules).extracting(PickupSchedule::getStatus)
+				.as("저장한 일정의 status")
+				.containsOnly(ScheduleStatus.READY);
+		PickupSchedule resaved = savedSchedules.stream()
+				.filter(schedule -> Long.valueOf(702L).equals(schedule.getScheduleId()))
+				.findFirst()
+				.orElseThrow();
+		assertThat(resaved.getChildUserId()).as("702의 자녀 (그대로)").isEqualTo(SIBLING_ID);
+		assertThat(resaved.getWeekdays()).as("702의 weekdays (그대로)").containsExactly(DayOfWeek.TUESDAY);
+		assertThat(resaved.getClassEndTime()).as("702의 classEndTime (그대로)").isEqualTo(LocalTime.of(17, 0));
+		assertThat(resaved.getTargetPickup()).as("702의 targetPickup (그대로)").isEqualTo(10);
+		assertThat(resaved.getAcademy().getAcademyId()).as("702의 academyId").isEqualTo(OLD_ACADEMY_ID);
+		assertThat(resaved.getAcademy().getEntrance()).as("702의 학원 entrance (저장한 학원)").isEqualTo(OLD_ENTRANCE);
+	}
+
+	@Test
+	@DisplayName("일정 수정으로 저장한 학원에 출입구가 없으면 같은 학원을 쓰는 다른 DRAFT 일정은 다시 저장하지 않는다")
+	void updateScheduleLeavesOtherDraftSchedulesOfSameAcademyWhenAcademyHasNoEntrance() {
+		Academy oldAcademyWithoutEntrance = oldAcademyWithoutEntrance();
+		PickupSchedule existing = savedSchedule(SCHEDULE_ID, OLD_WEEKDAYS, OLD_CLASS_END_TIME,
+				oldAcademyWithoutEntrance, ScheduleStatus.DRAFT);
+		given(loadSchedulePort.loadSchedule(SCHEDULE_ID)).willReturn(Optional.of(existing));
+		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
+		given(loadSchedulePort.loadSchedulesOfChild(CHILD_ID)).willReturn(List.of(existing));
+		given(loadAcademyPort.loadAcademyByExternalPlaceId(FAMILY_ID, OLD_EXTERNAL_PLACE_ID))
+				.willReturn(Optional.of(oldAcademyWithoutEntrance));
+		PickupSchedule siblingDraft = PickupSchedule.restore(702L, SIBLING_ID, oldAcademyWithoutEntrance,
+				Set.of(DayOfWeek.TUESDAY), LocalTime.of(17, 0), 10, ScheduleStatus.DRAFT);
+		lenient().when(loadSchedulePort.loadSchedulesOfAcademy(OLD_ACADEMY_ID))
+				.thenReturn(List.of(existing, siblingDraft));
+		givenSavePortsAssignIds();
+		AcademyInput samePlaceWithoutEntrance = new AcademyInput(OLD_EXTERNAL_PLACE_ID, "해솔영어학원",
+				"서울 강남구 테헤란로 152", OLD_LOCATION, null, "02-555-1234");
+
+		ScheduleResult result = updateScheduleService.updateSchedule(
+				command(OLD_WEEKDAYS, LocalTime.of(19, 0), OLD_TARGET_PICKUP, samePlaceWithoutEntrance));
+
+		assertThat(result).as("수정 결과")
+				.isEqualTo(new ScheduleResult(SCHEDULE_ID, OLD_ACADEMY_ID, ScheduleStatus.DRAFT));
+		ArgumentCaptor<PickupSchedule> scheduleCaptor = ArgumentCaptor.forClass(PickupSchedule.class);
+		verify(saveSchedulePort, times(1)).saveSchedule(scheduleCaptor.capture());
+		assertThat(scheduleCaptor.getValue().getScheduleId()).as("저장한 일정은 수정한 일정 하나뿐")
+				.isEqualTo(SCHEDULE_ID);
+		assertThat(scheduleCaptor.getValue().getStatus()).isEqualTo(ScheduleStatus.DRAFT);
+	}
+
+	@Test
 	@DisplayName("일정 수정은 targetPickup이 0~60을 벗어나면 VALIDATION_FAILED로 거절한다")
 	void updateScheduleRejectsWhenTargetPickupIsOutOfRange() {
 		givenExistingScheduleOfMyChildLeniently();
@@ -488,6 +584,11 @@ class UpdateScheduleServiceTest {
 	private static Academy oldAcademyWithEntrance() {
 		return Academy.restore(OLD_ACADEMY_ID, FAMILY_ID, OLD_EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152", OLD_LOCATION,
 				OLD_ENTRANCE, "02-555-1234");
+	}
+
+	private static Academy oldAcademyWithoutEntrance() {
+		return Academy.restore(OLD_ACADEMY_ID, FAMILY_ID, OLD_EXTERNAL_PLACE_ID, "해솔영어학원", "서울 강남구 테헤란로 152",
+				OLD_LOCATION, null, "02-555-1234");
 	}
 
 	private static PickupSchedule savedSchedule(long scheduleId, Set<DayOfWeek> weekdays, LocalTime classEndTime,

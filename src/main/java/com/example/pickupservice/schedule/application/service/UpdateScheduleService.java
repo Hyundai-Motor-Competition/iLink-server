@@ -43,6 +43,8 @@ public class UpdateScheduleService implements UpdateScheduleUseCase {
 
 		Academy savedAcademy = saveAcademyPort.saveAcademy(academy);
 		PickupSchedule savedSchedule = saveSchedulePort.saveSchedule(replaced(existing, candidate, savedAcademy));
+		ScheduleWriteRules.rejudgeDraftSchedulesOfAcademy(loadSchedulePort, saveSchedulePort, savedAcademy,
+				savedSchedule.getScheduleId());
 		return new ScheduleResult(savedSchedule.getScheduleId(), savedAcademy.getAcademyId(),
 				savedSchedule.getStatus());
 	}

@@ -574,6 +574,47 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 				.isEmpty();
 	}
 
+	@Test
+	@DisplayName("loadSchedulesOfAcademy는 그 학원을 쓰는 일정만 자녀와 상관없이 학원과 함께 돌려주고 다른 학원의 일정은 뺀다")
+	void loadSchedulesOfAcademyReturnsOnlySchedulesOfThatAcademy() {
+		Academy academy = newAcademy();
+		Academy otherAcademy = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), uniquePlaceId(), "한빛수학학원",
+				"서울 강남구 역삼로 10", ACADEMY_LOCATION, null, "02-777-0000"));
+		academyIds.add(otherAcademy.getAcademyId());
+		PickupSchedule minjunMonday = newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
+		PickupSchedule seoyunTuesday = newSchedule(users.seoyunId(), academy, DayOfWeek.TUESDAY);
+		newSchedule(users.minjunId(), otherAcademy, DayOfWeek.THURSDAY);
+		clearPersistenceContext();
+
+		List<PickupSchedule> loaded = loadSchedulePort.loadSchedulesOfAcademy(academy.getAcademyId());
+
+		assertThat(loaded).extracting(PickupSchedule::getScheduleId)
+				.as("그 학원의 일정 (민준 · 서윤)")
+				.containsExactlyInAnyOrder(minjunMonday.getScheduleId(), seoyunTuesday.getScheduleId());
+		assertThat(loaded).extracting(schedule -> schedule.getAcademy().getAcademyId())
+				.as("일정마다 그 학원이 채워진다")
+				.containsOnly(academy.getAcademyId());
+		assertThat(loaded).extracting(schedule -> schedule.getAcademy().getEntrance())
+				.as("학원 entrance")
+				.doesNotContainNull();
+		assertThat(loaded).extracting(PickupSchedule::getStatus)
+				.as("저장한 status")
+				.containsOnly(ScheduleStatus.READY);
+	}
+
+	@Test
+	@DisplayName("loadSchedulesOfAcademy에 일정이 없는 학원을 주면 빈 목록을 돌려준다")
+	void loadSchedulesOfAcademyReturnsEmptyListWhenAcademyHasNoSchedule() {
+		Academy academy = newAcademy();
+		Academy unusedAcademy = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), uniquePlaceId(), "한빛수학학원",
+				"서울 강남구 역삼로 10", ACADEMY_LOCATION, null, null));
+		academyIds.add(unusedAcademy.getAcademyId());
+		newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
+		clearPersistenceContext();
+
+		assertThat(loadSchedulePort.loadSchedulesOfAcademy(unusedAcademy.getAcademyId())).isNotNull().isEmpty();
+	}
+
 	private Academy newAcademy() {
 		Academy academy = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), uniquePlaceId(), "해솔영어학원", "서울 강남구 테헤란로 152",
 				ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));

@@ -10,4 +10,6 @@ interface PickupScheduleJpaRepository extends JpaRepository<PickupScheduleEntity
 
 	List<PickupScheduleEntity> findByChildUserIdIn(List<Long> childUserIds);
 
+	List<PickupScheduleEntity> findByAcademyId(Long academyId);
+
 }

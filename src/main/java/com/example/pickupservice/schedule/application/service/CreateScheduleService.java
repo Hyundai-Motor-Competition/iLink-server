@@ -35,6 +35,8 @@ public class CreateScheduleService implements CreateScheduleUseCase {
 
 		Academy savedAcademy = saveAcademyPort.saveAcademy(academy);
 		PickupSchedule savedSchedule = saveSchedulePort.saveSchedule(scheduleOf(command, savedAcademy));
+		ScheduleWriteRules.rejudgeDraftSchedulesOfAcademy(loadSchedulePort, saveSchedulePort, savedAcademy,
+				savedSchedule.getScheduleId());
 		return new ScheduleResult(savedSchedule.getScheduleId(), savedAcademy.getAcademyId(),
 				savedSchedule.getStatus());
 	}
