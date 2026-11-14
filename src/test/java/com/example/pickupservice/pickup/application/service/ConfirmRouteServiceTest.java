@@ -363,6 +363,35 @@ class ConfirmRouteServiceTest {
 	}
 
 	@Test
+	@DisplayName("두 번째 경로 확정 요청에 totalMeters가 없으면 첫 확정의 값을 남기지 않고 세션 routeTotalMeters와 세션 뷰 route.totalMeters를 null로 덮어쓴다")
+	void secondConfirmRouteWithoutTotalMetersOverwritesRouteTotalMetersWithNull() {
+		givenLockedSession(beforeFirstConfirm());
+		confirmRouteService.confirmRoute(commandWithTotalMeters(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION, 4_200));
+		assertThat(savedSession().getRouteTotalMeters()).isEqualTo(4_200);
+
+		SessionView view = confirmRouteService.confirmRoute(command(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION + 1));
+
+		assertThat(savedSession().getRouteTotalMeters()).isNull();
+		assertThat(view.route().totalMeters()).isNull();
+		assertThat(view.route().routeVersion()).isEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("candidate 경로 확정은 세션의 지금 장소를 place에서 못 찾으면 422 SPOT_NOT_SAVED로 거절하고 임시 장소를 만들지 않으며 아무것도 저장 · 발행하지 않는다")
+	void confirmRouteWithCandidateRejectsMissingCurrentSpotWithSpotNotSavedWithoutSavingTemporarySpot() {
+		givenLockedSession(beforeFirstConfirm());
+		givenTemporarySpotSaved();
+		lenient().when(loadSpotPort.loadSpot(FRONT_GATE_SPOT_ID)).thenReturn(Optional.empty());
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> confirmRouteService.confirmRoute(candidateCommand(FIRST_STATE_VERSION)));
+
+		assertSpotNotSaved(exception);
+		verifyNoInteractions(saveTemporarySpotPort, saveSessionPort, sessionEventPort, publishSessionEventPort,
+				recordNotificationPort);
+	}
+
+	@Test
 	@DisplayName("경로 확정은 저장한 SPOT_CONFIRMED를 append가 준 seq로 보호자와 세션 자녀에게 발행한다")
 	void confirmRoutePublishesSpotConfirmedToGuardianAndChildren() {
 		givenLockedSession(beforeFirstConfirm());

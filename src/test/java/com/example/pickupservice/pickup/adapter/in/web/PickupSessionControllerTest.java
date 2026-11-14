@@ -679,6 +679,18 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 	}
 
 	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes의 spotId가 다른 가족의 장소이거나 없는 장소면 422 SPOT_NOT_SAVED를 돌려준다")
+	void changeSpotWithUnsavedSpotReturns422SpotNotSaved() throws Exception {
+		given(changeSpotUseCase.changeSpot(any())).willThrow(PickupErrors.spotNotSaved());
+
+		mockMvc.perform(changeSpotRequest(VEHICLE))
+				.andExpect(commonError(HttpStatus.UNPROCESSABLE_CONTENT, "SPOT_NOT_SAVED"));
+
+		then(changeSpotUseCase).should().changeSpot(new ChangeSpotCommand(
+				VEHICLE, SESSION_ID, OTHER_SAVED_SPOT_ID, STATE_VERSION, SPOT_VERSION));
+	}
+
+	@Test
 	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다")
 	void changeSpotWithDelegateTokenReturns403Forbidden() throws Exception {
 		mockMvc.perform(changeSpotRequest(DELEGATE))
@@ -830,12 +842,12 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 	}
 
 	@Test
-	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes(here true)가 가드 미충족이면 409 CALL_GUARD_UNMET과 error.unmet [G6]을 돌려준다")
-	void changeSpotWithHereGuardUnmetReturns409CallGuardUnmetWithUnmet() throws Exception {
-		given(changeSpotUseCase.changeSpot(any())).willThrow(PickupErrors.callGuardUnmetConflict(List.of("G6")));
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes(here true)가 가드 미충족이면 CALL-02와 같이 422 CALL_GUARD_UNMET과 error.unmet [G6]을 돌려준다")
+	void changeSpotWithHereGuardUnmetReturns422CallGuardUnmetWithUnmet() throws Exception {
+		given(changeSpotUseCase.changeSpot(any())).willThrow(PickupErrors.callGuardUnmet(List.of("G6")));
 
 		mockMvc.perform(changeSpotRequest(VEHICLE, HERE_SPOT_CHANGE_BODY))
-				.andExpect(commonError(HttpStatus.CONFLICT, "CALL_GUARD_UNMET"))
+				.andExpect(commonError(HttpStatus.UNPROCESSABLE_CONTENT, "CALL_GUARD_UNMET"))
 				.andExpect(jsonPath("$.error.unmet", contains("G6")))
 				.andExpect(jsonPath("$", not(hasKey("unmet"))));
 	}

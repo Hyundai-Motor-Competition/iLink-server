@@ -20,7 +20,6 @@ import com.example.pickupservice.pickup.domain.PickupSession;
 import com.example.pickupservice.pickup.domain.SessionEvent;
 import com.example.pickupservice.pickup.domain.SessionEventType;
 import com.example.pickupservice.pickup.domain.SpotSnapshot;
-import com.example.pickupservice.place.application.port.in.SpotInfo;
 import com.example.pickupservice.user.application.port.in.MemberInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,7 +40,6 @@ public class ChangeSpotService implements ChangeSpotUseCase {
 	private static final String SPOT_CHANGED = SessionEventType.SPOT_CHANGED.name();
 	private static final String SPOT_CONFIRMED = SessionEventType.SPOT_CONFIRMED.name();
 	private static final String HERE_SPOT_NAME = "차량 정차 위치";
-	// 여기로 부르기는 장소를 바꾸고 바로 확정하므로 G2(장소 확정) · G3(경로 일치)은 통과로 본다
 	private static final Set<GuardId> HERE_CONFIRMED_GUARDS = EnumSet.of(GuardId.G2, GuardId.G3);
 
 	private final LoadSessionPort loadSessionPort;
@@ -74,7 +72,9 @@ public class ChangeSpotService implements ChangeSpotUseCase {
 		SpotSnapshot spot;
 		if (command.candidate() != null) {
 			SpotChangeGuard.requireSpotChangeable(locked, loadCallPort);
-			spot = temporarySpotOf(locked, command.candidate());
+			SpotCandidate candidate = command.candidate();
+			spot = TemporarySpot.createAtCurrentAcademy(locked, candidate.name(), candidate.location(),
+					loadSpotPort, saveTemporarySpotPort);
 		} else {
 			spot = savedSpotOf(command.spotId(), locked.getFamilyId());
 			SpotChangeGuard.requireSpotChangeable(locked, loadCallPort);
@@ -92,7 +92,6 @@ public class ChangeSpotService implements ChangeSpotUseCase {
 				members, loadCallPort.loadLatestCall(session.getSessionId()), now);
 	}
 
-	// 여기로 부르기: 거절 검사를 모두 마친 뒤 차량 위치로 임시 장소를 만들고 바로 확정 · MANUAL 호출한다
 	private SessionView callHere(PickupSession locked, ChangeSpotCommand command) {
 		SpotChangeGuard.requireSpotChangeable(locked, loadCallPort);
 		LatLng location = locked.getVehicleLocation();
@@ -105,13 +104,16 @@ public class ChangeSpotService implements ChangeSpotUseCase {
 				.map(GuardId::name)
 				.toList();
 		if (!unmet.isEmpty()) {
-			throw PickupErrors.callGuardUnmetConflict(unmet);
+			throw PickupErrors.callGuardUnmet(unmet);
 		}
-		long academyId = currentAcademyId(locked);
-		long spotId = saveTemporarySpotPort.saveTemporarySpot(locked.getFamilyId(), academyId, HERE_SPOT_NAME,
-				location, location);
-		locked.changeSpot(new SpotSnapshot(spotId, HERE_SPOT_NAME, location, location));
+		SpotSnapshot spot = TemporarySpot.createAtCurrentAcademy(locked, HERE_SPOT_NAME, location, loadSpotPort,
+				saveTemporarySpotPort);
+		if (locked.isCallHeld()) {
+			locked.releaseCallHold();
+		}
+		locked.changeSpot(spot);
 		int spotChangedStateVersion = locked.getStateVersion();
+		boolean firstConfirm = locked.getRouteVersion() == 0;
 		locked.confirmRoute(locked.getRouteTotalMeters());
 		PickupSession session = saveSessionPort.save(locked);
 		long familyId = session.getFamilyId();
@@ -121,6 +123,9 @@ public class ChangeSpotService implements ChangeSpotUseCase {
 				Map.of()), receivers);
 		publish(sessionEventPort.append(session.getSessionId(), SPOT_CONFIRMED, session.getStateVersion(), now,
 				Map.of()), receivers);
+		if (firstConfirm) {
+			callEngine.sendDepartureNotice(session, members, now);
+		}
 		callEngine.createCall(session, CallTriggerType.MANUAL, now);
 		return sessionAccess.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
 				members, loadCallPort.loadLatestCall(session.getSessionId()), now);
@@ -128,21 +133,6 @@ public class ChangeSpotService implements ChangeSpotUseCase {
 
 	private void publish(SessionEvent event, List<Long> receiverUserIds) {
 		publishSessionEventPort.publish(SessionEventMessages.of(event, receiverUserIds));
-	}
-
-	private long currentAcademyId(PickupSession locked) {
-		return loadSpotPort.loadSpot(locked.getSpotId())
-				.map(SpotInfo::academyId)
-				.orElseThrow(PickupErrors::spotNotSaved);
-	}
-
-	// 추천 장소 candidate: 거절 검사를 모두 마친 뒤에만 지금 장소의 학원으로 임시 장소를 만든다
-	private SpotSnapshot temporarySpotOf(PickupSession locked, SpotCandidate candidate) {
-		long academyId = currentAcademyId(locked);
-		LatLng location = candidate.location();
-		long spotId = saveTemporarySpotPort.saveTemporarySpot(locked.getFamilyId(), academyId, candidate.name(),
-				location, location);
-		return new SpotSnapshot(spotId, candidate.name(), location, location);
 	}
 
 	private SpotSnapshot savedSpotOf(long spotId, long familyId) {
