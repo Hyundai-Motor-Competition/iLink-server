@@ -82,6 +82,9 @@ class StartPickupServiceTest {
 	private static final long FAMILY_ID = 12L;
 	private static final long VEHICLE_ID = 77L;
 	private static final long GUARDIAN_ID = 31L;
+	private static final long CO_GUARDIAN_ID = 32L;
+	private static final long DELEGATE_ID = 35L;
+	private static final long TEACHER_ID = 36L;
 	private static final long MINJUN_ID = 33L;
 	private static final long SEOYUN_ID = 34L;
 	private static final long ACADEMY_ID = 55L;
@@ -538,6 +541,31 @@ class StartPickupServiceTest {
 	}
 
 	@Test
+	@DisplayName("SESSION_STARTED 알림 기록과 발행의 받는 사람은 가족의 GUARDIAN · CO_GUARDIAN · DELEGATE와 세션 자녀이고 TEACHER는 빠진다")
+	void startNotifiesGuardianCoGuardianDelegateAndChildrenWithoutTeacher() {
+		givenNewSessionSaved();
+		givenEventAppended();
+		when(loadFamilyPort.loadMembers(FAMILY_ID)).thenReturn(List.of(
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1234-5678"),
+				new MemberInfo(CO_GUARDIAN_ID, FAMILY_ID, Role.CO_GUARDIAN, "이공동", "010-3333-4444"),
+				new MemberInfo(DELEGATE_ID, FAMILY_ID, Role.DELEGATE, "박대리", "010-5555-6666"),
+				new MemberInfo(TEACHER_ID, FAMILY_ID, Role.TEACHER, "최선생", "010-7777-8888"),
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", null),
+				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", null)));
+
+		startPickupService.start(command(TODAY_KST));
+
+		ArgumentCaptor<NotificationRequest> requestCaptor = ArgumentCaptor.forClass(NotificationRequest.class);
+		verify(recordNotificationPort).recordNotifications(requestCaptor.capture());
+		assertThat(requestCaptor.getValue().receiverUserIds()).containsExactlyInAnyOrder(
+				GUARDIAN_ID, CO_GUARDIAN_ID, DELEGATE_ID, MINJUN_ID, SEOYUN_ID);
+		ArgumentCaptor<SessionEventMessage> publishedCaptor = ArgumentCaptor.forClass(SessionEventMessage.class);
+		verify(publishSessionEventPort).publish(publishedCaptor.capture());
+		assertThat(publishedCaptor.getValue().receiverUserIds()).containsExactlyInAnyOrder(
+				GUARDIAN_ID, CO_GUARDIAN_ID, DELEGATE_ID, MINJUN_ID, SEOYUN_ID);
+	}
+
+	@Test
 	@DisplayName("픽업 시작은 알림 기록이 돌려준 notificationId 목록을 알림 기록 뒤에 발행하는 SESSION_STARTED payload의 notificationIds에 담는다")
 	void startPublishesSessionStartedWithRecordedNotificationIds() {
 		givenNewSessionSaved();
@@ -573,6 +601,98 @@ class StartPickupServiceTest {
 				.containsExactlyInAnyOrder(
 						tuple(MINJUN_ID, ChildPhase.WAITING),
 						tuple(SEOYUN_ID, ChildPhase.WAITING));
+	}
+
+	@Test
+	@DisplayName("픽업 시작은 해제된 자녀(removed true)의 일정을 세션 자녀에서 빼고 나머지 자녀만 WAITING으로 저장한다")
+	void startExcludesScheduleOfRemovedChildFromSessionChildren() {
+		givenSeoyunRemoved();
+		givenNewSessionSaved();
+		givenEventAppended();
+
+		StartPickupResult result = startPickupService.start(command(TODAY_KST));
+
+		assertThat(savedSession().getChildren())
+				.extracting(SessionChild::getChildUserId, SessionChild::getScheduleId, SessionChild::getChildPhase)
+				.containsExactly(tuple(MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.WAITING));
+		assertThat(result.created()).isTrue();
+		assertThat(result.session().children())
+				.extracting(SessionChildView::childUserId)
+				.containsExactly(MINJUN_ID);
+	}
+
+	@Test
+	@DisplayName("픽업 시작은 해제된 자녀(removed true)를 SESSION_STARTED 알림 기록과 발행의 받는 사람에서 뺀다")
+	void startExcludesRemovedChildFromSessionStartedReceivers() {
+		givenSeoyunRemoved();
+		givenNewSessionSaved();
+		givenEventAppended();
+
+		startPickupService.start(command(TODAY_KST));
+
+		ArgumentCaptor<NotificationRequest> requestCaptor = ArgumentCaptor.forClass(NotificationRequest.class);
+		verify(recordNotificationPort).recordNotifications(requestCaptor.capture());
+		assertThat(requestCaptor.getValue().receiverUserIds()).containsExactlyInAnyOrder(GUARDIAN_ID, MINJUN_ID);
+		ArgumentCaptor<SessionEventMessage> publishedCaptor = ArgumentCaptor.forClass(SessionEventMessage.class);
+		verify(publishSessionEventPort).publish(publishedCaptor.capture());
+		assertThat(publishedCaptor.getValue().receiverUserIds()).containsExactlyInAnyOrder(GUARDIAN_ID, MINJUN_ID);
+	}
+
+	@Test
+	@DisplayName("픽업 시작은 요청한 일정이 모두 해제된 자녀(removed true)의 것이면 NOT_FOUND로 거절하고 세션 · 이벤트를 저장하지 않는다")
+	void startRejectsWithNotFoundWhenAllSchedulesBelongToRemovedChild() {
+		givenSeoyunRemoved();
+		givenSchedules(schedule(SEOYUN_SCHEDULE_ID, SEOYUN_ID, ACADEMY, CLASS_END_TIME, TARGET_PICKUP));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> startPickupService.start(command(TODAY_KST, List.of(SEOYUN_SCHEDULE_ID))));
+
+		assertRejected(exception, HttpStatus.NOT_FOUND, "NOT_FOUND");
+		assertNothingStarted();
+	}
+
+	@Test
+	@DisplayName("픽업 시작은 해제된 자녀(removed true)의 기기가 연결되지 않았어도 SETUP_INCOMPLETE로 거절하지 않고 남은 자녀로 세션을 시작한다")
+	void startIgnoresDeviceOfRemovedChildAndStartsWithRemainingChildren() {
+		givenSeoyunRemoved();
+		givenDeviceStatuses(Map.of(
+				MINJUN_ID, MemberDeviceStatus.CONNECTED,
+				SEOYUN_ID, MemberDeviceStatus.INVITE_PENDING));
+		givenNewSessionSaved();
+		givenEventAppended();
+
+		StartPickupResult result = startPickupService.start(command(TODAY_KST));
+
+		assertThat(result.created()).isTrue();
+		assertThat(savedSession().getChildren())
+				.extracting(SessionChild::getChildUserId, SessionChild::getScheduleId, SessionChild::getChildPhase)
+				.containsExactly(tuple(MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.WAITING));
+	}
+
+	@Test
+	@DisplayName("픽업 시작은 해제된 자녀(removed true)의 일정을 포함한 같은 scheduleIds로 다시 요청하면 ANOTHER_SESSION_ACTIVE가 아니라 기존 세션을 created false로 돌려준다")
+	void startReturnsExistingSessionWithCreatedFalseWhenRetriedWithRemovedChildSchedule() {
+		givenSeoyunRemoved();
+		// 처음 시작할 때 서윤은 이미 빠져 세션 자녀는 민준뿐이다
+		givenActiveSessionOfVehicle(activeSession(EXISTING_SESSION_ID, 3, TODAY_KST,
+				waitingChild(91L, MINJUN_ID, MINJUN_SCHEDULE_ID)));
+
+		StartPickupResult result = startPickupService.start(command(TODAY_KST));
+
+		assertThat(result.created()).isFalse();
+		assertThat(result.session()).isNotNull();
+		assertThat(result.session().sessionId()).isEqualTo(EXISTING_SESSION_ID);
+		assertThat(result.session().stateVersion()).isEqualTo(3);
+		assertNothingStarted();
+	}
+
+	// 서윤이 가족에서 해제됐다. user 모듈은 해제된 멤버를 loadMembers에서 빼고, loadMember로는 removed true로 돌려준다
+	private void givenSeoyunRemoved() {
+		lenient().when(loadFamilyPort.loadMember(SEOYUN_ID)).thenReturn(Optional.of(
+				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", null, null, true)));
+		lenient().when(loadFamilyPort.loadMembers(FAMILY_ID)).thenReturn(List.of(
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1234-5678"),
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", null)));
 	}
 
 	private void givenNewSessionSaved() {

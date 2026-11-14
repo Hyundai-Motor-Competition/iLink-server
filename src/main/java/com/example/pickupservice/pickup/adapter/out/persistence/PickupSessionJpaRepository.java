@@ -27,6 +27,7 @@ interface PickupSessionJpaRepository extends JpaRepository<PickupSessionEntity, 
 			select s from PickupSessionEntity s
 			where s.sessionStatus = :status
 			  and s.etaUpdatedAt < :staleBefore
+			  and s.boardingDetectedAt is null
 			  and exists (select 1 from CallEntity c
 			              where c.sessionId = s.sessionId and c.status <> :revoked)
 			order by s.sessionId

@@ -49,7 +49,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.example.pickupservice.common.error.BusinessException;
+import com.example.pickupservice.common.error.ErrorCode;
+import org.springframework.http.HttpStatus;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -305,6 +311,46 @@ class CompletePickupServiceTest {
 		assertThat(outcome.getBoardingMethod()).isEqualTo(BoardingMethod.IMMEDIATE);
 		assertThat(outcome.getActualStopAt()).isNull();
 		assertThat(outcome.getPredictedStopAt()).isNull();
+	}
+
+	@Test
+	@DisplayName("탑승 완료 MANUAL은 notBoardedChildUserIds에 세션에 없는 childUserId(999)가 있으면 404 NOT_FOUND로 거절하고 세션 · 자녀 상태를 바꾸지 않으며 저장 · 결과 · 이벤트도 남기지 않는다")
+	void completeManualRejectsNotBoardedChildNotInSessionWithNotFound() {
+		PickupSession session = stoppedSessionWithoutDoorSignal();
+		givenLockedSession(session);
+
+		assertRejectedWithNotFoundAndNothingChanged(session, "MANUAL");
+	}
+
+	@Test
+	@DisplayName("탑승 완료 IMMEDIATE는 notBoardedChildUserIds에 세션에 없는 childUserId(999)가 있으면 404 NOT_FOUND로 거절하고 세션 · 자녀 상태를 바꾸지 않으며 저장 · 결과 · 이벤트도 남기지 않는다")
+	void completeImmediateRejectsNotBoardedChildNotInSessionWithNotFound() {
+		PickupSession session = doorBoardedSession();
+		givenLockedSession(session);
+
+		assertRejectedWithNotFoundAndNothingChanged(session, "IMMEDIATE");
+	}
+
+	private void assertRejectedWithNotFoundAndNothingChanged(PickupSession session, String mode) {
+		long stateVersionBefore = session.getStateVersion();
+		List<ChildPhase> phasesBefore = session.getChildren().stream().map(SessionChild::getChildPhase).toList();
+		List<Instant> boardedAtBefore = session.getChildren().stream().map(SessionChild::getBoardedAt).toList();
+
+		assertThatThrownBy(() -> completePickupService.complete(command(mode, List.of(999L))))
+				.isInstanceOfSatisfying(BusinessException.class, exception -> {
+					assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
+					assertThat(exception.code()).isEqualTo(ErrorCode.NOT_FOUND.name());
+				});
+
+		assertThat(session.getSessionStatus()).isEqualTo(SessionStatus.ACTIVE);
+		assertThat(session.getStateVersion()).isEqualTo(stateVersionBefore);
+		assertThat(session.getChildren().stream().map(SessionChild::getChildPhase).toList()).isEqualTo(phasesBefore);
+		assertThat(session.getChildren().stream().map(SessionChild::getBoardedAt).toList())
+				.isEqualTo(boardedAtBefore);
+		verify(saveSessionPort, never()).save(any(PickupSession.class));
+		verify(saveOutcomePort, never()).saveOutcome(any(PickupOutcome.class));
+		verify(sessionEventPort, never()).append(anyLong(), anyString(), anyInt(), any(Instant.class), any());
+		verify(publishSessionEventPort, never()).publish(any(SessionEventMessage.class));
 	}
 
 	private void givenLockedSession(PickupSession session) {

@@ -73,6 +73,10 @@ public class StartPickupService implements StartPickupUseCase {
 		List<ScheduleInfo> schedules = loadSchedulePort.loadSchedules(command.scheduleIds());
 		long familyId = command.principal().familyId();
 		requireAllFoundInFamily(schedules, command, familyId);
+		schedules = withoutRemovedChildren(schedules);
+		if (schedules.isEmpty()) {
+			throw PickupErrors.notFound();
+		}
 		requireOnePerChildOnToday(schedules, command.date());
 		long academyId = singleAcademyId(schedules);
 		requireSameTargetPickupTime(schedules);
@@ -80,7 +84,7 @@ public class StartPickupService implements StartPickupUseCase {
 		requireSetupComplete(schedules, defaultSpot);
 		Optional<PickupSession> activeSession = loadSessionPort.loadActiveByVehicle(command.principal().id());
 		if (activeSession.isPresent()) {
-			return sameSessionOrReject(activeSession.get(), command);
+			return sameSessionOrReject(activeSession.get(), command, schedules);
 		}
 		PickupSession session = saveSessionPort.save(PickupSession.start(command.principal().id(), familyId,
 				command.date(), snapshotOf(defaultSpot.orElseThrow()), childSchedulesOf(schedules)));
@@ -109,6 +113,17 @@ public class StartPickupService implements StartPickupUseCase {
 		if (!allInFamily) {
 			throw PickupErrors.notFound();
 		}
+	}
+
+	private List<ScheduleInfo> withoutRemovedChildren(List<ScheduleInfo> schedules) {
+		Set<Long> removedChildUserIds = schedules.stream()
+				.map(ScheduleInfo::childUserId)
+				.distinct()
+				.filter(childUserId -> loadFamilyPort.loadMember(childUserId).filter(MemberInfo::removed).isPresent())
+				.collect(Collectors.toSet());
+		return schedules.stream()
+				.filter(schedule -> !removedChildUserIds.contains(schedule.childUserId()))
+				.toList();
 	}
 
 	private static void requireOnePerChildOnToday(List<ScheduleInfo> schedules, LocalDate date) {
@@ -155,12 +170,15 @@ public class StartPickupService implements StartPickupUseCase {
 				.anyMatch(childUserId -> deviceStatuses.get(childUserId) != MemberDeviceStatus.CONNECTED);
 	}
 
-	private StartPickupResult sameSessionOrReject(PickupSession activeSession, StartPickupCommand command) {
+	private StartPickupResult sameSessionOrReject(PickupSession activeSession, StartPickupCommand command,
+			List<ScheduleInfo> schedules) {
 		Set<Long> sessionScheduleIds = activeSession.getChildren().stream()
 				.map(SessionChild::getScheduleId)
 				.collect(Collectors.toSet());
 		boolean sameSession = activeSession.getDate().equals(command.date())
-				&& sessionScheduleIds.equals(Set.copyOf(command.scheduleIds()));
+				&& sessionScheduleIds.equals(schedules.stream()
+						.map(ScheduleInfo::scheduleId)
+						.collect(Collectors.toSet()));
 		if (!sameSession) {
 			throw PickupErrors.anotherSessionActive();
 		}

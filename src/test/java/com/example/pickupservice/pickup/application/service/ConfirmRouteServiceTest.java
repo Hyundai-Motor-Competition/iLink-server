@@ -6,6 +6,7 @@ import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.pickup.application.port.in.ConfirmRouteCommand;
+import com.example.pickupservice.pickup.application.port.in.SpotCandidate;
 import com.example.pickupservice.pickup.application.port.in.SessionView;
 import com.example.pickupservice.pickup.application.port.out.LoadCallPort;
 import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
@@ -15,8 +16,12 @@ import com.example.pickupservice.pickup.application.port.out.NotificationRequest
 import com.example.pickupservice.pickup.application.port.out.PublishSessionEventPort;
 import com.example.pickupservice.pickup.application.port.out.RecordNotificationPort;
 import com.example.pickupservice.pickup.application.port.out.SaveSessionPort;
+import com.example.pickupservice.pickup.application.port.out.SaveTemporarySpotPort;
 import com.example.pickupservice.pickup.application.port.out.SessionEventMessage;
 import com.example.pickupservice.pickup.application.port.out.SessionEventPort;
+import com.example.pickupservice.pickup.domain.Call;
+import com.example.pickupservice.pickup.domain.CallStatus;
+import com.example.pickupservice.pickup.domain.CallTriggerType;
 import com.example.pickupservice.pickup.domain.ChildPhase;
 import com.example.pickupservice.pickup.domain.PickupSession;
 import com.example.pickupservice.pickup.domain.SessionChild;
@@ -66,6 +71,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -105,11 +111,21 @@ class ConfirmRouteServiceTest {
 	private static final LatLng BACK_STOP_POINT = new LatLng(37.500800, 127.040300);
 	private static final LatLng BACK_MEETING_POINT = new LatLng(37.500750, 127.040250);
 
+	// 추천 장소 candidate(#269): 경로 확정 때 임시 장소로 만든다
+	private static final long TEMPORARY_SPOT_ID = 30L;
+	private static final String CANDIDATE_NAME = "학원 옆 편의점 앞";
+	private static final LatLng CANDIDATE_LOCATION = new LatLng(37.500900, 127.040500);
+	private static final int CANDIDATE_TOTAL_METERS = 3_800;
+	private static final long LIVE_CALL_ID = 6001L;
+
 	@Mock
 	private LoadSessionPort loadSessionPort;
 
 	@Mock
 	private LoadSpotPort loadSpotPort;
+
+	@Mock
+	private SaveTemporarySpotPort saveTemporarySpotPort;
 
 	@Mock
 	private SaveSessionPort saveSessionPort;
@@ -138,8 +154,8 @@ class ConfirmRouteServiceTest {
 	void setUp() {
 		Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
 		SessionAccess sessionAccess = new SessionAccess(loadFamilyPort, loadCallPort, ASSEMBLER, clock);
-		confirmRouteService = new ConfirmRouteService(loadSessionPort, loadSpotPort, saveSessionPort, loadFamilyPort,
-				loadCallPort, sessionEventPort, publishSessionEventPort, recordNotificationPort, sessionAccess,
+		confirmRouteService = new ConfirmRouteService(loadSessionPort, loadSpotPort, saveTemporarySpotPort,
+				saveSessionPort, loadFamilyPort, loadCallPort, sessionEventPort, publishSessionEventPort, recordNotificationPort, sessionAccess,
 				clock);
 		lenient().when(loadSpotPort.loadSpot(FRONT_GATE_SPOT_ID)).thenReturn(Optional.of(
 				new SpotInfo(FRONT_GATE_SPOT_ID, FAMILY_ID, ACADEMY_ID, "정문 앞", FRONT_STOP_POINT,
@@ -309,6 +325,73 @@ class ConfirmRouteServiceTest {
 	}
 
 	@Test
+	@DisplayName("경로 확정은 요청의 totalMeters를 세션 routeTotalMeters에 저장하고 돌려주는 세션 뷰 route.totalMeters에 그 값을 담는다")
+	void confirmRouteStoresTotalMetersAndShowsItInRouteView() {
+		givenLockedSession(beforeFirstConfirm());
+
+		SessionView view = confirmRouteService.confirmRoute(
+				commandWithTotalMeters(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION, 4_200));
+
+		assertThat(savedSession().getRouteTotalMeters()).isEqualTo(4_200);
+		assertThat(view.route().totalMeters()).isEqualTo(4_200);
+		assertThat(view.route().routeVersion()).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("경로 확정 요청에 totalMeters가 없으면 세션 routeTotalMeters와 세션 뷰 route.totalMeters가 null이다")
+	void confirmRouteWithoutTotalMetersLeavesRouteTotalMetersNull() {
+		givenLockedSession(beforeFirstConfirm());
+
+		SessionView view = confirmRouteService.confirmRoute(command(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION));
+
+		assertThat(savedSession().getRouteTotalMeters()).isNull();
+		assertThat(view.route().totalMeters()).isNull();
+	}
+
+	@Test
+	@DisplayName("두 번째 경로 확정은 세션 routeTotalMeters와 세션 뷰 route.totalMeters를 새 totalMeters로 덮어쓴다")
+	void secondConfirmRouteOverwritesTotalMetersWithNewValue() {
+		givenLockedSession(beforeFirstConfirm());
+		confirmRouteService.confirmRoute(commandWithTotalMeters(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION, 4_200));
+
+		SessionView view = confirmRouteService.confirmRoute(
+				commandWithTotalMeters(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION + 1, 3_100));
+
+		assertThat(savedSession().getRouteTotalMeters()).isEqualTo(3_100);
+		assertThat(view.route().totalMeters()).isEqualTo(3_100);
+		assertThat(view.route().routeVersion()).isEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("두 번째 경로 확정 요청에 totalMeters가 없으면 첫 확정의 값을 남기지 않고 세션 routeTotalMeters와 세션 뷰 route.totalMeters를 null로 덮어쓴다")
+	void secondConfirmRouteWithoutTotalMetersOverwritesRouteTotalMetersWithNull() {
+		givenLockedSession(beforeFirstConfirm());
+		confirmRouteService.confirmRoute(commandWithTotalMeters(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION, 4_200));
+		assertThat(savedSession().getRouteTotalMeters()).isEqualTo(4_200);
+
+		SessionView view = confirmRouteService.confirmRoute(command(FRONT_GATE_SPOT_ID, FIRST_STATE_VERSION + 1));
+
+		assertThat(savedSession().getRouteTotalMeters()).isNull();
+		assertThat(view.route().totalMeters()).isNull();
+		assertThat(view.route().routeVersion()).isEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("candidate 경로 확정은 세션의 지금 장소를 place에서 못 찾으면 422 SPOT_NOT_SAVED로 거절하고 임시 장소를 만들지 않으며 아무것도 저장 · 발행하지 않는다")
+	void confirmRouteWithCandidateRejectsMissingCurrentSpotWithSpotNotSavedWithoutSavingTemporarySpot() {
+		givenLockedSession(beforeFirstConfirm());
+		givenTemporarySpotSaved();
+		lenient().when(loadSpotPort.loadSpot(FRONT_GATE_SPOT_ID)).thenReturn(Optional.empty());
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> confirmRouteService.confirmRoute(candidateCommand(FIRST_STATE_VERSION)));
+
+		assertSpotNotSaved(exception);
+		verifyNoInteractions(saveTemporarySpotPort, saveSessionPort, sessionEventPort, publishSessionEventPort,
+				recordNotificationPort);
+	}
+
+	@Test
 	@DisplayName("경로 확정은 저장한 SPOT_CONFIRMED를 append가 준 seq로 보호자와 세션 자녀에게 발행한다")
 	void confirmRoutePublishesSpotConfirmedToGuardianAndChildren() {
 		givenLockedSession(beforeFirstConfirm());
@@ -377,6 +460,179 @@ class ConfirmRouteServiceTest {
 		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
 		assertThat(exception.code()).isEqualTo("SESSION_ALREADY_FINISHED");
 		verifyNoInteractions(saveSessionPort, sessionEventPort, publishSessionEventPort, recordNotificationPort);
+	}
+
+	@Test
+	@DisplayName("candidate 경로 확정은 세션 가족 · 세션 지금 장소의 academyId · candidate 이름 · 정차 지점=만남 지점=candidate 좌표로 임시 장소를 한 번 만든다")
+	void confirmRouteWithCandidateSavesTemporarySpotOnceWithSessionFamilyAndCurrentSpotAcademy() {
+		givenLockedSession(beforeFirstConfirm());
+		givenTemporarySpotSaved();
+
+		confirmRouteService.confirmRoute(candidateCommand(FIRST_STATE_VERSION));
+
+		verify(saveTemporarySpotPort).saveTemporarySpot(FAMILY_ID, ACADEMY_ID, CANDIDATE_NAME, CANDIDATE_LOCATION,
+				CANDIDATE_LOCATION);
+		verifyNoMoreInteractions(saveTemporarySpotPort);
+	}
+
+	@Test
+	@DisplayName("candidate 경로 확정은 세션 장소를 받은 임시 spotId로 바꾸고(spotVersion +1, 스냅샷 이름 · 좌표가 candidate 값) 경로를 확정해(CONFIRMED, routeVersion +1, totalMeters) 저장한다")
+	void confirmRouteWithCandidateChangesSessionSpotToTemporarySpotAndConfirmsRoute() {
+		givenLockedSession(beforeFirstConfirm());
+		givenTemporarySpotSaved();
+
+		SessionView view = confirmRouteService.confirmRoute(candidateCommand(FIRST_STATE_VERSION));
+
+		PickupSession saved = savedSession();
+		assertThat(saved.getSpotId()).isEqualTo(TEMPORARY_SPOT_ID);
+		assertThat(saved.getSpotName()).isEqualTo(CANDIDATE_NAME);
+		assertThat(saved.getStopPoint()).isEqualTo(CANDIDATE_LOCATION);
+		assertThat(saved.getMeetingPoint()).isEqualTo(CANDIDATE_LOCATION);
+		assertThat(saved.getSpotVersion()).isEqualTo(1);
+		assertThat(saved.getSpotStatus()).isEqualTo(SpotStatus.CONFIRMED);
+		assertThat(saved.getRouteVersion()).isEqualTo(1);
+		assertThat(saved.getRouteSpotVersion()).isEqualTo(1);
+		assertThat(saved.getRouteTotalMeters()).isEqualTo(CANDIDATE_TOTAL_METERS);
+		assertThat(saved.getStateVersion()).isEqualTo(FIRST_STATE_VERSION + 2);
+		assertThat(view.spot().spotId()).isEqualTo(TEMPORARY_SPOT_ID);
+		assertThat(view.spot().name()).isEqualTo(CANDIDATE_NAME);
+		assertThat(view.status().spot()).isEqualTo(SpotStatus.CONFIRMED);
+		assertThat(view.route().totalMeters()).isEqualTo(CANDIDATE_TOTAL_METERS);
+	}
+
+	@Test
+	@DisplayName("candidate 경로 확정은 SPOT_CHANGED 다음에 SPOT_CONFIRMED를 저장하고 둘 다 보호자와 세션 자녀에게 발행한다")
+	void confirmRouteWithCandidateAppendsSpotChangedThenSpotConfirmedAndPublishesBoth() {
+		givenLockedSession(beforeFirstConfirm());
+		givenTemporarySpotSaved();
+
+		confirmRouteService.confirmRoute(candidateCommand(FIRST_STATE_VERSION));
+
+		assertThat(appendedEvents)
+				.extracting(event -> event.getType().name())
+				.containsSubsequence("SPOT_CHANGED", "SPOT_CONFIRMED");
+		assertThat(appendedEventOf("SPOT_CONFIRMED").getStateVersion()).isEqualTo(savedSession().getStateVersion());
+		assertThat(publishedMessageOf("SPOT_CHANGED").receiverUserIds())
+				.containsExactlyInAnyOrder(GUARDIAN_ID, MINJUN_ID, SEOYUN_ID);
+		assertThat(publishedMessageOf("SPOT_CONFIRMED").receiverUserIds())
+				.containsExactlyInAnyOrder(GUARDIAN_ID, MINJUN_ID, SEOYUN_ID);
+	}
+
+	@Test
+	@DisplayName("candidate 첫 경로 확정도 세션 자녀에게 DEPARTURE 알림 기록을 한 번 요청하고 DEPARTURE_NOTICE_SENT를 저장한다")
+	void firstConfirmRouteWithCandidateRequestsDepartureNotificationOnce() {
+		givenLockedSession(beforeFirstConfirm());
+		givenTemporarySpotSaved();
+
+		confirmRouteService.confirmRoute(candidateCommand(FIRST_STATE_VERSION));
+
+		ArgumentCaptor<NotificationRequest> requestCaptor = ArgumentCaptor.forClass(NotificationRequest.class);
+		verify(recordNotificationPort).recordNotifications(requestCaptor.capture());
+		assertThat(requestCaptor.getValue().type()).isEqualTo("DEPARTURE");
+		assertThat(requestCaptor.getValue().receiverUserIds()).containsExactlyInAnyOrder(MINJUN_ID, SEOYUN_ID);
+		assertThat(appendedEventOf("DEPARTURE_NOTICE_SENT").getSessionId()).isEqualTo(SESSION_ID);
+	}
+
+	@Test
+	@DisplayName("candidate 경로 확정은 이동 중(MEETING) 자녀가 있으면 CHILD_ALREADY_MOVING으로 거절하고 임시 장소를 만들지 않으며 아무것도 저장 · 발행하지 않는다")
+	void confirmRouteWithCandidateRejectsMovingChildWithoutSavingTemporarySpot() {
+		givenLockedSession(beforeFirstConfirmWith(meetingChildren()));
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> confirmRouteService.confirmRoute(candidateCommand(FIRST_STATE_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("CHILD_ALREADY_MOVING");
+		verifyNoInteractions(saveTemporarySpotPort, saveSessionPort, sessionEventPort, publishSessionEventPort,
+				recordNotificationPort);
+	}
+
+	@Test
+	@DisplayName("candidate 경로 확정은 철회되지 않은 호출이 있으면 CALL_ALREADY_SENT로 거절하고 임시 장소를 만들지 않으며 아무것도 저장 · 발행하지 않는다")
+	void confirmRouteWithCandidateRejectsLiveCallWithoutSavingTemporarySpot() {
+		givenLockedSession(beforeFirstConfirm());
+		givenTemporarySpotSaved();
+		Call liveCall = liveCall();
+		lenient().when(loadCallPort.loadLiveCall(SESSION_ID)).thenReturn(Optional.of(liveCall));
+		lenient().when(loadCallPort.loadLatestCall(SESSION_ID)).thenReturn(Optional.of(liveCall));
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> confirmRouteService.confirmRoute(candidateCommand(FIRST_STATE_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("CALL_ALREADY_SENT");
+		verifyNoInteractions(saveTemporarySpotPort, saveSessionPort, sessionEventPort, publishSessionEventPort,
+				recordNotificationPort);
+	}
+
+	@Test
+	@DisplayName("candidate 경로 확정은 요청 stateVersion이 서버와 다르면 STATE_VERSION_CONFLICT와 최신 세션 뷰로 거절하고 임시 장소를 만들지 않는다")
+	void confirmRouteWithCandidateRejectsStaleStateVersionWithoutSavingTemporarySpot() {
+		givenLockedSession(beforeFirstConfirm());
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> confirmRouteService.confirmRoute(candidateCommand(FIRST_STATE_VERSION - 1)));
+
+		assertStateVersionConflictWithLatestView(exception, beforeFirstConfirm());
+		verifyNoInteractions(saveTemporarySpotPort, saveSessionPort, sessionEventPort, publishSessionEventPort,
+				recordNotificationPort);
+	}
+
+	@ParameterizedTest(name = "세션 {0}")
+	@EnumSource(value = SessionStatus.class, names = {"COMPLETED", "CANCELLED"})
+	@DisplayName("candidate 경로 확정은 끝난(COMPLETED · CANCELLED) 세션이면 SESSION_ALREADY_FINISHED로 거절하고 임시 장소를 만들지 않는다")
+	void confirmRouteWithCandidateRejectsFinishedSessionWithoutSavingTemporarySpot(SessionStatus finishedStatus) {
+		givenLockedSession(finishedBeforeFirstConfirm(finishedStatus));
+		givenTemporarySpotSaved();
+
+		BusinessException exception = catchThrowableOfType(BusinessException.class,
+				() -> confirmRouteService.confirmRoute(candidateCommand(FIRST_STATE_VERSION)));
+
+		assertThat(exception).isNotNull();
+		assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(exception.code()).isEqualTo("SESSION_ALREADY_FINISHED");
+		verifyNoInteractions(saveTemporarySpotPort, saveSessionPort, sessionEventPort, publishSessionEventPort,
+				recordNotificationPort);
+	}
+
+	// 임시 장소 포트가 TEMPORARY_SPOT_ID를 돌려주고, 그 id를 place에서 다시 읽으면 candidate 값의 임시 장소가 나온다
+	private void givenTemporarySpotSaved() {
+		lenient().when(saveTemporarySpotPort.saveTemporarySpot(anyLong(), anyLong(), anyString(), any(), any()))
+				.thenReturn(TEMPORARY_SPOT_ID);
+		lenient().when(loadSpotPort.loadSpot(TEMPORARY_SPOT_ID)).thenReturn(Optional.of(
+				new SpotInfo(TEMPORARY_SPOT_ID, FAMILY_ID, ACADEMY_ID, CANDIDATE_NAME, CANDIDATE_LOCATION,
+						CANDIDATE_LOCATION)));
+	}
+
+	private static ConfirmRouteCommand candidateCommand(int stateVersion) {
+		return ConfirmRouteCommand.ofCandidate(vehicle(VEHICLE_ID), SESSION_ID,
+				new SpotCandidate(CANDIDATE_NAME, CANDIDATE_LOCATION), NAV_ROUTE_ID, stateVersion,
+				CANDIDATE_TOTAL_METERS);
+	}
+
+	private static PickupSession beforeFirstConfirmWith(List<SessionChild> children) {
+		return PickupSession.restore(SESSION_ID, VEHICLE_ID, FAMILY_ID, FRONT_GATE_SPOT_ID, "정문 앞",
+				FRONT_STOP_POINT, FRONT_MEETING_POINT, TODAY_KST, SessionStatus.ACTIVE, VehiclePhase.ROUTING,
+				SpotStatus.SELECTED, FIRST_STATE_VERSION, 0, 0, null, false, NOW.plus(Duration.ofMinutes(12)), 4200,
+				NOW.minusSeconds(10), null, null, null, null, null, null, null, null, children);
+	}
+
+	private static List<SessionChild> meetingChildren() {
+		return List.of(
+				SessionChild.restore(7001L, MINJUN_ID, MINJUN_SCHEDULE_ID, ChildPhase.MEETING, 0, null, null, null,
+						null, null),
+				SessionChild.restore(7002L, SEOYUN_ID, SEOYUN_SCHEDULE_ID, ChildPhase.WAITING, 0, null, null, null,
+						null, null));
+	}
+
+	private static Call liveCall() {
+		Instant acceptedAt = NOW.minus(Duration.ofMinutes(2));
+		return Call.restore(LIVE_CALL_ID, SESSION_ID, null, CallTriggerType.ETA_3MIN, CallStatus.SENT, 0,
+				acceptedAt, acceptedAt.plusSeconds(1), null, null, null, null);
 	}
 
 	private void givenLockedSession(PickupSession session) {
@@ -467,6 +723,11 @@ class ConfirmRouteServiceTest {
 
 	private static ConfirmRouteCommand command(AuthPrincipal principal, long spotId, int stateVersion) {
 		return new ConfirmRouteCommand(principal, SESSION_ID, spotId, NAV_ROUTE_ID, stateVersion);
+	}
+
+	private static ConfirmRouteCommand commandWithTotalMeters(long spotId, int stateVersion, int totalMeters) {
+		return new ConfirmRouteCommand(vehicle(VEHICLE_ID), SESSION_ID, spotId, NAV_ROUTE_ID, stateVersion,
+				totalMeters);
 	}
 
 	private static AuthPrincipal vehicle(long vehicleId) {

@@ -17,6 +17,7 @@ import com.example.pickupservice.pickup.domain.PickupSession;
 import com.example.pickupservice.pickup.domain.SessionEvent;
 import com.example.pickupservice.pickup.domain.SessionEventType;
 import com.example.pickupservice.pickup.domain.SessionStatus;
+import com.example.pickupservice.user.application.port.in.MemberInfo;
 import com.example.pickupservice.user.domain.JoinCallMode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -81,6 +82,11 @@ public class CallEngine {
 		publishSessionEventPort.publish(SessionEventMessages.of(event,
 				SessionReceivers.guardians(loadFamilyPort.loadMembers(session.getFamilyId())), notificationIds));
 		return call;
+	}
+
+	public void sendDepartureNotice(PickupSession session, List<MemberInfo> members, Instant now) {
+		DepartureNotice.send(session, members, now, recordNotificationPort, sessionEventPort,
+				publishSessionEventPort);
 	}
 
 	private Call newCall(long sessionId, CallTriggerType triggerType, int spotVersion) {

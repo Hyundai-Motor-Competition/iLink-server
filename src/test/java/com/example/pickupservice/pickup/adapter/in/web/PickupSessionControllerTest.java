@@ -1,6 +1,7 @@
 package com.example.pickupservice.pickup.adapter.in.web;
 
 import com.example.pickupservice.common.fixture.AccessTokenFixture;
+import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.common.security.AuthPrincipal;
 import com.example.pickupservice.common.security.PrincipalType;
 import com.example.pickupservice.common.security.Role;
@@ -19,6 +20,7 @@ import com.example.pickupservice.pickup.application.port.in.RejectBoardingComman
 import com.example.pickupservice.pickup.application.port.in.SessionBoardingView;
 import com.example.pickupservice.pickup.application.port.in.SessionCallView;
 import com.example.pickupservice.pickup.application.port.in.SessionChildView;
+import com.example.pickupservice.pickup.application.port.in.SessionDriverView;
 import com.example.pickupservice.pickup.application.port.in.SessionEtaView;
 import com.example.pickupservice.pickup.application.port.in.SessionEventPage;
 import com.example.pickupservice.pickup.application.port.in.SessionIncidentView;
@@ -27,10 +29,13 @@ import com.example.pickupservice.pickup.application.port.in.SessionRouteView;
 import com.example.pickupservice.pickup.application.port.in.SessionSpotView;
 import com.example.pickupservice.pickup.application.port.in.SessionStatusView;
 import com.example.pickupservice.pickup.application.port.in.SessionView;
+import com.example.pickupservice.pickup.application.port.in.SpotCandidate;
 import com.example.pickupservice.pickup.application.port.in.StartPickupCommand;
 import com.example.pickupservice.pickup.application.port.in.StartPickupResult;
 import com.example.pickupservice.pickup.application.service.PickupErrors;
 import com.example.pickupservice.pickup.domain.ChildPhase;
+import com.example.pickupservice.pickup.domain.PickupRuleException;
+import com.example.pickupservice.pickup.domain.PickupViolation;
 import com.example.pickupservice.pickup.domain.SessionEvent;
 import com.example.pickupservice.pickup.domain.SessionEventType;
 import com.example.pickupservice.pickup.domain.SessionStatus;
@@ -45,6 +50,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -68,10 +74,12 @@ import static com.example.pickupservice.pickup.adapter.in.web.SessionViewFixture
 import static com.example.pickupservice.pickup.adapter.in.web.SessionViewFixture.SESSION_VIEW_JSON;
 import static com.example.pickupservice.pickup.adapter.in.web.SessionViewFixture.STATE_VERSION;
 import static com.example.pickupservice.pickup.adapter.in.web.SessionViewFixture.sessionView;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
@@ -97,6 +105,8 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 	private static final String ACTIVE_SESSION_PATH = "/v1/pickup-sessions/active";
 	private static final String SESSIONS_PATH = "/v1/pickup-sessions";
 	private static final String SESSION_PATH = "/v1/pickup-sessions/{sessionId}";
+	private static final String MINJUN_PROFILE_IMAGE_URL = "https://storage.example.com/profiles/31.jpg?sig=c";
+	private static final String GUARDIAN_PROFILE_IMAGE_URL = "https://storage.example.com/profiles/101.jpg?sig=a";
 	private static final String ROUTE_PATH = "/v1/pickup-sessions/{sessionId}/route";
 	private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 	private static final long SAVED_SPOT_ID = 21L;
@@ -111,6 +121,18 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 			""";
 	private static final String STALE_ROUTE_BODY = """
 			{"spotId":21,"navRouteId":"nav-route-7f3a","stateVersion":14}
+			""";
+	private static final String ROUTE_WITH_TOTAL_METERS_BODY = """
+			{"spotId":21,"navRouteId":"nav-route-7f3a","stateVersion":15,"totalMeters":4200}
+			""";
+	private static final String NEGATIVE_TOTAL_METERS_ROUTE_BODY = """
+			{"spotId":21,"navRouteId":"nav-route-7f3a","stateVersion":15,"totalMeters":-1}
+			""";
+	private static final String CANDIDATE_NAME = "학원 옆 편의점 앞";
+	private static final LatLng CANDIDATE_LOCATION = new LatLng(37.500900, 127.040500);
+	private static final String CANDIDATE_ROUTE_BODY = """
+			{"candidate":{"name":"학원 옆 편의점 앞","location":{"lat":37.500900,"lng":127.040500}},\
+			"navRouteId":"nav-route-7f3a","stateVersion":15,"totalMeters":3800}
 			""";
 	private static final long FAMILY_ID = 12L;
 	private static final long VEHICLE_ID = 77L;
@@ -136,6 +158,14 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 	private static final int SPOT_VERSION = 4;
 	private static final String SPOT_CHANGE_BODY = """
 			{"spotId":22,"stateVersion":15,"spotVersion":4}
+			""";
+	private static final String CANDIDATE_SPOT_CHANGE_BODY = """
+			{"candidate":{"name":"학원 옆 편의점 앞","location":{"lat":37.500900,"lng":127.040500}},\
+			"stateVersion":15,"spotVersion":4}
+			""";
+	// 여기로 부르기(#271): spotId · candidate 없이 here true
+	private static final String HERE_SPOT_CHANGE_BODY = """
+			{"here":true,"stateVersion":15,"spotVersion":4}
 			""";
 	private static final String HOLD_REASON = "아이 수업이 늦게 끝나요";
 	private static final String HOLD_BODY = """
@@ -381,6 +411,35 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 	}
 
 	@Test
+	@DisplayName("GET /v1/pickup-sessions/{sessionId}는 children[].profileImageUrl과 운전 중인 보호자 driver.name · driver.profileImageUrl을 돌려준다")
+	void getSessionWritesChildProfileImageUrlAndDriver() throws Exception {
+		given(getSessionUseCase.getSession(any())).willReturn(sessionViewWithProfileImagesAndDriver());
+
+		mockMvc.perform(get(SESSION_PATH, SESSION_ID)
+						.header(HttpHeaders.AUTHORIZATION, bearerOf(VEHICLE)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.children[0].childUserId").value(31))
+				.andExpect(jsonPath("$.children[0].profileImageUrl").value(MINJUN_PROFILE_IMAGE_URL))
+				.andExpect(jsonPath("$.children[1].childUserId").value(32))
+				.andExpect(jsonPath("$.children[1].profileImageUrl").value(nullValue()))
+				.andExpect(jsonPath("$.children[1]", hasKey("profileImageUrl")))
+				.andExpect(jsonPath("$.driver.name").value("김보호"))
+				.andExpect(jsonPath("$.driver.profileImageUrl").value(GUARDIAN_PROFILE_IMAGE_URL));
+	}
+
+	@Test
+	@DisplayName("GET /v1/pickup-sessions/{sessionId}는 driver가 없으면 driver를 null로 돌려준다")
+	void getSessionWritesNullDriverWithoutGuardian() throws Exception {
+		given(getSessionUseCase.getSession(any())).willReturn(sessionView());
+
+		mockMvc.perform(get(SESSION_PATH, SESSION_ID)
+						.header(HttpHeaders.AUTHORIZATION, bearerOf(VEHICLE)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$", hasKey("driver")))
+				.andExpect(jsonPath("$.driver").value(nullValue()));
+	}
+
+	@Test
 	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route는 200과 SessionView를 돌려준다")
 	void confirmRouteReturns200WithSessionView() throws Exception {
 		given(confirmRouteUseCase.confirmRoute(any())).willReturn(sessionView());
@@ -391,6 +450,162 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 
 		then(confirmRouteUseCase).should().confirmRoute(new ConfirmRouteCommand(
 				VEHICLE, SESSION_ID, SAVED_SPOT_ID, NAV_ROUTE_ID, STATE_VERSION));
+	}
+
+	@Test
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route 본문의 totalMeters 4200을 유스케이스 Command의 totalMeters에 담고 200을 돌려준다")
+	void confirmRoutePassesTotalMetersToCommand() throws Exception {
+		given(confirmRouteUseCase.confirmRoute(any())).willReturn(sessionView());
+
+		mockMvc.perform(confirmRouteRequest(VEHICLE, ROUTE_WITH_TOTAL_METERS_BODY))
+				.andExpect(status().isOk());
+
+		ArgumentCaptor<ConfirmRouteCommand> captor = ArgumentCaptor.forClass(ConfirmRouteCommand.class);
+		then(confirmRouteUseCase).should().confirmRoute(captor.capture());
+		ConfirmRouteCommand command = captor.getValue();
+		assertThat(command.totalMeters()).isEqualTo(4_200);
+		assertThat(command.spotId()).isEqualTo(SAVED_SPOT_ID);
+		assertThat(command.navRouteId()).isEqualTo(NAV_ROUTE_ID);
+		assertThat(command.stateVersion()).isEqualTo(STATE_VERSION);
+	}
+
+	@Test
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route 본문에 totalMeters가 없으면 Command의 totalMeters를 null로 담고 200을 돌려준다")
+	void confirmRouteWithoutTotalMetersPassesNullTotalMeters() throws Exception {
+		given(confirmRouteUseCase.confirmRoute(any())).willReturn(sessionView());
+
+		mockMvc.perform(confirmRouteRequest(VEHICLE, ROUTE_BODY))
+				.andExpect(status().isOk());
+
+		ArgumentCaptor<ConfirmRouteCommand> captor = ArgumentCaptor.forClass(ConfirmRouteCommand.class);
+		then(confirmRouteUseCase).should().confirmRoute(captor.capture());
+		assertThat(captor.getValue().totalMeters()).isNull();
+	}
+
+	@Test
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route의 totalMeters가 음수(-1)면 422 VALIDATION_FAILED(fields totalMeters)를 돌려주고 유스케이스를 부르지 않는다")
+	void confirmRouteWithNegativeTotalMetersReturns422ValidationFailed() throws Exception {
+		mockMvc.perform(confirmRouteRequest(VEHICLE, NEGATIVE_TOTAL_METERS_ROUTE_BODY))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", hasSize(1)))
+				.andExpect(jsonPath("$.error.fields[0].field").value("totalMeters"))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(confirmRouteUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route에 spotId 없이 candidate {name, location}을 보내면 Command에 candidate를 담고 spotId는 null로 두어 200을 돌려준다")
+	void confirmRouteWithCandidatePassesCandidateAndNullSpotIdToCommand() throws Exception {
+		given(confirmRouteUseCase.confirmRoute(any())).willReturn(sessionView());
+
+		mockMvc.perform(confirmRouteRequest(VEHICLE, CANDIDATE_ROUTE_BODY))
+				.andExpect(status().isOk())
+				.andExpect(content().json(SESSION_VIEW_JSON, JsonCompareMode.STRICT));
+
+		ArgumentCaptor<ConfirmRouteCommand> captor = ArgumentCaptor.forClass(ConfirmRouteCommand.class);
+		then(confirmRouteUseCase).should().confirmRoute(captor.capture());
+		ConfirmRouteCommand command = captor.getValue();
+		assertThat(command.candidate()).isEqualTo(new SpotCandidate(CANDIDATE_NAME, CANDIDATE_LOCATION));
+		assertThat(command.spotId()).isNull();
+		assertThat(command.principal()).isEqualTo(VEHICLE);
+		assertThat(command.sessionId()).isEqualTo(SESSION_ID);
+		assertThat(command.navRouteId()).isEqualTo(NAV_ROUTE_ID);
+		assertThat(command.stateVersion()).isEqualTo(STATE_VERSION);
+		assertThat(command.totalMeters()).isEqualTo(3_800);
+	}
+
+	@Test
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route의 candidate name이 50자면 받아서 Command에 그대로 담는다")
+	void confirmRouteWithFiftyCharCandidateNameIsAccepted() throws Exception {
+		given(confirmRouteUseCase.confirmRoute(any())).willReturn(sessionView());
+		String name50 = "가".repeat(50);
+
+		mockMvc.perform(confirmRouteRequest(VEHICLE, candidateRouteBody("\"" + name50 + "\"", "37.5009", "127.0405")))
+				.andExpect(status().isOk());
+
+		ArgumentCaptor<ConfirmRouteCommand> captor = ArgumentCaptor.forClass(ConfirmRouteCommand.class);
+		then(confirmRouteUseCase).should().confirmRoute(captor.capture());
+		assertThat(captor.getValue().candidate()).isEqualTo(new SpotCandidate(name50, CANDIDATE_LOCATION));
+	}
+
+	static Stream<Arguments> routeBodiesWithBothOrNeitherSpotIdAndCandidate() {
+		return Stream.of(
+				Arguments.of("spotId · candidate 둘 다", """
+						{"spotId":21,"candidate":{"name":"학원 옆 편의점 앞","location":{"lat":37.5009,"lng":127.0405}},\
+						"navRouteId":"nav-route-7f3a","stateVersion":15}
+						"""),
+				Arguments.of("spotId · candidate 둘 다 없음", """
+						{"navRouteId":"nav-route-7f3a","stateVersion":15}
+						"""));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("routeBodiesWithBothOrNeitherSpotIdAndCandidate")
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route에 spotId와 candidate를 둘 다 보내거나 둘 다 빼면 422 VALIDATION_FAILED를 돌려주고 유스케이스를 부르지 않는다")
+	void confirmRouteWithBothOrNeitherSpotIdAndCandidateReturns422ValidationFailed(String caseName, String body)
+			throws Exception {
+		mockMvc.perform(confirmRouteRequest(VEHICLE, body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", not(org.hamcrest.Matchers.empty())))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(confirmRouteUseCase).shouldHaveNoInteractions();
+	}
+
+	static Stream<Arguments> routeBodiesWithInvalidCandidate() {
+		return Stream.of(
+				Arguments.of("name 빈 값", candidateRouteBody("\"\"", "37.5009", "127.0405")),
+				Arguments.of("name 공백만", candidateRouteBody("\"   \"", "37.5009", "127.0405")),
+				Arguments.of("name 없음", candidateRouteBody("null", "37.5009", "127.0405")),
+				Arguments.of("name 51자", candidateRouteBody("\"" + "가".repeat(51) + "\"", "37.5009", "127.0405")),
+				Arguments.of("lat 90 초과", candidateRouteBody("\"편의점 앞\"", "90.000001", "127.0405")),
+				Arguments.of("lat -90 미만", candidateRouteBody("\"편의점 앞\"", "-90.000001", "127.0405")),
+				Arguments.of("lng 180 초과", candidateRouteBody("\"편의점 앞\"", "37.5009", "180.000001")),
+				Arguments.of("lng -180 미만", candidateRouteBody("\"편의점 앞\"", "37.5009", "-180.000001")),
+				Arguments.of("lat 없음", candidateRouteBody("\"편의점 앞\"", "null", "127.0405")),
+				Arguments.of("location 없음", """
+						{"candidate":{"name":"편의점 앞"},"navRouteId":"nav-route-7f3a","stateVersion":15}
+						"""));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("routeBodiesWithInvalidCandidate")
+	@DisplayName("PUT /v1/pickup-sessions/{sessionId}/route의 candidate name이 비었거나 50자를 넘거나 location이 없거나 범위 밖이면 422 VALIDATION_FAILED(fields candidate.*)를 돌려주고 유스케이스를 부르지 않는다")
+	void confirmRouteWithInvalidCandidateReturns422ValidationFailedOnCandidateField(String caseName, String body)
+			throws Exception {
+		mockMvc.perform(confirmRouteRequest(VEHICLE, body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", hasSize(1)))
+				.andExpect(jsonPath("$.error.fields[0].field", startsWith("candidate.")))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(confirmRouteUseCase).shouldHaveNoInteractions();
+	}
+
+	private static String candidateRouteBody(String nameJson, String lat, String lng) {
+		return """
+				{"candidate":{"name":%s,"location":{"lat":%s,"lng":%s}},"navRouteId":"nav-route-7f3a","stateVersion":15}
+				""".formatted(nameJson, lat, lng);
+	}
+
+	@Test
+	@DisplayName("GET /v1/pickup-sessions/{sessionId}는 세션 뷰 route.totalMeters를 route.totalMeters로 돌려준다")
+	void getSessionWritesRouteTotalMeters() throws Exception {
+		given(getSessionUseCase.getSession(any())).willReturn(sessionViewWithRouteTotalMeters());
+
+		mockMvc.perform(get(SESSION_PATH, SESSION_ID)
+						.header(HttpHeaders.AUTHORIZATION, bearerOf(VEHICLE)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.route.routeVersion").value(2))
+				.andExpect(jsonPath("$.route.remainingMeters").value(4200))
+				.andExpect(jsonPath("$.route.totalMeters").value(5800));
 	}
 
 	@Test
@@ -464,12 +679,183 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 	}
 
 	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes의 spotId가 다른 가족의 장소이거나 없는 장소면 422 SPOT_NOT_SAVED를 돌려준다")
+	void changeSpotWithUnsavedSpotReturns422SpotNotSaved() throws Exception {
+		given(changeSpotUseCase.changeSpot(any())).willThrow(PickupErrors.spotNotSaved());
+
+		mockMvc.perform(changeSpotRequest(VEHICLE))
+				.andExpect(commonError(HttpStatus.UNPROCESSABLE_CONTENT, "SPOT_NOT_SAVED"));
+
+		then(changeSpotUseCase).should().changeSpot(new ChangeSpotCommand(
+				VEHICLE, SESSION_ID, OTHER_SAVED_SPOT_ID, STATE_VERSION, SPOT_VERSION));
+	}
+
+	@Test
 	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes를 DELEGATE 토큰으로 부르면 403 FORBIDDEN을 돌려준다")
 	void changeSpotWithDelegateTokenReturns403Forbidden() throws Exception {
 		mockMvc.perform(changeSpotRequest(DELEGATE))
 				.andExpect(commonError(HttpStatus.FORBIDDEN, "FORBIDDEN"));
 
 		then(changeSpotUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes에 spotId 없이 candidate {name, location}을 보내면 Command에 candidate를 담고 spotId는 null로 두어 200을 돌려준다")
+	void changeSpotWithCandidatePassesCandidateAndNullSpotIdToCommand() throws Exception {
+		given(changeSpotUseCase.changeSpot(any())).willReturn(spotChangedSessionView());
+
+		mockMvc.perform(changeSpotRequest(VEHICLE, CANDIDATE_SPOT_CHANGE_BODY))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.sessionId").value(SESSION_ID))
+				.andExpect(jsonPath("$.status.spot").value("SELECTED"));
+
+		ArgumentCaptor<ChangeSpotCommand> captor = ArgumentCaptor.forClass(ChangeSpotCommand.class);
+		then(changeSpotUseCase).should().changeSpot(captor.capture());
+		ChangeSpotCommand command = captor.getValue();
+		assertThat(command.candidate()).isEqualTo(new SpotCandidate(CANDIDATE_NAME, CANDIDATE_LOCATION));
+		assertThat(command.spotId()).isNull();
+		assertThat(command.principal()).isEqualTo(VEHICLE);
+		assertThat(command.sessionId()).isEqualTo(SESSION_ID);
+		assertThat(command.stateVersion()).isEqualTo(STATE_VERSION);
+		assertThat(command.spotVersion()).isEqualTo(SPOT_VERSION);
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes의 candidate name이 50자면 받아서 Command에 그대로 담는다")
+	void changeSpotWithFiftyCharCandidateNameIsAccepted() throws Exception {
+		given(changeSpotUseCase.changeSpot(any())).willReturn(spotChangedSessionView());
+		String name50 = "가".repeat(50);
+
+		mockMvc.perform(changeSpotRequest(VEHICLE,
+						candidateSpotChangeBody("\"" + name50 + "\"", "37.5009", "127.0405")))
+				.andExpect(status().isOk());
+
+		ArgumentCaptor<ChangeSpotCommand> captor = ArgumentCaptor.forClass(ChangeSpotCommand.class);
+		then(changeSpotUseCase).should().changeSpot(captor.capture());
+		assertThat(captor.getValue().candidate()).isEqualTo(new SpotCandidate(name50, CANDIDATE_LOCATION));
+	}
+
+	static Stream<Arguments> spotChangeBodiesWithBothOrNeitherSpotIdAndCandidate() {
+		return Stream.of(
+				Arguments.of("spotId · candidate 둘 다", """
+						{"spotId":22,"candidate":{"name":"학원 옆 편의점 앞","location":{"lat":37.5009,"lng":127.0405}},\
+						"stateVersion":15,"spotVersion":4}
+						"""),
+				Arguments.of("spotId · candidate 둘 다 없음", """
+						{"stateVersion":15,"spotVersion":4}
+						"""));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("spotChangeBodiesWithBothOrNeitherSpotIdAndCandidate")
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes에 spotId와 candidate를 둘 다 보내거나 둘 다 빼면 422 VALIDATION_FAILED(fields spotId)를 돌려주고 유스케이스를 부르지 않는다")
+	void changeSpotWithBothOrNeitherSpotIdAndCandidateReturns422ValidationFailed(String caseName, String body)
+			throws Exception {
+		mockMvc.perform(changeSpotRequest(VEHICLE, body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", hasSize(1)))
+				.andExpect(jsonPath("$.error.fields[0].field").value("spotId"))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(changeSpotUseCase).shouldHaveNoInteractions();
+	}
+
+	static Stream<Arguments> spotChangeBodiesWithInvalidCandidate() {
+		return Stream.of(
+				Arguments.of("name 빈 값", candidateSpotChangeBody("\"\"", "37.5009", "127.0405")),
+				Arguments.of("name 공백만", candidateSpotChangeBody("\"   \"", "37.5009", "127.0405")),
+				Arguments.of("name 없음", candidateSpotChangeBody("null", "37.5009", "127.0405")),
+				Arguments.of("name 51자", candidateSpotChangeBody("\"" + "가".repeat(51) + "\"", "37.5009", "127.0405")),
+				Arguments.of("lat 90 초과", candidateSpotChangeBody("\"편의점 앞\"", "90.000001", "127.0405")),
+				Arguments.of("lat -90 미만", candidateSpotChangeBody("\"편의점 앞\"", "-90.000001", "127.0405")),
+				Arguments.of("lng 180 초과", candidateSpotChangeBody("\"편의점 앞\"", "37.5009", "180.000001")),
+				Arguments.of("lng -180 미만", candidateSpotChangeBody("\"편의점 앞\"", "37.5009", "-180.000001")),
+				Arguments.of("lat 없음", candidateSpotChangeBody("\"편의점 앞\"", "null", "127.0405")),
+				Arguments.of("location 없음", """
+						{"candidate":{"name":"편의점 앞"},"stateVersion":15,"spotVersion":4}
+						"""));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("spotChangeBodiesWithInvalidCandidate")
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes의 candidate name이 비었거나 50자를 넘거나 location이 없거나 범위 밖이면 422 VALIDATION_FAILED(fields candidate.*)를 돌려주고 유스케이스를 부르지 않는다")
+	void changeSpotWithInvalidCandidateReturns422ValidationFailedOnCandidateField(String caseName, String body)
+			throws Exception {
+		mockMvc.perform(changeSpotRequest(VEHICLE, body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", hasSize(1)))
+				.andExpect(jsonPath("$.error.fields[0].field", startsWith("candidate.")))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(changeSpotUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes에 spotId · candidate 없이 {here: true, stateVersion, spotVersion}을 보내면 Command에 here true · spotId null · candidate null을 담아 200을 돌려준다")
+	void changeSpotWithHerePassesHereTrueAndNullSpotIdAndCandidateToCommand() throws Exception {
+		given(changeSpotUseCase.changeSpot(any())).willReturn(spotChangedSessionView());
+
+		mockMvc.perform(changeSpotRequest(VEHICLE, HERE_SPOT_CHANGE_BODY))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.sessionId").value(SESSION_ID));
+
+		ArgumentCaptor<ChangeSpotCommand> captor = ArgumentCaptor.forClass(ChangeSpotCommand.class);
+		then(changeSpotUseCase).should().changeSpot(captor.capture());
+		ChangeSpotCommand command = captor.getValue();
+		assertThat(command.here()).isTrue();
+		assertThat(command.spotId()).isNull();
+		assertThat(command.candidate()).isNull();
+		assertThat(command.principal()).isEqualTo(VEHICLE);
+		assertThat(command.sessionId()).isEqualTo(SESSION_ID);
+		assertThat(command.stateVersion()).isEqualTo(STATE_VERSION);
+		assertThat(command.spotVersion()).isEqualTo(SPOT_VERSION);
+	}
+
+	static Stream<Arguments> spotChangeBodiesWithHereAndSpotIdOrCandidate() {
+		return Stream.of(
+				Arguments.of("here true · spotId", """
+						{"here":true,"spotId":22,"stateVersion":15,"spotVersion":4}
+						"""),
+				Arguments.of("here true · candidate", """
+						{"here":true,"candidate":{"name":"학원 옆 편의점 앞","location":{"lat":37.5009,"lng":127.0405}},\
+						"stateVersion":15,"spotVersion":4}
+						"""));
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("spotChangeBodiesWithHereAndSpotIdOrCandidate")
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes에 here true와 spotId 또는 candidate를 함께 보내면 422 VALIDATION_FAILED를 돌려주고 유스케이스를 부르지 않는다")
+	void changeSpotWithHereAndSpotIdOrCandidateReturns422ValidationFailed(String caseName, String body)
+			throws Exception {
+		mockMvc.perform(changeSpotRequest(VEHICLE, body))
+				.andExpect(status().isUnprocessableContent())
+				.andExpect(commonErrorKeys())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.fields", hasSize(1)))
+				.andExpect(jsonPath("$.error.fields[0].reason", not(emptyOrNullString())));
+
+		then(changeSpotUseCase).shouldHaveNoInteractions();
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/spot-changes(here true)가 가드 미충족이면 CALL-02와 같이 422 CALL_GUARD_UNMET과 error.unmet [G6]을 돌려준다")
+	void changeSpotWithHereGuardUnmetReturns422CallGuardUnmetWithUnmet() throws Exception {
+		given(changeSpotUseCase.changeSpot(any())).willThrow(PickupErrors.callGuardUnmet(List.of("G6")));
+
+		mockMvc.perform(changeSpotRequest(VEHICLE, HERE_SPOT_CHANGE_BODY))
+				.andExpect(commonError(HttpStatus.UNPROCESSABLE_CONTENT, "CALL_GUARD_UNMET"))
+				.andExpect(jsonPath("$.error.unmet", contains("G6")))
+				.andExpect(jsonPath("$", not(hasKey("unmet"))));
+	}
+
+	private static String candidateSpotChangeBody(String nameJson, String lat, String lng) {
+		return """
+				{"candidate":{"name":%s,"location":{"lat":%s,"lng":%s}},"stateVersion":15,"spotVersion":4}
+				""".formatted(nameJson, lat, lng);
 	}
 
 	@ParameterizedTest(name = "{0}")
@@ -637,6 +1023,20 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 
 		then(completePickupUseCase).should().complete(new CompletePickupCommand(
 				VEHICLE, SESSION_ID, "IMMEDIATE", STATE_VERSION, List.of()));
+	}
+
+	@Test
+	@DisplayName("POST /v1/pickup-sessions/{sessionId}/completion에 세션에 없는 childUserId를 notBoardedChildUserIds로 보내면 404 NOT_FOUND를 돌려준다")
+	void completeWithChildNotInSessionReturns404NotFound() throws Exception {
+		given(completePickupUseCase.complete(any()))
+				.willThrow(PickupErrors.from(new PickupRuleException(PickupViolation.CHILD_NOT_IN_SESSION)));
+
+		mockMvc.perform(completionRequest(VEHICLE,
+						"{\"mode\":\"MANUAL\",\"stateVersion\":15,\"notBoardedChildUserIds\":[999]}"))
+				.andExpect(commonError(HttpStatus.NOT_FOUND, "NOT_FOUND"));
+
+		then(completePickupUseCase).should().complete(new CompletePickupCommand(
+				VEHICLE, SESSION_ID, "MANUAL", STATE_VERSION, List.of(999L)));
 	}
 
 	@ParameterizedTest(name = "mode \"{0}\"")
@@ -1046,6 +1446,14 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 				.content(SPOT_CHANGE_BODY);
 	}
 
+	private MockHttpServletRequestBuilder changeSpotRequest(AuthPrincipal principal, String body) {
+		return post(SPOT_CHANGES_PATH, SESSION_ID)
+				.header(HttpHeaders.AUTHORIZATION, bearerOf(principal))
+				.header(IDEMPOTENCY_KEY_HEADER, UUID.randomUUID().toString())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body);
+	}
+
 	private MockHttpServletRequestBuilder holdRequest(AuthPrincipal principal) {
 		return put(HOLD_PATH, SESSION_ID)
 				.header(HttpHeaders.AUTHORIZATION, bearerOf(principal))
@@ -1092,6 +1500,46 @@ class PickupSessionControllerTest extends PickupWebTestSupport {
 				.header(IDEMPOTENCY_KEY_HEADER, UUID.randomUUID().toString())
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(body);
+	}
+
+	/** 민준(31)은 사진 URL이 있고 서윤(32)은 없다. 운전 중인 보호자는 GUARDIAN 김보호. */
+	private static SessionView sessionViewWithProfileImagesAndDriver() {
+		SessionView base = sessionView();
+		return new SessionView(
+				base.sessionId(),
+				base.stateVersion(),
+				base.status(),
+				base.spot(),
+				base.eta(),
+				base.call(),
+				List.of(
+						new SessionChildView(31L, "민준", ChildPhase.WAITING, 10,
+								Instant.parse("2026-11-05T09:10:00Z"), null, null, null, null,
+								MINJUN_PROFILE_IMAGE_URL),
+						new SessionChildView(32L, "서윤", ChildPhase.WAITING, 0, null, null, null, null, null, null)),
+				null,
+				base.route(),
+				base.boarding(),
+				base.incident(),
+				new SessionDriverView("김보호", GUARDIAN_PROFILE_IMAGE_URL));
+	}
+
+	/** 경로 확정 때 전체 거리 5800m, 남은 거리 4200m. */
+	private static SessionView sessionViewWithRouteTotalMeters() {
+		SessionView base = sessionView();
+		return new SessionView(
+				base.sessionId(),
+				base.stateVersion(),
+				base.status(),
+				base.spot(),
+				base.eta(),
+				base.call(),
+				base.children(),
+				base.vehicleLocation(),
+				new SessionRouteView(2, 4200, 5800),
+				base.boarding(),
+				base.incident(),
+				base.driver());
 	}
 
 	private static SessionView sessionViewWithEveryTimeField() {

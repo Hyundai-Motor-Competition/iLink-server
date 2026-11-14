@@ -9,6 +9,7 @@ import com.example.pickupservice.auth.domain.MemberInvite;
 import com.example.pickupservice.auth.domain.OwnerType;
 import com.example.pickupservice.auth.domain.Platform;
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
+import com.example.pickupservice.common.geo.LatLng;
 import com.example.pickupservice.common.security.Role;
 import com.example.pickupservice.pickup.application.port.out.LoadChildReadinessPort;
 import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
@@ -16,14 +17,22 @@ import com.example.pickupservice.pickup.application.port.out.LoadSchedulePort;
 import com.example.pickupservice.pickup.application.port.out.LoadSpotPort;
 import com.example.pickupservice.pickup.application.port.out.NotificationRequest;
 import com.example.pickupservice.pickup.application.port.out.RecordNotificationPort;
+import com.example.pickupservice.pickup.application.port.out.SaveTemporarySpotPort;
 import com.example.pickupservice.place.application.port.in.LoadPickupSpotUseCase;
 import com.example.pickupservice.place.application.port.in.SpotInfo;
+import com.example.pickupservice.place.application.port.in.SpotSummary;
 import com.example.pickupservice.place.fixture.PlaceSeed;
 import com.example.pickupservice.schedule.application.port.in.LoadScheduleUseCase;
 import com.example.pickupservice.schedule.application.port.in.ScheduleInfo;
 import com.example.pickupservice.schedule.domain.ScheduleStatus;
 import com.example.pickupservice.schedule.fixture.ScheduleSeed;
 import com.example.pickupservice.user.application.port.in.FamilyInfo;
+import com.example.pickupservice.user.application.port.in.GetMyFamilyQuery;
+import com.example.pickupservice.user.application.port.in.GetMyFamilyUseCase;
+import com.example.pickupservice.user.application.port.out.ProfileImageStoragePort;
+import jakarta.persistence.EntityManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import java.util.HashMap;
 import com.example.pickupservice.user.application.port.in.LoadFamilyUseCase;
 import com.example.pickupservice.user.application.port.in.LoadMemberUseCase;
 import com.example.pickupservice.user.application.port.in.MemberInfo;
@@ -70,6 +79,10 @@ class PickupModuleLinkAdaptersTest extends IntegrationTestSupport {
 	private final GetMemberDeviceStatusUseCase getMemberDeviceStatusUseCase;
 	private final SaveDevicePort saveDevicePort;
 	private final SaveInvitePort saveInvitePort;
+	private final GetMyFamilyUseCase getMyFamilyUseCase;
+	private final ProfileImageStoragePort profileImageStoragePort;
+	private final EntityManager entityManager;
+	private final TransactionTemplate transactionTemplate;
 
 	private UserSeed.Result seededUser;
 	private ScheduleSeed.Result seededSchedule;
@@ -158,6 +171,33 @@ class PickupModuleLinkAdaptersTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	@DisplayName("SaveTemporarySpotPort는 빈이 정확히 1개이고 pickup.adapter.out.place 아래 클래스가 구현한다")
+	void temporarySpotPortHasExactlyOneBeanInPickupOutPlacePackage() {
+		Object bean = onlyBeanOf(SaveTemporarySpotPort.class);
+
+		assertThat(AopUtils.getTargetClass(bean).getName()).startsWith(OUT_ADAPTER_PACKAGE + "place.");
+	}
+
+	@Test
+	@DisplayName("SaveTemporarySpotPort.saveTemporarySpot은 place SaveTemporarySpotUseCase에 위임해 같은 가족 · 학원 · 이름 · 정차 지점 · 만남 지점의 임시 장소를 만들고 그 spotId를 돌려준다(가족 장소 목록에는 안 보인다)")
+	void temporarySpotPortDelegatesToPlaceSaveTemporarySpot() {
+		SaveTemporarySpotPort temporarySpotPort = onlyBeanOf(SaveTemporarySpotPort.class);
+		seededPlace = placeSeed.seed();
+		long familyId = seededPlace.schedule().user().familyId();
+		long academyId = seededPlace.schedule().academyId();
+		LatLng location = new LatLng(37.500900, 127.040500);
+
+		long spotId = temporarySpotPort.saveTemporarySpot(familyId, academyId, "학원 옆 편의점 앞", location, location);
+
+		assertThat(spotId).isPositive().isNotIn(seededPlace.defaultSpotId(), seededPlace.otherSpotId());
+		assertThat(loadPickupSpotUseCase.findSpot(spotId)).contains(
+				new SpotInfo(spotId, familyId, academyId, "학원 옆 편의점 앞", location, location));
+		assertThat(loadPickupSpotUseCase.findSpots(familyId, List.of(academyId)))
+				.extracting(SpotSummary::spotId)
+				.doesNotContain(spotId);
+	}
+
+	@Test
 	@DisplayName("LoadSpotPort는 없는 장소 id, 기본 장소가 없는 가족 · 학원이면 빈 값을 돌려준다")
 	void spotPortReturnsEmptyForMissingSpot() {
 		LoadSpotPort spotPort = onlyBeanOf(LoadSpotPort.class);
@@ -184,6 +224,43 @@ class PickupModuleLinkAdaptersTest extends IntegrationTestSupport {
 				.containsExactlyInAnyOrder(seededUser.guardianId(), seededUser.minjunId(), seededUser.seoyunId());
 		assertThat(members).extracting(MemberInfo::name)
 				.containsExactlyInAnyOrder(UserSeed.GUARDIAN_NAME, UserSeed.MINJUN_NAME, UserSeed.SEOYUN_NAME);
+	}
+
+	@Test
+	@DisplayName("LoadFamilyPort가 주는 MemberInfo.profileImageUrl은 가족 조회(GetMyFamily)와 같은 URL이다: 사진 있는 민준 · 보호자는 저장 키의 URL, 사진 없는 서윤은 기본 사진 URL")
+	void familyPortFillsProfileImageUrlSameAsGetMyFamily() {
+		LoadFamilyPort familyPort = onlyBeanOf(LoadFamilyPort.class);
+		seededUser = userSeed.seed();
+		long familyId = seededUser.familyId();
+		String minjunKey = "profiles/minjun-" + UUID.randomUUID() + ".png";
+		String guardianKey = "profiles/guardian-" + UUID.randomUUID() + ".png";
+		setProfileImageKey(seededUser.minjunId(), minjunKey);
+		setProfileImageKey(seededUser.guardianId(), guardianKey);
+
+		List<MemberInfo> members = familyPort.loadMembers(familyId);
+		Map<Long, String> pickupUrls = new HashMap<>();
+		members.forEach(member -> pickupUrls.put(member.userId(), member.profileImageUrl()));
+		Map<Long, String> familyUrls = new HashMap<>();
+		getMyFamilyUseCase.getMyFamily(new GetMyFamilyQuery(familyId))
+				.members().forEach(member -> familyUrls.put(member.userId(), member.profileImageUrl()));
+
+		assertThat(pickupUrls).containsOnlyKeys(seededUser.guardianId(), seededUser.minjunId(), seededUser.seoyunId());
+		assertThat(pickupUrls).isEqualTo(familyUrls);
+		assertThat(pickupUrls.get(seededUser.minjunId())).isNotNull().contains(minjunKey);
+		assertThat(pickupUrls.get(seededUser.guardianId())).isNotNull().contains(guardianKey);
+		assertThat(pickupUrls.get(seededUser.seoyunId()))
+				.isNotNull()
+				.isEqualTo(profileImageStoragePort.defaultUrl().orElseThrow());
+		assertThat(familyPort.loadMember(seededUser.minjunId()).orElseThrow().profileImageUrl())
+				.isEqualTo(pickupUrls.get(seededUser.minjunId()));
+	}
+
+	private void setProfileImageKey(long userId, String key) {
+		transactionTemplate.executeWithoutResult(status -> entityManager
+				.createQuery("update UserEntity u set u.profileImageKey = :key where u.userId = :userId")
+				.setParameter("key", key)
+				.setParameter("userId", userId)
+				.executeUpdate());
 	}
 
 	@Test

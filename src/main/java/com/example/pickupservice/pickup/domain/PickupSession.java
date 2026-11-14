@@ -46,6 +46,7 @@ public class PickupSession {
 	private Instant incidentResolvedAt;
 	private LatLng vehicleLocation;
 	private Instant vehicleLocatedAt;
+	private Integer routeTotalMeters;
 	private List<SessionChild> children;
 
 	public static PickupSession start(long vehicleId, long familyId, LocalDate date, SpotSnapshot spot,
@@ -55,7 +56,8 @@ public class PickupSession {
 				.toList();
 		return new PickupSession(null, vehicleId, familyId, spot.spotId(), spot.name(), spot.stopPoint(),
 				spot.meetingPoint(), date, SessionStatus.ACTIVE, VehiclePhase.ROUTING, SpotStatus.SELECTED, 0, 0, 0,
-				null, false, null, null, null, null, null, null, null, null, null, null, null, null, null, children);
+				null, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+				children);
 	}
 
 	public static PickupSession restore(Long sessionId, long vehicleId, long familyId, long spotId, String spotName,
@@ -80,11 +82,26 @@ public class PickupSession {
 			IncidentType incidentType, String incidentCause, Long incidentChildUserId, Instant incidentOpenedAt,
 			Instant incidentResolvedAt, LatLng vehicleLocation, Instant vehicleLocatedAt,
 			List<SessionChild> children) {
+		return restore(sessionId, vehicleId, familyId, spotId, spotName, stopPoint, meetingPoint, date,
+				sessionStatus, vehiclePhase, spotStatus, stateVersion, spotVersion, routeVersion, routeSpotVersion,
+				callHeld, etaAt, remainingMeters, etaUpdatedAt, boardingDetectedAt, boardingCancelableUntil,
+				boardingDoor, incidentType, incidentCause, incidentChildUserId, incidentOpenedAt, incidentResolvedAt,
+				vehicleLocation, vehicleLocatedAt, null, children);
+	}
+
+	public static PickupSession restore(Long sessionId, long vehicleId, long familyId, long spotId, String spotName,
+			LatLng stopPoint, LatLng meetingPoint, LocalDate date, SessionStatus sessionStatus,
+			VehiclePhase vehiclePhase, SpotStatus spotStatus, int stateVersion, int spotVersion, int routeVersion,
+			Integer routeSpotVersion, boolean callHeld, Instant etaAt, Integer remainingMeters, Instant etaUpdatedAt,
+			Instant boardingDetectedAt, Instant boardingCancelableUntil, BoardingDoor boardingDoor,
+			IncidentType incidentType, String incidentCause, Long incidentChildUserId, Instant incidentOpenedAt,
+			Instant incidentResolvedAt, LatLng vehicleLocation, Instant vehicleLocatedAt, Integer routeTotalMeters,
+			List<SessionChild> children) {
 		return new PickupSession(sessionId, vehicleId, familyId, spotId, spotName, stopPoint, meetingPoint, date,
 				sessionStatus, vehiclePhase, spotStatus, stateVersion, spotVersion, routeVersion, routeSpotVersion,
 				callHeld, etaAt, remainingMeters, etaUpdatedAt, boardingDetectedAt, boardingCancelableUntil,
 				boardingDoor, incidentType, incidentCause, incidentChildUserId, incidentOpenedAt, incidentResolvedAt,
-				vehicleLocation, vehicleLocatedAt, children);
+				vehicleLocation, vehicleLocatedAt, routeTotalMeters, children);
 	}
 
 	public void applyTelemetry(Instant observedAt, int navEtaSeconds, int remainingMeters, LatLng location) {
@@ -146,6 +163,9 @@ public class PickupSession {
 
 	public void complete(BoardingMethod method, List<Long> notBoardedChildUserIds, Instant now) {
 		rejectIfFinished();
+		for (Long notBoardedId : notBoardedChildUserIds) {
+			childOf(notBoardedId);
+		}
 		boolean manual = method == BoardingMethod.MANUAL;
 		if (manual && vehiclePhase != VehiclePhase.STOPPED) {
 			throw new PickupRuleException(PickupViolation.VEHICLE_NOT_STOPPED);
@@ -224,18 +244,23 @@ public class PickupSession {
 		raiseStateVersion();
 	}
 
-	public void confirmRoute() {
+	public void confirmRoute(Integer totalMeters) {
 		spotStatus = SpotStatus.CONFIRMED;
 		routeVersion++;
 		routeSpotVersion = spotVersion;
+		routeTotalMeters = totalMeters;
 		raiseStateVersion();
 	}
 
-	public void changeSpot(SpotSnapshot spot) {
+	public void requireSpotChangeable() {
 		boolean childMoving = children.stream().anyMatch(child -> child.getChildPhase() == ChildPhase.MEETING);
 		if (childMoving) {
 			throw new PickupRuleException(PickupViolation.CHILD_ALREADY_MOVING);
 		}
+	}
+
+	public void changeSpot(SpotSnapshot spot) {
+		requireSpotChangeable();
 		spotStatus = SpotStatus.SELECTED;
 		spotVersion++;
 		spotId = spot.spotId();

@@ -3,14 +3,15 @@ package com.example.pickupservice.pickup.application.service;
 import com.example.pickupservice.pickup.application.port.in.ConfirmRouteCommand;
 import com.example.pickupservice.pickup.application.port.in.ConfirmRouteUseCase;
 import com.example.pickupservice.pickup.application.port.in.SessionView;
+import com.example.pickupservice.pickup.application.port.in.SpotCandidate;
 import com.example.pickupservice.pickup.application.port.out.LoadCallPort;
 import com.example.pickupservice.pickup.application.port.out.LoadFamilyPort;
 import com.example.pickupservice.pickup.application.port.out.LoadSessionPort;
 import com.example.pickupservice.pickup.application.port.out.LoadSpotPort;
-import com.example.pickupservice.pickup.application.port.out.NotificationRequest;
 import com.example.pickupservice.pickup.application.port.out.PublishSessionEventPort;
 import com.example.pickupservice.pickup.application.port.out.RecordNotificationPort;
 import com.example.pickupservice.pickup.application.port.out.SaveSessionPort;
+import com.example.pickupservice.pickup.application.port.out.SaveTemporarySpotPort;
 import com.example.pickupservice.pickup.application.port.out.SessionEventPort;
 import com.example.pickupservice.pickup.domain.PickupSession;
 import com.example.pickupservice.pickup.domain.SessionEvent;
@@ -30,12 +31,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ConfirmRouteService implements ConfirmRouteUseCase {
 
+	private static final String SPOT_CHANGED = SessionEventType.SPOT_CHANGED.name();
 	private static final String SPOT_CONFIRMED = SessionEventType.SPOT_CONFIRMED.name();
-	private static final String DEPARTURE_NOTICE_SENT = SessionEventType.DEPARTURE_NOTICE_SENT.name();
-	private static final String DEPARTURE_NOTIFICATION = "DEPARTURE";
 
 	private final LoadSessionPort loadSessionPort;
 	private final LoadSpotPort loadSpotPort;
+	private final SaveTemporarySpotPort saveTemporarySpotPort;
 	private final SaveSessionPort saveSessionPort;
 	private final LoadFamilyPort loadFamilyPort;
 	private final LoadCallPort loadCallPort;
@@ -54,24 +55,37 @@ public class ConfirmRouteService implements ConfirmRouteUseCase {
 		if (locked.isFinished()) {
 			throw PickupErrors.sessionAlreadyFinished();
 		}
-		requireSavedByFamily(command.spotId(), locked.getFamilyId());
-		requireSessionSpot(locked, command);
+		Integer spotChangedStateVersion = null;
+		if (command.candidate() != null) {
+			changeToCandidate(locked, command.candidate());
+			spotChangedStateVersion = locked.getStateVersion();
+		} else {
+			requireSavedByFamily(command.spotId(), locked.getFamilyId());
+			requireSessionSpot(locked, command);
+		}
 		boolean firstConfirm = locked.getRouteVersion() == 0;
-		locked.confirmRoute();
+		locked.confirmRoute(command.totalMeters());
 		PickupSession session = saveSessionPort.save(locked);
 		Instant now = clock.instant();
 		long familyId = session.getFamilyId();
 		List<MemberInfo> members = loadFamilyPort.loadMembers(familyId);
-		publish(append(session, SPOT_CONFIRMED, now), SessionReceivers.guardiansAndSessionChildren(session, members));
+		List<Long> spotReceivers = SessionReceivers.guardiansAndSessionChildren(session, members);
+		if (spotChangedStateVersion != null) {
+			publish(append(session, SPOT_CHANGED, spotChangedStateVersion, now), spotReceivers);
+		}
+		publish(append(session, SPOT_CONFIRMED, session.getStateVersion(), now), spotReceivers);
 		if (firstConfirm) {
-			List<Long> notificationIds = recordNotificationPort.recordNotifications(
-					new NotificationRequest(session.getSessionId(), null, DEPARTURE_NOTIFICATION,
-							SessionReceivers.sessionChildren(session)));
-			publishSessionEventPort.publish(SessionEventMessages.of(append(session, DEPARTURE_NOTICE_SENT, now),
-					SessionReceivers.guardians(members), notificationIds));
+			DepartureNotice.send(session, members, now, recordNotificationPort, sessionEventPort,
+					publishSessionEventPort);
 		}
 		return sessionAccess.assemble(session, command.principal(), loadFamilyPort.loadFamily(familyId),
 				members, loadCallPort.loadLatestCall(session.getSessionId()), now);
+	}
+
+	private void changeToCandidate(PickupSession locked, SpotCandidate candidate) {
+		SpotChangeGuard.requireSpotChangeable(locked, loadCallPort);
+		locked.changeSpot(TemporarySpot.createAtCurrentAcademy(locked, candidate.name(), candidate.location(),
+				loadSpotPort, saveTemporarySpotPort));
 	}
 
 	private void requireSavedByFamily(long spotId, long familyId) {
@@ -89,8 +103,8 @@ public class ConfirmRouteService implements ConfirmRouteUseCase {
 		}
 	}
 
-	private SessionEvent append(PickupSession session, String type, Instant now) {
-		return sessionEventPort.append(session.getSessionId(), type, session.getStateVersion(), now, Map.of());
+	private SessionEvent append(PickupSession session, String type, int stateVersion, Instant now) {
+		return sessionEventPort.append(session.getSessionId(), type, stateVersion, now, Map.of());
 	}
 
 	private void publish(SessionEvent event, List<Long> receiverUserIds) {

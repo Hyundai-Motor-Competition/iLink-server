@@ -122,6 +122,8 @@ public class PickupSessionEntity extends BaseTimeEntity {
 
 	private Instant vehicleLocatedAt;
 
+	private Integer routeTotalMeters;
+
 	public PickupSessionEntity(Long sessionId, Long vehicleId, Long familyId, Long spotId, String spotName,
 			Point stopPoint, Point meetingPoint, LocalDate date, SessionStatus sessionStatus, VehiclePhase vehiclePhase,
 			SpotStatus spotStatus, int stateVersion, int spotVersion, int routeVersion, Integer routeSpotVersion,
@@ -131,7 +133,7 @@ public class PickupSessionEntity extends BaseTimeEntity {
 		this(sessionId, vehicleId, familyId, spotId, spotName, stopPoint, meetingPoint, date, sessionStatus,
 				vehiclePhase, spotStatus, stateVersion, spotVersion, routeVersion, routeSpotVersion, callHeld, etaAt,
 				remainingMeters, etaUpdatedAt, boardingDetectedAt, boardingCancelableUntil, boardingDoor, incidentType,
-				incidentCause, incidentChildUserId, incidentOpenedAt, incidentResolvedAt, null, null, null);
+				incidentCause, incidentChildUserId, incidentOpenedAt, incidentResolvedAt, null, null, null, null);
 	}
 
 	public PickupSessionEntity(Long sessionId, Long vehicleId, Long familyId, Long spotId, String spotName,
@@ -140,7 +142,7 @@ public class PickupSessionEntity extends BaseTimeEntity {
 			boolean callHeld, Instant etaAt, Integer remainingMeters, Instant etaUpdatedAt, Instant boardingDetectedAt,
 			Instant boardingCancelableUntil, BoardingDoor boardingDoor, IncidentType incidentType,
 			String incidentCause, Long incidentChildUserId, Instant incidentOpenedAt, Instant incidentResolvedAt,
-			BigDecimal vehicleLat, BigDecimal vehicleLng, Instant vehicleLocatedAt) {
+			BigDecimal vehicleLat, BigDecimal vehicleLng, Instant vehicleLocatedAt, Integer routeTotalMeters) {
 		this.sessionId = sessionId;
 		this.vehicleId = vehicleId;
 		this.familyId = familyId;
@@ -171,6 +173,7 @@ public class PickupSessionEntity extends BaseTimeEntity {
 		this.vehicleLat = vehicleLat;
 		this.vehicleLng = vehicleLng;
 		this.vehicleLocatedAt = vehicleLocatedAt;
+		this.routeTotalMeters = routeTotalMeters;
 	}
 
 }

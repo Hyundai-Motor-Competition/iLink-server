@@ -439,6 +439,33 @@ class PlacePersistenceAdapterTest extends IntegrationTestSupport {
 				.contains(seeded.defaultSpotId());
 	}
 
+	@Test
+	@DisplayName("일반 장소(create)를 저장하고 다시 읽으면 temporary가 false다")
+	void savedRegularSpotIsLoadedWithTemporaryFalse() {
+		PickupSpot saved = saveSpotPort.saveSpot(PickupSpot.create(familyId, academyId, "옆문 앞", null,
+				SAVED_STOP, SAVED_MEETING, false, guardianId));
+
+		assertThat(loadSpotPort.loadSpot(saved.getSpotId()).orElseThrow().isTemporary()).isFalse();
+		assertThat(jdbcTemplate.queryForObject("select temporary from pickup_spot where spot_id = ?", Boolean.class,
+				saved.getSpotId())).as("DB temporary 컬럼").isFalse();
+	}
+
+	@Test
+	@DisplayName("loadSpot(spotId 단건 조회)은 temporary=true 장소도 가족 · 학원 · 이름 · 좌표를 담아 돌려준다(픽업이 임시 spotId로 경로를 확정)")
+	void loadSpotReturnsTemporarySpotBySpotId() {
+		long temporaryId = saveTemporarySpot(academyId, "임시 장소", SAVED_STOP);
+
+		PickupSpot loaded = loadSpotPort.loadSpot(temporaryId).orElseThrow();
+
+		assertThat(loaded.getSpotId()).isEqualTo(temporaryId);
+		assertThat(loaded.getFamilyId()).isEqualTo(familyId);
+		assertThat(loaded.getAcademyId()).isEqualTo(academyId);
+		assertThat(loaded.getName()).isEqualTo("임시 장소");
+		assertThat(loaded.isTemporary()).as("temporary").isTrue();
+		assertThat(loaded.getStopPoint().lat()).isCloseTo(SAVED_STOP.lat(), within(SIX_DECIMALS));
+		assertThat(loaded.getStopPoint().lng()).isCloseTo(SAVED_STOP.lng(), within(SIX_DECIMALS));
+	}
+
 	private long saveTemporarySpot(long spotAcademyId, String name, LatLng point) {
 		return saveSpotPort.saveSpot(PickupSpot.createTemporary(familyId, spotAcademyId, name, point, point))
 				.getSpotId();
