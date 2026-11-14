@@ -1,8 +1,8 @@
 # FOLLOWUP · 픽업 (pickup)
 
-- 생성: 2026-11-14 07:36 KST · tdd-guard
-- 상태: 진행 중 (체크 277/277 · 완료 기준 0/4)
-- 테스트: ● GREEN · 2953 passed · 전체 · 126s · .\gradlew.bat test --console=plain
+- 생성: 2026-11-14 09:29 KST · tdd-guard
+- 상태: 진행 중 (체크 283/283 · 완료 기준 0/4)
+- 테스트: ● GREEN · 2963 passed · 전체 · 128s · .\gradlew.bat test --console=plain
 - 설계서: C:/pw/pickup/docs/08_픽업-pickup.md
 
 ## 완료 항목
@@ -303,6 +303,16 @@ AutoCompleteBoardingServiceTest.자동 완료 SESSION_COMPLETED 발행의 받는
 - [x] #277 [서비스] 픽업 시작(StartPickup)은 해제된 자녀(user MemberInfo.removed true)의 일정을 세션 자녀에서 뺀다. 지난 기록 조회는 해제된 자녀 이름을 그대로 보인다(사람 결정 2026-11-14) ← StartPickupServiceTest.픽업 시작은 해제된 자녀(removed true)의 일정을 세션 자녀에서 빼고 나머지 자녀만 WAITING으로 저장한다
 StartPickupServiceTest.픽업 시작은 해제된 자녀(removed true)의 기기가 연결되지 않았어도 SETUP_INCOMPLETE로 거절하지 않고 남은 자녀로 세션을 시작한다
 StartPickupServiceTest.픽업 시작은 해제된 자녀(removed true)의 일정을 포함한 같은 scheduleIds로 다시 요청하면 ANOTHER_SESSION_ACTIVE가 아니라 기존 세션을 created false로 돌려준다
+- [x] #278 [서비스] 장소 변경(SES-05)의 spotId가 다른 가족의 장소이거나 없는 장소면 422 SPOT_NOT_SAVED로 거절하고 세션을 바꾸지 않는다(도메인 리뷰 2026-11-14) ← PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/spot-changes의 spotId가 다른 가족의 장소이거나 없는 장소면 422 SPOT_NOT_SAVED를 돌려준다
+ChangeSpotServiceTest.spotId 999
+- [x] #279 [서비스] 세션 뷰 driver는 가족에 GUARDIAN이 둘 이상이면 userId가 가장 작은 사람이고, 두 번째 경로 확정에 totalMeters를 빼면 routeTotalMeters를 null로 덮어쓴다(중간 리뷰 · 도메인 리뷰 2026-11-14) ← GetSessionServiceTest.세션 조회는 가족에 GUARDIAN 멤버가 둘 이상이면 목록 순서와 상관없이 userId가 가장 작은 GUARDIAN을 driver로 준다
+ConfirmRouteServiceTest.두 번째 경로 확정 요청에 totalMeters가 없으면 첫 확정의 값을 남기지 않고 세션 routeTotalMeters와 세션 뷰 route.totalMeters를 null로 덮어쓴다
+- [x] #280 [서비스] 여기로 부르기(SES-05 here)가 호출 가드를 못 넘으면 CALL-02와 같이 422 CALL_GUARD_UNMET(error.unmet)으로 거절한다(#272의 409를 바꿈, 사람 결정 2026-11-14) ← PickupSessionControllerTest.POST /v1/pickup-sessions/{sessionId}/spot-changes(here true)가 가드 미충족이면 CALL-02와 같이 422 CALL_GUARD_UNMET과 error.unmet [G6]을 돌려준다
+- [x] #281 [서비스] 여기로 부르기는 호출 보류(callHeld true) 중이면 보류를 풀고(callHeld false) 호출을 만든다(사람 결정 2026-11-14) ← ChangeSpotServiceTest.여기로 부르기는 호출 보류(callHeld true) 중이면 보류를 풀어 callHeld false로 저장하고 triggerType MANUAL 호출을 한 번 저장하며 CALL_TRIGGERED를 남긴다
+- [x] #282 [서비스] 여기로 부르기가 경로를 처음 확정하면(routeVersion 0) SES-04 첫 확정과 같이 세션 자녀에게 DEPARTURE 알림 기록을 요청하고 DEPARTURE_NOTICE_SENT를 저장한다(사람 결정 2026-11-14) ← ChangeSpotServiceTest.여기로 부르기가 경로를 처음 확정하면(routeVersion 0) 세션 자녀 둘에게 DEPARTURE 알림 기록(callId 없음)을 한 번, CALL 알림 기록을 한 번 요청한다
+ChangeSpotServiceTest.여기로 부르기가 경로를 처음 확정하면 SPOT_CHANGED · SPOT_CONFIRMED · DEPARTURE_NOTICE_SENT · CALL_TRIGGERED 순서로 저장 · 발행하고 DEPARTURE_NOTICE_SENT는 확정한 stateVersion으로 보호자에게 notificationIds와 함께 발행한다
+- [x] #283 [서비스] 추천 장소(candidate) 경로 확정 · 장소 변경에서 세션의 지금 장소를 place에서 못 찾으면 422 SPOT_NOT_SAVED로 거절하고 임시 장소를 만들지 않는다(사람 결정 2026-11-14) ← ChangeSpotServiceTest.candidate 장소 변경은 세션의 지금 장소를 place에서 못 찾으면 422 SPOT_NOT_SAVED로 거절하고 임시 장소를 만들지 않으며 아무것도 저장 · 발행하지 않는다
+ConfirmRouteServiceTest.candidate 경로 확정은 세션의 지금 장소를 place에서 못 찾으면 422 SPOT_NOT_SAVED로 거절하고 임시 장소를 만들지 않으며 아무것도 저장 · 발행하지 않는다
 
 ## 미완료 항목
 - 없음
@@ -314,7 +324,33 @@ StartPickupServiceTest.픽업 시작은 해제된 자녀(removed true)의 일정
 - [ ] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 아직 없음. 모든 항목이 체크되면 도메인 리뷰(tdd-guard:domain-reviewer · /tdd review)를 받아 checklist review로 기록해야 도메인이 완료된다.
+- 다시 리뷰 필요: 2026-11-14 07:41 KST 리뷰 뒤에 체크 · 추가된 항목 #278, #279, #280, #281, #282, #283
+- 2026-11-14 07:41 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 4 · 하 12 · 리뷰 시점 체크 277/277
+- 리뷰 시점 테스트: ● GREEN · 2953 passed · 전체 · 126s · .\gradlew.bat test --console=plain
+  - 결론: 조건부 통과
+  - 동작을 바꿔야 하는 [상]은 없습니다. 남은 것은 설계서 · 스웨거가 최근 구현(candidate · here · 해제된 자녀)을 따라오지 못한 부분과, 테스트가 없는 검사 1건입니다.
+  - [중] 설계서 본문과 API 표가 2026-11-14 결정을 반영하지 않음 — API 표 SES-04(L170) · SES-05(L171)의 요청 열에 candidate · here가 없고, 오류 열에도 SES-04 candidate의 CHILD_ALREADY_MOVING · CALL_ALREADY_SENT, SES-05 here의 422 VALIDATION_FAILED · 409 CALL_GUARD_UNMET, SES-05의 422 SPOT_NOT_SAVED가 없음. 핵심 로직 L279-282(SES-04 · 05)와 L265-270(SES-02 해제된 자녀 제외 · 모두 해제면 404)도 같음. 결정은 확인 필요 표 L788-790에만 있음 → note(설계서 갱신)
+  - [중] 같은 code CALL_GUARD_UNMET이 API마다 상태가 다름 — CALL-02는 422(PickupErrors.java:93 callGuardUnmet), SES-05 here는 409(PickupErrors.java:100 callGuardUnmetConflict, 확인 필요 L789). 앱이 status로 처리를 나누면 헷갈림 → 사람 결정(하나로 맞출지, 아니면 이대로 둘지)
+  - [중] 스웨거 문서가 새 입력값을 설명하지 않음 — PickupSessionApiDoc.java:59-70(SES-04)에 candidate · totalMeters가 없고, :74-85(SES-05)에 candidate · here, 409 CALL_GUARD_UNMET, 422 SPOT_NOT_SAVED가 없음(02 L78 「API 설명은 doc 인터페이스에」) → 리팩터링
+  - [중] SES-05 spotId 경로의 SPOT_NOT_SAVED에 테스트가 없음 — ChangeSpotService.java:148-153 savedSpotOf(다른 가족 장소 · 없는 장소 거절). 다른 가족 장소로 바꾸는 것을 막는 유일한 검사인데, ChangeSpotServiceTest · PickupSessionControllerTest 어디에도 없음 → 항목 추가
+  - [하] here=true가 callHeld true여도 호출을 만듦 — ChangeSpotService.java:96-124. 경로를 처음 확정하는 here일 때 DEPARTURE 알림도 없음 → 사람 결정
+  - [하] candidate에서 지금 세션 장소를 못 찾으면 422 SPOT_NOT_SAVED — ChangeSpotService.java:133-137, ConfirmRouteService.java:98-100. 설계서에 없고 테스트도 없음 → 사람 결정
+  - [하] place findSpot이 임시 장소도 돌려줌 — LoadPickupSpotService.java:30-32. SES-04 · 05 spotId 경로에서 같은 가족의 지난 임시 spotId도 「저장한 장소」로 통과 → note
+  - [하] 임시 장소 만들기 코드가 두 곳에 있음 — ChangeSpotService.temporarySpotOf · currentAcademyId, ConfirmRouteService.changeToCandidate → 리팩터링
+  - [하] 테스트에서만 쓰는 main 코드가 늘어남 — ConfirmRouteCommand 5인자 생성자 → 리팩터링
+  - [하] 새 한 줄 주석 8곳(02 L80) → 리팩터링
+  - [하] 설계서의 이벤트 종류 수가 낡음(19 · 21종, 실제 24종) → note
+  - [하] 02 L73 네이티브 쿼리 예외 목록에 ProcessedVehicleEventJpaRepository 없음 → note
+  - [하] findSignalLost에 boardingDetectedAt is null 조건이 없음 — PickupSessionJpaRepository.java:26-35 → 리팩터링
+  - [하] 중간 리뷰 테스트 공백(GUARDIAN 2명 driver, 두 번째 확정 totalMeters null 덮어쓰기) → 항목 추가(선택)
+  - [하] 해제된 보호자는 user loadMembers가 이미 뺌 → note(설계서 · 메모 정리)
+  - [하] 해제된 자녀 이름 보강은 GetSessionService에만 있음, RemoveMemberService가 진행 중 세션 자녀 해제를 막아 실제로는 생기지 않음 → note
+  - 완료 기준:
+  - C1 충족 — 체크 277/277, 전체 테스트 GREEN 2953 passed
+  - C2 미충족 — API 표 SES-02 · 04 · 05와 핵심 로직 본문이 구현과 다름. 설계서를 고치면 충족
+  - C3 사람 확인 필요 — [중] 4건 처리 뒤 충족으로 볼 수 있음
+  - C4 충족 — 미정 행이 모두 FOLLOWUP에 기록됨
+  - 테스트: scope all GREEN 2953 passed
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -368,7 +404,7 @@ StartPickupServiceTest.픽업 시작은 해제된 자녀(removed true)의 일정
 | 추천 장소 · 여기로 부르기의 임시 장소 저장 순서 | 결정됨: place #264(임시 장소 저장 in 포트) · #265(목록 · 기본 장소에서 제외)를 픽업 진행 중 메인 폴더에서 먼저 처리한 뒤 #269~#272를 진행한다(사람 결정 2026-11-14) |
 | 세션 뷰 driver(#273) | 결정됨: 세션 familyId의 role GUARDIAN 멤버 1명의 name · profileImageUrl. 없으면 null(사람 결정 2026-11-14). GUARDIAN이 여럿이면 userId가 가장 작은 사람(팀장 결정 2026-11-14) |
 | 추천 장소 candidate로 경로 확정 · 장소 변경(#269 · #270) | [팀장 결정 2026-11-14] candidate {name, location}을 받으면 place SaveTemporarySpotUseCase로 임시 장소를 만든다: SaveTemporarySpotCommand(familyId, academyId, name, stopPoint, meetingPoint)에 familyId는 세션 가족, academyId는 세션 지금 장소의 academyId, stopPoint · meetingPoint는 둘 다 location을 넣는다(createdBy는 place가 0으로 저장, main 구현을 따름). SES-04(route)는 세션 장소를 그 임시 장소로 바꾼 뒤(changeSpot과 같은 전제: CHILD_ALREADY_MOVING · CALL_ALREADY_SENT 거절) 바로 경로를 확정하고 SPOT_CHANGED · SPOT_CONFIRMED를 저장한다. 이때 spotId 불일치 409 검사는 하지 않는다. SES-05(spot-changes)는 spotId 대신 그 임시 spotId로 장소를 바꾼다. 거절이면 임시 장소를 만들지 않는다(같은 트랜잭션) |
-| 여기로 부르기 처리 순서(#271 · #272) | [팀장 결정 2026-11-14] SES-05 본문 here=true는 spotId · candidate와 함께 보낼 수 없다(422). 순서: stateVersion · 끝난 세션 · spotVersion · SpotChangeGuard(MEETING · 살아 있는 호출) → 마지막 차량 위치(vehicleLat · vehicleLng) 없으면 422 VALIDATION_FAILED(fields here) → 장소를 바꾼 뒤의 상태로 가드 판정(G2 · G3은 바로 확정하므로 통과로 보고 G1 · G4 · G5 · G6 검사)해 못 넘으면 409 CALL_GUARD_UNMET(error.unmet)이고 아무것도 바꾸지 않는다 → 임시 장소(이름 「차량 정차 위치」, stopPoint = meetingPoint = 차량 위치) 저장 → changeSpot → confirmRoute(totalMeters는 그대로 유지) → triggerType MANUAL Call 생성(joinCallMode와 상관없음, CALL 알림 기록 요청). 이벤트는 SPOT_CHANGED · SPOT_CONFIRMED · CALL_TRIGGERED 순서로 저장 · 발행 |
+| 여기로 부르기 처리 순서(#271 · #272) | [팀장 결정 2026-11-14] SES-05 본문 here=true는 spotId · candidate와 함께 보낼 수 없다(422). 순서: stateVersion · 끝난 세션 · spotVersion · SpotChangeGuard(MEETING · 살아 있는 호출) → 마지막 차량 위치(vehicleLat · vehicleLng) 없으면 422 VALIDATION_FAILED(fields here) → 장소를 바꾼 뒤의 상태로 가드 판정(G2 · G3은 바로 확정하므로 통과로 보고 G1 · G4 · G5 · G6 검사)해 못 넘으면 422 CALL_GUARD_UNMET(error.unmet, CALL-02와 같은 상태, 사람 결정 2026-11-14)이고 아무것도 바꾸지 않는다. 호출 보류(callHeld) 중이면 보류를 풀고 부르며, 경로를 처음 확정하면 DEPARTURE 알림도 보낸다(사람 결정 2026-11-14) → 임시 장소(이름 「차량 정차 위치」, stopPoint = meetingPoint = 차량 위치) 저장 → changeSpot → confirmRoute(totalMeters는 그대로 유지) → triggerType MANUAL Call 생성(joinCallMode와 상관없음, CALL 알림 기록 요청). 이벤트는 SPOT_CHANGED · SPOT_CONFIRMED · (첫 확정이면 DEPARTURE_NOTICE_SENT) · CALL_TRIGGERED 순서로 저장 · 발행. 보류 해제는 따로 이벤트를 남기지 않는다(CALL-01 DELETE와 같음) |
 | 해제된 자녀와 픽업 시작(#277) | 요청 일정이 모두 해제된 자녀(removed true)의 것이면 404 NOT_FOUND(사람 결정 2026-11-14). [팀장 결정 2026-11-14, 사람 확인 전] 해제된 자녀의 일정은 가장 먼저 빼고, 그 뒤 기기 검사(CHILD_DEVICE)와 「같은 세션이면 created false」 비교를 남은 일정으로 한다. 지난 세션 조회의 자녀 이름은 loadMember로 해제된 자녀 이름도 채운다 |
 | 세션 뷰 route.totalMeters(#274) | 결정됨: SES-04 요청에 totalMeters(0 이상 정수, 선택)를 더하고 pickup_session.route_total_meters에 저장한다. 확정 전이나 값이 없으면 null(사람 결정 2026-11-14). 다시 확정하면 요청 값으로 덮어쓰고 값이 없으면 null(팀장 결정 2026-11-14) |
 | 이벤트 payload의 시각 값 | [사람 결정 2026-11-09] etaAt · predictedStopAt · callNotBefore · nextAllowedAt 등은 +09:00 문자열 |
@@ -395,7 +431,7 @@ StartPickupServiceTest.픽업 시작은 해제된 자녀(removed true)의 일정
 | SES-08 SSE 요청 로그 · 비동기 실행기 | 03 요청 로깅은 SSE를 연결(stream=open) · 종료(stream=closed) 두 줄로 남김. 타임아웃 · 연결 끊김 · completeWithError 때 종료 줄의 status · errorCode와 MVC 비동기 실행기 설정 필요 여부를 SES-08 때 정해야 함 |
 
 ## 다음 단계
-- 도메인 리뷰: /tdd review pickup (기록 없음)
+- 도메인 리뷰: /tdd review pickup (2026-11-14 07:41 KST 리뷰 뒤에 체크 · 추가된 항목 #278, #279, #280, #281, #282, #283)
 - 커밋 · 푸시: /tdd commit (기능별 분할 커밋) · /tdd push (커밋 후 기능 브랜치 푸시)
 - 다음 도메인: 알림 (09_알림-notification.md). 시작: /tdd domain notification
 
@@ -407,6 +443,8 @@ StartPickupServiceTest.픽업 시작은 해제된 자녀(removed true)의 일정
 - user 병합 뒤 MemberInfo에 removed(D7 멤버 해제 삭제 표시)가 생김. removed=true 멤버를 pickup 알림 · 실시간 이벤트 받는 사람(SessionReceivers)과 세션 뷰 driver에서 뺄지 설계서에 없음. 사람 결정 필요(제안: 받는 사람 · driver에서 뺀다)
 - #269: candidate 경로 확정 때 세션 지금 장소를 못 찾으면(academyId를 읽을 수 없음) 422 SPOT_NOT_SAVED로 거절(구현자 임의 결정, 설계서 확인 필요). doc/PickupSessionApiDoc의 SES-04 설명에 candidate · totalMeters가 아직 없음
 - 여기로 부르기(#271): 호출 보류(callHeld true) 중에 here=true가 오면 막을지, 경로를 처음 확정하는 here일 때 자녀에게 DEPARTURE 알림을 보낼지 설계서에 없음. 사람 결정 필요
+- 도메인 리뷰 2026-11-14 [하] 문서 정리: 설계서 이벤트 종류 수 표기(19 · 21종)를 24종으로, 02 공통 규칙 네이티브 쿼리 예외 목록에 ProcessedVehicleEventJpaRepository(INSERT … ON CONFLICT) 추가, place findSpot이 임시 장소도 돌려줘 SES-04 · 05 spotId 경로에서 같은 가족의 지난 임시 spotId도 「저장한 장소」로 통과(SES-04가 임시 장소를 다시 확정하려면 필요, 설계서에 범위 명시 필요), 해제된 보호자는 user loadMembers가 이미 빼므로 받는 사람 · driver · 연락처에서 저절로 빠짐(앞선 removed 메모는 이것으로 해소), 해제된 자녀 이름 보강은 GetSessionService에만 있으나 RemoveMemberService가 진행 중 세션 자녀 해제를 막아 다른 세션 뷰에서는 생기지 않음
+- findSignalLost 쿼리에 boardingDetectedAt is null을 더했으나(리팩터링), 탑승 인식 세션을 쿼리가 빼는지 실제 DB로 확인하는 테스트는 RevokeSignalLostCallsSchedulerTest에 없음(#264는 서비스 단위 테스트로만 확인)
 - [팀장 결정 · 설정 키] 픽업 기준값은 application.yml `pickup.session.*` 하위 키로 둠(`pickup:` 아래는 이미 async · idempotency · jwt 등 앱 전체 설정). 롤백되면 저장하지 않는 이벤트(ETA_UPDATED)도 커밋 뒤 발행하지 않음
 - [service lane #94] AutoCompleteBoardingService에 테스트 전용 package-private 4인자 생성자가 남음(구현자는 테스트 생성 코드를 못 고침) — AutoCompleteBoardingServiceTest 생성 코드를 5인자(TransactionOperations)로 바꾸고 생성자를 하나로 정리할 것. 자동 완료 한 세션 실패 시 건너뛰기 테스트 없음, PickupProperties yml 바인딩 확인 테스트 없음
 - [리뷰 거리] (1) #137 테스트 보조 SseEmitterProbe를 src/test의 org.springframework.web.servlet.mvc.method.annotation 패키지에 둠(패키지 전용 API 접근용) — 스프링 버전이 바뀌면 깨질 수 있음 (2) #207로 auth · place · user 테스트 이름이 바뀌어 auth #98 · place #44 · user #64의 체크 증거 이름과 어긋남 — 해당 도메인 문서 증거 갱신 필요 (3) 04 · 05 · 07 설계서의 「임시 어댑터」 설명(user L8 · L202, auth L19 · L266, place L8 · L19 · L153)을 실제 위임으로 고칠 것 (4) seq 없는 이벤트(ETA_UPDATED 등)는 SSE에서 id 줄 없이 보냄 — 팀장 결정
