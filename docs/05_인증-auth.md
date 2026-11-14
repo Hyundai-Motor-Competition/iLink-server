@@ -297,8 +297,8 @@ void publishDeviceReplaced(List<Long> previousDeviceIds);                   // P
 - [x] [기반] ConsentType에 SERVICE_IMPROVEMENT가 있고, CHILD 필수 동의와 보호자 연결 필수 동의 어디에도 들어가지 않는다(선택 동의, #121의 기반)
 - [x] [persistence] Device를 refreshTokenExpiresAt과 함께 저장했다 다시 읽으면 refreshTokenExpiresAt이 같고, rotateRefreshToken(hash, expiresAt) 뒤 저장하면 새 만료 시각이 읽힌다(도메인 리뷰 11-14)
 - [x] [web] POST /v1/vehicle-links(LINK-04)와 POST /v1/invites/{token}/acceptance(FAM-06)에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려주고, pushToken을 빼면 201이다(AUTH-03과 같은 1~255자, 사람 결정 2026-11-14)
-- [ ] [서비스] 초대 발급 · 초대 조회 · 초대 수락은 대상 멤버가 해제된 멤버(user MemberInfo.removed true)면 404 NOT_FOUND로 거절하고 기기 · 토큰을 만들지 않는다(user D7 삭제 표시 뒤 후속, 사람 결정 2026-11-14)
-- [ ] [서비스] RevokeMemberDevicesUseCase(멤버 해제 때 호출)는 그 멤버의 기기 · 토큰과 함께 아직 쓰지 않은 초대도 폐기한다(사람 결정 2026-11-14)
+- [x] [서비스] 초대 발급 · 초대 조회 · 초대 수락은 대상 멤버가 해제된 멤버(user MemberInfo.removed true)면 404 NOT_FOUND로 거절하고 기기 · 토큰을 만들지 않는다(user D7 삭제 표시 뒤 후속, 사람 결정 2026-11-14)
+- [x] [서비스] RevokeMemberDevicesUseCase(멤버 해제 때 호출)는 그 멤버의 기기 · 토큰과 함께 아직 쓰지 않은 초대도 폐기한다(사람 결정 2026-11-14)
 
 ## 확인 필요 사항
 

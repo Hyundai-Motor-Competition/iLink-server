@@ -1,9 +1,9 @@
 # FOLLOWUP · 사용자 (user)
 
-- 생성: 2026-11-14 01:10 KST · tdd-guard
+- 생성: 2026-11-14 09:56 KST · tdd-guard
 - 상태: 완료 (체크 87/87 · 완료 기준 4/4)
-- 테스트: ● GREEN · 2773 passed · 전체 · 246s · .\gradlew.bat test --console=plain
-- 설계서: C:/pw/user/docs/04_사용자-user.md
+- 테스트: ● GREEN · 3045 passed · 전체 · 131s · .\gradlew.bat test --console=plain
+- 설계서: C:/pickup/docs/04_사용자-user.md
 
 ## 완료 항목
 - [x] #1 [기반] Role은 GUARDIAN · CO_GUARDIAN · DELEGATE · TEACHER · CHILD 다섯 값을 갖는다
@@ -85,14 +85,14 @@
 - [x] #77 [web] PUT /v1/families/me/child-location은 200과 childLocationEnabled · settingsVersion을 돌려주고, enabled가 없으면 422 VALIDATION_FAILED, CHILD · DELEGATE · TEACHER 토큰이면 403 FORBIDDEN을 돌려준다
 - [x] #78 [web] GET /v1/families/me와 LoadFamilyUseCase.findFamily의 FamilyInfo는 childLocationEnabled를 함께 돌려준다
 - [x] #79 [서비스] 가족 조회(FAM-01)는 저장된 Family의 childLocationEnabled를 FamilyResult에 그대로 옮긴다(true면 true)
-- [x] #80 [서비스] 멤버 해제(FAM-07)는 User 행을 지우지 않고 removedAt을 채운다(삭제 표시, D7 사람 결정 2026-11-13) ← RemoveMemberServiceTest.멤버 해제는 User 행을 지우지 않고 removedAt을 지금 시각으로 채워 저장하며 다른 값은 그대로 둔다, RemoveMemberServiceTest.이미 해제된(removedAt이 채워진) 멤버를 다시 해제하면 NOT_FOUND로 거절하고 저장 · 폐기를 하지 않는다
-- [x] #81 [persistence] 가족 멤버 조회(loadUsers · 다른 모듈용 멤버 조회)는 removedAt이 있는 멤버를 빼고 돌려준다 ← UserPersistenceAdapterTest.loadUsers는 removedAt이 있는 멤버를 빼고 그 가족의 해제되지 않은 멤버만 돌려준다, RemoveMemberServiceIntegrationTest.해제된 멤버는 다른 모듈용 findMembers에서 빠지고 findMember(userId)로는 이름 · role이 그대로 읽힌다
-- [x] #82 [서비스] 해제된 멤버는 가족 인원 한도 계산과 가족 조회(FAM-01) members에서 빠진다 ← UserPersistenceAdapterTest.countNonChildMembers는 removedAt이 있는 자녀 외 멤버를 세지 않는다, RemoveMemberServiceIntegrationTest.자녀 외 멤버 5명 중 1명을 해제하면 한도에 자리가 생겨 새 자녀 외 멤버 등록이 성공한다, RemoveMemberServiceIntegrationTest.해제된 멤버는 가족 조회(FAM-01) members에 나오지 않는다
-- [x] #83 [persistence] removedAt이 있는 User도 userId로 단건 조회하면 그대로 읽혀 지난 픽업 기록의 이름을 보여줄 수 있다 ← UserPersistenceAdapterTest.removedAt이 있는 User도 loadUser(userId)로 읽으면 이름 · role · removedAt이 그대로 나온다
-- [x] #84 [web] 자녀 등록(FAM-02) · 멤버 수정(FAM-03)은 선택 값 grade(1~20자, 예: 「중학교 2학년」)를 받아 저장하고 가족 조회(FAM-01) members[]에 grade를 담는다. 21자 이상이면 422 VALIDATION_FAILED(최종디자인 11/13 픽업일정등록1) ← FamilyControllerTest.GET /v1/families/me는 members[]마다 grade를 담고 grade가 없는 멤버는 "grade":null로 돌려준다, FamilyControllerTest.POST /v1/families/me/members에 grade를 보내면 RegisterMemberCommand의 grade로 유스케이스에 넘긴다, FamilyControllerTest.PATCH /v1/families/me/members/{userId}에 grade를 보내면 UpdateMemberCommand의 grade로 넘기고 응답에 grade를 담는다, UserPersistenceAdapterTest.User의 grade에 값을 넣어 저장하면 users.grade에 남고 loadUser · loadUsers로 다시 읽었을 때 같은 값이다
-- [x] #85 [서비스] 다른 모듈용 멤버 조회 in 포트는 멤버마다 profileImageUrl(사진 키 서명 URL 또는 기본 아바타 URL, 저장소 설정 없으면 null)을 함께 돌려준다(차량 · 자녀 화면 아바타용) ← LoadMemberServiceTest.findMember는 사진 키가 있는 멤버에게 그 키의 서명 URL을 profileImageUrl로 준다, LoadMemberServiceTest.findMember는 사진 키가 없는 멤버에게 기본 아바타 URL을 profileImageUrl로 준다, LoadMemberServiceTest.findMember는 저장소 설정이 없으면 profileImageUrl을 null로 준다, LoadMemberServiceTest.findMembers는 멤버마다 사진 키 서명 URL 또는 기본 아바타 URL을 profileImageUrl로 준다
-- [x] #86 [서비스] 다른 모듈용 멤버 조회(findMember · findMembers)의 MemberInfo는 removed(해제 여부)를 담는다. findMember는 해제된 멤버도 removed true로 돌려준다(사람 결정 2026-11-14) ← LoadMemberServiceTest.findMember는 해제된 멤버도 돌려주고 removed를 true로 담는다, LoadMemberServiceTest.findMember는 해제되지 않은 멤버의 removed를 false로 담는다
-- [x] #87 [서비스] 멤버 수정(FAM-03)은 해제된(removedAt이 있는) 멤버면 404 NOT_FOUND로 거절하고 저장하지 않는다(사람 결정 2026-11-14) ← UpdateMemberServiceTest.이미 해제된(removedAt이 있는) 멤버를 수정하려 하면 NOT_FOUND로 거절하고 저장하지 않는다
+- [x] #80 [서비스] 멤버 해제(FAM-07)는 User 행을 지우지 않고 removedAt을 채운다(삭제 표시, D7 사람 결정 2026-11-13)
+- [x] #81 [persistence] 가족 멤버 조회(loadUsers · 다른 모듈용 멤버 조회)는 removedAt이 있는 멤버를 빼고 돌려준다
+- [x] #82 [서비스] 해제된 멤버는 가족 인원 한도 계산과 가족 조회(FAM-01) members에서 빠진다
+- [x] #83 [persistence] removedAt이 있는 User도 userId로 단건 조회하면 그대로 읽혀 지난 픽업 기록의 이름을 보여줄 수 있다
+- [x] #84 [web] 자녀 등록(FAM-02) · 멤버 수정(FAM-03)은 선택 값 grade(1~20자, 예: 「중학교 2학년」)를 받아 저장하고 가족 조회(FAM-01) members[]에 grade를 담는다. 21자 이상이면 422 VALIDATION_FAILED(최종디자인 11/13 픽업일정등록1)
+- [x] #85 [서비스] 다른 모듈용 멤버 조회 in 포트는 멤버마다 profileImageUrl(사진 키 서명 URL 또는 기본 아바타 URL, 저장소 설정 없으면 null)을 함께 돌려준다(차량 · 자녀 화면 아바타용)
+- [x] #86 [서비스] 다른 모듈용 멤버 조회(findMember · findMembers)의 MemberInfo는 removed(해제 여부)를 담는다. findMember는 해제된 멤버도 removed true로 돌려준다(사람 결정 2026-11-14)
+- [x] #87 [서비스] 멤버 수정(FAM-03)은 해제된(removedAt이 있는) 멤버면 404 NOT_FOUND로 거절하고 저장하지 않는다(사람 결정 2026-11-14)
 
 ## 미완료 항목
 - 없음
@@ -104,31 +104,10 @@
 - [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-14 01:05 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 2 · 하 12 · 리뷰 시점 체크 87/87
-- 리뷰 시점 테스트: ● GREEN · 2773 passed · 전체 · 244s · .\gradlew.bat test --console=plain
-  - 결론: 조건부 통과
-  - user 도메인에는 동작을 바꿔야 하는 [상]이 없습니다. 다만 해제된 멤버를 막는 처리가 auth · schedule · pickup에 아직 없어서, 그 항목들이 처리될 때까지 운영에 배포하면 안 됩니다.
-  - [중] 해제된 멤버가 아직 쓰지 않은 초대를 수락하면 새 기기와 토큰을 받을 수 있음 — main에서 MemberInfo.removed()를 쓰는 곳 0건, AcceptInviteService.java:45 · IssueInviteService.java:61 · GetInviteService.java:30이 findMember 결과를 그대로 씀. 05 #125 · #126 미체크 → note(auth에서 먼저 처리, 그 전 배포 금지)
-  - [중] schedule · pickup이 findMember로 해제된 자녀를 통과시킴 — FamilyChildGuard.java:15, StartPickupService.java:104. 06 #84 · 08 #276 미체크. 설정 요약(SET-07, GetSetupSummaryService.java:42)에서 해제된 자녀를 어떻게 다룰지는 06 항목에 없음 → 사람 결정
-  - [하] 스웨거 SET-06 설명 「다음 세션부터 적용된다」가 설계서와 반대 — FamilyApiDoc.java:74 → 리팩터링
-  - [하] 스웨거에 이번 변경분이 빠짐: FAM-02 · FAM-03 grade(1~20자), FAM-01 해제 멤버 제외, FAM-03 · FAM-07 해제된 멤버 404 — FamilyApiDoc.java:27 · :33 · :56 · :64 · :69 → 리팩터링
-  - [하] 주석 규칙(02:80) 위반 2건 — ProfileImageUrls.java:13 Javadoc, PickupActivityAdapter.java:8 → 리팩터링
-  - [하] 테스트에서만 쓰는 보조 생성자 · with 메서드가 main에 늘어남 — MemberInfo 5인자, MemberResult 6인자 · withGrade, UpdateMemberCommand 7인자 · withGrade, User.restore 5 · 6 · 7인자 → note
-  - [하] SaveUserPort.deleteUser를 main에서 부르는 곳이 없고 어댑터 테스트도 없음 → 사람 결정(지울지)
-  - [하] prod DDL 문장이 없음. 제안: ALTER TABLE users ADD COLUMN removed_at TIMESTAMPTZ NULL, ADD COLUMN grade VARCHAR(20) NULL; → note
-  - [하] 해제된 CO_GUARDIAN · DELEGATE도 access token이 살아 있는 30분 동안 FAM-01~03 · SET-06 · SET-11을 호출할 수 있음 — access-ttl PT30M, 요청마다 폐기 확인 없음 → note(범위를 넓혀 기록)
-  - [하] findMember · findMembers가 멤버마다 서명 URL을 만듦. 이름만 쓰는 pickup · schedule 호출도 서명 비용을 내고, 서명 실패 시 503 STORAGE_UNAVAILABLE 경로가 새로 생김 → note
-  - [하] users.family_id 조회 인덱스 없음(findByFamilyIdAndRemovedAtIsNullOrderByUserIdAsc) → note(기존 메모 유지)
-  - [하] FOLLOWUP user.md 후속 과제 23건 중 해소된 것이 그대로 남아 있음 → note(정리)
-  - [하] TODO.md에서 공유모듈이 「완료 · 리뷰 조건부 통과」에서 「대기 · 기록 없음 · 0/4」로 바뀜. 이 worktree에 shared 리뷰 기록이 없어서인지 미확인 → 사람 확인
-  - [하] 체크된 #76 문장이 아직 옛 이름 「SET-07」을 씀(지금은 SET-11) → note(기존 메모 유지)
-  - 완료 기준:
-  - C1 충족 — 87/87 체크, GREEN 2773 passed.
-  - C2 충족 — removedAt 삭제 표시, 조회 · 한도에서 해제 멤버 제외, 단건 조회는 해제 멤버도 읽음, 해제 멤버 수정 · 재해제 404, grade, MemberInfo profileImageUrl · removed가 설계서 04와 맞음. 스웨거 문구만 2건 어긋남([하]).
-  - C3 사람 확인 필요 — 검토는 끝남. 공통 규칙 위반은 주석 2건(02:80, [하]).
-  - C4 충족 — 확인 필요 사항 14행이 FOLLOWUP에 있음. 열린 것은 「settingsVersion을 올리는 변경의 범위」 하나이고 기록돼 있음.
-  - 후속 과제 상태(요약): 남음 — 해제 멤버 초대(auth #125 · #126), 해제 멤버 token TTL 동안 접근, LoadMemberService.sorted 중복, child_location ALTER · FamilyEntity @Version 없음, FamilyApiDoc:74 문구, child-location Idempotency 테스트, 번호판 채우는 시점, 키 교체 방법, 가족당 연결 차량 1대, 중복 VIN 500, service 형식 직접 확인, 필터 순서 · familyId null · PATCH null 구분, 동시성 · 인덱스 · web 오류 행 테스트, 같은 차량 동시 해제 500 · versionToSave 폴백 · 02:216 픽스처 문구, UserErrors.java:1…
-  - 테스트: scope all GREEN 2773 passed.
+- 2026-11-14 09:52 KST · 사람 · 결론 생략 · 상 0 · 중 0 · 하 0 · 리뷰 시점 체크 87/87
+- 리뷰 시점 테스트: ● GREEN · 3039 passed · 전체 · 134s · .\gradlew.bat test --console=plain
+  - 결론: 생략
+  - 사람이 도메인 리뷰를 생략
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |

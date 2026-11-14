@@ -1,8 +1,8 @@
 # FOLLOWUP · 공유모듈 (shared)
 
-- 생성: 2026-11-14 00:02 KST · tdd-guard
+- 생성: 2026-11-14 09:50 KST · tdd-guard
 - 상태: 완료 (체크 72/72 · 완료 기준 4/4)
-- 테스트: ● GREEN · 2738 passed · 전체 · 161s · .\gradlew.bat test --console=plain
+- 테스트: ● GREEN · 3039 passed · 전체 · 134s · .\gradlew.bat test --console=plain
 - 설계서: C:/pickup/docs/03_공유모듈-shared.md
 
 ## 완료 항목

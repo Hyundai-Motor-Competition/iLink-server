@@ -1,9 +1,9 @@
 # FOLLOWUP · 인증 (auth)
 
-- 생성: 2026-11-14 01:13 KST · tdd-guard
-- 상태: 진행 중 (체크 128/128 · 완료 기준 3/4)
-- 테스트: ● GREEN · 2772 passed · 전체 · 238s · .\gradlew.bat test --console=plain
-- 설계서: C:/pw/auth/docs/05_인증-auth.md
+- 생성: 2026-11-14 10:15 KST · tdd-guard
+- 상태: 완료 (체크 130/130 · 완료 기준 4/4)
+- 테스트: ● GREEN · 3045 passed · 전체 · 131s · .\gradlew.bat test --console=plain
+- 설계서: C:/pickup/docs/05_인증-auth.md
 
 ## 완료 항목
 - [x] #1 [기반] LinkCode는 발급 시각 + 5분을 expiresAt으로 갖고 status ISSUED로 시작한다
@@ -126,43 +126,54 @@
 - [x] #118 [persistence] vehicle.version 컬럼은 NOT NULL에 기본값 0을 가진다(행이 있는 DB에도 컬럼을 추가할 수 있음)
 - [x] #119 [web] POST /v1/vehicle-link-codes를 연결 전 토큰(familyId 없음)으로 부르는데 차량이 이미 가족에 연결돼 있으면 409 VEHICLE_ALREADY_LINKED를 돌려준다
 - [x] #120 [web] POST /v1/families/me/members/{userId}/invites의 대상 멤버가 GUARDIAN이면 403 FORBIDDEN을 돌려준다
-- [x] #121 [web] 초대 수락(FAM-06)과 연결 승인(LINK-04)의 consents에 SERVICE_IMPROVEMENT(선택 동의)를 보낼 수 있고, 빠져도 수락 · 승인은 성공한다(C00 · 가족 프로필 등록4 「(선택) 서비스 개선」) ← InviteControllerTest.POST /v1/invites/{token}/acceptance의 consents에 SERVICE_IMPROVEMENT를 담아도 201을 돌려주고 그대로 넘긴다, InviteControllerTest.POST /v1/invites/{token}/acceptance의 consents에서 SERVICE_IMPROVEMENT가 빠져도 201을 돌려준다, VehicleLinkCodeControllerTest.POST /v1/vehicle-links의 consents에 SERVICE_IMPROVEMENT를 담아도 201을 돌려주고 그대로 넘긴다, VehicleLinkCodeControllerTest.POST /v1/vehicle-links의 consents에서 SERVICE_IMPROVEMENT가 빠져도 201을 돌려준다
-- [x] #122 [서비스] refresh 토큰은 발급 14일(P14D) 뒤 만료되고, 만료된 refresh 토큰으로 POST /v1/auth/refresh를 부르면 유효하지 않은 refresh 토큰과 같은 401로 거절한다(사람 결정 2026-11-13) ← RefreshTokenServiceTest.refresh 토큰 만료 시각이 지난 기기의 토큰으로 갱신하면 REFRESH_TOKEN_INVALID로 거절하고 아무것도 저장하지 않는다, RefreshTokenServiceTest.refresh 토큰 만료 시각과 같은 순간에 갱신하면 만료로 보고 REFRESH_TOKEN_INVALID로 거절한다, RefreshTokenServiceTest.refresh 토큰 만료 1초 전에 갱신하면 성공하고 기기의 refresh 만료 시각은 발급자가 준 발급 시각 + 14일로 바뀐다, RefreshTokenServiceTest.refresh 토큰 만료 시각이 없는 옛 기기의 토큰으로 갱신하면 REFRESH_TOKEN_INVALID로 거절한다
-- [x] #123 [통합] access 토큰 유효 기간 PT30M · refresh 토큰 유효 기간 P14D는 application.yml 설정값으로 두고, 발급한 access 토큰의 exp가 발급 시각 + 30분이다 ← JwtTokenIssuerTest.고정 시각에 발급하면 access 토큰 만료는 발급 시각 + 30분(exp claim · accessTokenExpiresAt)이고 refresh 토큰 만료는 발급 시각 + 14일이다, JwtTokenIssuerTest.application.yml의 pickup.jwt.access-ttl은 PT30M, pickup.jwt.refresh-ttl은 P14D이고 dev · prod 프로필도 그대로다, JwtTokenIssuerTest.JwtTokenIssuer의 생성자는 하나이고 access · refresh 유효 기간을 @Value로 pickup.jwt.access-ttl · pickup.jwt.refresh-ttl 설정에서 받는다
-- [x] #124 [web] GET /v1/vehicle-link-codes/by-code/{code}(LINK-03)가 같은 기기 5번 실패 뒤면 429 LINK_CODE_ATTEMPT_LIMIT과 error.retryAfterSeconds(차단이 풀릴 때까지 남은 초)를 돌려준다(D3) ← VehicleLinkCodeControllerTest.GET /v1/vehicle-link-codes/by-code/{code}가 같은 기기 5번 실패 뒤면 429 LINK_CODE_ATTEMPT_LIMIT과 retryAfterSeconds 42를 돌려준다
-- [x] #125 [기반] Device는 refreshTokenExpiresAt을 갖고(DeviceEntity refresh_token_expires_at TIMESTAMPTZ, 값이 없는 옛 행을 위해 NULL 허용), restore · register가 그 값을 받으며, rotateRefreshToken(hash, expiresAt)은 해시와 만료 시각을 함께 바꾸고, isRefreshTokenExpired(now)는 now가 만료 시각 이상이거나 값이 없으면 true다(#122의 기반) ← DeviceTest.Device.restore는 저장된 refreshTokenExpiresAt을 그대로 가진 객체를 만들고, 값이 없던 옛 행은 비운 채로 만든다, DeviceTest.Device.rotateRefreshToken(hash, expiresAt)은 refreshTokenHash와 refreshTokenExpiresAt을 함께 바꾸고 다른 값은 그대로 둔다, DeviceTest.Device.register는 받은 refreshTokenExpiresAt을 그대로 가진 객체를 만든다, DeviceTest.Device.isRefreshTokenExpired는 만료 시각 1초 전이면 false, 만료 시각과 같거나 지나면 true다, DeviceTest.Device.isRefreshTokenExpired는 refreshTokenExpiresAt이 없으면 true다, AuthPersistenceEntitiesMappingTest.device 테이블은 값이 없는 옛 행을 위해 NULL을 허용하는 refresh_token_expires_at TIMESTAMPTZ 컬럼을 갖는다, AuthPersistenceEntitiesTest.DeviceEntity는 NULL을 허용하는 Instant 필드 refreshTokenExpiresAt을 갖는다
-- [x] #126 [기반] ConsentType에 SERVICE_IMPROVEMENT가 있고, CHILD 필수 동의와 보호자 연결 필수 동의 어디에도 들어가지 않는다(선택 동의, #121의 기반) ← ConsentsTest.동의 종류는 TERMS · PRIVACY · MARKETING · LOCATION · PUSH · SERVICE_IMPROVEMENT 여섯 가지다, ConsentsTest.SERVICE_IMPROVEMENT는 보호자 연결 필수 동의에 들어가지 않는다
-- [x] #127 [persistence] Device를 refreshTokenExpiresAt과 함께 저장했다 다시 읽으면 refreshTokenExpiresAt이 같고, rotateRefreshToken(hash, expiresAt) 뒤 저장하면 새 만료 시각이 읽힌다(도메인 리뷰 11-14) ← AuthPersistenceAdapterTest.Device를 refreshTokenExpiresAt과 함께 저장했다 다시 읽으면 값이 같고, rotateRefreshToken(hash, expiresAt) 뒤 저장하면 새 만료 시각이 읽힌다
-- [x] #128 [web] POST /v1/vehicle-links(LINK-04)와 POST /v1/invites/{token}/acceptance(FAM-06)에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려주고, pushToken을 빼면 201이다(AUTH-03과 같은 1~255자, 사람 결정 2026-11-14) ← VehicleLinkCodeControllerTest.POST /v1/vehicle-links에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려준다, VehicleLinkCodeControllerTest.POST /v1/vehicle-links의 multipart request 파트에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려준다, VehicleLinkCodeControllerTest.POST /v1/vehicle-links에 pushToken을 빼면 201을 돌려주고 pushToken null을 넘긴다, InviteControllerTest.POST /v1/invites/{token}/acceptance에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려준다, InviteControllerTest.POST /v1/invites/{token}/acceptance는 pushToken 없이도 201을 돌려주고 pushToken null을 넘긴다
+- [x] #121 [web] 초대 수락(FAM-06)과 연결 승인(LINK-04)의 consents에 SERVICE_IMPROVEMENT(선택 동의)를 보낼 수 있고, 빠져도 수락 · 승인은 성공한다(C00 · 가족 프로필 등록4 「(선택) 서비스 개선」)
+- [x] #122 [서비스] refresh 토큰은 발급 14일(P14D) 뒤 만료되고, 만료된 refresh 토큰으로 POST /v1/auth/refresh를 부르면 유효하지 않은 refresh 토큰과 같은 401로 거절한다(사람 결정 2026-11-13)
+- [x] #123 [통합] access 토큰 유효 기간 PT30M · refresh 토큰 유효 기간 P14D는 application.yml 설정값으로 두고, 발급한 access 토큰의 exp가 발급 시각 + 30분이다
+- [x] #124 [web] GET /v1/vehicle-link-codes/by-code/{code}(LINK-03)가 같은 기기 5번 실패 뒤면 429 LINK_CODE_ATTEMPT_LIMIT과 error.retryAfterSeconds(차단이 풀릴 때까지 남은 초)를 돌려준다(D3)
+- [x] #125 [기반] Device는 refreshTokenExpiresAt을 갖고(DeviceEntity refresh_token_expires_at TIMESTAMPTZ, 값이 없는 옛 행을 위해 NULL 허용), restore · register가 그 값을 받으며, rotateRefreshToken(hash, expiresAt)은 해시와 만료 시각을 함께 바꾸고, isRefreshTokenExpired(now)는 now가 만료 시각 이상이거나 값이 없으면 true다(#122의 기반)
+- [x] #126 [기반] ConsentType에 SERVICE_IMPROVEMENT가 있고, CHILD 필수 동의와 보호자 연결 필수 동의 어디에도 들어가지 않는다(선택 동의, #121의 기반)
+- [x] #127 [persistence] Device를 refreshTokenExpiresAt과 함께 저장했다 다시 읽으면 refreshTokenExpiresAt이 같고, rotateRefreshToken(hash, expiresAt) 뒤 저장하면 새 만료 시각이 읽힌다(도메인 리뷰 11-14)
+- [x] #128 [web] POST /v1/vehicle-links(LINK-04)와 POST /v1/invites/{token}/acceptance(FAM-06)에 pushToken을 빈 문자열로 보내면 422 VALIDATION_FAILED와 fields의 pushToken을 돌려주고, pushToken을 빼면 201이다(AUTH-03과 같은 1~255자, 사람 결정 2026-11-14)
+- [x] #129 [서비스] 초대 발급 · 초대 조회 · 초대 수락은 대상 멤버가 해제된 멤버(user MemberInfo.removed true)면 404 NOT_FOUND로 거절하고 기기 · 토큰을 만들지 않는다(user D7 삭제 표시 뒤 후속, 사람 결정 2026-11-14) ← IssueInviteServiceTest.초대 발급은 대상 멤버가 해제된 멤버(removed true)면 NOT_FOUND로 거절하고 초대를 만들지 않는다
+GetInviteServiceTest.초대 확인은 대상 멤버가 해제된 멤버(removed true)면 NOT_FOUND로 거절한다
+AcceptInviteServiceTest.초대 수락은 대상 멤버가 해제된 멤버(removed true)면 NOT_FOUND로 거절하고 기기 · 토큰을 만들지 않는다
+- [x] #130 [서비스] RevokeMemberDevicesUseCase(멤버 해제 때 호출)는 그 멤버의 기기 · 토큰과 함께 아직 쓰지 않은 초대도 폐기한다(사람 결정 2026-11-14) ← RevokeMemberDevicesServiceTest.revokeDevicesOf는 그 멤버의 아직 쓰지 않은 초대도 폐기해 그 토큰으로 확인 · 수락할 수 없게 한다
+RevokeMemberDevicesServiceTest.revokeDevicesOf는 살아 있는 기기가 없어도 그 멤버의 쓰지 않은 초대를 폐기한다
+RevokeMemberDevicesServiceTest.revokeDevicesOf는 이미 쓴 초대와 다른 멤버의 초대는 그대로 둔다
 
 ## 미완료 항목
 - 없음
 
 ## 완료 기준 (공통 규칙 문서)
-- [ ] C1 설계서의 테스트 케이스가 모두 GREEN
+- [x] C1 설계서의 테스트 케이스가 모두 GREEN
 - [x] C2 구현이 설계서의 API 명세 · 핵심 로직과 일치
 - [x] C3 리뷰어 검토 완료, 공통 규칙 위반 없음
 - [x] C4 설계서의 확인 필요 사항이 해소되거나 FOLLOWUP에 기록됨
 
 ## 도메인 리뷰
-- 2026-11-14 01:12 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 2 · 하 8 · 리뷰 시점 체크 128/128
-- 리뷰 시점 테스트: ● GREEN · 2772 passed · 전체 · 238s · .\gradlew.bat test --console=plain
+- 2026-11-14 10:03 KST · 도메인 리뷰어 · 결론 조건부 통과 · 상 0 · 중 3 · 하 11 · 리뷰 시점 체크 130/130
+- 리뷰 시점 테스트: ● GREEN · 3045 passed · 전체 · 131s · .\gradlew.bat test --console=plain
   - 결론: 조건부 통과
-  - 이전 리뷰(11-14 00:52) 지적: [중] 6건 중 5건 해소(RevokeVehicleDevicesServiceTest 고정 Clock · 만료 NOW+3일, #127 저장 · 읽기 테스트, 옛 오버로드 5개 삭제, 05 본문 반영, LoadPushTargetByDeviceUseCase 시그니처). [하] sliding 만료(사람 결정) · AuthSeed · 주석 · LoadPushTargetService 중복 · Idempotency-Key @Parameter · 빈 pushToken(#128) 해소. TODO · REVIEW 기록, AuthInPortsTest 시그니처, 운영 DDL · FK 표기 · profile.md:104는 남음.
-  - [중] 진행 기록이 아직 되돌아가 있음. TODO.md:12는 shared를 「대기 · 완료 기준 0/4」로, REVIEW.md:8은 「리뷰 없음」으로 적음. HEAD에는 「완료 · 4/4 · 리뷰 11-14 00:02 조건부 통과」 → note(커밋 전에 HEAD의 shared 줄을 되살릴 것)
-  - [중] #1~#120 증거 기록이 그대로 없음. auth.md 증거 8/128건. 108/120건은 항목 문장과 같은 DisplayName이 있음. 12건(#26 #31 #70 #72 #98 #103 #104 #105 #115 #116 #117 #118)은 이름이 다른 테스트로 이어짐 → 사람 결정(7b20627 기록을 되살리거나 12건 증거를 다시 연결)
-  - [하] LINK-04 · FAM-06은 공백만 있는 pushToken("   ")을 받음. ApproveLinkRequest:19 · AcceptInviteRequest:14는 @Size(min = 1), AUTH-03은 UpdatePushTokenRequest:11 @NotBlank. LoadPushTargetService:47은 isEmpty만 걸러 공백 토큰도 푸시 대상 → 사람 결정
-  - [하] 05 API 표 LINK-04(05:76) · FAM-06(05:79) pushToken에 1~255자 제한 표기가 없음 → note(문서)
-  - [하] #127 테스트 마지막 단언(AuthPersistenceAdapterTest:105-106)은 DB를 거치지 않는 도메인 확인이라 항목과 관계없음 → 리팩터링(단언 삭제)
-  - [하] FOLLOWUP 낡은 문장: auth.md:219 「access PT30M 임시값, refresh 만료 미구현」, profile.md:104 → note
-  - [하] 운영 DDL SQL 파일 없음(device.refresh_token_expires_at, vehicle.version). 05:31 · 46 「FK」와 02:145 「DB FK 제약 없음」 불일치 → note
-  - [하] (지난 리뷰부터) RevokeVehicleDevicesUseCase · LoadPushTargetByDeviceUseCase 시그니처 테스트가 auth port 테스트에 없음 → 항목 추가(선택)
-  - [하] LoadPushTargetService:33 filter(Device::isLive) 중복 → 리팩터링
-  - [하] #121~#128 작업 49개 파일이 커밋 전 → note
-  - 확인한 것: 토큰을 내는 경로 5곳이 모두 DeviceTokenRotator:17-18을 거쳐 refreshTokenExpiresAt을 채움. RefreshTokenService:39 경계값을 RefreshTokenServiceTest:192-252가 검증. JwtTokenIssuer:39-56 refresh-ttl @Value, application.yml:47 P14D.
-  - 완료 기준: C1 사람 확인 필요(128/128 체크, GREEN 2772 passed, 증거 기록 8/128) / C2 충족 / C3 충족 / C4 충족
-  - 테스트: GREEN 2772 passed · 238s
-- 이전 리뷰: 2026-11-14 00:52 KST (조건부 통과)
+  - 동작을 바꿔야 하는 [상]은 없습니다. #129 · #130 구현과 테스트는 항목 문장과 맞고, 추가된 테스트 4개 모두 해당 코드를 빼면 실패합니다. 남은 것은 404/410 순서에 대한 사람 결정, 작업 트리의 진행 기록 되돌림, 지난 리뷰의 [하]입니다.
+  - [중] 해제된 멤버의 초대 조회 · 수락이 보통 흐름에서는 404가 아니라 410 INVITE_EXPIRED로 끝남 — FAM-07이 #130으로 초대를 먼저 폐기(RevokeMemberDevicesService.java:38-45, expiresAt=now)하고, 조회 · 수락은 초대 검사(InviteRules.java:20-30)를 해제 검사(GetInviteService.java:32, AcceptInviteService.java:47)보다 먼저 함. 404는 폐기되지 않은 초대(동시 FAM-04, 옛 데이터)에서만 남. 이미 쓴 초대는 409 → 사람 결정
+  - [중] 작업 트리의 진행 기록이 HEAD보다 뒤로 돌아감 — docs/followup/auth.md에서 #121~#128 증거 8건과 이전 도메인 리뷰 기록(11-14 01:12 조건부 통과 등)이 지워짐. REVIEW.md:11 · 13은 schedule · pickup을 「리뷰 없음」으로 적음(schedule.md:108 · pickup.md:327에는 기록 있음). user.md도 #80~#87 증거와 도메인 리뷰어 기록이 사라짐 → note
+  - [중] #1~#120 증거 기록이 여전히 없음(auth.md 증거 2/130) → 사람 결정(기존 메모)
+  - [하] 초대 폐기 코드 중복 — RevokeMemberDevicesService.java:38-45와 IssueInviteService.java:74-81 → 리팩터링(InviteRules로 합치기)
+  - [하] #130은 가장 최근 초대 1건만 폐기. 동시 FAM-04 두 번이면 살아 있는 초대 2개 가능. 수락은 #129에서 404로 막힘 → note
+  - [하] 05 본문에 #129 · #130 미반영(시그니처 주석 revokeDevicesOf, 「초대」 절 FAM-04~06 404) → note(문서)
+  - [하] InviteApiDoc.java:24 · 31 · 40 404 설명에 「해제된 멤버」 없음 → 리팩터링
+  - [하] RevokeMemberDevicesServiceTest.java:161-162 쓰지 않는 loadInviteByToken stub, 첫 테스트 DisplayName이 isExpired만 확인 → 리팩터링
+  - [하] FAM-07 HTTP → member_invite.expires_at → FAM-05 410 통합 테스트 없음 → 항목 추가(선택)
+  - [하] RefreshTokenService.java:52-55는 member.removed()를 보지 않음. 해제 멤버 차단은 FAM-07 기기 폐기에만 기댐 → note
+  - [하] 지난 리뷰 지적 그대로 — AuthPersistenceAdapterTest.java:104-105, LoadPushTargetService.java:33 filter 중복, AuthInPortsTest 시그니처 검사 누락 → 리팩터링
+  - [하] 05:31 · 46 「FK」와 02:145 「DB FK 제약 없음」 불일치, 운영 DDL SQL 파일 없음 → note(기존 메모)
+  - [하] 낡은 FOLLOWUP 문장 — profile.md:104, auth.md:206, user.md:136-137 → note
+  - [하] member_invite.user_id 인덱스 없음 → note(기존 메모)
+  - 완료 기준:
+  - C1 사람 확인 필요 — 체크 130/130, GREEN 3045 passed. 증거 기록은 #129 · #130만 있음
+  - C2 충족 — 410/404 순서만 사람 결정
+  - C3 충족 — 공통 규칙 위반 없음
+  - C4 충족 — 확인 필요 사항 27행이 auth.md에 있음. 미결 사람 결정 5건은 남음 상태로 기록됨
 
 ## 확인 필요 사항 (설계서)
 | 항목 | 현재 가정 |
@@ -202,6 +213,9 @@
 - 다음 도메인: 일정 (06_일정-schedule.md). 시작: /tdd domain schedule
 
 ## 후속 과제
+- [사람 결정 2026-11-14] 해제된 멤버의 초대 조회 · 수락은 #130 폐기 뒤 410 INVITE_EXPIRED 그대로 둔다(404는 폐기되지 않은 초대에서만). 05 「초대」 절 FAM-04~06과 시그니처 주석 revokeDevicesOf에 #129 · #130 반영 필요
+- [auth 도메인 리뷰 11-14 하] 리팩터링 남음: 초대 폐기 중복(RevokeMemberDevicesService:38-45 · IssueInviteService:74-81 → InviteRules), InviteApiDoc 404 설명에 해제된 멤버 추가, RevokeMemberDevicesServiceTest 미사용 stub. RefreshTokenService가 member.removed()를 안 봄(해제 차단은 기기 폐기에만 기댐). member_invite.user_id 인덱스 없음. FAM-07→FAM-05 410 통합 테스트 없음(선택)
+- [auth 도메인 리뷰 11-14 중] main에서 tdd-guard가 다시 만든 followup(auth.md · user.md · REVIEW.md)은 작업 트리에서 받은 증거 · 리뷰 기록이 빠짐. 이전 기록은 docs/followup/archive/에 HEAD 판으로 보관. #1~#120 증거 재연결은 사람 결정 대기
 - auth lane worktree(lane/auth/service · lane/auth/web)는 옛 커밋(202커밋 뒤, 고유 커밋 없음)에서 다시 쓰여 남은 항목 #121~#126은 메인 폴더(feature/auth)에서 순차 진행. lane worktree · 브랜치 정리는 사람이 판단.
 - 운영 배포 전 device.refresh_token_expires_at(TIMESTAMPTZ, NULL 허용) 컬럼을 운영 DB에 직접 추가해야 한다(prod ddl-auto validate). 값이 없는 옛 기기는 refresh 만료로 보아 다시 로그인해야 한다.
 - [auth 리뷰 11-14 · 중] 커밋 전 확인: 작업 트리의 docs/followup/TODO.md가 shared를 「완료 · 4/4 · 리뷰 11-14 조건부 통과」에서 「대기 · 0/4」로 되돌림. REVIEW.md:10도 auth 120/124 · 리뷰 없음. 커밋 때 shared 기록을 되살릴 것. #1~#120 증거 기록은 d7ff790이 다른 폴더 상태로 auth.md를 다시 만들며 사라짐(7b20627에 120/120, 112건은 지금 이름 그대로)
