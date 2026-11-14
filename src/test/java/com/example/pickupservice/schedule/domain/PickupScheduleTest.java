@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PickupScheduleTest {
 
+	private static final long FAMILY_ID = 3L;
 	private static final long CHILD_USER_ID = 7L;
 	private static final LatLng LOCATION = new LatLng(37.5665, 126.9780);
 	private static final LatLng ENTRANCE = new LatLng(37.5666, 126.9781);
@@ -129,12 +130,43 @@ class PickupScheduleTest {
 		assertThat(schedule.targetPickupTime()).isEqualTo(LocalTime.of(18, 30));
 	}
 
+	@Test
+	@DisplayName("rejudgedWith는 출입구 있는 학원으로 다시 판정하면 DRAFT 일정을 READY로 바꾸고 나머지 값은 그대로 둔다")
+	void rejudgedWithAcademyHavingEntranceMakesDraftScheduleReady() {
+		PickupSchedule draft = PickupSchedule.restore(55L, CHILD_USER_ID, academyWithoutEntrance(), MON_WED_FRI, SIX_PM, 5,
+				ScheduleStatus.DRAFT);
+		Academy withEntrance = academyWithEntrance();
+
+		PickupSchedule rejudged = draft.rejudgedWith(withEntrance);
+
+		assertThat(rejudged.getStatus()).isEqualTo(ScheduleStatus.READY);
+		assertThat(rejudged.getAcademy()).isSameAs(withEntrance);
+		assertThat(rejudged.getScheduleId()).isEqualTo(55L);
+		assertThat(rejudged.getChildUserId()).isEqualTo(CHILD_USER_ID);
+		assertThat(rejudged.getWeekdays()).containsExactlyInAnyOrderElementsOf(MON_WED_FRI);
+		assertThat(rejudged.getClassEndTime()).isEqualTo(SIX_PM);
+		assertThat(rejudged.getTargetPickup()).isEqualTo(5);
+	}
+
+	@Test
+	@DisplayName("rejudgedWith는 출입구 없는 학원으로 다시 판정하면 READY 일정을 DRAFT로 바꾼다")
+	void rejudgedWithAcademyWithoutEntranceMakesReadyScheduleDraft() {
+		PickupSchedule ready = PickupSchedule.restore(56L, CHILD_USER_ID, academyWithEntrance(), MON_WED_FRI, SIX_PM, 10,
+				ScheduleStatus.READY);
+
+		PickupSchedule rejudged = ready.rejudgedWith(academyWithoutEntrance());
+
+		assertThat(rejudged.getStatus()).isEqualTo(ScheduleStatus.DRAFT);
+		assertThat(rejudged.getScheduleId()).isEqualTo(56L);
+		assertThat(rejudged.getTargetPickup()).isEqualTo(10);
+	}
+
 	private static Academy academyWithEntrance() {
-		return Academy.create("kakao:12345", "한빛수학학원", "서울 중구 세종대로 110", LOCATION, ENTRANCE, "+8221234567");
+		return Academy.create(FAMILY_ID, "kakao:12345", "한빛수학학원", "서울 중구 세종대로 110", LOCATION, ENTRANCE, "+8221234567");
 	}
 
 	private static Academy academyWithoutEntrance() {
-		return Academy.create("kakao:12345", "한빛수학학원", "서울 중구 세종대로 110", LOCATION, null, "+8221234567");
+		return Academy.create(FAMILY_ID, "kakao:12345", "한빛수학학원", "서울 중구 세종대로 110", LOCATION, null, "+8221234567");
 	}
 
 	private static void assertInvalidSchedule(ThrowingCallable call, String field, String reason) {

@@ -22,6 +22,7 @@ import static org.mockito.BDDMockito.given;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class LoadAcademyServiceTest {
 
+	private static final long FAMILY_ID = 10L;
 	private static final long ACADEMY_ID = 301L;
 	private static final long MISSING_ACADEMY_ID = 999L;
 
@@ -39,7 +40,7 @@ class LoadAcademyServiceTest {
 	@Test
 	@DisplayName("findAcademy는 학원 id의 이름 · 주소 · 위치 · 출입구 · 대표번호를 돌려준다")
 	void findAcademyReturnsAcademyInfo() {
-		given(loadAcademyPort.loadAcademy(ACADEMY_ID)).willReturn(Optional.of(Academy.restore(ACADEMY_ID, "kakao:12345",
+		given(loadAcademyPort.loadAcademy(ACADEMY_ID)).willReturn(Optional.of(Academy.restore(ACADEMY_ID, FAMILY_ID, "kakao:12345",
 				"해솔영어학원", "서울 강남구 테헤란로 1", LOCATION, ENTRANCE, "02-555-1234")));
 
 		Optional<AcademyInfo> academy = service.findAcademy(ACADEMY_ID);
@@ -51,7 +52,7 @@ class LoadAcademyServiceTest {
 	@Test
 	@DisplayName("findAcademy는 출입구가 없는 학원이면 entrance를 null로 돌려준다")
 	void findAcademyReturnsNullEntranceWhenAcademyHasNoEntrance() {
-		given(loadAcademyPort.loadAcademy(ACADEMY_ID)).willReturn(Optional.of(Academy.restore(ACADEMY_ID, "kakao:12345",
+		given(loadAcademyPort.loadAcademy(ACADEMY_ID)).willReturn(Optional.of(Academy.restore(ACADEMY_ID, FAMILY_ID, "kakao:12345",
 				"해솔영어학원", "서울 강남구 테헤란로 1", LOCATION, null, "02-555-1234")));
 
 		Optional<AcademyInfo> academy = service.findAcademy(ACADEMY_ID);

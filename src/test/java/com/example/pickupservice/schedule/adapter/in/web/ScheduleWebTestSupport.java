@@ -3,7 +3,9 @@ package com.example.pickupservice.schedule.adapter.in.web;
 import com.example.pickupservice.common.fixture.IntegrationTestSupport;
 import com.example.pickupservice.schedule.application.port.in.CompleteSetupUseCase;
 import com.example.pickupservice.schedule.application.port.in.CreateScheduleUseCase;
+import com.example.pickupservice.schedule.application.port.in.GetNextPickupUseCase;
 import com.example.pickupservice.schedule.application.port.in.GetSetupSummaryUseCase;
+import com.example.pickupservice.schedule.application.port.in.GetTodayPickupsUseCase;
 import com.example.pickupservice.schedule.application.port.in.GetVehicleSettingsSummaryUseCase;
 import com.example.pickupservice.schedule.application.port.in.GetWeeklyPickupsUseCase;
 import com.example.pickupservice.schedule.application.port.in.ListSchedulesUseCase;
@@ -36,5 +38,11 @@ public abstract class ScheduleWebTestSupport extends IntegrationTestSupport {
 
 	@MockitoBean
 	protected GetVehicleSettingsSummaryUseCase getVehicleSettingsSummaryUseCase;
+
+	@MockitoBean
+	protected GetNextPickupUseCase getNextPickupUseCase;
+
+	@MockitoBean
+	protected GetTodayPickupsUseCase getTodayPickupsUseCase;
 
 }

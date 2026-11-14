@@ -59,10 +59,12 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 	private final List<Long> academyIds = new ArrayList<>();
 	private final List<Long> scheduleIds = new ArrayList<>();
 	private UserSeed.Result users;
+	private UserSeed.Result otherUsers;
 
 	@BeforeEach
 	void seedUsers() {
 		users = userSeed.seed();
+		otherUsers = userSeed.seed();
 	}
 
 	@AfterEach
@@ -80,16 +82,17 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 			}
 		});
 		userSeed.clear(users);
+		userSeed.clear(otherUsers);
 	}
 
 	@Test
 	@DisplayName("Academy를 저장하고 읽으면 location · entrance 좌표가 같다")
 	void savedAcademyIsLoadedWithSameLocationAndEntrance() {
-		Academy saved = saveAcademyPort.saveAcademy(Academy.create(uniquePlaceId(), "해솔영어학원", "서울 강남구 테헤란로 152",
+		Academy saved = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), uniquePlaceId(), "해솔영어학원", "서울 강남구 테헤란로 152",
 				ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
 		assertThat(saved.getAcademyId()).as("저장된 academyId").isNotNull();
 		academyIds.add(saved.getAcademyId());
-		Academy savedWithoutEntrance = saveAcademyPort.saveAcademy(Academy.create(uniquePlaceId(), "바른수학학원",
+		Academy savedWithoutEntrance = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), uniquePlaceId(), "바른수학학원",
 				"서울 강남구 역삼로 10", ACADEMY_LOCATION, null, null));
 		academyIds.add(savedWithoutEntrance.getAcademyId());
 		clearPersistenceContext();
@@ -119,10 +122,10 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 	@DisplayName("Academy를 저장하면 external_place_id 컬럼에 externalPlaceId가 들어가고 loadAcademy · loadAcademyByExternalPlaceId로 읽으면 같은 학원이 나온다")
 	void savedAcademyKeepsExternalPlaceIdAndIsFoundByIt() {
 		String placeId = uniquePlaceId();
-		Academy saved = saveAcademyPort.saveAcademy(Academy.create(placeId, "해솔영어학원", "서울 강남구 테헤란로 152",
+		Academy saved = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), placeId, "해솔영어학원", "서울 강남구 테헤란로 152",
 				ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
 		academyIds.add(saved.getAcademyId());
-		Academy other = saveAcademyPort.saveAcademy(Academy.create(uniquePlaceId(), "바른수학학원", "서울 강남구 역삼로 10",
+		Academy other = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), uniquePlaceId(), "바른수학학원", "서울 강남구 역삼로 10",
 				ACADEMY_LOCATION, null, null));
 		academyIds.add(other.getAcademyId());
 		clearPersistenceContext();
@@ -135,7 +138,7 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 				.as("loadAcademy로 읽은 externalPlaceId")
 				.isEqualTo(placeId);
 
-		Academy found = loadAcademyPort.loadAcademyByExternalPlaceId(placeId).orElseThrow();
+		Academy found = loadAcademyPort.loadAcademyByExternalPlaceId(users.familyId(), placeId).orElseThrow();
 		assertThat(found.getAcademyId()).as("externalPlaceId로 찾은 academyId").isEqualTo(saved.getAcademyId());
 		assertThat(found.getExternalPlaceId()).isEqualTo(placeId);
 		assertThat(found.getName()).isEqualTo("해솔영어학원");
@@ -154,22 +157,22 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 		newAcademy();
 		clearPersistenceContext();
 
-		assertThat(loadAcademyPort.loadAcademyByExternalPlaceId(uniquePlaceId())).as("없는 externalPlaceId").isEmpty();
+		assertThat(loadAcademyPort.loadAcademyByExternalPlaceId(users.familyId(), uniquePlaceId())).as("없는 externalPlaceId").isEmpty();
 	}
 
 	@Test
-	@DisplayName("같은 externalPlaceId의 학원이 이미 저장된 뒤 academyId 없는 새 학원을 저장하면(동시 등록 유니크 충돌) 오류 없이 이미 저장된 그 학원을 돌려주고 행이 늘지 않으며 같은 트랜잭션에서 계속 읽을 수 있다")
+	@DisplayName("같은 가족 · 같은 externalPlaceId의 학원이 이미 저장된 뒤 그 가족의 academyId 없는 새 학원을 저장하면(동시 등록 유니크 충돌) 오류 없이 이미 저장된 그 학원을 돌려주고 행이 늘지 않으며 같은 트랜잭션에서 계속 읽을 수 있다")
 	void savingNewAcademyWithAlreadySavedExternalPlaceIdReusesSavedAcademyWithoutError() {
 		String placeId = uniquePlaceId();
-		Academy first = saveAcademyPort.saveAcademy(Academy.create(placeId, "해솔영어학원", "서울 강남구 테헤란로 152",
+		Academy first = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), placeId, "해솔영어학원", "서울 강남구 테헤란로 152",
 				ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
 		academyIds.add(first.getAcademyId());
 		clearPersistenceContext();
 
 		Academy[] reusedAndReloaded = transactionTemplate.execute(status -> {
-			Academy reused = saveAcademyPort.saveAcademy(Academy.create(placeId, "해솔영어학원 2관",
+			Academy reused = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), placeId, "해솔영어학원 2관",
 					"서울 강남구 테헤란로 200", ACADEMY_LOCATION, null, null));
-			Academy reloaded = loadAcademyPort.loadAcademyByExternalPlaceId(placeId).orElseThrow();
+			Academy reloaded = loadAcademyPort.loadAcademyByExternalPlaceId(users.familyId(), placeId).orElseThrow();
 			return new Academy[] {reused, reloaded};
 		});
 
@@ -177,6 +180,7 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 		assertThat(reused.getAcademyId()).as("saveAcademy가 돌려준 학원의 academyId (이미 저장된 학원)")
 				.isEqualTo(first.getAcademyId());
 		assertThat(reused.getExternalPlaceId()).isEqualTo(placeId);
+		assertThat(reused.getFamilyId()).as("다시 쓴 학원의 familyId").isEqualTo(users.familyId());
 		assertThat(reused.getEntrance()).as("새 학원의 entrance가 비어 있어도 이미 저장된 entrance는 남는다").isNotNull();
 		assertThat(reused.getEntrance().lat()).isCloseTo(ACADEMY_ENTRANCE.lat(), within(COORDINATE_TOLERANCE));
 		assertThat(reused.getPhone()).as("새 학원의 phone이 비어 있어도 이미 저장된 phone은 남는다").isEqualTo("02-555-1234");
@@ -184,8 +188,9 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 				.isEqualTo(first.getAcademyId());
 
 		Integer rows = jdbcTemplate.queryForObject(
-				"select count(*) from academy where external_place_id = ?", Integer.class, placeId);
-		assertThat(rows).as("externalPlaceId %s인 academy 행 수", placeId).isEqualTo(1);
+				"select count(*) from academy where family_id = ? and external_place_id = ?", Integer.class,
+				users.familyId(), placeId);
+		assertThat(rows).as("가족 %s · externalPlaceId %s인 academy 행 수", users.familyId(), placeId).isEqualTo(1);
 		String storedEntrance = jdbcTemplate.queryForObject(
 				"select ST_AsText(entrance) from academy where academy_id = ?", String.class, first.getAcademyId());
 		assertThat(storedEntrance).as("DB에 남은 entrance").isNotNull();
@@ -195,13 +200,13 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 	@DisplayName("saveAcademy로 academyId가 있는 학원을 다시 저장하면 새 행을 만들지 않고 그 행의 이름 · 주소 · 위치 · 출입구 · 전화가 바뀌며 externalPlaceId는 그대로다")
 	void savingAcademyWithIdUpdatesSameRowInsteadOfInsertingNewOne() {
 		String placeId = uniquePlaceId();
-		Academy saved = saveAcademyPort.saveAcademy(Academy.create(placeId, "해솔영어학원", "서울 강남구 테헤란로 152",
+		Academy saved = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), placeId, "해솔영어학원", "서울 강남구 테헤란로 152",
 				ACADEMY_LOCATION, null, null));
 		academyIds.add(saved.getAcademyId());
 		clearPersistenceContext();
 		LatLng newLocation = new LatLng(37.497942, 127.027621);
 
-		Academy updated = saveAcademyPort.saveAcademy(Academy.restore(saved.getAcademyId(), placeId, "해솔영어학원 본관",
+		Academy updated = saveAcademyPort.saveAcademy(Academy.restore(saved.getAcademyId(), users.familyId(), placeId, "해솔영어학원 본관",
 				"서울 강남구 테헤란로 200", newLocation, ACADEMY_ENTRANCE, "02-555-9999"));
 		clearPersistenceContext();
 
@@ -218,6 +223,99 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 		assertThat(loaded.getLocation().lng()).isCloseTo(newLocation.lng(), within(COORDINATE_TOLERANCE));
 		assertThat(loaded.getEntrance()).as("새로 생긴 entrance").isNotNull();
 		assertThat(loaded.getEntrance().lat()).isCloseTo(ACADEMY_ENTRANCE.lat(), within(COORDINATE_TOLERANCE));
+	}
+
+	@Test
+	@DisplayName("두 가족이 같은 externalPlaceId로 학원을 저장하면 academyId가 서로 다른 academy 행이 가족마다 따로 생긴다")
+	void twoFamiliesSavingSameExternalPlaceIdGetSeparateAcademyRows() {
+		String placeId = uniquePlaceId();
+
+		Academy ofFamily = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), placeId, "해솔영어학원",
+				"서울 강남구 테헤란로 152", ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
+		academyIds.add(ofFamily.getAcademyId());
+		Academy ofOtherFamily = saveAcademyPort.saveAcademy(Academy.create(otherUsers.familyId(), placeId,
+				"해솔영어학원 (다른 가족)", "서울 강남구 테헤란로 200", ACADEMY_LOCATION, null, "02-777-0000"));
+		academyIds.add(ofOtherFamily.getAcademyId());
+		clearPersistenceContext();
+
+		assertThat(ofOtherFamily.getAcademyId()).as("다른 가족이 저장한 학원의 academyId")
+				.isNotNull()
+				.isNotEqualTo(ofFamily.getAcademyId());
+		Integer rows = jdbcTemplate.queryForObject(
+				"select count(*) from academy where external_place_id = ?", Integer.class, placeId);
+		assertThat(rows).as("externalPlaceId %s인 academy 행 수", placeId).isEqualTo(2);
+		List<Long> familyIds = jdbcTemplate.queryForList(
+				"select family_id from academy where external_place_id = ?", Long.class, placeId);
+		assertThat(familyIds).as("academy.family_id 컬럼 값")
+				.containsExactlyInAnyOrder(users.familyId(), otherUsers.familyId());
+
+		Academy first = loadAcademyPort.loadAcademy(ofFamily.getAcademyId()).orElseThrow();
+		assertThat(first.getName()).as("먼저 저장한 가족의 학원 이름은 다른 가족 저장으로 바뀌지 않는다")
+				.isEqualTo("해솔영어학원");
+		assertThat(first.getAddress()).isEqualTo("서울 강남구 테헤란로 152");
+		assertThat(first.getPhone()).isEqualTo("02-555-1234");
+		assertThat(first.getEntrance()).as("먼저 저장한 가족의 학원 entrance").isNotNull();
+	}
+
+	@Test
+	@DisplayName("loadAcademyByExternalPlaceId(familyId, externalPlaceId)는 그 가족의 학원만 돌려주고 그 externalPlaceId 학원이 없는 가족으로 찾으면 빈 값을 돌려준다")
+	void loadAcademyByExternalPlaceIdReturnsOnlyAcademyOfGivenFamily() {
+		String placeId = uniquePlaceId();
+		String onlyFamilyPlaceId = uniquePlaceId();
+		Academy ofFamily = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), placeId, "해솔영어학원",
+				"서울 강남구 테헤란로 152", ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
+		academyIds.add(ofFamily.getAcademyId());
+		Academy ofOtherFamily = saveAcademyPort.saveAcademy(Academy.create(otherUsers.familyId(), placeId,
+				"해솔영어학원 (다른 가족)", "서울 강남구 테헤란로 200", ACADEMY_LOCATION, null, null));
+		academyIds.add(ofOtherFamily.getAcademyId());
+		Academy onlyOfFamily = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), onlyFamilyPlaceId,
+				"바른수학학원", "서울 강남구 역삼로 10", ACADEMY_LOCATION, null, null));
+		academyIds.add(onlyOfFamily.getAcademyId());
+		clearPersistenceContext();
+
+		Academy foundForFamily = loadAcademyPort.loadAcademyByExternalPlaceId(users.familyId(), placeId)
+				.orElseThrow();
+		assertThat(foundForFamily.getAcademyId()).as("가족 A로 찾은 academyId").isEqualTo(ofFamily.getAcademyId());
+		assertThat(foundForFamily.getFamilyId()).as("가족 A로 찾은 학원의 familyId").isEqualTo(users.familyId());
+		assertThat(foundForFamily.getName()).isEqualTo("해솔영어학원");
+
+		Academy foundForOtherFamily = loadAcademyPort.loadAcademyByExternalPlaceId(otherUsers.familyId(), placeId)
+				.orElseThrow();
+		assertThat(foundForOtherFamily.getAcademyId()).as("가족 B로 찾은 academyId")
+				.isEqualTo(ofOtherFamily.getAcademyId());
+		assertThat(foundForOtherFamily.getFamilyId()).as("가족 B로 찾은 학원의 familyId")
+				.isEqualTo(otherUsers.familyId());
+		assertThat(foundForOtherFamily.getName()).isEqualTo("해솔영어학원 (다른 가족)");
+
+		assertThat(loadAcademyPort.loadAcademyByExternalPlaceId(otherUsers.familyId(), onlyFamilyPlaceId))
+				.as("가족 A만 저장한 externalPlaceId를 가족 B로 찾은 결과")
+				.isEmpty();
+	}
+
+	@Test
+	@DisplayName("Academy를 저장하고 loadAcademy로 읽으면 familyId가 그대로이고 academy.family_id 컬럼에 그 값이 들어간다")
+	void savedAcademyKeepsFamilyId() {
+		Academy saved = saveAcademyPort.saveAcademy(Academy.create(otherUsers.familyId(), uniquePlaceId(),
+				"해솔영어학원", "서울 강남구 테헤란로 152", ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
+		academyIds.add(saved.getAcademyId());
+		clearPersistenceContext();
+
+		assertThat(saved.getFamilyId()).as("saveAcademy가 돌려준 학원의 familyId").isEqualTo(otherUsers.familyId());
+		Long column = jdbcTemplate.queryForObject(
+				"select family_id from academy where academy_id = ?", Long.class, saved.getAcademyId());
+		assertThat(column).as("academy.family_id 컬럼 원문").isEqualTo(otherUsers.familyId());
+		assertThat(loadAcademyPort.loadAcademy(saved.getAcademyId()).orElseThrow().getFamilyId())
+				.as("loadAcademy로 읽은 familyId")
+				.isEqualTo(otherUsers.familyId());
+
+		Academy updated = saveAcademyPort.saveAcademy(Academy.restore(saved.getAcademyId(), otherUsers.familyId(),
+				saved.getExternalPlaceId(), "해솔영어학원 본관", "서울 강남구 테헤란로 200", ACADEMY_LOCATION, null, null));
+		clearPersistenceContext();
+
+		assertThat(updated.getFamilyId()).as("academyId로 다시 저장한 학원의 familyId").isEqualTo(otherUsers.familyId());
+		assertThat(loadAcademyPort.loadAcademy(saved.getAcademyId()).orElseThrow().getFamilyId())
+				.as("다시 저장한 뒤 읽은 familyId")
+				.isEqualTo(otherUsers.familyId());
 	}
 
 	@Test
@@ -248,7 +346,7 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 	void savingScheduleWithIdUpdatesSameRowInsteadOfInsertingNewOne() {
 		Academy academy = newAcademy();
 		PickupSchedule saved = newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
-		Academy academyWithoutEntrance = saveAcademyPort.saveAcademy(Academy.create(uniquePlaceId(), "바른수학학원",
+		Academy academyWithoutEntrance = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), uniquePlaceId(), "바른수학학원",
 				"서울 강남구 역삼로 10", ACADEMY_LOCATION, null, null));
 		academyIds.add(academyWithoutEntrance.getAcademyId());
 		clearPersistenceContext();
@@ -388,7 +486,7 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 	@DisplayName("loadSchedules는 여러 scheduleId의 일정을 학원과 함께 한 번에 돌려주고 없는 id는 빼며, SQL은 일정 조회 1회 + 학원 조회 1회 이하다")
 	void loadSchedulesReturnsSchedulesOfGivenIdsWithAcademiesAtOnce() {
 		Academy academy = newAcademy();
-		Academy otherAcademy = saveAcademyPort.saveAcademy(Academy.create(uniquePlaceId(), "한빛수학학원",
+		Academy otherAcademy = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), uniquePlaceId(), "한빛수학학원",
 				"서울 강남구 역삼로 10", ACADEMY_LOCATION, null, "02-777-0000"));
 		academyIds.add(otherAcademy.getAcademyId());
 		PickupSchedule minjunMonday = newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
@@ -476,8 +574,49 @@ class SchedulePersistenceAdapterTest extends IntegrationTestSupport {
 				.isEmpty();
 	}
 
+	@Test
+	@DisplayName("loadSchedulesOfAcademy는 그 학원을 쓰는 일정만 자녀와 상관없이 학원과 함께 돌려주고 다른 학원의 일정은 뺀다")
+	void loadSchedulesOfAcademyReturnsOnlySchedulesOfThatAcademy() {
+		Academy academy = newAcademy();
+		Academy otherAcademy = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), uniquePlaceId(), "한빛수학학원",
+				"서울 강남구 역삼로 10", ACADEMY_LOCATION, null, "02-777-0000"));
+		academyIds.add(otherAcademy.getAcademyId());
+		PickupSchedule minjunMonday = newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
+		PickupSchedule seoyunTuesday = newSchedule(users.seoyunId(), academy, DayOfWeek.TUESDAY);
+		newSchedule(users.minjunId(), otherAcademy, DayOfWeek.THURSDAY);
+		clearPersistenceContext();
+
+		List<PickupSchedule> loaded = loadSchedulePort.loadSchedulesOfAcademy(academy.getAcademyId());
+
+		assertThat(loaded).extracting(PickupSchedule::getScheduleId)
+				.as("그 학원의 일정 (민준 · 서윤)")
+				.containsExactlyInAnyOrder(minjunMonday.getScheduleId(), seoyunTuesday.getScheduleId());
+		assertThat(loaded).extracting(schedule -> schedule.getAcademy().getAcademyId())
+				.as("일정마다 그 학원이 채워진다")
+				.containsOnly(academy.getAcademyId());
+		assertThat(loaded).extracting(schedule -> schedule.getAcademy().getEntrance())
+				.as("학원 entrance")
+				.doesNotContainNull();
+		assertThat(loaded).extracting(PickupSchedule::getStatus)
+				.as("저장한 status")
+				.containsOnly(ScheduleStatus.READY);
+	}
+
+	@Test
+	@DisplayName("loadSchedulesOfAcademy에 일정이 없는 학원을 주면 빈 목록을 돌려준다")
+	void loadSchedulesOfAcademyReturnsEmptyListWhenAcademyHasNoSchedule() {
+		Academy academy = newAcademy();
+		Academy unusedAcademy = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), uniquePlaceId(), "한빛수학학원",
+				"서울 강남구 역삼로 10", ACADEMY_LOCATION, null, null));
+		academyIds.add(unusedAcademy.getAcademyId());
+		newSchedule(users.minjunId(), academy, DayOfWeek.MONDAY);
+		clearPersistenceContext();
+
+		assertThat(loadSchedulePort.loadSchedulesOfAcademy(unusedAcademy.getAcademyId())).isNotNull().isEmpty();
+	}
+
 	private Academy newAcademy() {
-		Academy academy = saveAcademyPort.saveAcademy(Academy.create(uniquePlaceId(), "해솔영어학원", "서울 강남구 테헤란로 152",
+		Academy academy = saveAcademyPort.saveAcademy(Academy.create(users.familyId(), uniquePlaceId(), "해솔영어학원", "서울 강남구 테헤란로 152",
 				ACADEMY_LOCATION, ACADEMY_ENTRANCE, "02-555-1234"));
 		academyIds.add(academy.getAcademyId());
 		return academy;

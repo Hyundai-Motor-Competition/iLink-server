@@ -59,9 +59,9 @@ class ListSchedulesServiceTest {
 	@DisplayName("일정 목록은 자녀의 일정을 scheduleId · 학원 · weekdays · classEndTime · targetPickup · status로 돌려준다")
 	void listSchedulesReturnsScheduleViewsOfChild() {
 		givenMember(CHILD_ID, FAMILY_ID, Role.CHILD);
-		Academy english = Academy.restore(301L, "kakao:12345", "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE,
+		Academy english = Academy.restore(301L, FAMILY_ID, "kakao:12345", "해솔영어학원", "서울 강남구 테헤란로 152", LOCATION, ENTRANCE,
 				"02-555-1234");
-		Academy math = Academy.restore(302L, "kakao:67890", "바른수학교실", "서울 강남구 역삼로 10", LOCATION, null, "02-555-5678");
+		Academy math = Academy.restore(302L, FAMILY_ID, "kakao:67890", "바른수학교실", "서울 강남구 역삼로 10", LOCATION, null, "02-555-5678");
 		given(loadSchedulePort.loadSchedulesOfChild(CHILD_ID)).willReturn(List.of(
 				PickupSchedule.restore(702L, CHILD_ID, math, Set.of(DayOfWeek.THURSDAY, DayOfWeek.TUESDAY),
 						LocalTime.of(17, 30), 10, ScheduleStatus.DRAFT),
@@ -119,6 +119,19 @@ class ListSchedulesServiceTest {
 	@DisplayName("일정 목록은 없는 childId면 NOT_FOUND로 거절한다")
 	void listSchedulesRejectsWithNotFoundWhenMemberDoesNotExist() {
 		given(loadMemberUseCase.findMember(CHILD_ID)).willReturn(Optional.empty());
+
+		BusinessException thrown = catchThrowableOfType(BusinessException.class,
+				() -> listSchedulesService.listSchedules(new ChildQuery(FAMILY_ID, CHILD_ID)));
+
+		assertNotFound(thrown);
+		verifyNoInteractions(loadSchedulePort);
+	}
+
+	@Test
+	@DisplayName("일정 목록은 해제된 자녀(removed true)면 NOT_FOUND로 거절하고 일정 조회 포트를 부르지 않는다")
+	void listSchedulesRejectsWithNotFoundWhenChildIsRemoved() {
+		given(loadMemberUseCase.findMember(CHILD_ID)).willReturn(Optional.of(
+				new MemberInfo(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", "010-0000-0000", null, true)));
 
 		BusinessException thrown = catchThrowableOfType(BusinessException.class,
 				() -> listSchedulesService.listSchedules(new ChildQuery(FAMILY_ID, CHILD_ID)));

@@ -41,10 +41,13 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -67,6 +70,9 @@ class GetWeeklyPickupsServiceTest {
 	// UTC 2026-11-08(일) 16:00 = 한국 2026-11-09(월) 01:00
 	private static final Instant KST_MONDAY_UTC_SUNDAY = Instant.parse("2026-11-08T16:00:00Z");
 	private static final LocalDate MONDAY = LocalDate.of(2026, 11, 9);
+
+	private static final String MINJUN_PROFILE_URL = "https://storage.test/ilink/profiles/minjun.webp?sig=test";
+	private static final String SEOYEON_PROFILE_URL = "https://storage.test/ilink/profiles/seoyeon.webp?sig=test";
 
 	@Mock
 	private LoadMemberUseCase loadMemberUseCase;
@@ -142,9 +148,9 @@ class GetWeeklyPickupsServiceTest {
 
 		WeeklyPickups weekly = service(KST_MONDAY_UTC_SUNDAY).getWeeklyPickups(FAMILY_ID, MONDAY);
 
-		WeeklyPickup minjun = new WeeklyPickup(SCHEDULE_ID, "민준", "해솔영어학원", LocalTime.of(18, 0),
+		WeeklyPickup minjun = new WeeklyPickup(SCHEDULE_ID, "민준", null, "해솔영어학원", LocalTime.of(18, 0),
 				LocalTime.of(18, 5));
-		WeeklyPickup seoyeon = new WeeklyPickup(OTHER_SCHEDULE_ID, "서연", "한빛수학학원", LocalTime.of(17, 0),
+		WeeklyPickup seoyeon = new WeeklyPickup(OTHER_SCHEDULE_ID, "서연", null, "한빛수학학원", LocalTime.of(17, 0),
 				LocalTime.of(17, 10));
 		assertThat(weekly.days()).containsExactly(
 				new DailyPickups(MONDAY, List.of(minjun)),
@@ -184,7 +190,54 @@ class GetWeeklyPickupsServiceTest {
 		WeeklyPickups weekly = service(KST_MONDAY_UTC_SUNDAY).getWeeklyPickups(FAMILY_ID, MONDAY);
 
 		assertThat(weekly.days().get(4)).isEqualTo(new DailyPickups(MONDAY.plusDays(4), List.of(
-				new WeeklyPickup(SCHEDULE_ID, "민준", "해솔영어학원", LocalTime.of(18, 0), LocalTime.of(18, 5)))));
+				new WeeklyPickup(SCHEDULE_ID, "민준", null, "해솔영어학원", LocalTime.of(18, 0), LocalTime.of(18, 5)))));
+	}
+
+	// #80 · #85
+
+	@Test
+	@DisplayName("주간 일정은 각 픽업에 findMembers가 준 그 자녀의 MemberInfo.profileImageUrl을 담고 URL이 없는 자녀는 null로 둔다")
+	void getWeeklyPickupsFillsProfileImageUrlOfEachChild() {
+		givenFamilyMembers(MINJUN_PROFILE_URL, null);
+		givenSchedules(
+				schedule(SCHEDULE_ID, MINJUN_ID, academy(ACADEMY_ID, "해솔영어학원"),
+						Set.of(DayOfWeek.MONDAY), LocalTime.of(18, 0), 5, ScheduleStatus.READY),
+				schedule(OTHER_SCHEDULE_ID, SEOYEON_ID, academy(OTHER_ACADEMY_ID, "한빛수학학원"),
+						Set.of(DayOfWeek.MONDAY), LocalTime.of(17, 0), 10, ScheduleStatus.READY));
+		givenDeviceStatuses(Map.of(MINJUN_ID, DeviceStatus.CONNECTED, SEOYEON_ID, DeviceStatus.CONNECTED));
+		givenSpots(defaultSpot(SPOT_ID, ACADEMY_ID), defaultSpot(OTHER_SPOT_ID, OTHER_ACADEMY_ID));
+
+		WeeklyPickups weekly = service(KST_MONDAY_UTC_SUNDAY).getWeeklyPickups(FAMILY_ID, MONDAY);
+
+		assertThat(weekly.days().get(0).pickups())
+				.extracting(WeeklyPickup::scheduleId, WeeklyPickup::profileImageUrl)
+				.containsExactly(
+						tuple(OTHER_SCHEDULE_ID, null),
+						tuple(SCHEDULE_ID, MINJUN_PROFILE_URL));
+	}
+
+	@Test
+	@DisplayName("주간 일정은 findMembers가 준 MemberInfo.profileImageUrl을 담고 findProfileImageUrls 같은 별도 조회를 하지 않는다")
+	void getWeeklyPickupsUsesMemberInfoProfileImageUrlWithoutSeparateLookup() {
+		givenFamilyMembers(MINJUN_PROFILE_URL, SEOYEON_PROFILE_URL);
+		givenSchedules(
+				schedule(SCHEDULE_ID, MINJUN_ID, academy(ACADEMY_ID, "해솔영어학원"),
+						Set.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY), LocalTime.of(18, 0), 5,
+						ScheduleStatus.READY),
+				schedule(OTHER_SCHEDULE_ID, SEOYEON_ID, academy(OTHER_ACADEMY_ID, "한빛수학학원"),
+						Set.of(DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY), LocalTime.of(17, 0), 10, ScheduleStatus.READY));
+		givenDeviceStatuses(Map.of(MINJUN_ID, DeviceStatus.CONNECTED, SEOYEON_ID, DeviceStatus.CONNECTED));
+		givenSpots(defaultSpot(SPOT_ID, ACADEMY_ID), defaultSpot(OTHER_SPOT_ID, OTHER_ACADEMY_ID));
+
+		WeeklyPickups weekly = service(KST_MONDAY_UTC_SUNDAY).getWeeklyPickups(FAMILY_ID, MONDAY);
+
+		assertThat(weekly.days().get(2).pickups())
+				.extracting(WeeklyPickup::scheduleId, WeeklyPickup::profileImageUrl)
+				.containsExactly(
+						tuple(OTHER_SCHEDULE_ID, SEOYEON_PROFILE_URL),
+						tuple(SCHEDULE_ID, MINJUN_PROFILE_URL));
+		verify(loadMemberUseCase, times(1)).findMembers(FAMILY_ID);
+		verifyNoMoreInteractions(loadMemberUseCase);
 	}
 
 	// #35
@@ -290,8 +343,8 @@ class GetWeeklyPickupsServiceTest {
 	// #69
 
 	@Test
-	@DisplayName("주간 일정 readiness는 오늘 일정 중 DRAFT가 있으면 기기와 기본 장소가 다 있어도 startable false와 빈 missing을 돌려준다")
-	void readinessIsNotStartableWhenTodayHasDraftSchedule() {
+	@DisplayName("주간 일정 readiness는 오늘 일정 중 DRAFT가 있으면 기기와 기본 장소가 다 있어도 startable false와 missing [SCHEDULE]을 돌려준다")
+	void readinessIsNotStartableWithScheduleMissingWhenTodayHasDraftSchedule() {
 		givenFamilyMembers();
 		givenSchedules(
 				mondayScheduleOfMinjun(),
@@ -302,7 +355,23 @@ class GetWeeklyPickupsServiceTest {
 
 		WeeklyPickups weekly = service(KST_MONDAY_UTC_SUNDAY).getWeeklyPickups(FAMILY_ID, null);
 
-		assertThat(weekly.readiness()).isEqualTo(new PickupReadiness(false, List.of()));
+		assertThat(weekly.readiness())
+				.isEqualTo(new PickupReadiness(false, List.of(MissingSetupItem.SCHEDULE)));
+	}
+
+	@Test
+	@DisplayName("주간 일정 readiness는 오늘 일정이 DRAFT이고 기기도 기본 장소도 없으면 missing을 CHILD_DEVICE, SCHEDULE, PICKUP_SPOT 순서로 돌려준다")
+	void readinessListsMissingItemsInStartPickupOrderWhenTodayScheduleIsDraft() {
+		givenFamilyMembers();
+		givenSchedules(schedule(SCHEDULE_ID, MINJUN_ID, academy(ACADEMY_ID, "해솔영어학원"),
+				Set.of(DayOfWeek.MONDAY), LocalTime.of(18, 0), 5, ScheduleStatus.DRAFT));
+		givenDeviceStatuses(Map.of(MINJUN_ID, DeviceStatus.NONE));
+		givenSpots();
+
+		WeeklyPickups weekly = service(KST_MONDAY_UTC_SUNDAY).getWeeklyPickups(FAMILY_ID, null);
+
+		assertThat(weekly.readiness()).isEqualTo(new PickupReadiness(false,
+				List.of(MissingSetupItem.CHILD_DEVICE, MissingSetupItem.SCHEDULE, MissingSetupItem.PICKUP_SPOT)));
 	}
 
 	@Test
@@ -333,6 +402,15 @@ class GetWeeklyPickupsServiceTest {
 				new MemberInfo(SEOYEON_ID, FAMILY_ID, Role.CHILD, "서연", "010-5555-6666")));
 	}
 
+	private void givenFamilyMembers(String minjunProfileImageUrl, String seoyeonProfileImageUrl) {
+		given(loadMemberUseCase.findMembers(FAMILY_ID)).willReturn(List.of(
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1111-2222",
+						"https://storage.test/ilink/profiles/guardian.webp?sig=test", false),
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", "010-3333-4444", minjunProfileImageUrl, false),
+				new MemberInfo(SEOYEON_ID, FAMILY_ID, Role.CHILD, "서연", "010-5555-6666", seoyeonProfileImageUrl,
+						false)));
+	}
+
 	private void givenSchedules(PickupSchedule... schedules) {
 		given(loadSchedulePort.loadSchedulesOfChildren(anyList())).willReturn(List.of(schedules));
 	}
@@ -355,11 +433,11 @@ class GetWeeklyPickupsServiceTest {
 	}
 
 	private static Academy academy(long academyId, String name) {
-		return Academy.restore(academyId, "kakao:" + academyId, name, "서울 강남구 테헤란로 152", LOCATION, ENTRANCE, "02-555-1234");
+		return Academy.restore(academyId, FAMILY_ID, "kakao:" + academyId, name, "서울 강남구 테헤란로 152", LOCATION, ENTRANCE, "02-555-1234");
 	}
 
 	private static Academy academyWithoutEntrance(long academyId, String name) {
-		return Academy.restore(academyId, "kakao:" + academyId, name, "서울 강남구 테헤란로 152", LOCATION, null, "02-555-1234");
+		return Academy.restore(academyId, FAMILY_ID, "kakao:" + academyId, name, "서울 강남구 테헤란로 152", LOCATION, null, "02-555-1234");
 	}
 
 	private static PickupSchedule schedule(long scheduleId, long childId, Academy academy, Set<DayOfWeek> weekdays,

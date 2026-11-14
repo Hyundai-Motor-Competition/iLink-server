@@ -7,13 +7,15 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.locationtech.jts.geom.Point;
 
 @Entity
-@Table(name = "academy")
+@Table(name = "academy", uniqueConstraints = @UniqueConstraint(name = "uk_academy_family_external_place",
+		columnNames = {"family_id", "external_place_id"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AcademyEntity extends BaseTimeEntity {
@@ -22,7 +24,10 @@ public class AcademyEntity extends BaseTimeEntity {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long academyId;
 
-	@Column(nullable = false, length = 100, unique = true)
+	@Column(nullable = false)
+	private Long familyId;
+
+	@Column(nullable = false, length = 100)
 	private String externalPlaceId;
 
 	@Column(nullable = false, length = 100)
@@ -40,9 +45,10 @@ public class AcademyEntity extends BaseTimeEntity {
 	@Column(length = 20)
 	private String phone;
 
-	public AcademyEntity(Long academyId, String externalPlaceId, String name, String address, Point location,
-			Point entrance, String phone) {
+	public AcademyEntity(Long academyId, long familyId, String externalPlaceId, String name, String address,
+			Point location, Point entrance, String phone) {
 		this.academyId = academyId;
+		this.familyId = familyId;
 		this.externalPlaceId = externalPlaceId;
 		this.name = name;
 		this.address = address;

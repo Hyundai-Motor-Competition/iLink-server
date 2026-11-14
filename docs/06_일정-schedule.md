@@ -4,19 +4,20 @@
 
 | 항목 | 내용 |
 |---|---|
-| 범위 | 엔티티 Academy · PickupSchedule. API SET-01~04, SET-07~10. 다른 모듈용 in 포트(일정 조회 · 학원 조회) |
-| 의존 | 03_공유모듈-shared, 04_사용자-user(자녀 · 가족 · 합류 안내 방식 · settingsVersion · 보호자 이름. 서비스가 user in 포트 LoadMemberUseCase · LoadFamilyUseCase를 직접 부름), 05_인증-auth(자녀 기기 상태. out 포트 LoadMemberDeviceStatusPort → auth in 포트). 07_장소-place(장소 목록 · 기본 장소 유무. out 포트 LoadPickupSpotPort → place in 포트 LoadPickupSpotUseCase.findSpots). schedule 코드는 user.domain 타입을 쓰지 않는다(JoinCallMode · DeviceStatus는 schedule 자체 enum) |
+| 범위 | 엔티티 Academy · PickupSchedule. API SET-01~04, SET-07~10, SET-12 · SET-13(SET-11은 user의 자녀 위치 설정이 씀). 다른 모듈용 in 포트(일정 조회 · 학원 조회) |
+| 의존 | 03_공유모듈-shared, 04_사용자-user(자녀 · 가족 · 합류 안내 방식 · settingsVersion · 보호자 이름. 서비스가 user in 포트 LoadMemberUseCase · LoadFamilyUseCase를 직접 부름), 05_인증-auth(자녀 기기 상태. out 포트 LoadMemberDeviceStatusPort → auth in 포트). 07_장소-place(장소 목록 · 기본 장소 유무. out 포트 LoadPickupSpotPort → place in 포트 LoadPickupSpotUseCase.findSpots). schedule 코드는 user.domain 타입을 쓰지 않는다(JoinCallMode · DeviceStatus는 schedule 자체 enum). 08_픽업-pickup(오늘의 픽업 SET-13 진행 상태. out 포트 LoadPickupProgressPort → pickup in 포트 PickupProgressQueryUseCase, 사람 결정 2026-11-14) |
 | 진행 | 계층 병렬 |
 
 ## 구조
 
 ```text
 schedule
-├─ adapter/in/web          ScheduleController(SET-01~04), SetupController(SET-07 · 08), VehicleScheduleController(SET-09 · 10), doc 인터페이스
+├─ adapter/in/web          ScheduleController(SET-01~04), SetupController(SET-07 · 08), VehicleScheduleController(SET-09 · 10), ChildScheduleController(SET-12), FamilyScheduleController(SET-13), doc 인터페이스
 ├─ adapter/out/persistence AcademyEntity · PickupScheduleEntity, 저장소
 ├─ adapter/out/map         KakaoMapSearchAdapter: 카카오 로컬 키워드 검색(RestClient), 키는 환경 변수 KAKAO_REST_API_KEY, 연결 2s · 읽기 3s
 ├─ adapter/out/auth        LoadMemberDeviceStatusPort 구현 → auth in 포트
 ├─ adapter/out/place       LoadPickupSpotPort 구현 → place in 포트 LoadPickupSpotUseCase.findSpots
+├─ adapter/out/pickup      LoadPickupProgressPort 구현 → pickup in 포트 PickupProgressQueryUseCase(SET-13, 사람 결정 2026-11-14)
 ├─ application/port/in · out · service
 └─ domain                  Academy, PickupSchedule, ScheduleStatus, JoinCallMode · DeviceStatus(schedule 자체 enum), InvalidScheduleException, 겹침 · 하루 한도 규칙, 이름 마스킹
 ```
@@ -28,7 +29,8 @@ schedule
 | 컬럼 | 타입 | 키 · 제약 | 설명 |
 |---|---|---|---|
 | academyId | BIGINT | PK | |
-| externalPlaceId | VARCHAR(100) | UNIQUE, NOT NULL | 외부 지도 장소 id(예: kakao:12345). 지금은 전역 UNIQUE로 같은 학원을 가족 간 공유. 학원은 가족마다 따로 두기로 해 familyId를 더하고 (familyId, externalPlaceId) 유니크로 바꿀 예정, 테스트 케이스 참고(사람 결정 2026-11-13) |
+| familyId | BIGINT | NOT NULL, UNIQUE(familyId, externalPlaceId) | 학원을 등록한 가족. 학원은 가족마다 따로 둔다(사람 결정 2026-11-13) |
+| externalPlaceId | VARCHAR(100) | NOT NULL, UNIQUE(familyId, externalPlaceId) | 외부 지도 장소 id(예: kakao:12345). 같은 가족 안에서만 같은 학원을 다시 쓴다 |
 | name | VARCHAR(100) | | |
 | address | VARCHAR(255) | | |
 | location | geography(Point,4326) | GIST | 학원 위치 |
@@ -59,14 +61,18 @@ schedule
 | SET-04 | GET /v1/children/{childId}/schedules | GUARDIAN · CO_GUARDIAN | 불필요 | — → 200 items[](scheduleId · academy{academyId, name} · weekdays · classEndTime · targetPickup · status) | 404 NOT_FOUND(내 가족 CHILD 아님) |
 | SET-07 | GET /v1/children/{childId}/setup-summary | GUARDIAN · CO_GUARDIAN | 불필요 | — → 200 child{userId, name, deviceStatus}, schedules[](scheduleId · academyName · status), pickupSpots[](spotId · name · isDefault), joinCallMode, missing[](CHILD_DEVICE · SCHEDULE · PICKUP_SPOT), settingsVersion | 404 NOT_FOUND(내 가족 CHILD 아님) |
 | SET-08 | POST /v1/children/{childId}/setup-completion | GUARDIAN · CO_GUARDIAN | 필요 | settingsVersion → 200 syncedToVehicle | 404 NOT_FOUND(내 가족 CHILD 아님), 409 SETTINGS_VERSION_CONFLICT, 422 SETUP_INCOMPLETE |
-| SET-09 | GET /v1/vehicles/me/weekly-pickups | 차량 앱 | 불필요 | weekStart(선택, 그 주 월요일) → 200 weekStart, days[](date · pickups[](scheduleId · childName · academyName · classEndTime · targetPickupTime)), readiness{startable, missing[](CHILD_DEVICE · PICKUP_SPOT)} | 400 INVALID_REQUEST(weekStart 형식 오류) |
+| SET-09 | GET /v1/vehicles/me/weekly-pickups | 차량 앱 | 불필요 | weekStart(선택, 그 주 월요일) → 200 weekStart, days[](date · pickups[](scheduleId · childName · profileImageUrl · academyName · classEndTime · targetPickupTime)), readiness{startable, missing[](CHILD_DEVICE · SCHEDULE · PICKUP_SPOT)} | 400 INVALID_REQUEST(weekStart 형식 오류) |
 | SET-10 | GET /v1/vehicles/me/settings-summary | 차량 앱 | 불필요 | — → 200 guardianNameMasked, children[](userId · name), joinCallMode | 공통 |
+| SET-12 | GET /v1/children/me/next-pickup | CHILD | 불필요 | — → 200 academyName, spotName(그 학원의 가족 기본 장소 이름, 없으면 null), targetAt(KST, 오프셋 +09:00). 지금 이후 가장 가까운 READY 일정의 픽업. 남은 일정이 없으면 200, Content-Type application/json, 본문 JSON null | 403 FORBIDDEN(CHILD 아님) |
+| SET-13 | GET /v1/families/me/today-pickups | GUARDIAN · CO_GUARDIAN | 불필요 | — → 200 items[](scheduleId · childName · academyName · targetAt(KST +09:00) · status(SCHEDULED · IN_PROGRESS · COMPLETED)). 한국 날짜 오늘 요일이 맞는 가족 자녀들의 일정(DRAFT 포함), targetAt 오름차순(같으면 scheduleId). status는 오늘 그 일정이 들어간 픽업 세션 상태로 정함: ACTIVE · ON_HOLD → IN_PROGRESS, COMPLETED → COMPLETED, 세션 없음 · CANCELLED만 → SCHEDULED(여러 세션이면 COMPLETED > IN_PROGRESS > SCHEDULED). 세션 상태는 out 포트 LoadPickupProgressPort → pickup in 포트(사람 결정 2026-11-14: schedule → pickup 허용) | 403 FORBIDDEN(GUARDIAN · CO_GUARDIAN 아님) |
 
 응답 예시
 - SET-01: `{"items":[{"externalPlaceId":"kakao:12345","name":"해솔영어학원","address":"서울 강남구 …","location":{"lat":37.501234,"lng":127.039876}}]}`
 - SET-04: `{"items":[{"scheduleId":801,"academy":{"academyId":55,"name":"해솔영어학원"},"weekdays":["MON","WED"],"classEndTime":"18:00","targetPickup":5,"status":"READY"}]}`
 - SET-07: `{"child":{"userId":131,"name":"민준","deviceStatus":"CONNECTED"},"schedules":[{"scheduleId":801,"academyName":"해솔영어학원","status":"READY"}],"pickupSpots":[{"spotId":21,"name":"정문 앞","isDefault":true}],"joinCallMode":"AUTO","missing":[],"settingsVersion":8}`
-- SET-09: `{"weekStart":"2026-11-02","days":[{"date":"2026-11-05","pickups":[{"scheduleId":801,"childName":"민준","academyName":"해솔영어학원","classEndTime":"18:00","targetPickupTime":"18:05"}]}],"readiness":{"startable":true,"missing":[]}}`
+- SET-09: `{"weekStart":"2026-11-02","days":[{"date":"2026-11-05","pickups":[{"scheduleId":801,"childName":"민준","profileImageUrl":"https://…","academyName":"해솔영어학원","classEndTime":"18:00","targetPickupTime":"18:05"}]}],"readiness":{"startable":true,"missing":[]}}`
+- SET-12: `{"academyName":"해솔영어학원","spotName":"정문 앞","targetAt":"2026-11-16T18:05:00+09:00"}`
+- SET-13: `{"items":[{"scheduleId":801,"childName":"민준","academyName":"해솔영어학원","targetAt":"2026-11-16T18:05:00+09:00","status":"SCHEDULED"}]}`
 - SET-10: `{"guardianNameMasked":"김*호","children":[{"userId":131,"name":"민준"}],"joinCallMode":"AUTO"}`
 
 ## 핵심 로직
@@ -97,13 +103,19 @@ schedule
 - 도메인 검증 실패는 도메인 전용 예외 InvalidScheduleException(field, reason)으로 던지고 서비스가 422 VALIDATION_FAILED(fields)로 바꾼다. 도메인은 Spring · common.error를 쓰지 않는다.
 - SET-03은 진행 중인 세션에도 바로 적용된다. pickup은 세션 시작 때 일정 값을 스냅샷하지 않고(SessionChild에는 scheduleId만 둠) 판정 때마다 최신 값을 읽는다(사람 결정 2026-11-13).
 
-학원 다시 쓰기(externalPlaceId 기준)
+학원 다시 쓰기(같은 가족 · externalPlaceId 기준. 다른 가족의 학원은 찾지도 바꾸지도 않는다)
 
 | 경우 | 동작 |
 |---|---|
-| 같은 externalPlaceId 학원이 있음 | 그 academyId를 쓴다. name · address · location은 요청 값으로 갱신, entrance · phone은 요청 값이 비어 있으면(null) 기존 값 유지 |
+| 같은 가족에 같은 externalPlaceId 학원이 있음 | 그 academyId를 쓴다. name · address · location은 요청 값으로 갱신, entrance · phone은 요청 값이 비어 있으면(null) 기존 값 유지 |
 | 없음 | 새로 만든다 |
-| 같은 새 학원이 동시에 저장되어 유니크가 부딪힘 | 오류 없이 저장된 학원을 쓴다(INSERT … ON CONFLICT, 위와 같은 갱신 규칙) |
+| 같은 가족의 같은 새 학원이 동시에 저장되어 유니크가 부딪힘 | 오류 없이 저장된 학원을 쓴다(INSERT … ON CONFLICT (family_id, external_place_id), 위와 같은 갱신 규칙) |
+
+### 해제된 자녀
+- 해제된 자녀(user MemberInfo.removed true)는 SET-02 · 03 · 04 · 07 · 08에서 404 NOT_FOUND(FamilyChildGuard, SET-08은 SET-07을 거침). 기존 일정 행은 지우지 않는다(사람 결정 2026-11-14).
+
+### 출입구가 생긴 학원
+- 일정 등록 · 수정으로 저장한 학원에 출입구가 있으면, 그 학원(같은 가족)을 쓰는 다른 DRAFT 일정을 READY로 다시 판정해 저장한다(사람 결정 2026-11-14).
 
 ### 일정 목록 (SET-04)
 - scheduleId 오름차순, weekdays는 월요일부터.
@@ -124,13 +136,13 @@ schedule
 - weekStart가 없으면 이번 주 월요일(한국 날짜). weekStart 형식 오류는 400 INVALID_REQUEST.
 - days는 7일, 하루 최대 3개. 하루 안은 classEndTime 오름차순. DRAFT 일정도 days에 보여 준다.
 - targetPickupTime = classEndTime + targetPickup분(예: 18:00 + 5 = 18:05).
-- readiness: 오늘 픽업을 시작할 수 있는지와 빠진 항목(CHILD_DEVICE · PICKUP_SPOT). 보호자가 설정을 끝내기 전에는 차량에서 픽업을 시작할 수 없다.
+- readiness: 오늘 픽업을 시작할 수 있는지와 빠진 항목(CHILD_DEVICE · SCHEDULE · PICKUP_SPOT, SES-02와 같은 순서). 보호자가 설정을 끝내기 전에는 차량에서 픽업을 시작할 수 없다.
 - readiness 판정 대상은 한국 날짜 오늘 일정이 있는 자녀 · 학원이다.
 
 | readiness 경우 | startable | missing |
 |---|---|---|
 | 오늘 일정이 없음 | false | 빈 목록 |
-| 오늘 일정 중 DRAFT가 있음 | false | DRAFT 때문에 바뀌지 않음(기기 · 장소 판정 값 그대로) |
+| 오늘 일정 중 DRAFT가 있음 | false | SCHEDULE을 넣음(SES-02와 같은 순서 CHILD_DEVICE · SCHEDULE · PICKUP_SPOT, D10 사람 결정 2026-11-13) |
 | 자녀 기기 · 기본 장소가 빠짐 | false | CHILD_DEVICE · PICKUP_SPOT |
 
 - SET-10 guardianNameMasked는 GUARDIAN 이름의 가운데 글자를 가린다(김보호 → 김*호). GUARDIAN이 없으면 null.
@@ -147,6 +159,7 @@ SetupSummary getSetupSummary(ChildQuery q);                              // GetS
 SetupCompletionResult completeSetup(CompleteSetupCommand c);             // CompleteSetupUseCase
 WeeklyPickups getWeeklyPickups(long familyId, LocalDate weekStart);      // GetWeeklyPickupsUseCase
 VehicleSettingsSummary getVehicleSettingsSummary(long familyId);         // GetVehicleSettingsSummaryUseCase
+Optional<NextPickup> getNextPickup(long familyId, long childUserId);     // GetNextPickupUseCase (SET-12). READY만, 한국 날짜 오늘~오늘+7, targetAt이 지금보다 엄격히 뒤인 가장 이른 것
 
 // in 포트 — 다른 모듈용
 List<ScheduleInfo> findSchedules(List<Long> scheduleIds);                // LoadScheduleUseCase (pickup SES-02). loadSchedules를 1회 부름
@@ -155,15 +168,18 @@ Optional<AcademyInfo> findAcademy(long academyId);                       // Load
 // out 포트
 List<AcademyCandidate> search(String query);                             // SearchAcademyPort (외부 지도 API)
 Optional<Academy> loadAcademy(long academyId);                           // LoadAcademyPort
-Optional<Academy> loadAcademyByExternalPlaceId(String externalPlaceId);  // LoadAcademyPort
+Optional<Academy> loadAcademyByExternalPlaceId(long familyId, String externalPlaceId);  // LoadAcademyPort (가족마다 따로)
 Academy saveAcademy(Academy a);                                          // SaveAcademyPort
 Optional<PickupSchedule> loadSchedule(long scheduleId);                  // LoadSchedulePort
 List<PickupSchedule> loadSchedules(List<Long> scheduleIds);              // LoadSchedulePort (findSchedules가 1회 사용)
 List<PickupSchedule> loadSchedulesOfChild(long childUserId);             // LoadSchedulePort
 List<PickupSchedule> loadSchedulesOfChildren(List<Long> childUserIds);   // LoadSchedulePort
+List<PickupSchedule> loadSchedulesOfAcademy(long academyId);           // LoadSchedulePort (출입구가 생긴 학원의 DRAFT 일정 다시 판정, 사람 결정 2026-11-14)
 PickupSchedule saveSchedule(PickupSchedule s);                           // SaveSchedulePort
 List<SpotSummary> loadSpots(long familyId, List<Long> academyIds);       // LoadPickupSpotPort → place
 Map<Long, DeviceStatus> loadDeviceStatuses(List<Long> userIds);          // LoadMemberDeviceStatusPort → auth
+Map<Long, TodayPickupStatus> loadProgress(long familyId, LocalDate date); // LoadPickupProgressPort → pickup PickupProgressQueryUseCase (SET-13)
+List<TodayPickup> getTodayPickups(long familyId);                       // GetTodayPickupsUseCase (SET-13)
 
 // domain
 InvalidScheduleException(String field, String reason)                   // 도메인 검증 실패. Spring · common.error 안 씀, 서비스가 422 VALIDATION_FAILED(fields)로 바꿈
@@ -248,19 +264,23 @@ InvalidScheduleException(String field, String reason)                   // 도�
 - [x] joinCallMode는 schedule 자체 enum으로 설정 요약 · 차량용 설정 요약 in 포트와 응답에 담고 user.domain 타입을 import하지 않는다
 - [x] POST /v1/children/{childId}/schedules · PUT /v1/schedules/{scheduleId}에 101자 externalPlaceId를 보내면 422 VALIDATION_FAILED를 돌려준다
 - [x] 일정 수정은 등록과 같이 저장한 학원(기존 출입구 반영) 기준으로 status를 판정한다
-- [ ] [서비스] SET-09 readiness는 오늘 일정이 DRAFT면 startable false와 missing에 SCHEDULE을 넣어 SES-02 픽업 시작 판정과 같은 값을 준다(D10, 사람 결정 2026-11-13)
-- [ ] [web] GET /v1/children/me/next-pickup(CHILD 전용)은 지금 이후 가장 가까운 픽업의 academyName · spotName · targetAt(KST)을 돌려주고, 남은 일정이 없으면 200과 null 본문을 준다(최종디자인 11/13 C01 실내 대기)
-- [ ] [web] GET /v1/vehicles/me/weekly-pickups의 각 픽업에 자녀 profileImageUrl을 담는다(V01 자녀 카드)
-- [ ] [web] GET /v1/families/me/today-pickups(GUARDIAN · CO_GUARDIAN)는 오늘 가족 자녀들의 픽업을 시각 순으로 childName · academyName · targetAt · status(SCHEDULED · IN_PROGRESS · COMPLETED)로 돌려준다(부모 메인 오늘의 픽업 타임라인)
-- [ ] [persistence] Academy는 familyId를 갖고 (familyId, externalPlaceId)가 유니크다. 두 가족이 같은 externalPlaceId로 일정을 등록하면 학원 행이 가족마다 따로 생긴다(사람 결정 2026-11-13: 학원은 가족마다 따로 둠)
-- [ ] [서비스] 일정 등록 · 수정의 학원 다시 쓰기는 같은 가족의 학원만 갱신하고, 다른 가족 학원의 이름 · 주소 · 위치 · 출입구 · 대표번호를 바꾸지 않는다
-- [ ] [서비스] 해제된 자녀(user MemberInfo.removed true)에게는 일정 생성 · 수정을 404 NOT_FOUND로 거절한다. 해제된 자녀의 기존 일정 행은 지우지 않는다(사람 결정 2026-11-14)
+- [x] [서비스] SET-09 readiness는 오늘 일정이 DRAFT면 startable false와 missing에 SCHEDULE을 넣어 SES-02 픽업 시작 판정과 같은 값을 준다(D10, 사람 결정 2026-11-13)
+- [x] [web] GET /v1/children/me/next-pickup(CHILD 전용)은 지금 이후 가장 가까운 픽업의 academyName · spotName · targetAt(KST)을 돌려주고, 남은 일정이 없으면 200과 null 본문을 준다(최종디자인 11/13 C01 실내 대기)
+- [x] [web] GET /v1/vehicles/me/weekly-pickups의 각 픽업에 자녀 profileImageUrl을 담는다(V01 자녀 카드)
+- [x] [web] GET /v1/families/me/today-pickups(GUARDIAN · CO_GUARDIAN)는 오늘 가족 자녀들의 픽업을 시각 순으로 childName · academyName · targetAt · status(SCHEDULED · IN_PROGRESS · COMPLETED)로 돌려준다(부모 메인 오늘의 픽업 타임라인)
+- [x] [persistence] Academy는 familyId를 갖고 (familyId, externalPlaceId)가 유니크다. 두 가족이 같은 externalPlaceId로 일정을 등록하면 학원 행이 가족마다 따로 생긴다(사람 결정 2026-11-13: 학원은 가족마다 따로 둠)
+- [x] [서비스] 일정 등록 · 수정의 학원 다시 쓰기는 같은 가족의 학원만 갱신하고, 다른 가족 학원의 이름 · 주소 · 위치 · 출입구 · 대표번호를 바꾸지 않는다
+- [x] [서비스] 해제된 자녀(user MemberInfo.removed true)에게는 일정 생성 · 수정을 404 NOT_FOUND로 거절한다. 해제된 자녀의 기존 일정 행은 지우지 않는다(사람 결정 2026-11-14)
+- [x] [서비스] 주간 일정(SET-09)의 자녀 profileImageUrl은 findMembers가 주는 MemberInfo.profileImageUrl을 쓰고, user LoadMemberUseCase.findProfileImageUrls와 LoadUserPort.loadUsersByIds는 지운다(사람 결정 2026-11-14, main 병합 뒤 중복 정리)
+- [x] [서비스] 일정 등록 · 수정으로 학원에 출입구가 생기면 같은 가족이 그 학원을 쓰는 다른 DRAFT 일정도 READY로 다시 판정해 저장한다(사람 결정 2026-11-14)
+- [x] [web] GET /v1/children/me/next-pickup(SET-12)은 남은 일정이 없으면 200, Content-Type application/json, 본문 JSON null을 돌려준다(사람 결정 2026-11-14)
+- [x] [서비스] 해제된 자녀(MemberInfo.removed true)면 일정 목록(SET-04) · 설정 요약(SET-07)도 404 NOT_FOUND로 거절한다(설계서 「해제된 자녀」 절)
 
 ## 확인 필요 사항
 
 | 항목 | 현재 가정 |
 |---|---|
-| Academy에 externalPlaceId 칸이 없음 | 해소: externalPlaceId 컬럼(UNIQUE)으로 같은 학원을 다시 씀(가족 간 공유). 핵심 로직 「학원 다시 쓰기」 |
+| Academy에 externalPlaceId 칸이 없음 | 해소: externalPlaceId 컬럼으로 같은 가족 안에서 같은 학원을 다시 씀((familyId, externalPlaceId) 유니크, #82). 핵심 로직 「학원 다시 쓰기」 |
 | 학원을 가족 간에 공유할지 | 결정됨: 학원은 가족마다 따로 둔다. Academy에 familyId를 더하고 (familyId, externalPlaceId)를 유니크로 한다. 테스트 케이스 끝의 두 항목으로 구현(사람 결정 2026-11-13) |
 | 이미 있는 학원 갱신의 동시 수정 | 후속 과제. 이미 있는 학원 갱신은 JPA merge라 동시 수정 때 다른 가족이 막 넣은 entrance를 지울 수 있음 |
 | 일정 수정 때 학원 정보가 바뀐 경우 | 해소: 같은 externalPlaceId면 그 행을 갱신, 다르면 그 학원을 찾거나 새로 만듦 |

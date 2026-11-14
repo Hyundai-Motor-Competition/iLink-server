@@ -37,6 +37,11 @@ public class PickupSchedule {
 				status);
 	}
 
+	public PickupSchedule rejudgedWith(Academy academy) {
+		return new PickupSchedule(scheduleId, childUserId, academy, weekdays, classEndTime, targetPickup,
+				statusOf(academy));
+	}
+
 	public LocalTime targetPickupTime() {
 		return classEndTime.plusMinutes(targetPickup);
 	}

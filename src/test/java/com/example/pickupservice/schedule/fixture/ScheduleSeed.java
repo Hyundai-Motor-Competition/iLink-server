@@ -44,7 +44,7 @@ public class ScheduleSeed {
 	private Result seedAcademy(Point entrance) {
 		UserSeed.Result user = userSeed.seed();
 		return transactionTemplate.execute(status -> {
-			AcademyEntity academy = persist(new AcademyEntity(null, ACADEMY_EXTERNAL_PLACE_ID, ACADEMY_NAME, ACADEMY_ADDRESS,
+			AcademyEntity academy = persist(new AcademyEntity(null, user.familyId(), ACADEMY_EXTERNAL_PLACE_ID, ACADEMY_NAME, ACADEMY_ADDRESS,
 					GeoPoints.toPoint(ACADEMY_LAT, ACADEMY_LNG), entrance,
 					ACADEMY_PHONE));
 			PickupScheduleEntity schedule = persist(new PickupScheduleEntity(null, user.minjunId(),

@@ -10,6 +10,7 @@ import com.example.pickupservice.place.application.port.out.DriveTimePort;
 import com.example.pickupservice.place.domain.RecommendedSpot;
 import com.example.pickupservice.place.domain.SpotKind;
 import com.example.pickupservice.schedule.adapter.out.persistence.AcademyEntity;
+import com.example.pickupservice.user.fixture.UserSeed;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.AfterEach;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -39,6 +41,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 @RequiredArgsConstructor
+@Import(UserSeed.class)
 class RecommendPickupSpotsServiceIntegrationTest extends IntegrationTestSupport {
 
 	private static final LatLng DAECHI_ACADEMY = new LatLng(37.4998344, 127.0674141);
@@ -58,18 +61,28 @@ class RecommendPickupSpotsServiceIntegrationTest extends IntegrationTestSupport 
 	private final RecommendPickupSpotsUseCase recommendPickupSpotsUseCase;
 	private final EntityManager entityManager;
 	private final TransactionTemplate transactionTemplate;
+	private final UserSeed userSeed;
 
 	@MockitoBean
 	private DriveTimePort driveTimePort;
 
 	private long daechiAcademyId;
 	private long cityHallAcademyId;
+	private UserSeed.Result family;
 
 	@BeforeEach
 	void seedAcademies() {
 		clearAcademies();
+		family = userSeed.seed();
 		daechiAcademyId = saveAcademy(DAECHI_PLACE_ID, "대치동 테스트학원", DAECHI_ACADEMY);
 		cityHallAcademyId = saveAcademy(CITY_HALL_PLACE_ID, "시청 앞 테스트학원", SEOUL_CITY_HALL);
+	}
+
+	@AfterEach
+	void clearFamily() {
+		if (family != null) {
+			userSeed.clear(family);
+		}
 	}
 
 	@AfterEach
@@ -178,7 +191,7 @@ class RecommendPickupSpotsServiceIntegrationTest extends IntegrationTestSupport 
 
 	private long saveAcademy(String externalPlaceId, String name, LatLng location) {
 		return transactionTemplate.execute(status -> {
-			AcademyEntity academy = new AcademyEntity(null, externalPlaceId, name, "테스트 주소",
+			AcademyEntity academy = new AcademyEntity(null, family.familyId(), externalPlaceId, name, "테스트 주소",
 					GeoPoints.toPoint(location.lat(), location.lng()), null, null);
 			entityManager.persist(academy);
 			entityManager.flush();

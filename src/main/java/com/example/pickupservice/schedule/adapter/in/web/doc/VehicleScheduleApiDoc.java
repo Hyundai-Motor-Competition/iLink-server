@@ -14,8 +14,9 @@ import java.time.LocalDate;
 public interface VehicleScheduleApiDoc {
 
 	@Operation(summary = "주간 픽업 (SET-09)", description = "차량 토큰 전용. weekStart가 없으면 이번 주를 돌려준다")
-	@ApiResponse(responseCode = "200", description = "weekStart · days[]{date, pickups[]{scheduleId, childName, academyName, "
-			+ "classEndTime, targetPickupTime}} · readiness{startable, missing[]}")
+	@ApiResponse(responseCode = "200", description = "weekStart · days[]{date, pickups[]{scheduleId, childName, "
+			+ "profileImageUrl(없으면 null), academyName, classEndTime, targetPickupTime}} · "
+			+ "readiness{startable, missing[](CHILD_DEVICE · SCHEDULE · PICKUP_SPOT)}")
 	@ApiResponse(responseCode = "400", description = "INVALID_REQUEST (weekStart가 yyyy-MM-dd 형식이 아님)")
 	@ApiResponse(responseCode = "401", description = "UNAUTHORIZED")
 	@ApiResponse(responseCode = "403", description = "FORBIDDEN (차량 토큰이 아님)")

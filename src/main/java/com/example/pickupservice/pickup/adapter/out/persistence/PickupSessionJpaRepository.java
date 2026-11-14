@@ -40,6 +40,8 @@ interface PickupSessionJpaRepository extends JpaRepository<PickupSessionEntity, 
 	Optional<PickupSessionEntity> findFirstByFamilyIdAndSessionStatusInOrderBySessionIdDesc(Long familyId,
 			Collection<SessionStatus> statuses);
 
+	List<PickupSessionEntity> findByFamilyIdAndDateOrderBySessionId(Long familyId, LocalDate date);
+
 	Optional<PickupSessionEntity> findFirstBySpotIdAndSessionStatusInOrderBySessionIdDesc(Long spotId,
 			Collection<SessionStatus> statuses);
 

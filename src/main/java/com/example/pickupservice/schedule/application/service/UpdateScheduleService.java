@@ -36,13 +36,15 @@ public class UpdateScheduleService implements UpdateScheduleUseCase {
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
 		FamilyChildGuard.requireChildOfFamily(loadMemberUseCase, command.familyId(), existing.getChildUserId());
 
-		Academy academy = ScheduleWriteRules.academyOf(loadAcademyPort, command.academy());
+		Academy academy = ScheduleWriteRules.academyOf(loadAcademyPort, command.familyId(), command.academy());
 		PickupSchedule candidate = ScheduleWriteRules.newSchedule(existing.getChildUserId(), academy, command.weekdays(),
 				command.classEndTime(), command.targetPickup());
 		ScheduleWriteRules.rejectConflicts(candidate, othersOf(existing));
 
 		Academy savedAcademy = saveAcademyPort.saveAcademy(academy);
 		PickupSchedule savedSchedule = saveSchedulePort.saveSchedule(replaced(existing, candidate, savedAcademy));
+		ScheduleWriteRules.rejudgeDraftSchedulesOfAcademy(loadSchedulePort, saveSchedulePort, savedAcademy,
+				savedSchedule.getScheduleId());
 		return new ScheduleResult(savedSchedule.getScheduleId(), savedAcademy.getAcademyId(),
 				savedSchedule.getStatus());
 	}

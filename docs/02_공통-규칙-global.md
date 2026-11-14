@@ -17,7 +17,7 @@
 | 09_알림-notification.md | notification | 푸시 발송, 수신 확인, 재발송 |
 | 10_프로필사진-profile.md | profile (user · auth · common.image에 걸침) | 가입(LINK-04) · 멤버 등록(FAM-02) 때 프로필 사진 받기, MinIO 저장, 가족 조회(FAM-01) 서명 URL |
 
-의존 방향(src/main의 모듈 사이 import 기준, 17개): user → auth · pickup, auth → user · pickup, schedule → user · auth · place, place → schedule · pickup, pickup → user · auth · schedule · place · notification, notification → user · auth · pickup. 이 중 서로 부르는 쌍은 user ↔ auth, user ↔ pickup, auth ↔ pickup, schedule ↔ place, place ↔ pickup, pickup ↔ notification 6개다. notification은 pickup이 발행한 이벤트를 커밋 뒤에 받고 푸시 토큰은 auth의 Device에서 읽는다(사람 결정 2026-11-13).
+의존 방향(src/main의 모듈 사이 import 기준, 18개): user → auth · pickup, auth → user · pickup, schedule → user · auth · place · pickup, place → schedule · pickup, pickup → user · auth · schedule · place · notification, notification → user · auth · pickup. 이 중 서로 부르는 쌍은 user ↔ auth, user ↔ pickup, auth ↔ pickup, schedule ↔ place, schedule ↔ pickup, place ↔ pickup, pickup ↔ notification 7개다. schedule → pickup은 오늘의 픽업 타임라인(schedule #81) status를 위해 schedule out 포트 어댑터가 pickup in 포트를 부르는 것만 허용한다(사람 결정 2026-11-14). notification은 pickup이 발행한 이벤트를 커밋 뒤에 받고 푸시 토큰은 auth의 Device에서 읽는다(사람 결정 2026-11-13).
 
 ## 용어
 

@@ -43,6 +43,7 @@ class VehicleScheduleControllerTest extends ScheduleWebTestSupport {
 	private static final long GUARDIAN_USER_ID = 101L;
 	private static final long CHILD_USER_ID = 131L;
 	private static final LocalDate WEEK_START = LocalDate.of(2026, 11, 2);
+	private static final String MINJUN_PROFILE_URL = "https://storage.test/ilink/profiles/minjun.webp?sig=test";
 
 	private final MockMvc mockMvc;
 	private final AccessTokenFixture accessTokenFixture;
@@ -59,8 +60,37 @@ class VehicleScheduleControllerTest extends ScheduleWebTestSupport {
 				.andExpect(content().json("""
 						{"weekStart":"2026-11-02",
 						 "days":[{"date":"2026-11-05",
-						          "pickups":[{"scheduleId":801,"childName":"민준","academyName":"해솔영어학원",
+						          "pickups":[{"scheduleId":801,"childName":"민준","profileImageUrl":null,
+						                      "academyName":"해솔영어학원",
 						                      "classEndTime":"18:00","targetPickupTime":"18:05"}]}],
+						 "readiness":{"startable":true,"missing":[]}}
+						""", JsonCompareMode.STRICT));
+	}
+
+	// #80
+
+	@Test
+	@DisplayName("GET /v1/vehicles/me/weekly-pickups는 pickups[]마다 자녀 profileImageUrl을 담고 URL이 없으면 null로 돌려준다")
+	void getWeeklyPickupsReturnsProfileImageUrlOfEachPickup() throws Exception {
+		given(getWeeklyPickupsUseCase.getWeeklyPickups(anyLong(), any())).willReturn(new WeeklyPickups(
+				WEEK_START,
+				List.of(new DailyPickups(LocalDate.of(2026, 11, 5), List.of(
+						new WeeklyPickup(801L, "민준", MINJUN_PROFILE_URL, "해솔영어학원",
+								LocalTime.of(18, 0), LocalTime.of(18, 5)),
+						new WeeklyPickup(802L, "서연", null, "한빛수학학원",
+								LocalTime.of(19, 0), LocalTime.of(19, 10))))),
+				new PickupReadiness(true, List.of())));
+
+		mockMvc.perform(weeklyPickupsRequest(vehicleBearer()))
+				.andExpect(status().isOk())
+				.andExpect(content().json("""
+						{"weekStart":"2026-11-02",
+						 "days":[{"date":"2026-11-05",
+						          "pickups":[{"scheduleId":801,"childName":"민준",
+						                      "profileImageUrl":"https://storage.test/ilink/profiles/minjun.webp?sig=test",
+						                      "academyName":"해솔영어학원","classEndTime":"18:00","targetPickupTime":"18:05"},
+						                     {"scheduleId":802,"childName":"서연","profileImageUrl":null,
+						                      "academyName":"한빛수학학원","classEndTime":"19:00","targetPickupTime":"19:10"}]}],
 						 "readiness":{"startable":true,"missing":[]}}
 						""", JsonCompareMode.STRICT));
 	}
@@ -162,7 +192,7 @@ class VehicleScheduleControllerTest extends ScheduleWebTestSupport {
 		return new WeeklyPickups(
 				WEEK_START,
 				List.of(new DailyPickups(LocalDate.of(2026, 11, 5), List.of(new WeeklyPickup(
-						801L, "민준", "해솔영어학원", LocalTime.of(18, 0), LocalTime.of(18, 5))))),
+						801L, "민준", null, "해솔영어학원", LocalTime.of(18, 0), LocalTime.of(18, 5))))),
 				new PickupReadiness(true, List.of()));
 	}
 

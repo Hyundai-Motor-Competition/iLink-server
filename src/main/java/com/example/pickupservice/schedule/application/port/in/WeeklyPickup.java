@@ -5,6 +5,7 @@ import java.time.LocalTime;
 public record WeeklyPickup(
 		long scheduleId,
 		String childName,
+		String profileImageUrl,
 		String academyName,
 		LocalTime classEndTime,
 		LocalTime targetPickupTime

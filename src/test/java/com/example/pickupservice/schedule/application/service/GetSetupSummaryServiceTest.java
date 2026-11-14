@@ -47,6 +47,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class GetSetupSummaryServiceTest {
@@ -269,6 +270,19 @@ class GetSetupSummaryServiceTest {
 		assertNotFound(thrown);
 	}
 
+	@Test
+	@DisplayName("설정 요약은 해제된 자녀(removed true)면 NOT_FOUND로 거절하고 일정 조회 포트를 부르지 않는다")
+	void getSetupSummaryRejectsWithNotFoundWhenChildIsRemoved() {
+		given(loadMemberUseCase.findMember(CHILD_ID)).willReturn(Optional.of(
+				new MemberInfo(CHILD_ID, FAMILY_ID, Role.CHILD, CHILD_NAME, "010-0000-0000", null, true)));
+
+		BusinessException thrown = catchThrowableOfType(BusinessException.class,
+				() -> getSetupSummaryService.getSetupSummary(QUERY));
+
+		assertNotFound(thrown);
+		verifyNoInteractions(loadSchedulePort);
+	}
+
 	private void givenChild(long familyId, Role role) {
 		given(loadMemberUseCase.findMember(CHILD_ID))
 				.willReturn(Optional.of(new MemberInfo(CHILD_ID, familyId, role, CHILD_NAME, "010-0000-0000")));
@@ -292,7 +306,7 @@ class GetSetupSummaryServiceTest {
 	}
 
 	private static Academy academy(long academyId, String name) {
-		return Academy.restore(academyId, "kakao:" + academyId, name, "서울 강남구 테헤란로 152", LOCATION, ENTRANCE, "02-555-1234");
+		return Academy.restore(academyId, FAMILY_ID, "kakao:" + academyId, name, "서울 강남구 테헤란로 152", LOCATION, ENTRANCE, "02-555-1234");
 	}
 
 	private static PickupSchedule schedule(long scheduleId, Academy academy, ScheduleStatus status) {

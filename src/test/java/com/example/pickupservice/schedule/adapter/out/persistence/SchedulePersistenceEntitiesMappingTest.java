@@ -65,20 +65,33 @@ class SchedulePersistenceEntitiesMappingTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	@DisplayName("academy.external_place_id에는 그 컬럼 하나만 묶은 유니크 인덱스가 1개 있다")
-	void academyExternalPlaceIdHasUniqueIndex() {
-		List<String> indexDefinitions = jdbcTemplate.queryForList("""
+	@DisplayName("academy.family_id는 BIGINT NOT NULL 컬럼이다")
+	void academyFamilyIdIsNotNullBigint() {
+		assertThat(columnsOf("academy"))
+				.containsEntry("family_id", new ColumnType(BIGINT, null, NOT_NULL));
+	}
+
+	@Test
+	@DisplayName("academy에는 (family_id, external_place_id)를 묶은 유니크 인덱스가 1개 있고 external_place_id 하나만 묶은 유니크 인덱스는 없다")
+	void academyHasUniqueIndexOnFamilyIdAndExternalPlaceId() {
+		List<String> uniqueIndexDefinitions = jdbcTemplate.queryForList("""
 				select indexdef
 				from pg_indexes
 				where schemaname = current_schema()
 				  and tablename = 'academy'
-				""", String.class);
+				""", String.class).stream()
+				.filter(definition -> definition.startsWith("CREATE UNIQUE INDEX"))
+				.toList();
 
-		assertThat(indexDefinitions)
-				.as("academy 테이블의 인덱스 정의")
-				.filteredOn(definition -> definition.startsWith("CREATE UNIQUE INDEX")
-						&& definition.endsWith("(external_place_id)"))
+		assertThat(uniqueIndexDefinitions)
+				.as("academy 테이블의 (family_id, external_place_id) 유니크 인덱스")
+				.filteredOn(definition -> definition.endsWith("(family_id, external_place_id)")
+						|| definition.endsWith("(external_place_id, family_id)"))
 				.hasSize(1);
+		assertThat(uniqueIndexDefinitions)
+				.as("academy 테이블의 external_place_id 단독 유니크 인덱스")
+				.filteredOn(definition -> definition.endsWith("(external_place_id)"))
+				.isEmpty();
 	}
 
 	@Test

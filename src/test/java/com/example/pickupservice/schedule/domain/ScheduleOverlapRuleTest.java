@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ScheduleOverlapRuleTest {
 
+	private static final long FAMILY_ID = 3L;
 	private static final long CHILD_USER_ID = 7L;
 	private static final long OTHER_CHILD_USER_ID = 8L;
 	private static final LocalTime SIX_PM = LocalTime.of(18, 0);
@@ -101,7 +102,7 @@ class ScheduleOverlapRuleTest {
 	}
 
 	private static Academy academy() {
-		return Academy.create("kakao:12345", "한빛수학학원", "서울 중구 세종대로 110", new LatLng(37.5665, 126.9780),
+		return Academy.create(FAMILY_ID, "kakao:12345", "한빛수학학원", "서울 중구 세종대로 110", new LatLng(37.5665, 126.9780),
 				new LatLng(37.5666, 126.9781), "+8221234567");
 	}
 }

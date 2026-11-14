@@ -174,6 +174,7 @@ class ScheduleInPortsTest {
 		assertRecord(WeeklyPickup.class, components(
 				"scheduleId", "long",
 				"childName", String.class.getName(),
+				"profileImageUrl", String.class.getName(),
 				"academyName", String.class.getName(),
 				"classEndTime", LocalTime.class.getName(),
 				"targetPickupTime", LocalTime.class.getName()));

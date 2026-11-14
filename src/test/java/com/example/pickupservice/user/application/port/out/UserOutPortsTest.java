@@ -35,6 +35,14 @@ class UserOutPortsTest {
 	}
 
 	@Test
+	@DisplayName("LoadUserPort에 loadUsersByIds가 없다")
+	void loadUserPortHasNoLoadUsersByIds() {
+		assertThat(Arrays.stream(LoadUserPort.class.getDeclaredMethods()).map(Method::getName).toList())
+				.as("LoadUserPort 메서드 이름")
+				.doesNotContain("loadUsersByIds");
+	}
+
+	@Test
 	@DisplayName("auth · pickup 연결 out 포트 3개는 interface이고 설계서 시그니처의 메서드만 갖는다")
 	void modulePortsHaveDesignSignatures() {
 		verifyModulePorts();

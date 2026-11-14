@@ -51,12 +51,14 @@ class ScheduleOutPortsTest {
 	private void verifyPersistencePorts() {
 		assertPort(LoadAcademyPort.class,
 				method("loadAcademy", generic(Optional.class, Academy.class), params(long.class)),
-				method("loadAcademyByExternalPlaceId", generic(Optional.class, Academy.class), params(String.class)));
+				method("loadAcademyByExternalPlaceId", generic(Optional.class, Academy.class),
+						params(long.class, String.class)));
 		assertPort(SaveAcademyPort.class,
 				method("saveAcademy", Academy.class.getName(), params(Academy.class)));
 		assertPort(LoadSchedulePort.class,
 				method("loadSchedule", generic(Optional.class, PickupSchedule.class), params(long.class)),
 				method("loadSchedulesOfChild", generic(List.class, PickupSchedule.class), params(long.class)),
+				method("loadSchedulesOfAcademy", generic(List.class, PickupSchedule.class), params(long.class)),
 				method("loadSchedulesOfChildren", generic(List.class, PickupSchedule.class),
 						params(List.class), generic(List.class, Long.class)),
 				method("loadSchedules", generic(List.class, PickupSchedule.class),
@@ -106,6 +108,11 @@ class ScheduleOutPortsTest {
 				.collect(Collectors.joining(", ")) + ">";
 	}
 
+	private static String signatureOf(String name, Class<?>[] parameterTypes) {
+		return name + Arrays.stream(parameterTypes).map(Class::getTypeName)
+				.collect(Collectors.joining(", ", "(", ")"));
+	}
+
 	private static void assertPort(Class<?> port, ExpectedMethod... expectedMethods) {
 		assertThat(port.isInterface())
 				.as("%s는 interface여야 한다", port.getSimpleName())
@@ -113,11 +120,11 @@ class ScheduleOutPortsTest {
 
 		List<String> abstractMethodNames = Arrays.stream(port.getDeclaredMethods())
 				.filter(m -> Modifier.isAbstract(m.getModifiers()))
-				.map(Method::getName)
+				.map(m -> signatureOf(m.getName(), m.getParameterTypes()))
 				.sorted()
 				.toList();
 		List<String> expectedNames = Arrays.stream(expectedMethods)
-				.map(ExpectedMethod::name)
+				.map(expected -> signatureOf(expected.name(), expected.parameterTypes()))
 				.sorted()
 				.toList();
 		assertThat(abstractMethodNames)
