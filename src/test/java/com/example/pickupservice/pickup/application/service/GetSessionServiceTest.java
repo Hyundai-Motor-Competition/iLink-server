@@ -360,6 +360,25 @@ class GetSessionServiceTest {
 	}
 
 	@Test
+	@DisplayName("세션 조회는 가족에 GUARDIAN 멤버가 둘 이상이면 목록 순서와 상관없이 userId가 가장 작은 GUARDIAN을 driver로 준다")
+	void getSessionGivesGuardianWithSmallestUserIdAsDriver() {
+		// 목록 맨 앞(37)도 맨 끝(38)도 아닌 가운데 31이 가장 작다
+		givenMembers(List.of(
+				new MemberInfo(37L, FAMILY_ID, Role.GUARDIAN, "최보호", "010-1212-3434",
+						"https://storage.example.com/profiles/37.jpg?sig=d", false),
+				new MemberInfo(GUARDIAN_ID, FAMILY_ID, Role.GUARDIAN, "김보호", "010-1111-2222",
+						GUARDIAN_PROFILE_IMAGE_URL, false),
+				new MemberInfo(38L, FAMILY_ID, Role.GUARDIAN, "정보호", "010-5656-7878", null, false),
+				new MemberInfo(MINJUN_ID, FAMILY_ID, Role.CHILD, "민준", "010-7777-8888", MINJUN_PROFILE_IMAGE_URL, false),
+				new MemberInfo(SEOYUN_ID, FAMILY_ID, Role.CHILD, "서윤", "010-9999-0000", null, false)));
+		givenSession(afterRouteConfirmedWithCalledChildren());
+
+		SessionView view = getSessionService.getSession(new SessionQuery(vehicle(), SESSION_ID));
+
+		assertThat(view.driver()).isEqualTo(new SessionDriverView("김보호", GUARDIAN_PROFILE_IMAGE_URL));
+	}
+
+	@Test
 	@DisplayName("세션 조회는 가족에 GUARDIAN 멤버가 없으면 driver를 null로 돌려준다")
 	void getSessionGivesNullDriverWithoutGuardian() {
 		givenMembers(List.of(
