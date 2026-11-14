@@ -127,6 +127,19 @@ class ListSchedulesServiceTest {
 		verifyNoInteractions(loadSchedulePort);
 	}
 
+	@Test
+	@DisplayName("일정 목록은 해제된 자녀(removed true)면 NOT_FOUND로 거절하고 일정 조회 포트를 부르지 않는다")
+	void listSchedulesRejectsWithNotFoundWhenChildIsRemoved() {
+		given(loadMemberUseCase.findMember(CHILD_ID)).willReturn(Optional.of(
+				new MemberInfo(CHILD_ID, FAMILY_ID, Role.CHILD, "민준", "010-0000-0000", null, true)));
+
+		BusinessException thrown = catchThrowableOfType(BusinessException.class,
+				() -> listSchedulesService.listSchedules(new ChildQuery(FAMILY_ID, CHILD_ID)));
+
+		assertNotFound(thrown);
+		verifyNoInteractions(loadSchedulePort);
+	}
+
 	private void givenMember(long userId, long familyId, Role role) {
 		given(loadMemberUseCase.findMember(userId))
 				.willReturn(Optional.of(new MemberInfo(userId, familyId, role, "민준", "010-0000-0000")));

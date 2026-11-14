@@ -47,6 +47,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class GetSetupSummaryServiceTest {
@@ -267,6 +268,19 @@ class GetSetupSummaryServiceTest {
 				() -> getSetupSummaryService.getSetupSummary(QUERY));
 
 		assertNotFound(thrown);
+	}
+
+	@Test
+	@DisplayName("설정 요약은 해제된 자녀(removed true)면 NOT_FOUND로 거절하고 일정 조회 포트를 부르지 않는다")
+	void getSetupSummaryRejectsWithNotFoundWhenChildIsRemoved() {
+		given(loadMemberUseCase.findMember(CHILD_ID)).willReturn(Optional.of(
+				new MemberInfo(CHILD_ID, FAMILY_ID, Role.CHILD, CHILD_NAME, "010-0000-0000", null, true)));
+
+		BusinessException thrown = catchThrowableOfType(BusinessException.class,
+				() -> getSetupSummaryService.getSetupSummary(QUERY));
+
+		assertNotFound(thrown);
+		verifyNoInteractions(loadSchedulePort);
 	}
 
 	private void givenChild(long familyId, Role role) {

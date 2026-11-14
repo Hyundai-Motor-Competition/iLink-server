@@ -15,6 +15,7 @@ final class FamilyChildGuard {
 		return loadMemberUseCase.findMember(childId)
 				.filter(member -> member.familyId() == familyId)
 				.filter(member -> member.role() == Role.CHILD)
+				.filter(member -> !member.removed())
 				.orElseThrow(() -> BusinessException.of(ErrorCode.NOT_FOUND));
 	}
 }
